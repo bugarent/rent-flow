@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/fx-rates",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/integrations-sync",
+      "schedule": "*/30 * * * *"
+    }
+  ]
+}

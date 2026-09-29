@@ -1,0 +1,60 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import { MessageCircle, X } from "lucide-react";
+import { usePreferences } from "@/components/providers/preferences-context";
+import { subscribeLiveChatWidget } from "@/components/live-chat/live-chat-widget-bus";
+
+const LiveChatPanel = dynamic(
+  () => import("@/components/live-chat/live-chat-panel").then((m) => m.LiveChatPanel),
+  { ssr: false },
+);
+
+export function FloatingOnlineChat({
+  email: _email,
+  phone: _phone,
+}: {
+  email?: string;
+  phone?: string;
+}) {
+  const { dictionary } = usePreferences();
+  const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const label = dictionary.common.onlineChat;
+
+  useEffect(() => {
+    return subscribeLiveChatWidget(() => {
+      setMounted(true);
+      setOpen(true);
+    });
+  }, []);
+
+  const toggle = () => {
+    setMounted(true);
+    setOpen((v) => !v);
+  };
+
+  return (
+    <div className="pointer-events-none fixed bottom-20 end-4 z-50 flex flex-col items-end gap-3 md:bottom-6">
+      {mounted && open ? (
+        <div className="pointer-events-auto w-[min(100vw-2rem,24rem)] shadow-[0_24px_60px_rgba(11,31,75,0.28)]">
+          <LiveChatPanel onClose={() => setOpen(false)} />
+        </div>
+      ) : null}
+
+      <button
+        type="button"
+        aria-label={label}
+        aria-expanded={open}
+        onClick={toggle}
+        className="pointer-events-auto flex items-center gap-2 rounded-full bg-[#1d6fe8] px-4 py-3 text-white shadow-xl transition hover:bg-[#1558c0]"
+      >
+        {open ? <X className="h-6 w-6" aria-hidden /> : <MessageCircle className="h-6 w-6" aria-hidden />}
+        <span className="hidden max-w-[9rem] text-[11px] font-bold uppercase leading-tight sm:block">
+          {label}
+        </span>
+      </button>
+    </div>
+  );
+}

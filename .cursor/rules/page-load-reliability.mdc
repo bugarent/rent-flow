@@ -1,0 +1,26 @@
+---
+description: Keep public pages fast and always openable — avoid RSC payload / client bundle regressions
+alwaysApply: true
+---
+
+# Page load reliability (rentairportcars.com)
+
+## Never do this
+
+- Do **not** pass the full `Dictionary` (or other huge nested i18n objects) from a Server Component into a Client Component / provider prop. Flight serialization of that payload makes navigations hang or fail to open.
+- Do **not** put `getDictionary()` results into `useEffect` dependency arrays as object identity (new reference every request → update loops).
+- Do **not** reintroduce multi‑MB hero/backdrop JPGs under `public/images/` — keep compressed assets (roughly ≤150KB for full‑bleed heroes).
+
+## Do this instead
+
+- Resolve copy on the **client** with `getDictionary(locale)` inside `PreferencesProvider`, **or** pass only the **small string props** a page actually needs (like About).
+- Keep **TTL memory caches** on hot file/DB reads (`footer-contact`, homepage info/reviews/channels, search airports, platform settings, help center). Reuse `createTtlCache` from `src/lib/server/ttl-cache.ts`.
+- Prefer `next/dynamic` + mount-gated modals for contact/help/booking — do not eagerly import heavy modals into the shell.
+- After performance or layout/provider changes, smoke-check `/`, `/about`, `/contact`, `/help` still render before finishing.
+
+## If pages “won’t open” again
+
+1. Check `.next/dev/logs/next-development.log` for **parse/syntax errors** first (a broken hot-path file like `delivery-locations.ts` blocks `/`, search, and many APIs).
+2. Check whether a large object was recently added to `AppProviders` / `PublicShell` / root layout client props.
+3. Prefer reverting the payload change over “more caching” when the UI fails to navigate at all.
+4. After editing `src/lib/server/*` used by the homepage, confirm the file ends cleanly (no leftover code after the closing brace) and smoke-check `/`.

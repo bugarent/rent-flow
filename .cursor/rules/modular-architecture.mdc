@@ -1,0 +1,29 @@
+---
+description: Modular file structure and avoid full-page reloads on save
+alwaysApply: true
+---
+
+# Modular architecture & targeted updates
+
+## Modular structure
+
+- Never grow a single file into a “god module”. Prefer small, logical units:
+  - UI → `src/components/<domain>/`
+  - Server I/O / stores → `src/lib/server/`
+  - Shared types → `src/lib/catalog/` or `src/lib/<domain>/`
+  - Route handlers → `src/app/api/.../route.ts`
+- If a component, form, or section becomes large or multi-concern (UI + upload + save + copy), **split it**: extract subcomponents, hooks, helpers, and types into sibling files/folders without waiting to be asked.
+- Keep imports explicit; avoid barrel files that re-export entire trees unless the folder already uses that pattern.
+
+## No pointless full reloads
+
+- On admin and public pages, **do not** call `router.refresh()` (or remount the whole page) after a local save/update when the response already contains the new data.
+- Prefer: update local state from the API response → show success → leave the rest of the page mounted.
+- Use `router.refresh()` only when sibling **server-rendered** data on the same page must change and there is no narrower invalidation path.
+- Prefer dynamic updates of the affected section (re-render that component) over full window/page reloads.
+
+## When refactoring existing code
+
+- Split oversized files carefully: preserve behavior, public props, and API contracts.
+- Do not mix refactors with unrelated feature work in the same change unless required for the split.
+- After a split, the feature must remain stable (same UX, same endpoints).
