@@ -1,0 +1,694 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  CUSTOMER
+  VENDOR
+  ADMIN
+}
+
+enum UserStatus {
+  PENDING_OTP
+  PENDING_APPROVAL
+  ACTIVE
+  SUSPENDED
+}
+
+enum Messenger {
+  WHATSAPP
+  VIBER
+  TELEGRAM
+}
+
+enum PartnerStatus {
+  PENDING
+  INVITED
+  PENDING_FINAL
+  NEEDS_CORRECTION
+  PENDING_REMODERATION
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum PartnerKind {
+  COMPANY
+  PRIVATE
+}
+
+enum FleetAgeRange {
+  AGE_0_5
+  AGE_6_9
+  AGE_10_PLUS
+  /// @deprecated — kept for legacy rows
+  AGE_0_2
+  /// @deprecated
+  AGE_3_5
+  /// @deprecated
+  AGE_6_8
+  /// @deprecated
+  AGE_9_12
+  /// @deprecated
+  AGE_13_PLUS
+}
+
+enum ListingStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  PENDING_REMODERATION
+  HIDDEN
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  /// Admin-marked: partner did not fulfill the booking
+  UNFULFILLED
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum NotificationChannel {
+  EMAIL
+  TELEGRAM
+}
+
+enum NotificationEvent {
+  BOOKING_NEW
+  BOOKING_EDITED
+  BOOKING_CANCELLED
+  REVIEW_INVITE
+  OTP
+  PARTNER_APPROVED
+  PARTNER_INVITE
+  PARTNER_FEEDBACK
+}
+
+enum CurrencyCode {
+  EUR
+  USD
+}
+
+enum LocaleCode {
+  en
+  ka
+  ru
+  fr
+  de
+  pl
+  ar
+}
+
+enum Transmission {
+  AUTOMATIC
+  MANUAL
+}
+
+enum FuelType {
+  PETROL
+  DIESEL
+  HYBRID
+  ELECTRIC
+  LPG
+}
+
+model User {
+  id                   String     @id @default(cuid())
+  sequentialNumber     Int        @unique @default(autoincrement())
+  /// Independent customer-facing ID (1000, 1001, …). Null for admin/vendor accounts.
+  customerNumber       Int?       @unique
+  firstName            String
+  lastName             String
+  email                String     @unique
+  phone                String
+  countryOfResidence   String
+  preferredMessenger   Messenger
+  /// Selected messengers (WhatsApp / Viber / Telegram). At least one required for customers.
+  messengers           Json       @default("[]")
+  passwordHash         String
+  role                 Role       @default(CUSTOMER)
+  status               UserStatus @default(PENDING_OTP)
+  locale               LocaleCode @default(en)
+  currency             CurrencyCode @default(EUR)
+  emailVerifiedAt      DateTime?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  partner              Partner?
+  otps                 OtpChallenge[]
+  bookings             Booking[]
+  reviews              Review[]
+  notifications        NotificationLog[]
+
+  @@index([role, sequentialNumber])
+  @@index([role, customerNumber])
+  @@index([email])
+}
+
+model OtpChallenge {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash    String
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  attempts    Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model Partner {
+  id                        String         @id @default(cuid())
+  /// Null until the partner completes registration from the invite link
+  userId                    String?        @unique
+  user                      User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind                      PartnerKind    @default(COMPANY)
+  companyName               String
+  contactName               String
+  /// Company tax ID or personal ID (depending on kind)
+  personalId                String         @default("")
+  representativeFirstName   String?
+  representativeLastName    String?
+  representativePersonalId  String?
+  email                     String
+  phone                     String
+  secondaryPhone            String?
+  messenger                 Messenger      @default(WHATSAPP)
+  /// Selected social platforms (WhatsApp / Viber / Telegram). At least one required.
+  messengers                Json           @default("[]")
+  fleetSize                 Int
+  fleetAgeRange             FleetAgeRange  @default(AGE_0_5)
+  logoUrl                   String?
+  sequentialNumber          Int?           @unique
+  status                    PartnerStatus  @default(PENDING)
+  googleMapsUrl             String?
+  /// ISO2 list of countries the partner operates in (independent of airport rows).
+  operatingCountryIso2s     Json           @default("[]")
+  phoneCountryIso2          String         @default("GE")
+  secondaryPhoneCountryIso2 String?
+  /// Rejection reason or correction feedback for the partner
+  rejectionNote             String?
+  /// Re-application / follow-up snapshots within the 30-day window (JSON array).
+  applicationMessages       Json           @default("[]")
+  /// Unread re-apply notices for admin (badge count).
+  unreadReapplyCount        Int            @default(0)
+  inviteToken               String?        @unique
+  inviteTokenExpiresAt      DateTime?
+  phoneVerifiedAt           DateTime?
+  /// Telegram Bot API chat id for partner booking alerts (set after bot verification).
+  telegramChatId            String?
+  /// @username captured at registration (optional; chat id is the source of truth).
+  telegramUsername          String?
+  telegramVerifiedAt        DateTime?
+  /// Partner seasonal pricing periods for Create auto (JSON: { enabled, seasons: [{from,to}] }).
+  seasonalPricing           Json           @default("{\"enabled\":false,\"seasons\":[]}")
+  /// Full company / personal-info settings (main info, work days, payments, tariffs…).
+  companySettings           Json?
+  /// Profile remodeation + timed unlock for delivery countries (JSON).
+  profileModeration         Json           @default("{}")
+  approvedAt                DateTime?
+  invitedAt                 DateTime?
+  registrationSubmittedAt   DateTime?
+  createdAt                 DateTime       @default(now())
+  updatedAt                 DateTime       @updatedAt
+
+  locations     PartnerAirport[]
+  cars          Car[]
+  reviews       Review[]
+  integrations  PartnerIntegration[]
+
+  @@index([status, kind])
+  @@index([email])
+  @@index([telegramChatId])
+}
+
+/// Independent counters for partner codes (PRT-1000+), customer IDs (1000+), and bookings (RE-10000+).
+model IdSequence {
+  key   String @id
+  value Int
+}
+
+model Country {
+  id        String   @id @default(cuid())
+  iso2      String   @unique
+  name      Json
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(100)
+  cities    City[]
+}
+
+model City {
+  id        String   @id @default(cuid())
+  countryId String
+  country   Country  @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  slug      String
+  name      Json
+  isActive  Boolean  @default(true)
+  airports  Airport[]
+
+  @@unique([countryId, slug])
+}
+
+model Airport {
+  id          String   @id @default(cuid())
+  iata        String   @unique
+  icao        String?
+  cityId      String
+  city        City     @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  name        Json
+  latitude    Float?
+  longitude   Float?
+  /// IANA timezone for this airport (e.g. Asia/Tbilisi). Pickup/return wall times use this zone; Booking.pickupAt/dropoffAt stay UTC.
+  timezone    String   @default("Asia/Tbilisi")
+  /// Local HH:mm open for pickup/return (airport timezone).
+  operatingOpenLocal  String  @default("00:00")
+  /// Local HH:mm close for pickup/return (airport timezone).
+  operatingCloseLocal String  @default("23:59")
+  /// When false, rentals may not span midnight across this location's calendar day.
+  overnightAllowed    Boolean @default(true)
+  isActive    Boolean  @default(true)
+  isHub       Boolean  @default(false)
+  sortOrder   Int      @default(100)
+  createdAt   DateTime @default(now())
+
+  partners    PartnerAirport[]
+  pickupBookings  Booking[] @relation("PickupAirport")
+  dropoffBookings Booking[] @relation("DropoffAirport")
+  deliveryLocation DeliveryLocation?
+
+  @@index([isActive, isHub])
+}
+
+model PartnerAirport {
+  partnerId String
+  airportId String
+  partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  airport   Airport @relation(fields: [airportId], references: [id], onDelete: Cascade)
+
+  @@id([partnerId, airportId])
+}
+
+/// Admin-configured airport delivery points shown in search + partner car delivery pricing.
+model DeliveryLocation {
+  id                  String   @id @default(cuid())
+  airportId           String   @unique
+  airport             Airport  @relation(fields: [airportId], references: [id], onDelete: Cascade)
+  /// Maximum reasonable one-way delivery fee partners may charge (EUR)
+  maxDeliveryPriceEur Decimal  @db.Decimal(12, 2)
+  isActive            Boolean  @default(true)
+  sortOrder           Int      @default(100)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  carPrices CarDeliveryPrice[]
+
+  @@index([isActive, sortOrder])
+}
+
+model CarDeliveryPrice {
+  id                 String           @id @default(cuid())
+  carId              String
+  deliveryLocationId String
+  car                Car              @relation(fields: [carId], references: [id], onDelete: Cascade)
+  deliveryLocation   DeliveryLocation @relation(fields: [deliveryLocationId], references: [id], onDelete: Cascade)
+  /// One-way delivery fee (EUR)
+  priceEur           Decimal          @db.Decimal(12, 2)
+  /// If rental length (days) is strictly greater, delivery fee becomes 0
+  freeAfterDays      Int?
+  /// Minimum lead time from "now" until pickup for this place to appear in search
+  travelTimeMinutes  Int              @default(0)
+
+  @@unique([carId, deliveryLocationId])
+  @@index([deliveryLocationId])
+}
+
+model Car {
+  id               String        @id @default(cuid())
+  partnerId        String
+  partner          Partner       @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  title            String
+  description      String        @default("")
+  make             String
+  model            String
+  year             Int
+  seats            Int           @default(5)
+  doors            Int           @default(4)
+  transmission     Transmission  @default(AUTOMATIC)
+  fuelType         FuelType      @default(PETROL)
+  dailyRateEur     Decimal       @db.Decimal(12, 2)
+  discountPercent  Decimal       @default(0) @db.Decimal(5, 2)
+  status           ListingStatus @default(PENDING)
+  /// Normalized Latin plate (e.g. AA-123-BB). Unique among live listings.
+  registrationNumber String?
+  /// Homepage category slug resolved from admin make/model mappings at create time
+  categorySlug     String?
+  hiddenReason     String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  photos           CarPhoto[]
+  passport         CarPassport?
+  extras           CarExtra[]
+  deliveryPrices   CarDeliveryPrice[]
+  bookings         Booking[]
+  reviews          Review[]
+
+  @@index([status, partnerId])
+  @@index([categorySlug])
+  @@index([registrationNumber])
+}
+
+/// Public gallery only. Minimum 5 high-res photos per listing.
+model CarPhoto {
+  id        String   @id @default(cuid())
+  carId     String
+  car       Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+  url       String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([carId, sortOrder])
+}
+
+/// Confidential vehicle passport (both sides). Admin-only. Never returned by public APIs.
+model CarPassport {
+  id        String   @id @default(cuid())
+  carId     String   @unique
+  car       Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+  frontUrl  String
+  backUrl   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ExtraService {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  name             Json
+  description      Json
+  isTpl            Boolean  @default(false)
+  isActive         Boolean  @default(true)
+  /// Suggested/default daily price partners see pre-filled (EUR / 24h)
+  defaultPriceEur  Decimal  @default(0) @db.Decimal(12, 2)
+  /// Admin min daily price (EUR / 24h). Null = price not configured (partner uses on/off toggle).
+  minPriceEur      Decimal? @db.Decimal(12, 2)
+  /// Admin max daily price (EUR / 24h). Null with null min = toggle mode. 0 = must be free.
+  maxPriceEur      Decimal? @db.Decimal(12, 2)
+  sortOrder        Int      @default(100)
+  carExtras        CarExtra[]
+  bookingExtras    BookingExtra[]
+}
+
+model CarExtra {
+  id             String       @id @default(cuid())
+  carId          String
+  extraServiceId String
+  car            Car          @relation(fields: [carId], references: [id], onDelete: Cascade)
+  extraService   ExtraService @relation(fields: [extraServiceId], references: [id], onDelete: Cascade)
+  priceEur       Decimal      @db.Decimal(12, 2)
+
+  @@unique([carId, extraServiceId])
+}
+
+model Booking {
+  id                 String        @id @default(cuid())
+  sequentialNumber   Int           @unique @default(autoincrement())
+  carId              String
+  car                Car           @relation(fields: [carId], references: [id], onDelete: Restrict)
+  customerId         String
+  customer           User          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  pickupAirportId    String
+  pickupAirport      Airport       @relation("PickupAirport", fields: [pickupAirportId], references: [id])
+  dropoffAirportId   String
+  dropoffAirport     Airport       @relation("DropoffAirport", fields: [dropoffAirportId], references: [id])
+  pickupAt           DateTime
+  dropoffAt          DateTime
+  pickupAddress      String        @default("")
+  dropoffAddress     String        @default("")
+  /// dropoffAt + 12h preparation buffer — blocks the next booking window
+  bufferEndsAt       DateTime
+  flightNumber       String
+  status             BookingStatus @default(PENDING)
+  totalPriceEur      Decimal       @db.Decimal(12, 2)
+  depositPercent     Int
+  depositPaidEur     Decimal       @default(0) @db.Decimal(12, 2)
+  balanceDueEur      Decimal       @db.Decimal(12, 2)
+  guestFirstName     String
+  guestLastName      String
+  guestPhone         String
+  guestEmail         String
+  guestMessenger     Messenger
+  /// Guest date of birth (YYYY-MM-DD), optional
+  guestDateOfBirth   String        @default("")
+  /// Customer promo / discount code, optional
+  promoCode          String        @default("")
+  cancelledAt        DateTime?
+  completedAt        DateTime?
+  /// External booking id returned by partner channel after lock
+  externalRef        String?
+  /// Outbound channel lock result for partner integrations
+  integrationLockStatus IntegrationLockStatus?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  extras             BookingExtra[]
+  review             Review?
+  reviewInvite       ReviewInvite?
+  notifications      NotificationLog[]
+
+  @@index([carId, status, pickupAt, bufferEndsAt])
+  @@index([status, pickupAt, bufferEndsAt])
+  @@index([customerId])
+}
+
+model BookingExtra {
+  id             String       @id @default(cuid())
+  bookingId      String
+  extraServiceId String
+  booking        Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  extraService   ExtraService @relation(fields: [extraServiceId], references: [id], onDelete: Restrict)
+  priceEur       Decimal      @db.Decimal(12, 2)
+  label          String
+
+  @@unique([bookingId, extraServiceId])
+}
+
+model Review {
+  id                      String       @id @default(cuid())
+  bookingId               String       @unique
+  booking                 Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  carId                   String
+  car                     Car          @relation(fields: [carId], references: [id], onDelete: Cascade)
+  partnerId               String
+  partner                 Partner      @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  authorId                String
+  author                  User         @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  vehicleQuality          Int
+  hostCommunication       Int
+  deliveryServiceQuality  Int
+  comment                 String       @default("")
+  averageRating           Float
+  status                  ReviewStatus @default(PENDING)
+  googleMapsPromptedAt    DateTime?
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+
+  @@index([partnerId, status])
+  @@index([carId, status])
+}
+
+model ReviewInvite {
+  id          String    @id @default(cuid())
+  bookingId   String    @unique
+  booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  token       String    @unique
+  sentAt      DateTime  @default(now())
+  consumedAt  DateTime?
+}
+
+model NotificationLog {
+  id        String              @id @default(cuid())
+  userId    String?
+  user      User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  bookingId String?
+  booking   Booking?            @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  channel   NotificationChannel
+  event     NotificationEvent
+  recipient String
+  payload   Json?
+  sentAt    DateTime            @default(now())
+  error     String?
+
+  @@index([event, sentAt])
+}
+
+model PlatformSetting {
+  id                    String   @id @default("default")
+  depositPercent        Int      @default(15)
+  telegramBotSiteName   String   @default("RentAirportCars")
+  eurUsdRate            Decimal  @default(1.08) @db.Decimal(12, 4)
+  eurGbpRate            Decimal  @default(0.86) @db.Decimal(12, 4)
+  eurGelRate            Decimal  @default(2.90) @db.Decimal(12, 4)
+  eurRubRate            Decimal  @default(100) @db.Decimal(12, 4)
+  /// Last successful automated FX sync (UTC).
+  fxRatesUpdatedAt      DateTime?
+  googleMapsUrl         String?
+  extraMinPriceEur      Decimal  @default(0) @db.Decimal(12, 2)
+  extraMaxPriceEur      Decimal  @default(500) @db.Decimal(12, 2)
+  /// Homepage Popular Airports section: "grid" (multi-row) or "slider" (single-row carousel)
+  popularAirportsLayout String   @default("grid")
+  /// ISO2 list of Europe/Asia countries partners may select. Empty = all Europe & Asia.
+  partnerOperatingCountryIso2s Json @default("[]")
+  updatedAt             DateTime @updatedAt
+}
+
+model HomepageCategory {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  name         String
+  /// Human-readable summary of mapped models (kept for admin/analytics display)
+  details      String   @default("")
+  imageUrl     String
+  /// JSON array of { make: string, model: string } used for filtering & auto-assign
+  mappedModels Json     @default("[]")
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sortOrder])
+  @@index([isActive, sortOrder])
+}
+
+model HomepageAirport {
+  id        String   @id @default(cuid())
+  iata      String
+  title     String
+  imageUrl  String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sortOrder])
+}
+
+enum IntegrationStatus {
+  DRAFT
+  TESTING
+  LIVE
+  DISABLED
+}
+
+enum IntegrationSyncMode {
+  PULL
+  PUSH
+  BOTH
+}
+
+enum IntegrationMappingKind {
+  VEHICLE
+  LOCATION
+  CATEGORY
+}
+
+enum IntegrationSyncDirection {
+  IN
+  OUT
+}
+
+enum IntegrationSyncEvent {
+  TEST
+  PULL_FLEET
+  PULL_AVAIL
+  BOOKING_LOCK
+  BOOKING_UNLOCK
+  SANDBOX
+}
+
+enum IntegrationSyncLogStatus {
+  OK
+  ERROR
+}
+
+enum IntegrationLockStatus {
+  PENDING
+  LOCKED
+  FAILED
+  SKIPPED
+}
+
+/// Channel-manager connection for a partner (API key + optional webhook).
+model PartnerIntegration {
+  id                  String               @id @default(cuid())
+  partnerId           String
+  partner             Partner              @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  name                String
+  provider            String               @default("RAC_GENERIC")
+  status              IntegrationStatus    @default(DRAFT)
+  apiKeyHash          String
+  apiKeyPrefix        String
+  webhookUrl          String?
+  syncMode            IntegrationSyncMode  @default(BOTH)
+  manualOverride      Boolean              @default(false)
+  pollIntervalMinutes Int                  @default(30)
+  lastTestAt          DateTime?
+  lastTestOk          Boolean?
+  lastSyncAt          DateTime?
+  isSandbox           Boolean              @default(false)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  mappings IntegrationMapping[]
+  logs     IntegrationSyncLog[]
+
+  @@index([partnerId, status])
+  @@index([apiKeyPrefix])
+  @@index([status, manualOverride, lastSyncAt])
+}
+
+model IntegrationMapping {
+  id            String                 @id @default(cuid())
+  integrationId String
+  integration   PartnerIntegration     @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  kind          IntegrationMappingKind
+  externalId    String
+  externalLabel String                 @default("")
+  internalId    String
+  meta          Json                   @default("{}")
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  @@unique([integrationId, kind, externalId])
+  @@index([integrationId, kind])
+}
+
+model IntegrationSyncLog {
+  id              String                    @id @default(cuid())
+  integrationId   String
+  integration     PartnerIntegration        @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  direction       IntegrationSyncDirection
+  event           IntegrationSyncEvent
+  status          IntegrationSyncLogStatus
+  latencyMs       Int                       @default(0)
+  requestSummary  String                    @default("")
+  responseSummary String                    @default("")
+  errorMessage    String?
+  createdAt       DateTime                  @default(now())
+
+  @@index([integrationId, createdAt])
+  @@index([status, createdAt])
+}

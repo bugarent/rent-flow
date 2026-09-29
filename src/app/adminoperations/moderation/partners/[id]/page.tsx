@@ -1,0 +1,48 @@
+import { requireAdmin } from "@/lib/auth/guards";
+import { AdminPartnerReviewPanel } from "@/components/admin/admin-partner-review-panel";
+import { AdminProfileRemoderationPanel } from "@/components/admin/admin-profile-remodeation-panel";
+import { ADMIN_BASE } from "@/lib/routes";
+
+export default async function AdminPartnerModerationReviewPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }> | { id: string };
+  searchParams: Promise<{ returnTab?: string }>;
+}) {
+  await requireAdmin();
+  const resolved = await Promise.resolve(params);
+  const id = decodeURIComponent(resolved.id);
+  const sp = await searchParams;
+  const returnTab = sp.returnTab?.trim().toLowerCase();
+
+  let backHref = `${ADMIN_BASE}/moderation`;
+  let backLabel = "← პარტნიორები";
+  if (returnTab === "profiles") {
+    backHref = `${ADMIN_BASE}/moderation?tab=profiles`;
+    backLabel = "← პროფილები";
+  } else if (returnTab === "company") {
+    backHref = `${ADMIN_BASE}/moderation?partnerTab=company`;
+  } else if (returnTab === "private") {
+    backHref = `${ADMIN_BASE}/moderation?partnerTab=private`;
+  }
+
+  if (returnTab === "profiles") {
+    return (
+      <AdminProfileRemoderationPanel
+        partnerId={id}
+        backHref={backHref}
+        backLabel={backLabel}
+      />
+    );
+  }
+
+  return (
+    <AdminPartnerReviewPanel
+      partnerId={id}
+      backHref={backHref}
+      backLabel={backLabel}
+      editable
+    />
+  );
+}
