@@ -138,8 +138,8 @@ async function main() {
   }
 
   const previousLogins = ["aaaaaaaaaa", "admin@rentairportcars.com", "aaaaa@gmail.com"];
-  const adminLogin = "aaaaa@gmail.com";
-  const adminPassword = "55555";
+  const adminLogin = "bugarent22@gmail.com";
+  const adminPassword = "lilelizi2020";
   const adminHash = hashSecret(adminPassword);
 
   const existing =

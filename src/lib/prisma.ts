@@ -4,7 +4,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool, type PoolClient } from "pg";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 
-const CLIENT_REV = 8;
+const CLIENT_REV = 9;
 const DB_COOLDOWN_MS = 300_000; // 5 min — avoid hammering a dead Postgres on every navigation
 
 const globalForPrisma = globalThis as unknown as {
@@ -122,6 +122,18 @@ function unavailableClient(): PrismaClient {
   });
 }
 
+/** Hosted Postgres uses a self-signed chain. `pg` treats require/prefer as verify-full and then login never sees the User row. */
+function connectionStringForPool(url: string) {
+  if (!/[?&]sslmode=/i.test(url)) return url;
+  const withoutSslMode = url
+    .replace(/([?&])sslmode=[^&]*/gi, "$1")
+    .replace(/[?&]$/, "")
+    .replace(/\?&/, "?")
+    .replace(/&&+/g, "&");
+  const joiner = withoutSslMode.includes("?") ? "&" : "?";
+  return `${withoutSslMode}${joiner}sslmode=no-verify`;
+}
+
 function createPrisma(): PrismaClient {
   const url = process.env.DATABASE_URL;
   if (!url) return unavailableClient();
@@ -133,8 +145,10 @@ function createPrisma(): PrismaClient {
     };
     let pool = globalForPrisma.pool;
     if (!pool) {
+      const connectionString = connectionStringForPool(url);
       pool = new Pool({
-        connectionString: url,
+        connectionString,
+        ssl: /sslmode=no-verify/i.test(connectionString) ? { rejectUnauthorized: false } : undefined,
         // Fail fast when Postgres is down so pages fall back to file stores
         // instead of hanging until the browser shows "This page couldn't load".
         connectionTimeoutMillis: 500,

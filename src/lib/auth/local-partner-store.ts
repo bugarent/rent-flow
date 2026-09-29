@@ -30,8 +30,12 @@ function readStore(): LocalPartnerRecord | null {
 }
 
 function writeStore(record: LocalPartnerRecord) {
-  mkdirSync(dirname(STORE_PATH), { recursive: true });
-  writeFileSync(STORE_PATH, JSON.stringify(record, null, 2), "utf8");
+  try {
+    mkdirSync(dirname(STORE_PATH), { recursive: true });
+    writeFileSync(STORE_PATH, JSON.stringify(record, null, 2), "utf8");
+  } catch {
+    // Serverless hosts (Vercel) mount the app at read-only /var/task.
+  }
 }
 
 export function loadLocalPartner(): LocalPartnerRecord | null {

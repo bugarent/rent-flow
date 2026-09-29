@@ -18,8 +18,8 @@ if (existsSync(envFile)) {
   }
 }
 
-const ADMIN_EMAIL = "aaaaa@gmail.com";
-const ADMIN_PASSWORD = "55555";
+const ADMIN_EMAIL = "bugarent22@gmail.com";
+const ADMIN_PASSWORD = "lilelizi2020";
 const LEGACY_EMAILS = ["aaaaaaaaaa", "admin@rentairportcars.com", "aaaaa@gmail.com"];
 
 async function main() {

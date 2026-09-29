@@ -3,8 +3,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { hashSecret, verifySecret } from "@/lib/crypto";
 
-export const TEST_ADMIN_EMAIL = "aaaaa@gmail.com";
-export const TEST_ADMIN_PASSWORD = "55555";
+export const TEST_ADMIN_EMAIL = "bugarent22@gmail.com";
+export const TEST_ADMIN_PASSWORD = "lilelizi2020";
 export const LOCAL_ADMIN_ID = "local-admin";
 
 export type LocalAdminRecord = {
@@ -18,7 +18,11 @@ export type LocalAdminRecord = {
 };
 
 const STORE_PATH = dataFile("admin-account.json");
-const LEGACY_EMAILS = new Set(["aaaaaaaaaa", "admin@rentairportcars.com"]);
+const LEGACY_EMAILS = new Set([
+  "aaaaaaaaaa",
+  "admin@rentairportcars.com",
+  "aaaaa@gmail.com",
+]);
 
 function readStore(): LocalAdminRecord | null {
   if (!existsSync(STORE_PATH)) return null;
@@ -30,8 +34,13 @@ function readStore(): LocalAdminRecord | null {
 }
 
 function writeStore(record: LocalAdminRecord) {
-  mkdirSync(dirname(STORE_PATH), { recursive: true });
-  writeFileSync(STORE_PATH, JSON.stringify(record, null, 2), "utf8");
+  try {
+    mkdirSync(dirname(STORE_PATH), { recursive: true });
+    writeFileSync(STORE_PATH, JSON.stringify(record, null, 2), "utf8");
+  } catch {
+    // Serverless hosts (Vercel) mount the app at read-only /var/task.
+    // Login must continue and check the database user.
+  }
 }
 
 export function loadLocalAdmin(): LocalAdminRecord | null {
