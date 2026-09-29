@@ -15,22 +15,22 @@ export function BrandLogo({
 }) {
   const mark =
     size === "xl"
-      ? "h-10 w-[48px] sm:h-11 sm:w-[52px] lg:h-12 lg:w-[56px]"
+      ? "h-8 w-9 sm:h-11 sm:w-[52px] lg:h-12 lg:w-[56px]"
       : size === "lg"
-        ? "h-9 w-[42px] sm:h-10 sm:w-[48px] lg:h-11 lg:w-[52px]"
+        ? "h-8 w-9 sm:h-10 sm:w-[48px] lg:h-11 lg:w-[52px]"
         : "h-8 w-[38px] sm:h-9 sm:w-[43px] lg:h-[42px] lg:w-[50px]";
   const word =
     size === "xl"
-      ? "text-lg sm:text-xl lg:text-[22px]"
+      ? "text-[15px] sm:text-xl lg:text-[22px]"
       : size === "lg"
-        ? "text-base sm:text-lg lg:text-[19px]"
+        ? "text-[15px] sm:text-lg lg:text-[19px]"
         : "text-[15px] sm:text-[17px] lg:text-[18px]";
   const gap =
-    size === "xl" ? "gap-3 sm:gap-3.5" : size === "lg" ? "gap-2.5 sm:gap-3" : "gap-2 sm:gap-2.5";
+    size === "xl" ? "gap-2 sm:gap-3.5" : size === "lg" ? "gap-2 sm:gap-3" : "gap-2 sm:gap-2.5";
 
   return (
     <span
-      className={`notranslate inline-flex items-center ${gap} ${className}`}
+      className={`notranslate inline-flex min-w-0 items-center ${gap} ${className}`}
       lang="en"
       translate="no"
       data-nosnippet

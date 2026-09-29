@@ -22,7 +22,7 @@ export function AirportHero({
       />
       <div className="absolute inset-0 bg-slate-950/15" aria-hidden />
 
-      <div className="relative z-10 mx-auto flex w-full max-w-5xl items-center justify-center px-3 pb-[calc(1.5rem+1.5cm)] pt-[calc(5.5rem+0.5cm)] sm:px-4 sm:pb-[calc(2rem+1.5cm)] sm:pt-[calc(6rem+0.5cm)] lg:px-6 lg:pt-[calc(6.5rem+0.5cm)]">
+      <div className="relative z-10 mx-auto flex w-full max-w-5xl items-center justify-center px-3 pb-[calc(1.5rem+1.5cm)] pt-[calc(8.25rem+0.5cm)] sm:px-4 sm:pb-[calc(2rem+1.5cm)] sm:pt-[calc(6rem+0.5cm)] lg:px-6 lg:pt-[calc(6.5rem+0.5cm)]">
         <div className="w-full min-w-0 max-w-[calc(680px+4cm)]">
           <AirportSearch
             options={airports}

@@ -19,6 +19,7 @@ const ManageBookingModal = dynamic(
 );
 
 const navLinkClass = `${headerChipClass} whitespace-nowrap`;
+const mobileChipClass = "max-sm:h-9 max-sm:min-h-9 max-sm:gap-1 max-sm:px-2.5 max-sm:text-xs";
 
 const helpButtonClass = headerChipClass;
 
@@ -111,10 +112,10 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
             : "sticky top-0 z-[100] border-b border-slate-200 bg-white"
         }
       >
-        <div className="mx-auto flex h-[68px] max-w-[1240px] items-center gap-3 px-4 sm:h-[76px] sm:gap-4 lg:h-[84px] lg:gap-5 lg:px-6">
+        <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-2 px-3 py-2 sm:h-[76px] sm:flex-nowrap sm:gap-4 sm:px-4 sm:py-0 lg:h-[84px] lg:gap-5 lg:px-6">
           <Link
             href="/"
-            className={`${headerChipClass} h-[54px] min-h-[54px] gap-3 px-5 sm:h-14 sm:min-h-14 sm:gap-3.5 sm:px-6 lg:h-[60px] lg:min-h-[60px] lg:px-7`}
+            className={`${headerChipClass} h-12 min-h-12 min-w-0 max-w-full flex-1 basis-full justify-start gap-2 px-2.5 sm:h-14 sm:min-h-14 sm:flex-none sm:basis-auto sm:gap-3.5 sm:px-6 lg:h-[60px] lg:min-h-[60px] lg:px-7`}
             onClick={(e) => {
               setOpen(false);
               // Always land on the public home page from any route (including `/` itself).
@@ -136,7 +137,7 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
             <BrandLogo size="xl" />
           </Link>
 
-          <div className="ms-auto flex h-11 min-w-0 items-center justify-end gap-3 sm:gap-4 lg:gap-5">
+          <div className="flex h-9 w-full min-w-0 items-center justify-end gap-1.5 sm:ms-auto sm:h-11 sm:w-auto sm:gap-4 lg:gap-5">
             {!hideCustomerNav ? (
               <>
                 <span className="hidden sm:inline-flex">{helpButton}</span>
@@ -144,9 +145,9 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
               </>
             ) : null}
             {!isPartnershipPage ? (
-              <CurrencySelect currency={currency} onChange={setCurrency} />
+              <CurrencySelect currency={currency} onChange={setCurrency} buttonClassName={mobileChipClass} />
             ) : null}
-            <LanguageSelect locale={locale} onChange={setLocale} />
+            <LanguageSelect locale={locale} onChange={setLocale} buttonClassName={mobileChipClass} />
             {isPartnershipPage ? (
               <Link
                 href={BUSINESS_PARTNER_LOGIN}
@@ -160,7 +161,7 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
             {!hideCustomerNav ? (
               <button
                 type="button"
-                className={`${headerChipClass} h-11 w-11 justify-center px-0 sm:px-0 lg:hidden`}
+                className={`${headerChipClass} h-9 w-9 justify-center px-0 sm:h-11 sm:w-11 sm:px-0 lg:hidden`}
                 aria-label={open ? dictionary.common.closeMenu : dictionary.common.openMenu}
                 onClick={() => setOpen((v) => !v)}
               >

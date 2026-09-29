@@ -31,7 +31,7 @@ export function PublicShell({
 
   return (
     <>
-      <Suspense fallback={<div className="h-[68px] sm:h-[76px] lg:h-[84px]" aria-hidden />}>
+      <Suspense fallback={<div className="h-[7.25rem] sm:h-[76px] lg:h-[84px]" aria-hidden />}>
         <Header overlay={isHome} />
       </Suspense>
       <main className="relative min-w-0 flex-1 overflow-x-clip pb-20 md:pb-0">{children}</main>

@@ -106,7 +106,7 @@ function Dropdown({
               id={menuId}
               role="listbox"
               className={cn(
-                "fixed z-[200] max-h-[min(70vh,420px)] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl",
+                "fixed z-[200] max-h-[min(46vh,320px)] w-[min(calc(100vw-1rem),16rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl",
                 menuClassName,
               )}
               style={{ top: coords.top, left: coords.left, minWidth: coords.minWidth }}
@@ -123,9 +123,11 @@ function Dropdown({
 export function LanguageSelect({
   locale,
   onChange,
+  buttonClassName,
 }: {
   locale: Locale;
   onChange: (locale: Locale) => void;
+  buttonClassName?: string;
 }) {
   return (
     <Dropdown
@@ -137,7 +139,7 @@ export function LanguageSelect({
             e.stopPropagation();
             toggle();
           }}
-          className={headerChipClass}
+          className={cn(headerChipClass, buttonClassName)}
           aria-haspopup="listbox"
           aria-expanded={open}
         >
@@ -177,9 +179,11 @@ export function LanguageSelect({
 export function CurrencySelect({
   currency,
   onChange,
+  buttonClassName,
 }: {
   currency: Currency;
   onChange: (currency: Currency) => void;
+  buttonClassName?: string;
 }) {
   return (
     <Dropdown
@@ -192,7 +196,7 @@ export function CurrencySelect({
             e.stopPropagation();
             toggle();
           }}
-          className={headerChipClass}
+          className={cn(headerChipClass, buttonClassName)}
           aria-haspopup="listbox"
           aria-expanded={open}
         >
