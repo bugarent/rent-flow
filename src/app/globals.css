@@ -116,3 +116,9 @@ body {
     font-size: 16px; /* iOS zoom prevention */
   }
 }
+
+/* Netlify injects a "Powered by Netlify" badge into the bottom-right corner. */
+#nl-badge-frame,
+iframe[title="Powered by Netlify"] {
+  display: none !important;
+}
