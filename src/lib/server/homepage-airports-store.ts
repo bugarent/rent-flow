@@ -65,8 +65,12 @@ async function readFileStore(): Promise<StoredHomepageAirport[]> {
 }
 
 async function writeFileStore(rows: StoredHomepageAirport[]) {
-  await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(DATA_FILE, JSON.stringify(rows, null, 2), "utf8");
+  try {
+    await mkdir(DATA_DIR, { recursive: true });
+    await writeFile(DATA_FILE, JSON.stringify(rows, null, 2), "utf8");
+  } catch {
+    /* Hosted filesystem is read-only. */
+  }
 }
 
 function getDbDelegate(): AirportDelegate | null {

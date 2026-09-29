@@ -35,8 +35,12 @@ function normalize(parsed: Partial<LegalPagesConfig> | null | undefined): LegalP
 }
 
 async function writeConfig(config: LegalPagesConfig) {
-  await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(DATA_FILE, JSON.stringify(config, null, 2), "utf8");
+  try {
+    await mkdir(DATA_DIR, { recursive: true });
+    await writeFile(DATA_FILE, JSON.stringify(config, null, 2), "utf8");
+  } catch {
+    /* Hosted filesystem is read-only. */
+  }
 }
 
 export async function getLegalPagesConfig(): Promise<LegalPagesConfig> {

@@ -27,8 +27,12 @@ async function readFileStore(): Promise<PopularAirportsLayout> {
 }
 
 async function writeFileStore(layout: PopularAirportsLayout) {
-  await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(DATA_FILE, JSON.stringify({ layout }, null, 2), "utf8");
+  try {
+    await mkdir(DATA_DIR, { recursive: true });
+    await writeFile(DATA_FILE, JSON.stringify({ layout }, null, 2), "utf8");
+  } catch {
+    /* Hosted filesystem is read-only. */
+  }
 }
 
 export async function getPopularAirportsLayout(): Promise<PopularAirportsLayout> {

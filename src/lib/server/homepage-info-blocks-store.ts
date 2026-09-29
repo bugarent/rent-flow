@@ -148,9 +148,13 @@ function normalizeContent(raw: unknown): HomepageInfoContent {
 }
 
 async function writeStore(content: HomepageInfoContent) {
-  await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(DATA_FILE, JSON.stringify(content, null, 2), "utf8");
   cache.set(content);
+  try {
+    await mkdir(DATA_DIR, { recursive: true });
+    await writeFile(DATA_FILE, JSON.stringify(content, null, 2), "utf8");
+  } catch {
+    /* Hosted filesystem is read-only. */
+  }
 }
 
 export async function getHomepageInfoContent(): Promise<HomepageInfoContent> {

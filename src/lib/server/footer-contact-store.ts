@@ -26,9 +26,13 @@ function normalize(parsed: Partial<FooterContactConfig>): FooterContactConfig {
 }
 
 async function writeConfig(config: FooterContactConfig) {
-  await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(DATA_FILE, JSON.stringify(config, null, 2), "utf8");
   cache.set(config);
+  try {
+    await mkdir(DATA_DIR, { recursive: true });
+    await writeFile(DATA_FILE, JSON.stringify(config, null, 2), "utf8");
+  } catch {
+    /* Hosted filesystem is read-only. */
+  }
 }
 
 export async function getFooterContactConfig(): Promise<FooterContactConfig> {
