@@ -4,8 +4,12 @@ import { dirname } from "node:path";
 import { hashSecret, verifySecret } from "@/lib/crypto";
 
 export const TEST_ADMIN_EMAIL = "bugarent22@gmail.com";
-export const TEST_ADMIN_PASSWORD = "lilelizi2020";
 export const LOCAL_ADMIN_ID = "local-admin";
+
+/** Bootstrap admin password from the environment; empty means "never provision or reset". */
+export function bootstrapAdminPassword(): string {
+  return (process.env.ADMIN_PASSWORD ?? "").trim();
+}
 
 export type LocalAdminRecord = {
   id: string;
@@ -55,7 +59,8 @@ export function revealAdminPassword(
   if (!hash) return "";
   const plain = (passwordPlain || "").trim();
   if (plain && verifySecret(plain, hash)) return plain;
-  if (verifySecret(TEST_ADMIN_PASSWORD, hash)) return TEST_ADMIN_PASSWORD;
+  const bootstrap = bootstrapAdminPassword();
+  if (bootstrap && verifySecret(bootstrap, hash)) return bootstrap;
   return "";
 }
 
@@ -63,10 +68,12 @@ export function saveLocalAdmin(
   patch: Partial<Pick<LocalAdminRecord, "email" | "passwordHash" | "passwordPlain">>,
 ): LocalAdminRecord {
   const current = readStore();
+  const bootstrap = bootstrapAdminPassword();
   const record: LocalAdminRecord = {
     id: current?.id ?? LOCAL_ADMIN_ID,
     email: patch.email ?? current?.email ?? TEST_ADMIN_EMAIL,
-    passwordHash: patch.passwordHash ?? current?.passwordHash ?? hashSecret(TEST_ADMIN_PASSWORD),
+    passwordHash:
+      patch.passwordHash ?? current?.passwordHash ?? (bootstrap ? hashSecret(bootstrap) : ""),
     passwordPlain:
       patch.passwordPlain !== undefined ? patch.passwordPlain : current?.passwordPlain,
     role: "ADMIN",
@@ -76,21 +83,15 @@ export function saveLocalAdmin(
   return record;
 }
 
-export function provisionLocalAdmin(): LocalAdminRecord {
+export function provisionLocalAdmin(): LocalAdminRecord | null {
   const current = readStore();
-  if (!current) {
+  const bootstrap = bootstrapAdminPassword();
+  if (!current || LEGACY_EMAILS.has(current.email)) {
+    if (!bootstrap) return current;
     return saveLocalAdmin({
       email: TEST_ADMIN_EMAIL,
-      passwordHash: hashSecret(TEST_ADMIN_PASSWORD),
-      passwordPlain: TEST_ADMIN_PASSWORD,
-    });
-  }
-
-  if (LEGACY_EMAILS.has(current.email)) {
-    return saveLocalAdmin({
-      email: TEST_ADMIN_EMAIL,
-      passwordHash: hashSecret(TEST_ADMIN_PASSWORD),
-      passwordPlain: TEST_ADMIN_PASSWORD,
+      passwordHash: hashSecret(bootstrap),
+      passwordPlain: bootstrap,
     });
   }
 

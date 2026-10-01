@@ -143,15 +143,18 @@ async function main() {
 
   const previousLogins = ["aaaaaaaaaa", "admin@rentairportcars.com", "aaaaa@gmail.com"];
   const adminLogin = "bugarent22@gmail.com";
-  const adminPassword = "lilelizi2020";
-  const adminHash = hashSecret(adminPassword);
+  const adminPassword = (process.env.ADMIN_PASSWORD ?? "").trim();
+  const adminHash = adminPassword ? hashSecret(adminPassword) : "";
 
-  const existing =
-    (await prisma.user.findUnique({ where: { email: adminLogin } })) ??
-    (await prisma.user.findFirst({ where: { email: { in: previousLogins } } })) ??
-    (await prisma.user.findFirst({ where: { role: "ADMIN" } }));
+  const existing = !adminPassword
+    ? null
+    : (await prisma.user.findUnique({ where: { email: adminLogin } })) ??
+      (await prisma.user.findFirst({ where: { email: { in: previousLogins } } })) ??
+      (await prisma.user.findFirst({ where: { role: "ADMIN" } }));
 
-  if (existing) {
+  if (!adminPassword) {
+    console.warn("ADMIN_PASSWORD not set — skipping admin account (run create-admin.mjs later).");
+  } else if (existing) {
     await prisma.user.update({
       where: { id: existing.id },
       data: {

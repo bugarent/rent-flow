@@ -19,10 +19,13 @@ if (existsSync(envFile)) {
 }
 
 const ADMIN_EMAIL = "bugarent22@gmail.com";
-const ADMIN_PASSWORD = "lilelizi2020";
+const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD ?? "").trim();
 const LEGACY_EMAILS = ["aaaaaaaaaa", "admin@rentairportcars.com", "aaaaa@gmail.com"];
 
 async function main() {
+  if (!ADMIN_PASSWORD) {
+    throw new Error("ADMIN_PASSWORD is missing. Add it to .env (never commit it) and run again.");
+  }
   const { prisma } = await import("../src/lib/prisma");
   const passwordHash = hashSecret(ADMIN_PASSWORD);
 

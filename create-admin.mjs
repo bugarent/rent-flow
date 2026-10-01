@@ -6,7 +6,6 @@ import { Pool } from "pg";
 import { hashSync } from "bcryptjs";
 
 const EMAIL = "bugarent22@gmail.com";
-const PASSWORD = "lilelizi2020";
 const BCRYPT_ROUNDS = 12;
 
 function loadEnv() {
@@ -34,6 +33,12 @@ loadEnv();
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
   console.error("DATABASE_URL is missing. Add it to .env and run the script again.");
+  process.exit(1);
+}
+
+const PASSWORD = (process.env.ADMIN_PASSWORD ?? "").trim();
+if (!PASSWORD) {
+  console.error("ADMIN_PASSWORD is missing. Add it to .env (never commit it) and run the script again.");
   process.exit(1);
 }
 

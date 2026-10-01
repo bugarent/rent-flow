@@ -59,7 +59,7 @@ async function authorizeForPortal(
     provisionLocalAdmin,
     saveLocalAdmin,
     TEST_ADMIN_EMAIL,
-    TEST_ADMIN_PASSWORD,
+    bootstrapAdminPassword,
     LOCAL_ADMIN_ID,
   } = await import("@/lib/auth/local-admin-store");
   const { loadLocalPartner, provisionLocalPartner } = await import("@/lib/auth/local-partner-store");
@@ -121,11 +121,13 @@ async function authorizeForPortal(
     // Fall through to local stores when the database is unavailable.
   }
 
+  const bootstrapPassword = bootstrapAdminPassword();
   if (
     portal === "admin" &&
     !databaseReached &&
+    Boolean(bootstrapPassword) &&
     login === normalizeLogin(TEST_ADMIN_EMAIL) &&
-    credentials.password === TEST_ADMIN_PASSWORD
+    credentials.password === bootstrapPassword
   ) {
     return {
       id: LOCAL_ADMIN_ID,

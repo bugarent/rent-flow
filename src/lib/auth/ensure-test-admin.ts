@@ -2,23 +2,25 @@ import { verifySecret } from "@/lib/crypto";
 import { prisma } from "@/lib/prisma";
 import {
   TEST_ADMIN_EMAIL,
-  TEST_ADMIN_PASSWORD,
+  bootstrapAdminPassword,
   provisionLocalAdmin,
 } from "@/lib/auth/local-admin-store";
 
 const LEGACY_EMAILS = ["aaaaaaaaaa", "admin@rentairportcars.com", "aaaaa@gmail.com"];
 
-export { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD };
+export { TEST_ADMIN_EMAIL };
 
 export async function ensureTestAdmin() {
   const local = provisionLocalAdmin();
-  const passwordHash = local.passwordHash;
+  const passwordHash = local?.passwordHash ?? "";
+  const bootstrap = bootstrapAdminPassword();
 
   try {
     const current = await prisma.user.findUnique({ where: { email: TEST_ADMIN_EMAIL } });
     if (current) {
-      const passwordOk = verifySecret(TEST_ADMIN_PASSWORD, current.passwordHash);
-      const shouldResetPassword = !passwordOk && local.passwordPlain === TEST_ADMIN_PASSWORD;
+      const passwordOk = bootstrap ? verifySecret(bootstrap, current.passwordHash) : true;
+      const shouldResetPassword =
+        !passwordOk && Boolean(passwordHash) && local?.passwordPlain === bootstrap;
       if (current.role !== "ADMIN" || current.status !== "ACTIVE" || shouldResetPassword) {
         await prisma.user.update({
           where: { id: current.id },
@@ -32,6 +34,8 @@ export async function ensureTestAdmin() {
       }
       return;
     }
+
+    if (!passwordHash) return;
 
     const legacy = await prisma.user.findFirst({
       where: { email: { in: LEGACY_EMAILS } },

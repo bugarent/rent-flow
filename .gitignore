@@ -33,6 +33,8 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env
 .env.local
+# project archives can contain .env and other secrets
+*.zip
 .env.*.local
 !.env.example
 
