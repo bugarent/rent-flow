@@ -20,11 +20,31 @@ import { dirname, join } from "node:path";
 import { Pool } from "pg";
 import { dataRoot, isServerlessHost, jsonStoreKey } from "@/lib/persistent-paths";
 import { databaseUrl } from "@/lib/database-url";
+import { isDbAuthError } from "@/lib/server/db-errors";
 
 export { access, rename, cp, readdir, stat };
 
+/** Retrying a rejected password on every read/write is what locks the role at the pooler. */
+const AUTH_COOLDOWN_MS = 300_000;
+
 let tableReady: Promise<void> | null = null;
 let jsonPool: Pool | null = null;
+let authBlockedUntil = 0;
+let lastAuthError: unknown = null;
+
+function noteStoreError(error: unknown) {
+  if (!isDbAuthError(error)) return;
+  authBlockedUntil = Date.now() + AUTH_COOLDOWN_MS;
+  lastAuthError = error;
+  const pool = jsonPool;
+  jsonPool = null;
+  tableReady = null;
+  void pool?.end().catch(() => undefined);
+}
+
+function storeAuthBlocked() {
+  return Date.now() < authBlockedUntil;
+}
 
 function connectionStringForPool(url: string) {
   if (!/[?&]sslmode=/i.test(url)) return url;
@@ -40,7 +60,7 @@ function connectionStringForPool(url: string) {
 /** Own pool so a short page-load timeout cannot skip an admin/partner save. */
 function storePool(): Pool | null {
   const url = databaseUrl();
-  if (!url) return null;
+  if (!url || storeAuthBlocked()) return null;
   if (!jsonPool) {
     const connectionString = connectionStringForPool(url);
     jsonPool = new Pool({
@@ -77,10 +97,16 @@ async function ensureTable(pool: Pool): Promise<void> {
 }
 
 export async function pingJsonStore(): Promise<void> {
+  if (storeAuthBlocked() && lastAuthError) throw lastAuthError;
   const pool = storePool();
   if (!pool) throw new Error("DATABASE_URL is not set");
-  await ensureTable(pool);
-  await pool.query("SELECT 1");
+  try {
+    await ensureTable(pool);
+    await pool.query("SELECT 1");
+  } catch (error) {
+    noteStoreError(error);
+    throw error;
+  }
 }
 
 function looksLikeJsonText(data: unknown): data is string {
@@ -110,6 +136,7 @@ async function readFromDb(absPath: string): Promise<string | null> {
     if (!row) return null;
     return JSON.stringify(row.payload, null, 2);
   } catch (error) {
+    noteStoreError(error);
     console.warn("[json-store] read failed", jsonStoreKey(absPath), error);
     return null;
   }
@@ -132,6 +159,7 @@ async function writeToDb(absPath: string, text: string): Promise<boolean> {
     );
     return true;
   } catch (error) {
+    noteStoreError(error);
     console.warn("[json-store] write failed", key, error);
     return false;
   }
