@@ -277,13 +277,26 @@ export async function createDeliveryLocation(input: {
   const isActive = input.isActive ?? true;
   const sortOrder = input.sortOrder ?? 100;
 
+  /** A saved row for this place already exists: switch it on if asked, never off. */
+  const reuseExisting = async (id: string, currentlyActive: boolean): Promise<DeliveryLocationView> => {
+    if (isActive && !currentlyActive) {
+      const updated = await updateDeliveryLocation(id, { isActive: true });
+      if (updated) return updated;
+    }
+    const all = await listDeliveryLocations({ activeOnly: false });
+    const found = all.find((l) => l.id === id);
+    if (!found) throw new Error("This airport is already configured");
+    return found;
+  };
+
   const createInFile = async (): Promise<DeliveryLocationView> => {
     const place = findSearchPlace(input.airportId);
     const iata = place?.code ?? normalizeLocationCode(input.airportId);
     const fileRows = await readFileStore();
-    if (fileRows.some((r) => normalizeLocationCode(r.iata) === iata || r.airportId === input.airportId)) {
-      throw new Error("This airport is already configured");
-    }
+    const existingRow = fileRows.find(
+      (r) => normalizeLocationCode(r.iata) === iata || r.airportId === input.airportId,
+    );
+    if (existingRow) return reuseExisting(existingRow.id, existingRow.isActive);
 
     const now = new Date().toISOString();
     const view: StoredDeliveryLocation = {
@@ -327,7 +340,7 @@ export async function createDeliveryLocation(input: {
     const existing = await prisma.deliveryLocation.findUnique({
       where: { airportId: airport.id },
     });
-    if (existing) throw new Error("This airport is already configured");
+    if (existing) return reuseExisting(existing.id, existing.isActive);
 
     const row = await prisma.deliveryLocation.create({
       data: {
