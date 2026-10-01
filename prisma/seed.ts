@@ -20,6 +20,10 @@ if (existsSync(envFile)) {
   }
 }
 
+// Seeding is a one-off bulk job over a remote pooler, not a page request.
+process.env.DB_CONNECT_TIMEOUT_MS ??= "20000";
+process.env.DB_QUERY_TIMEOUT_MS ??= "120000";
+
 async function main() {
   const { prisma } = await import("../src/lib/prisma");
 

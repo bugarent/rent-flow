@@ -134,6 +134,11 @@ function connectionStringForPool(url: string) {
   return `${withoutSslMode}${joiner}sslmode=no-verify`;
 }
 
+function envMs(name: string, fallback: number): number {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
 function createPrisma(): PrismaClient {
   const url = process.env.DATABASE_URL;
   if (!url) return unavailableClient();
@@ -151,11 +156,12 @@ function createPrisma(): PrismaClient {
         ssl: /sslmode=no-verify/i.test(connectionString) ? { rejectUnauthorized: false } : undefined,
         // Fail fast when Postgres is down so pages fall back to file stores
         // instead of hanging until the browser shows "This page couldn't load".
-        connectionTimeoutMillis: 500,
+        // A cold TLS handshake to a remote Supabase pooler needs more than 500 ms.
+        connectionTimeoutMillis: envMs("DB_CONNECT_TIMEOUT_MS", 4_000),
         idleTimeoutMillis: 5_000,
         max: 3,
-        query_timeout: 1500,
-        statement_timeout: 1500,
+        query_timeout: envMs("DB_QUERY_TIMEOUT_MS", 8_000),
+        statement_timeout: envMs("DB_QUERY_TIMEOUT_MS", 8_000),
       });
       guardPool(pool);
       globalForPrisma.pool = pool;
