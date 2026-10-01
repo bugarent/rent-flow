@@ -161,40 +161,6 @@ export function HomepageSearchCountries({
     }
   }
 
-  async function toggleIndividualBooking(code: string, on: boolean) {
-    setBusy(true);
-    setError(null);
-    try {
-      const key = normalizeLocationCode(code);
-      let loc = locations.find((row) => locationCodesEqual(row.iata, key));
-      if (!loc) {
-        await setPlaceOnHomepage(code, true);
-        await refresh();
-        const res = await fetch("/api/admin/delivery", { cache: "no-store" });
-        const data = await res.json().catch(() => ({}));
-        const rows = Array.isArray(data.locations) ? (data.locations as DeliveryLocationView[]) : [];
-        loc = rows.find((row) => locationCodesEqual(row.iata, key));
-        if (rows.length) setLocations(rows);
-      }
-      if (!loc) throw new Error("Enable this location on the homepage first");
-      if (!loc.isActive && on) {
-        await setPlaceOnHomepage(code, true);
-      }
-      const res = await fetch(`/api/admin/delivery/${loc.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ individualBookingEnabled: on, isActive: true }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Update failed");
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function enableAllInCountry() {
     setBusy(true);
     setError(null);
@@ -238,10 +204,9 @@ export function HomepageSearchCountries({
   function placeRow(place: SearchPlace) {
     const loc = byCode.get(place.code);
     const on = Boolean(loc?.isActive);
-    const individualOn = Boolean(loc?.individualBookingEnabled);
     return (
-      <li key={place.code} className="flex flex-col gap-2 border-b border-slate-100 py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-        <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+      <li key={place.code} className="border-b border-slate-100 py-3 last:border-0">
+        <label className="flex min-w-0 cursor-pointer items-center gap-3">
           <input
             type="checkbox"
             checked={on}
@@ -261,34 +226,6 @@ export function HomepageSearchCountries({
             <span className="mt-0.5 block text-xs text-slate-500">{place.name}</span>
           </span>
         </label>
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          {on ? (
-            <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-800">
-              {s.onHomepage}
-            </span>
-          ) : (
-            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{s.hidden}</span>
-          )}
-          <label
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${
-              on
-                ? individualOn
-                  ? "border-sky-300 bg-sky-50 text-sky-900"
-                  : "border-slate-200 bg-white text-slate-600"
-                : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400"
-            }`}
-            title={s.placesHelp}
-          >
-            <input
-              type="checkbox"
-              checked={individualOn}
-              disabled={busy || !on || !loc}
-              onChange={(e) => void toggleIndividualBooking(place.code, e.target.checked)}
-              className="h-3.5 w-3.5"
-            />
-            {s.individualBooking}
-          </label>
-        </div>
       </li>
     );
   }

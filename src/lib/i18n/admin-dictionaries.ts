@@ -541,8 +541,7 @@ const en: AdminDictionary = {
     city: "City",
     noPlaces: "No airports or major cities listed for this country yet.",
     noCountryYet: "No country is enabled yet. Select locations on the right to show them on the homepage.",
-    placesHelp:
-      "Turn on airports and major cities for homepage search. Individual booking shows the custom-booking banner when that pickup is selected.",
+    placesHelp: "Turn on airports and major cities for homepage search.",
     liveBotSavedNote: "The active bot receives live-chat messages when AI cannot answer or the guest asks for an operator.",
     botUsername: "Bot username",
     botToken: "Bot token",
@@ -872,8 +871,7 @@ const ka: AdminDictionary = {
     city: "ქალაქი",
     noPlaces: "ამ ქვეყანაში აეროპორტი ან ქალაქი ჯერ არ არის.",
     noCountryYet: "არც ერთი ქვეყანა არ არის ჩართული. მარჯვნივ აირჩიეთ ლოკაციები.",
-    placesHelp:
-      "ჩართეთ აეროპორტები და ქალაქები მთავარი გვერდის ძიებისთვის. ინდივიდუალური ჯავშანი აჩვენებს ბანერს, როცა ეს აღების წერტილია არჩეული.",
+    placesHelp: "ჩართეთ აეროპორტები და ქალაქები მთავარი გვერდის ძიებისთვის.",
     liveBotSavedNote: "აქტიური ბოტი მიიღებს live-chat შეტყობინებებს, როცა AI ვერ პასუხობს ან სტუმარი ოპერატორს ითხოვს.",
     botUsername: "ბოტის username",
     botToken: "ბოტის ტოკენი",
@@ -1203,8 +1201,7 @@ const ru: AdminDictionary = {
     city: "Город",
     noPlaces: "Для этой страны аэропорты и города ещё не добавлены.",
     noCountryYet: "Ни одна страна не включена. Выберите локации справа.",
-    placesHelp:
-      "Включите аэропорты и города для поиска на главной. Индивидуальная бронь показывает баннер, когда выбран этот пункт выдачи.",
+    placesHelp: "Включите аэропорты и города для поиска на главной.",
     liveBotSavedNote: "Активный бот получает сообщения live-chat, если ИИ не может ответить или гость просит оператора.",
     botUsername: "Имя пользователя бота",
     botToken: "Токен бота",
