@@ -16,7 +16,10 @@ export async function GET() {
   let dbError = "";
   let store: "ok" | "skip" | "error" = "skip";
   let storeError = "";
-  const hasDatabaseUrl = Boolean(process.env.DATABASE_URL?.trim());
+  const rawDatabaseUrl = process.env.DATABASE_URL?.trim() ?? "";
+  const hasDatabaseUrl = Boolean(rawDatabaseUrl);
+  const databaseUrlNeedsCleanup =
+    /^DATABASE_URL\s*=/i.test(rawDatabaseUrl) || /^["']/.test(rawDatabaseUrl) || /["']$/.test(rawDatabaseUrl);
 
   try {
     const { prisma } = await import("@/lib/prisma");
@@ -44,6 +47,7 @@ export async function GET() {
     db,
     dbError: dbError || undefined,
     hasDatabaseUrl,
+    databaseUrlNeedsCleanup: databaseUrlNeedsCleanup || undefined,
     store,
     storeError: storeError || undefined,
     ms: Date.now() - started,

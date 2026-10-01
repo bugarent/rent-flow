@@ -19,6 +19,7 @@ import {
 import { dirname, join } from "node:path";
 import { Pool } from "pg";
 import { dataRoot, isServerlessHost, jsonStoreKey } from "@/lib/persistent-paths";
+import { databaseUrl } from "@/lib/database-url";
 
 export { access, rename, cp, readdir, stat };
 
@@ -38,7 +39,7 @@ function connectionStringForPool(url: string) {
 
 /** Own pool so a short page-load timeout cannot skip an admin/partner save. */
 function storePool(): Pool | null {
-  const url = process.env.DATABASE_URL?.trim();
+  const url = databaseUrl();
   if (!url) return null;
   if (!jsonPool) {
     const connectionString = connectionStringForPool(url);

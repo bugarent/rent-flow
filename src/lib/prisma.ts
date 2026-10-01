@@ -3,6 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool, type PoolClient } from "pg";
 import { isDbOfflineError } from "@/lib/server/db-errors";
+import { databaseUrl } from "@/lib/database-url";
 
 const CLIENT_REV = 10;
 const DB_COOLDOWN_MS = 300_000; // 5 min — avoid hammering a dead Postgres on every navigation
@@ -140,7 +141,7 @@ function envMs(name: string, fallback: number): number {
 }
 
 function createPrisma(): PrismaClient {
-  const url = process.env.DATABASE_URL;
+  const url = databaseUrl();
   if (!url) return unavailableClient();
 
   try {
