@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import {
-  locationCodesEqual,
   normalizeLocationCode,
   searchPlacesForCountry,
   type SearchPlace,
@@ -11,8 +10,7 @@ import {
 import { WORLD_COUNTRIES, worldCountryName } from "@/lib/catalog/world-countries";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
-
-const DEFAULT_MAX_EUR = 10;
+import { locationKey, useHomepageLocations } from "@/components/admin/use-homepage-locations";
 
 export function HomepageSearchCountries({
   initialLocations,
@@ -23,33 +21,14 @@ export function HomepageSearchCountries({
 }) {
   const { dictionary } = useAdminLocale();
   const s = dictionary.sections;
-  const [locations, setLocations] = useState(initialLocations);
+  const { locations, activeCountByCountry, isOn, isPending, setPlace, setMany, bulkBusy, error } =
+    useHomepageLocations(initialLocations);
   const [query, setQuery] = useState("");
   const [placeQuery, setPlaceQuery] = useState("");
   const [selectedIso2, setSelectedIso2] = useState(() => {
     const active = initialLocations.find((l) => l.isActive);
     return (active?.countryIso2 ?? "GE").toUpperCase();
   });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const byCode = useMemo(() => {
-    const map = new Map<string, DeliveryLocationView>();
-    for (const loc of locations) {
-      if (loc.iata) map.set(normalizeLocationCode(loc.iata), loc);
-    }
-    return map;
-  }, [locations]);
-
-  const activeCountByCountry = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const loc of locations) {
-      if (!loc.isActive) continue;
-      const iso = loc.countryIso2.toUpperCase();
-      counts[iso] = (counts[iso] ?? 0) + 1;
-    }
-    return counts;
-  }, [locations]);
 
   const enabledCountries = useMemo(
     () =>
@@ -73,7 +52,15 @@ export function HomepageSearchCountries({
     });
   }, [query, activeCountByCountry]);
 
-  const countryPlaces = useMemo(() => searchPlacesForCountry(selectedIso2), [selectedIso2]);
+  const countryPlaces = useMemo(() => {
+    const seen = new Set<string>();
+    return searchPlacesForCountry(selectedIso2).filter((p) => {
+      const key = locationKey(p.code);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [selectedIso2]);
 
   const filteredPlaces = useMemo(() => {
     const q = placeQuery.trim().toLowerCase();
@@ -90,128 +77,37 @@ export function HomepageSearchCountries({
   const airports = filteredPlaces.filter((p) => p.kind === "airport");
   const cities = filteredPlaces.filter((p) => p.kind === "city");
 
-  const extraLocations = useMemo(
-    () =>
-      locations.filter((loc) => {
-        if (loc.countryIso2.toUpperCase() !== selectedIso2) return false;
-        return !countryPlaces.some((p) => locationCodesEqual(p.code, loc.iata));
-      }),
-    [locations, selectedIso2, countryPlaces],
-  );
+  const extraLocations = useMemo(() => {
+    const catalogKeys = new Set(countryPlaces.map((p) => locationKey(p.code)));
+    return locations.filter(
+      (loc) => loc.countryIso2.toUpperCase() === selectedIso2 && !catalogKeys.has(locationKey(loc)),
+    );
+  }, [locations, selectedIso2, countryPlaces]);
 
-  async function refresh() {
-    const res = await fetch("/api/admin/delivery", { cache: "no-store" });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && Array.isArray(data.locations)) setLocations(data.locations);
+  function enableAllInCountry() {
+    const targets = countryPlaces
+      .filter((p) => !isOn(p.code))
+      .map((p) => ({ code: p.code, countryIso2: selectedIso2 }));
+    void setMany(targets, true);
   }
 
-  async function setPlaceOnHomepage(code: string, on: boolean, current = locations) {
-    const key = normalizeLocationCode(code);
-    const existing = current.find((loc) => locationCodesEqual(loc.iata, key));
-    if (existing) {
-      const res = await fetch(`/api/admin/delivery/${existing.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: on }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Update failed");
-      return;
-    }
-    if (!on) return;
-    const res = await fetch("/api/admin/delivery", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        airportId: key,
-        maxDeliveryPriceEur: DEFAULT_MAX_EUR,
-        isActive: true,
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok) return;
-    if (res.status === 409) {
-      const latestRes = await fetch("/api/admin/delivery", { cache: "no-store" });
-      const latest = await latestRes.json().catch(() => ({}));
-      const rows = Array.isArray(latest.locations) ? (latest.locations as DeliveryLocationView[]) : [];
-      const found = rows.find((loc) => locationCodesEqual(loc.iata, key));
-      if (!found) throw new Error(data.error ?? "This location is already configured");
-      const patch = await fetch(`/api/admin/delivery/${found.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: true }),
-      });
-      const patchData = await patch.json().catch(() => ({}));
-      if (!patch.ok) throw new Error(patchData.error ?? "Update failed");
-      return;
-    }
-    throw new Error(data.error ?? "Create failed");
-  }
-
-  async function togglePlace(code: string, on: boolean) {
-    setBusy(true);
-    setError(null);
-    try {
-      await setPlaceOnHomepage(code, on);
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function enableAllInCountry() {
-    setBusy(true);
-    setError(null);
-    try {
-      let current = locations;
-      for (const place of countryPlaces) {
-        const loc = current.find((row) => locationCodesEqual(row.iata, place.code));
-        if (loc?.isActive) continue;
-        await setPlaceOnHomepage(place.code, true, current);
-        const res = await fetch("/api/admin/delivery", { cache: "no-store" });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && Array.isArray(data.locations)) current = data.locations;
-      }
-      setLocations(current);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
-      await refresh();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function disableCountry() {
-    setBusy(true);
-    setError(null);
-    try {
-      const active = locations.filter(
-        (l) => l.isActive && l.countryIso2.toUpperCase() === selectedIso2,
-      );
-      for (const loc of active) {
-        await setPlaceOnHomepage(loc.iata, false, locations);
-      }
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setBusy(false);
-    }
+  function disableCountry() {
+    const codes = [...countryPlaces.map((p) => p.code), ...extraLocations.map((l) => l.iata)];
+    const targets = codes.filter((code) => isOn(code)).map((code) => ({ code, countryIso2: selectedIso2 }));
+    void setMany(targets, false);
   }
 
   function placeRow(place: SearchPlace) {
-    const loc = byCode.get(place.code);
-    const on = Boolean(loc?.isActive);
+    const on = isOn(place.code);
+    const saving = isPending(place.code);
     return (
-      <li key={place.code} className="border-b border-slate-100 py-3 last:border-0">
-        <label className="flex min-w-0 cursor-pointer items-center gap-3">
+      <li key={locationKey(place.code)} className="border-b border-slate-100 py-3 last:border-0">
+        <label className={`flex min-w-0 cursor-pointer items-center gap-3 ${saving ? "opacity-60" : ""}`}>
           <input
             type="checkbox"
             checked={on}
-            disabled={busy}
-            onChange={(e) => void togglePlace(place.code, e.target.checked)}
+            aria-busy={saving}
+            onChange={(e) => setPlace({ code: place.code, countryIso2: selectedIso2 }, e.target.checked)}
             className="h-4 w-4"
           />
           <span>
@@ -308,7 +204,7 @@ export function HomepageSearchCountries({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={busy || countryPlaces.length === 0}
+              disabled={bulkBusy || countryPlaces.length === 0}
               onClick={() => void enableAllInCountry()}
               className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
             >
@@ -316,7 +212,7 @@ export function HomepageSearchCountries({
             </button>
             <button
               type="button"
-              disabled={busy || !(activeCountByCountry[selectedIso2] > 0)}
+              disabled={bulkBusy || !(activeCountByCountry[selectedIso2] > 0)}
               onClick={() => void disableCountry()}
               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold disabled:opacity-50"
             >
