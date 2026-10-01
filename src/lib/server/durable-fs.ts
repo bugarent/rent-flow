@@ -75,6 +75,13 @@ async function ensureTable(pool: Pool): Promise<void> {
   await tableReady;
 }
 
+export async function pingJsonStore(): Promise<void> {
+  const pool = storePool();
+  if (!pool) throw new Error("DATABASE_URL is not set");
+  await ensureTable(pool);
+  await pool.query("SELECT 1");
+}
+
 function looksLikeJsonText(data: unknown): data is string {
   if (typeof data !== "string") return false;
   const t = data.trimStart();
