@@ -1,5 +1,5 @@
 import { dataFile } from "@/lib/persistent-paths";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "@/lib/server/durable-fs";
 import { dirname } from "node:path";
 import { hashSecret, verifySecret } from "@/lib/crypto";
 

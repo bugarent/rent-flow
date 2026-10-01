@@ -1,6 +1,6 @@
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "@/lib/server/durable-fs";
 import { randomBytes } from "node:crypto";
 import { dirname } from "node:path";
 import { resolveDataFile } from "@/lib/server/data-paths";

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomBytes } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "@/lib/server/durable-fs";
 import { ensureDataDir, resolveDataFile } from "@/lib/server/data-paths";
 
 export type InvoiceShareRecord = {

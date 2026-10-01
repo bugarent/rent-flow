@@ -2,7 +2,7 @@ import { dataRoot } from "@/lib/persistent-paths";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "@/lib/server/durable-fs";
 import { join } from "node:path";
 
 export type LiveChatRole = "assistant" | "user" | "system";

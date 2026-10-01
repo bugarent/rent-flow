@@ -4,7 +4,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool, type PoolClient } from "pg";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 
-const CLIENT_REV = 9;
+const CLIENT_REV = 10;
 const DB_COOLDOWN_MS = 300_000; // 5 min — avoid hammering a dead Postgres on every navigation
 
 const globalForPrisma = globalThis as unknown as {

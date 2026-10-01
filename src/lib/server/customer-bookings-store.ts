@@ -1,6 +1,6 @@
 import "server-only";
 
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "@/lib/server/durable-fs";
 import { randomUUID } from "node:crypto";
 import { BOOKING_REF_START } from "@/lib/ids";
 import { ensureDataDir, resolveDataFile } from "@/lib/server/data-paths";

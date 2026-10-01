@@ -1,6 +1,7 @@
 import "server-only";
 
-import { access, mkdir, rename } from "node:fs/promises";
+import { access, rename } from "node:fs/promises";
+import { mkdir } from "@/lib/server/durable-fs";
 import { dirname, join } from "node:path";
 import { dataRoot as persistentDataRoot } from "@/lib/persistent-paths";
 
@@ -53,7 +54,11 @@ export async function resolveDataFile(group: DataGroup, fileName: string): Promi
 
 export async function ensureDataDir(group?: DataGroup): Promise<string> {
   const dir = group ? join(ROOT(), group) : ROOT();
-  await mkdir(dir, { recursive: true });
+  try {
+    await mkdir(dir, { recursive: true });
+  } catch (error) {
+    console.warn("[data-paths] mkdir skipped", dir, error);
+  }
   return dir;
 }
 

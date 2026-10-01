@@ -1,6 +1,6 @@
 import "server-only";
 
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "@/lib/server/durable-fs";
 import { SITE_DOMAIN } from "@/lib/brand";
 import type { InvoiceIssuer } from "@/lib/invoices/types";
 import { ensureDataDir, resolveDataFile } from "@/lib/server/data-paths";

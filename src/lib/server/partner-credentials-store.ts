@@ -1,5 +1,5 @@
 import { dataRoot } from "@/lib/persistent-paths";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "@/lib/server/durable-fs";
 import { join } from "node:path";
 import {
   LOCAL_PARTNER_ID,

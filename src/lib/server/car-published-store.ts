@@ -1,5 +1,5 @@
 import { dataRoot } from "@/lib/persistent-paths";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "@/lib/server/durable-fs";
 import { join } from "node:path";
 
 const SNAP_STORE = join(dataRoot(), "car-published-snapshots.json");

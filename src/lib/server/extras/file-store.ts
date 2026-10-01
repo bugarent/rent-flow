@@ -1,6 +1,6 @@
 import "server-only";
 
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "@/lib/server/durable-fs";
 import {
   resolveCheckoutSlot,
 } from "@/lib/extras/checkout-slot";

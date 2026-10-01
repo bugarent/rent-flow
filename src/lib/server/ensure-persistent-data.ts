@@ -1,8 +1,9 @@
 import "server-only";
 
-import { cp, mkdir, readdir, stat } from "node:fs/promises";
+import { cp, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { dataRoot, uploadRoot } from "@/lib/persistent-paths";
+import { hydrateJsonStoreFiles, mkdir } from "@/lib/server/durable-fs";
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -38,8 +39,17 @@ async function copyMissing(source: string, destination: string) {
 export async function ensurePersistentData() {
   const cwdData = join(process.cwd(), ".data");
   const cwdUploads = join(process.cwd(), "public", "uploads");
-  await mkdir(dataRoot(), { recursive: true });
-  await mkdir(uploadRoot(), { recursive: true });
-  await copyMissing(cwdData, dataRoot());
-  await copyMissing(cwdUploads, uploadRoot());
+  try {
+    await mkdir(dataRoot(), { recursive: true });
+    await mkdir(uploadRoot(), { recursive: true });
+  } catch (error) {
+    console.warn("[persist] mkdir skipped", error);
+  }
+  try {
+    await copyMissing(cwdData, dataRoot());
+    await copyMissing(cwdUploads, uploadRoot());
+  } catch (error) {
+    console.warn("[persist] copy skipped", error);
+  }
+  await hydrateJsonStoreFiles();
 }

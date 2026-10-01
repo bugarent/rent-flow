@@ -692,3 +692,10 @@ model IntegrationSyncLog {
   @@index([integrationId, createdAt])
   @@index([status, createdAt])
 }
+
+/// Durable JSON documents for file-backed stores (Vercel /var/task is read-only).
+model JsonStore {
+  key       String   @id
+  payload   Json
+  updatedAt DateTime @updatedAt
+}

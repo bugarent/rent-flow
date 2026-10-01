@@ -1,6 +1,6 @@
 import "server-only";
 
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "@/lib/server/durable-fs";
 import { parsePartnerMessengers, type PartnerSocialPlatform } from "@/lib/partner";
 import { ensureDataDir, resolveDataFile } from "@/lib/server/data-paths";
 

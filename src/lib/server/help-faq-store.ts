@@ -1,7 +1,7 @@
 import { dataRoot } from "@/lib/persistent-paths";
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "@/lib/server/durable-fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { DEFAULT_HELP_FAQ, type HelpFaqConfig, type HelpFaqItem } from "@/lib/catalog/help-faq";

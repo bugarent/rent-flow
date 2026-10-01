@@ -1,5 +1,5 @@
 import { dataFile } from "@/lib/persistent-paths";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "@/lib/server/durable-fs";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { hashSecret, verifySecret } from "@/lib/crypto";
@@ -51,8 +51,12 @@ function readStore(): StoreFile {
 }
 
 function writeStore(store: StoreFile) {
-  mkdirSync(dirname(STORE_PATH), { recursive: true });
-  writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), "utf8");
+  try {
+    mkdirSync(dirname(STORE_PATH), { recursive: true });
+    writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), "utf8");
+  } catch (error) {
+    console.warn("[local-customers] file write failed", error);
+  }
 }
 
 export function listLocalCustomers(): LocalCustomerRecord[] {
