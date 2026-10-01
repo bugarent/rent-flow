@@ -17,32 +17,48 @@ import {
   writeFileSync as fsWriteFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
+import { Pool } from "pg";
 import { dataRoot, isServerlessHost, jsonStoreKey } from "@/lib/persistent-paths";
-import { isDbOfflineError } from "@/lib/server/db-errors";
 
 export { access, rename, cp, readdir, stat };
 
 let tableReady: Promise<void> | null = null;
+let jsonPool: Pool | null = null;
 
-type SqlClient = {
-  $executeRawUnsafe: (query: string, ...values: unknown[]) => Promise<unknown>;
-  $queryRawUnsafe: <T>(query: string, ...values: unknown[]) => Promise<T>;
-};
-
-async function sqlClient(): Promise<SqlClient | null> {
-  try {
-    const { isDbCircuitOpen, prisma } = await import("@/lib/prisma");
-    if (isDbCircuitOpen()) return null;
-    return prisma as unknown as SqlClient;
-  } catch {
-    return null;
-  }
+function connectionStringForPool(url: string) {
+  if (!/[?&]sslmode=/i.test(url)) return url;
+  const withoutSslMode = url
+    .replace(/([?&])sslmode=[^&]*/gi, "$1")
+    .replace(/[?&]$/, "")
+    .replace(/\?&/, "?")
+    .replace(/&&+/g, "&");
+  const joiner = withoutSslMode.includes("?") ? "&" : "?";
+  return `${withoutSslMode}${joiner}sslmode=no-verify`;
 }
 
-async function ensureTable(db: SqlClient): Promise<boolean> {
+/** Own pool so a short page-load timeout cannot skip an admin/partner save. */
+function storePool(): Pool | null {
+  const url = process.env.DATABASE_URL?.trim();
+  if (!url) return null;
+  if (!jsonPool) {
+    const connectionString = connectionStringForPool(url);
+    jsonPool = new Pool({
+      connectionString,
+      ssl: /sslmode=no-verify/i.test(connectionString) ? { rejectUnauthorized: false } : undefined,
+      connectionTimeoutMillis: 10_000,
+      query_timeout: 10_000,
+      idleTimeoutMillis: 20_000,
+      max: 2,
+    });
+    jsonPool.on("error", () => undefined);
+  }
+  return jsonPool;
+}
+
+async function ensureTable(pool: Pool): Promise<void> {
   if (!tableReady) {
-    tableReady = db
-      .$executeRawUnsafe(
+    tableReady = pool
+      .query(
         `CREATE TABLE IF NOT EXISTS "JsonStore" (
           "key" TEXT NOT NULL,
           "payload" JSONB NOT NULL,
@@ -51,14 +67,12 @@ async function ensureTable(db: SqlClient): Promise<boolean> {
         )`,
       )
       .then(() => undefined)
-      .catch(async (error: unknown) => {
+      .catch((error: unknown) => {
         tableReady = null;
-        const { markDbCircuitOpen } = await import("@/lib/prisma");
-        if (isDbOfflineError(error)) markDbCircuitOpen("json-store", error);
+        throw error;
       });
   }
   await tableReady;
-  return true;
 }
 
 function looksLikeJsonText(data: unknown): data is string {
@@ -76,45 +90,41 @@ function parseJsonPayload(raw: string): unknown {
 }
 
 async function readFromDb(absPath: string): Promise<string | null> {
-  const db = await sqlClient();
-  if (!db) return null;
+  const pool = storePool();
+  if (!pool) return null;
   try {
-    await ensureTable(db);
-    const rows = await db.$queryRawUnsafe<Array<{ payload: unknown }>>(
+    await ensureTable(pool);
+    const result = await pool.query<{ payload: unknown }>(
       `SELECT "payload" FROM "JsonStore" WHERE "key" = $1 LIMIT 1`,
-      jsonStoreKey(absPath),
+      [jsonStoreKey(absPath)],
     );
-    const row = rows[0];
+    const row = result.rows[0];
     if (!row) return null;
     return JSON.stringify(row.payload, null, 2);
   } catch (error) {
-    const { markDbCircuitOpen } = await import("@/lib/prisma");
-    if (isDbOfflineError(error)) markDbCircuitOpen("json-store-read", error);
+    console.warn("[json-store] read failed", jsonStoreKey(absPath), error);
     return null;
   }
 }
 
 async function writeToDb(absPath: string, text: string): Promise<boolean> {
   if (!looksLikeJsonText(text)) return false;
-  const db = await sqlClient();
-  if (!db) return false;
+  const pool = storePool();
+  if (!pool) return false;
   const key = jsonStoreKey(absPath);
   const payload = JSON.stringify(parseJsonPayload(text));
   try {
-    await ensureTable(db);
-    await db.$executeRawUnsafe(
+    await ensureTable(pool);
+    await pool.query(
       `INSERT INTO "JsonStore" ("key", "payload", "updatedAt")
        VALUES ($1, CAST($2 AS JSONB), CURRENT_TIMESTAMP)
        ON CONFLICT ("key") DO UPDATE
        SET "payload" = EXCLUDED."payload", "updatedAt" = CURRENT_TIMESTAMP`,
-      key,
-      payload,
+      [key, payload],
     );
     return true;
   } catch (error) {
-    const { markDbCircuitOpen } = await import("@/lib/prisma");
-    if (isDbOfflineError(error)) markDbCircuitOpen("json-store-write", error);
-    else console.warn("[json-store] write failed", key, error);
+    console.warn("[json-store] write failed", key, error);
     return false;
   }
 }
@@ -235,16 +245,16 @@ export function existsSync(path: string): boolean {
 }
 
 export async function hydrateJsonStoreFiles() {
-  const db = await sqlClient();
-  if (!db) return;
+  const pool = storePool();
+  if (!pool) return;
   try {
-    await ensureTable(db);
-    const rows = await db.$queryRawUnsafe<Array<{ key: string; payload: unknown }>>(
+    await ensureTable(pool);
+    const result = await pool.query<{ key: string; payload: unknown }>(
       `SELECT "key", "payload" FROM "JsonStore"`,
     );
     const root = dataRoot();
     await fsMkdir(root, { recursive: true });
-    for (const row of rows) {
+    for (const row of result.rows) {
       const dest = join(root, ...row.key.split("/").filter(Boolean));
       if (fsExistsSync(dest)) continue;
       await hydrateFile(dest, JSON.stringify(row.payload, null, 2));
