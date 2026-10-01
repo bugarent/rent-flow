@@ -1,4 +1,4 @@
-export const ADMIN_BASE = "/adminoperations";
+export const ADMIN_BASE = "/admin505";
 export const ADMIN_LOGIN = `${ADMIN_BASE}/login`;
 
 export const PARTNER_BASE = "/partner-portal";

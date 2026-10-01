@@ -8,8 +8,8 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "*",
         allow: ["/", "/api/health"],
         disallow: [
-          "/adminoperations",
-          "/adminoperations/",
+          "/admin505",
+          "/admin505/",
           "/partner-portal",
           "/partner-portal/",
           "/business-portal",

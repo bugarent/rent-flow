@@ -70,4 +70,4 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
-Write-Host "Database is ready. Refresh /adminoperations/financials" -ForegroundColor Green
+Write-Host "Database is ready. Refresh /admin505/financials" -ForegroundColor Green

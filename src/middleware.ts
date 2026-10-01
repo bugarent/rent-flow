@@ -148,8 +148,8 @@ export const config = {
   matcher: [
     "/account",
     "/account/:path*",
-    "/adminoperations",
-    "/adminoperations/:path*",
+    "/admin505",
+    "/admin505/:path*",
     "/partner-portal",
     "/partner-portal/:path*",
     "/business-portal",

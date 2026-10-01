@@ -66,6 +66,6 @@ export async function ensureTestAdmin() {
       },
     });
   } catch {
-    // Local bcrypt-hashed credentials still allow /adminoperations login if Postgres is down.
+    // Local bcrypt-hashed credentials still allow /admin505 login if Postgres is down.
   }
 }

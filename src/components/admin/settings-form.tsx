@@ -5,6 +5,7 @@ import { useBpLabels } from "@/components/admin/business-partners/labels";
 import { DEPOSIT_MAX_PERCENT, DEPOSIT_MIN_PERCENT } from "@/lib/brand";
 import { DEFAULT_FX_RATES } from "@/lib/fx";
 import { OperatingCountriesSettings } from "@/components/admin/operating-countries-settings";
+import { ADMIN_BASE } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 type GelFxDraft = {
@@ -449,7 +450,7 @@ export function AdminSettingsForm(props: {
 
       <p className="text-xs text-slate-500">
         Extra services and their daily price limits are managed under{" "}
-        <a className="font-semibold text-sky-700 hover:underline" href="/adminoperations/extras">
+        <a className="font-semibold text-sky-700 hover:underline" href={`${ADMIN_BASE}/extras`}>
           Extra services
         </a>
         .

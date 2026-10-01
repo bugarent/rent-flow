@@ -2,6 +2,7 @@
 
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import type { AdminDictionary } from "@/lib/i18n/admin-dictionaries";
+import { ADMIN_BASE } from "@/lib/routes";
 
 type PageKey = keyof AdminDictionary["pages"];
 
@@ -30,7 +31,7 @@ export function AdminDeliverySearchLink() {
   const { dictionary } = useAdminLocale();
   return (
     <a
-      href="/adminoperations"
+      href={ADMIN_BASE}
       className="mb-8 flex items-center justify-between gap-4 rounded-2xl border border-sky-200 bg-sky-50 px-5 py-4 text-sm text-sky-950 hover:border-sky-400"
     >
       <span>
