@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { databaseUrl } from "@/lib/database-url";
 
 /**
  * Lightweight readiness probe for load balancers / deploy checks.
@@ -8,6 +9,16 @@ function errorSummary(error: unknown): string {
   const err = error as { code?: string; message?: string };
   const text = `${err?.code ?? ""} ${err?.message ?? String(error)}`;
   return text.replace(/postgres(ql)?:\/\/\S+/gi, "postgres://***").trim().slice(0, 160);
+}
+
+/** `user@host` of the configured database — enough to spot a stale URL, never the password. */
+function databaseTarget(): string | undefined {
+  try {
+    const u = new URL(databaseUrl());
+    return `${decodeURIComponent(u.username)}@${u.hostname}`;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function GET() {
@@ -47,6 +58,7 @@ export async function GET() {
     db,
     dbError: dbError || undefined,
     hasDatabaseUrl,
+    dbTarget: databaseTarget(),
     databaseUrlNeedsCleanup: databaseUrlNeedsCleanup || undefined,
     store,
     storeError: storeError || undefined,
