@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { PopularAirportCard } from "@/lib/catalog/popular-airports";
@@ -9,7 +9,8 @@ import { usePreferences } from "@/components/providers/preferences-context";
 import { airportCarsLabel } from "@/lib/i18n/airport-cars-label";
 import { placeLabel } from "@/lib/i18n/place-label";
 
-const PAGE_SIZE = 3;
+const AUTO_MS = 4000;
+const SLIDE_MS = 650;
 
 function AirportCard({
   airport,
@@ -51,19 +52,95 @@ export function PopularAirports({
   airports: PopularAirportCard[];
   layout?: PopularAirportsLayout;
 }) {
-  const { dictionary, locale } = usePreferences();
-  const [page, setPage] = useState(0);
+  const { dictionary, locale, dir } = usePreferences();
+  const scroller = useRef<HTMLDivElement>(null);
+  const scrolling = useRef(false);
+  const [paused, setPaused] = useState(false);
+  const [lead, setLead] = useState(0);
+  const rtl = dir === "rtl";
+  const canLoop = airports.length > 1;
+  const slides = canLoop ? [...airports, ...airports, ...airports] : airports;
 
-  const pageCount = Math.max(1, Math.ceil(airports.length / PAGE_SIZE));
-  const safePage = Math.min(page, pageCount - 1);
+  const metrics = useCallback(() => {
+    const node = scroller.current;
+    const card = node?.querySelector("article");
+    if (!node || !(card instanceof HTMLElement)) {
+      return { step: 320, cycle: 320 * Math.max(airports.length, 1) };
+    }
+    const gap = Number.parseFloat(getComputedStyle(node).columnGap || getComputedStyle(node).gap) || 16;
+    const step = card.offsetWidth + gap;
+    return { step, cycle: step * airports.length };
+  }, [airports.length]);
 
-  const visible = useMemo(() => {
-    const start = safePage * PAGE_SIZE;
-    return airports.slice(start, start + PAGE_SIZE);
-  }, [airports, safePage]);
+  const alignToCard = useCallback(
+    (scrollLeft: number) => {
+      const { cycle, step } = metrics();
+      if (cycle <= 0 || step <= 0) return scrollLeft;
+      let x = scrollLeft;
+      const min = cycle;
+      const max = cycle * 2;
+      while (x >= max) x -= cycle;
+      while (x < min) x += cycle;
+      const index = Math.round((x - min) / step);
+      return min + index * step;
+    },
+    [metrics],
+  );
 
-  const canPrev = safePage > 0;
-  const canNext = safePage < pageCount - 1;
+  const applyStart = useCallback(() => {
+    const node = scroller.current;
+    if (!node || !canLoop) return;
+    node.scrollLeft = metrics().cycle;
+  }, [canLoop, metrics]);
+
+  const normalizeLoop = useCallback(() => {
+    const node = scroller.current;
+    if (!node || !canLoop) return;
+    node.scrollLeft = alignToCard(node.scrollLeft);
+  }, [alignToCard, canLoop]);
+
+  const scrollByCard = useCallback(
+    (dirStep: -1 | 1) => {
+      const node = scroller.current;
+      if (!node || scrolling.current) return;
+      scrolling.current = true;
+      const { step } = metrics();
+      node.scrollBy({ left: step * dirStep * (rtl ? -1 : 1), behavior: "smooth" });
+      setLead((current) => (current + dirStep + airports.length) % airports.length);
+      window.setTimeout(() => {
+        normalizeLoop();
+        scrolling.current = false;
+      }, SLIDE_MS + 50);
+    },
+    [airports.length, metrics, normalizeLoop, rtl],
+  );
+
+  useLayoutEffect(() => {
+    applyStart();
+    const node = scroller.current;
+    if (!node) return;
+    const raf = window.requestAnimationFrame(() => applyStart());
+    const ro = new ResizeObserver(() => {
+      if (scrolling.current || !canLoop) return;
+      node.scrollLeft = alignToCard(node.scrollLeft);
+    });
+    ro.observe(node);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [alignToCard, applyStart, canLoop]);
+
+  useEffect(() => {
+    if (!canLoop || paused) return;
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (media.matches) return;
+    const id = window.setInterval(() => scrollByCard(1), AUTO_MS);
+    return () => window.clearInterval(id);
+  }, [canLoop, paused, scrollByCard]);
+
+  const arrowClass =
+    "flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0b1f4b] shadow-sm transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1d6fe8]";
 
   return (
     <section id="airports" className="relative w-full min-w-0 overflow-x-clip bg-white px-4 py-12 sm:py-16">
@@ -72,47 +149,48 @@ export function PopularAirports({
           <h2 className="min-w-0 flex-1 text-2xl font-extrabold text-[#0b1f4b] sm:text-3xl">
             {dictionary.home.popularAirports}
           </h2>
-          {pageCount > 1 ? (
+          {canLoop ? (
             <div
               className="ml-auto flex shrink-0 items-center gap-2"
               role="group"
               aria-label={dictionary.home.popularAirports}
             >
-              <button
-                type="button"
-                aria-label="Previous airports"
-                disabled={!canPrev}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0b1f4b] shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1d6fe8]"
-              >
+              <button type="button" aria-label="Previous airports" onClick={() => scrollByCard(-1)} className={arrowClass}>
                 <ChevronLeft className="h-5 w-5" aria-hidden />
               </button>
-              <button
-                type="button"
-                aria-label="Next airports"
-                disabled={!canNext}
-                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0b1f4b] shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1d6fe8]"
-              >
+              <button type="button" aria-label="Next airports" onClick={() => scrollByCard(1)} className={arrowClass}>
                 <ChevronRight className="h-5 w-5" aria-hidden />
               </button>
             </div>
           ) : null}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-6">
-          {visible.map((airport) => (
-            <AirportCard
-              key={`${airport.iata}-${airport.rank}-${airport.name}-${safePage}`}
-              airport={airport}
-              locale={locale}
-            />
-          ))}
+        <div
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+          onFocus={() => setPaused(true)}
+          onBlur={() => setPaused(false)}
+        >
+          <div
+            ref={scroller}
+            onPointerDown={() => setPaused(true)}
+            onPointerUp={() => setPaused(false)}
+            onPointerCancel={() => setPaused(false)}
+            className="grid grid-flow-col grid-rows-1 auto-cols-[100%] gap-4 overflow-x-auto pb-1 sm:auto-cols-[calc((100%-1.25rem)/2)] sm:gap-5 lg:auto-cols-[calc((100%-3rem)/3)] lg:gap-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {slides.map((airport, index) => (
+              <AirportCard
+                key={`${airport.iata}-${airport.rank}-${index}`}
+                airport={airport}
+                locale={locale}
+              />
+            ))}
+          </div>
         </div>
 
-        {pageCount > 1 ? (
+        {canLoop ? (
           <p className="mt-4 text-center text-xs font-medium text-slate-500 sm:mt-5">
-            {safePage + 1} / {pageCount}
+            {lead + 1} / {airports.length}
           </p>
         ) : null}
       </div>
