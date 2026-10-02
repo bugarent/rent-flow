@@ -48,15 +48,20 @@ export async function carIdsBookedInRange(
 
 async function mergeFileBookedCarIds(into: Set<string>, rangeStart: Date, rangeEnd: Date) {
   try {
-    const [{ listFileCars }, { listFileBookingsForCars }] = await Promise.all([
-      import("@/lib/server/partner-cars-store"),
-      import("@/lib/server/customer-bookings-store"),
-    ]);
-    const carIds = (await listFileCars()).map((c) => c.id);
-    if (!carIds.length) return;
-    const fileBookings = await listFileBookingsForCars(carIds, rangeStart, rangeEnd);
+    const { listAllFileBookings } = await import("@/lib/server/customer-bookings-store");
+    const fromMs = rangeStart.getTime();
+    const toMs = rangeEnd.getTime();
+    const fileBookings = await listAllFileBookings();
     for (const b of fileBookings) {
-      if (b.status === "PENDING" || b.status === "CONFIRMED") into.add(b.carId);
+      if (b.status !== "PENDING" && b.status !== "CONFIRMED") continue;
+      if (!b.carId) continue;
+      const pickup = new Date(b.pickupAt).getTime();
+      const buffer = new Date(
+        b.bufferEndsAt || computeBufferEndsAt(new Date(b.dropoffAt)),
+      ).getTime();
+      if (!Number.isFinite(pickup) || !Number.isFinite(buffer)) continue;
+      // Occupied through drop-off plus the 12h prep window.
+      if (pickup < toMs && buffer > fromMs) into.add(b.carId);
     }
   } catch {
     /* file store optional */

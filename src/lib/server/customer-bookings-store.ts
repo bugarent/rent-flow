@@ -127,6 +127,12 @@ export async function createFileBooking(
   store.bookings.unshift(row);
   store.nextSequential = sequentialNumber + 1;
   await writeStore(store);
+  try {
+    const { clearAvailabilityCache } = await import("@/lib/server/cache/availability-cache");
+    await clearAvailabilityCache();
+  } catch {
+    /* search must still see the booking on the next uncached read */
+  }
   return row;
 }
 
