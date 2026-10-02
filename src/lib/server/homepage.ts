@@ -3,7 +3,7 @@ import { VEHICLE_CATEGORIES } from "@/lib/catalog/categories";
 import { getPopularAirports as getStaticPopularAirports } from "@/lib/catalog/popular-airports";
 import type { PopularAirportsLayout } from "@/lib/catalog/popular-airports-layout";
 import type { MappedCarModel } from "@/lib/catalog/car-models";
-import { parseMappedModels, summarizeMappedModels } from "@/lib/cars/category-mapping";
+import { summarizeMappedModels } from "@/lib/cars/category-mapping";
 import { listHomepageCategories } from "@/lib/server/homepage-categories-store";
 import { getPopularAirportsLayout as readPopularAirportsLayout } from "@/lib/server/homepage-airports-layout-store";
 
@@ -48,24 +48,6 @@ export async function ensureHomepageDefaults() {
               sortOrder: index,
             })),
           });
-        } else {
-          // Backfill empty mappings for default slugs after schema upgrade
-          const existing = await prisma.homepageCategory.findMany({
-            select: { id: true, slug: true, mappedModels: true },
-          });
-          for (const row of existing) {
-            const mapped = parseMappedModels(row.mappedModels);
-            if (mapped.length > 0) continue;
-            const defaults = VEHICLE_CATEGORIES.find((c) => c.id === row.slug);
-            if (!defaults?.mappedModels.length) continue;
-            await prisma.homepageCategory.update({
-              where: { id: row.id },
-              data: {
-                mappedModels: defaults.mappedModels,
-                details: summarizeMappedModels(defaults.mappedModels) || defaults.model,
-              },
-            });
-          }
         }
 
         if (airportCount === 0) {

@@ -69,20 +69,6 @@ export function HomepageContentManager({
     }
   }
 
-  const refreshCategories = async () => {
-    const res = await fetch("/api/admin/homepage/categories");
-    const data = await readJsonResponse<Category[] | { error?: string }>(res);
-    if (!res.ok) {
-      throw new Error(
-        data && typeof data === "object" && "error" in data && data.error
-          ? String(data.error)
-          : "Could not reload categories",
-      );
-    }
-    if (!Array.isArray(data)) throw new Error("Invalid categories response");
-    setCategories(data);
-  };
-
   const refreshAirports = async () => {
     const res = await fetch("/api/admin/homepage/airports");
     const data = await readJsonResponse<Airport[] | { error?: string }>(res);
@@ -150,11 +136,6 @@ export function HomepageContentManager({
         return [...prev, data];
       });
       resetCategoryForm();
-      try {
-        await refreshCategories();
-      } catch {
-        /* list already updated from response */
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : e.couldNotSaveCategory);
     } finally {
@@ -173,11 +154,6 @@ export function HomepageContentManager({
       }
       setCategories((prev) => prev.filter((c) => c.id !== id));
       if (editingCategory?.id === id) resetCategoryForm();
-      try {
-        await refreshCategories();
-      } catch {
-        /* list already updated locally */
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : e.couldNotDeleteCategory);
     }
@@ -238,11 +214,6 @@ export function HomepageContentManager({
         return [...prev, { ...data, isActive: true }];
       });
       setPanelForm(blankCategoryForm());
-      try {
-        await refreshCategories();
-      } catch {
-        /* already updated */
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : e.couldNotSaveCategory);
     } finally {

@@ -3,7 +3,6 @@ import "server-only";
 
 import { mkdir, readFile, writeFile } from "@/lib/server/durable-fs";
 import { join } from "node:path";
-import { VEHICLE_CATEGORIES } from "@/lib/catalog/categories";
 import type { MappedCarModel } from "@/lib/catalog/car-models";
 import { parseMappedModels, summarizeMappedModels } from "@/lib/cars/category-mapping";
 import { prisma } from "@/lib/prisma";
@@ -43,27 +42,11 @@ function slugify(value: string) {
     .slice(0, 40) || "category";
 }
 
-function defaultCategories(): StoredHomepageCategory[] {
-  const now = new Date().toISOString();
-  return VEHICLE_CATEGORIES.map((c, index) => ({
-    id: c.id,
-    slug: c.id,
-    name: c.name,
-    details: summarizeMappedModels(c.mappedModels ?? []) || c.model,
-    imageUrl: c.image,
-    mappedModels: c.mappedModels ?? [],
-    sortOrder: index,
-    isActive: true,
-    createdAt: now,
-    updatedAt: now,
-  }));
-}
-
 async function readFileStore(): Promise<StoredHomepageCategory[]> {
   try {
     const raw = await readFile(DATA_FILE, "utf8");
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return defaultCategories();
+    if (!Array.isArray(parsed)) return [];
     return parsed.map((row, index) => {
       const item = row as Partial<StoredHomepageCategory>;
       return {
@@ -90,10 +73,29 @@ async function writeFileStore(rows: StoredHomepageCategory[]) {
   revalidatePublishedContent();
 }
 
-/** Copy the database list into the JSON store the homepage reads immediately. */
-async function publishFromDb(db: CategoryDelegate) {
-  const rows = await db.findMany({ orderBy: { sortOrder: "asc" } });
-  await writeFileStore(rows.map(toStored));
+/** Keep the saved row in the published file. Do not re-read the table — a late read puts the old cars back. */
+async function publishSaved(row: StoredHomepageCategory) {
+  let rows = await readFileStore();
+  if (!rows.length) {
+    const db = getDbDelegate();
+    if (db) {
+      try {
+        rows = (await db.findMany({ orderBy: { sortOrder: "asc" } })).map(toStored);
+      } catch {
+        rows = [];
+      }
+    }
+  }
+  const index = rows.findIndex((item) => item.id === row.id);
+  if (index >= 0) rows[index] = row;
+  else rows.push(row);
+  rows.sort((a, b) => a.sortOrder - b.sortOrder);
+  await writeFileStore(rows);
+}
+
+async function publishRemoved(id: string) {
+  const rows = await readFileStore();
+  await writeFileStore(rows.filter((item) => item.id !== id));
 }
 
 /** Prefer file store when Prisma delegate is missing or DB is unreachable. */
@@ -220,8 +222,9 @@ export async function createHomepageCategory(input: {
         isActive: true,
       },
     });
-    await publishFromDb(db);
-    return toStored(row);
+    const stored = toStored(row);
+    await publishSaved(stored);
+    return stored;
   } catch (error) {
     // Retry without isActive if column is missing until migration.
     try {
@@ -242,8 +245,9 @@ export async function createHomepageCategory(input: {
           sortOrder: (max._max.sortOrder ?? -1) + 1,
         },
       });
-      await publishFromDb(db);
-      return { ...toStored(row), isActive: true };
+      const stored = { ...toStored(row), isActive: true };
+      await publishSaved(stored);
+      return stored;
     } catch {
       console.warn("[homepage-categories] DB create failed, using file store:", error);
       return createInFileStore(payload);
@@ -307,13 +311,14 @@ export async function updateHomepageCategory(
     }
     try {
       const row = await db.update({ where: { id }, data });
-      await publishFromDb(db);
-      return toStored(row);
+      const stored = toStored(row);
+      await publishSaved(stored);
+      return stored;
     } catch {
       const { isActive: _ignored, ...withoutActive } = data;
       const row = await db.update({ where: { id }, data: withoutActive });
-      await publishFromDb(db);
       const stored = toStored(row);
+      await publishSaved(stored);
       if (input.isActive !== undefined) {
         return applyFileUpdate();
       }
@@ -340,7 +345,7 @@ export async function deleteHomepageCategory(id: string): Promise<void> {
 
   try {
     await db.delete({ where: { id } });
-    await publishFromDb(db);
+    await publishRemoved(id);
   } catch (error) {
     console.warn("[homepage-categories] DB delete failed, using file store:", error);
     await deleteFromFile();
@@ -374,8 +379,7 @@ export async function reorderHomepageCategories(orderedIds: string[]): Promise<S
     await Promise.all(
       orderedIds.map((id, index) => db.update({ where: { id }, data: { sortOrder: index } })),
     );
-    await publishFromDb(db);
-    return listHomepageCategories();
+    return applyFileReorder();
   } catch (error) {
     console.warn("[homepage-categories] DB reorder failed, using file store:", error);
     return applyFileReorder();

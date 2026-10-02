@@ -6,8 +6,6 @@ import {
   createHomepageCategory,
   listHomepageCategories,
 } from "@/lib/server/homepage-categories-store";
-import { ensureHomepageDefaults } from "@/lib/server/homepage";
-
 async function requireAdmin() {
   const session = await getAdminSession();
   if (!session || session.user.role !== "ADMIN") return null;
@@ -31,11 +29,6 @@ export async function GET() {
   try {
     if (!(await requireAdmin())) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 });
-    }
-    try {
-      await ensureHomepageDefaults();
-    } catch {
-      /* DB may be offline — file store still works */
     }
     const rows = await listHomepageCategories();
     return NextResponse.json(Array.isArray(rows) ? rows : []);
