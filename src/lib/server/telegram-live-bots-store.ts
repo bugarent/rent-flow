@@ -84,7 +84,7 @@ export async function saveTelegramLiveBotsConfig(
   return next;
 }
 
-/** The bot marked active for live-chat operator notifications. */
+/** The bot that receives new booking notices. */
 export async function getActiveTelegramLiveBot(): Promise<TelegramLiveBot | null> {
   const { bots } = await getTelegramLiveBotsConfig();
   return bots.find((b) => b.active && b.botToken.trim() && b.chatId.trim()) ?? null;

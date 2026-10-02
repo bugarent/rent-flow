@@ -9,7 +9,6 @@ import {
   type LiveChatSession,
   type OperatorMode,
 } from "@/lib/server/live-chat/store";
-import { getActiveTelegramLiveBot } from "@/lib/server/telegram-live-bots-store";
 import { sendTelegramMessageWithToken } from "@/lib/telegram/send-with-token";
 import { notifyAdminTelegram } from "@/lib/telegram/notify-admin";
 import { getPlatformSettings } from "@/lib/server/platform-settings-store";
@@ -46,13 +45,7 @@ function activeConfirm(locale: string): string {
 }
 
 async function notifyLiveChatTelegram(text: string): Promise<boolean> {
-  const active = await getActiveTelegramLiveBot();
-  if (active?.botToken && active.chatId) {
-    const sent = await sendTelegramMessageWithToken(active.botToken, active.chatId, text);
-    if (sent.ok) return true;
-  }
-
-  // Fallback: platform bot + admin chat ids
+  // The homepage bot is reserved for booking notices. Live chat uses the platform admin chat.
   const { sent } = await notifyAdminTelegram(text);
   if (sent > 0) return true;
 

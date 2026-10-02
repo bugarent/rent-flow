@@ -5,9 +5,9 @@ export type TelegramLiveBot = {
   /** Without @ */
   botUsername: string;
   botToken: string;
-  /** Telegram chat/group that receives live-chat handoffs */
+  /** Telegram chat that receives new booking notices */
   chatId: string;
-  /** Only one bot may be active for live-chat notifications */
+  /** The one bot that receives booking notices */
   active: boolean;
   createdAt: string;
   updatedAt: string;

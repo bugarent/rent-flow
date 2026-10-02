@@ -3,8 +3,6 @@ import { z } from "zod";
 import { enqueueOperatorRequest } from "@/lib/server/live-chat/operator-queue";
 import { getLiveChatSession } from "@/lib/server/live-chat/store";
 import { isOperatorHours, operatorHoursLabel } from "@/lib/server/live-chat/operator-hours";
-import { getActiveTelegramLiveBot } from "@/lib/server/telegram-live-bots-store";
-
 const schema = z.object({
   sessionId: z.string().uuid(),
 });
@@ -35,17 +33,6 @@ export async function POST(req: Request) {
             "Operator handoff is only available after the assistant cannot answer and you request live help.",
         },
         { status: 403 },
-      );
-    }
-
-    const activeBot = await getActiveTelegramLiveBot();
-    if (!activeBot) {
-      return NextResponse.json(
-        {
-          error:
-            "No active Telegram bot configured. Add and activate one in Admin → Telegram ბოტები (Live Chat).",
-        },
-        { status: 503 },
       );
     }
 

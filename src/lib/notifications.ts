@@ -175,6 +175,26 @@ async function deliverBookingNotice(input: {
     }
   }
 
+  if (input.event === "BOOKING_NEW") {
+    try {
+      const { notifyBookingTelegramBot } = await import("@/lib/telegram/notify-booking-bot");
+      await notifyBookingTelegramBot({
+        carLabel: input.booking.carLabel,
+        pickupIata: input.booking.pickupIata,
+        dropoffIata: input.booking.dropoffIata,
+        pickupAddress: input.booking.pickupAddress,
+        dropoffAddress: input.booking.dropoffAddress,
+        pickupAt: input.booking.pickupAt,
+        dropoffAt: input.booking.dropoffAt,
+        totalPriceEur: input.booking.totalPriceEur,
+        paidEur: input.booking.depositPaidEur,
+        dueOnSiteEur: input.booking.balanceDueEur,
+      });
+    } catch (error) {
+      console.warn("[notify] booking bot failed", error);
+    }
+  }
+
   const chats = [...new Set([...input.partnerChatIds, ...(await adminChatIds())].map((id) => id.trim()).filter(Boolean))];
   for (const chatId of chats) {
     const sent = await sendTelegramMessage(chatId, text);
@@ -300,7 +320,35 @@ export async function notifyFileBookingEvent(
   const { getFileCar } = await import("@/lib/server/partner-cars-store");
   const fileCar = await getFileCar(booking.carId);
   if (!fileCar) {
-    console.warn("[notify] file booking missing car", booking.id, booking.carId);
+    let carLabel = booking.carId;
+    try {
+      const car = await prisma.car.findUnique({
+        where: { id: booking.carId },
+        select: { make: true, model: true, year: true },
+      });
+      if (car) carLabel = `${car.make} ${car.model} ${car.year}`.replace(/\s+/g, " ").trim();
+    } catch {
+      /* booking notice still goes out with the car id */
+    }
+    if (event === "BOOKING_NEW") {
+      try {
+        const { notifyBookingTelegramBot } = await import("@/lib/telegram/notify-booking-bot");
+        await notifyBookingTelegramBot({
+          carLabel,
+          pickupIata: booking.pickupAirportIata,
+          dropoffIata: booking.dropoffAirportIata,
+          pickupAddress: booking.pickupAddress,
+          dropoffAddress: booking.dropoffAddress,
+          pickupAt: new Date(booking.pickupAt),
+          dropoffAt: new Date(booking.dropoffAt),
+          totalPriceEur: Number(booking.totalPriceEur) || 0,
+          paidEur: Number(booking.depositPaidEur) || 0,
+          dueOnSiteEur: Number(booking.balanceDueEur) || 0,
+        });
+      } catch (error) {
+        console.warn("[notify] booking bot failed", error);
+      }
+    }
     return;
   }
 
