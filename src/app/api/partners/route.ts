@@ -2,7 +2,7 @@ import type { Messenger } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { FLEET_AGE_RANGES, PARTNER_SOCIAL_PLATFORMS } from "@/lib/partner";
+import { FLEET_AGE_RANGES, PARTNER_SOCIAL_PLATFORMS, isStrongPartnerPassword } from "@/lib/partner";
 import { setPartnerAirports } from "@/lib/server/partner-airports";
 import { airportsForCountries } from "@/lib/catalog/operating-regions";
 import { formatInternationalPhone } from "@/lib/catalog/dial-codes";
@@ -25,30 +25,57 @@ function asMessenger(value: string | undefined): Messenger {
 const fleetAgeValues = FLEET_AGE_RANGES.map((r) => r.value) as [string, ...string[]];
 const socialValues = PARTNER_SOCIAL_PLATFORMS.map((p) => p.value) as [string, ...string[]];
 
-const applicationSchema = z.object({
-  firstName: z.string().trim().min(1).max(80),
-  lastName: z.string().trim().min(1).max(80),
-  kind: z.enum(["COMPANY", "PRIVATE"]),
-  identificationNumber: z.string().trim().min(5).max(40),
-  email: z.string().email(),
-  phone: z.string().trim().min(8).max(40),
-  phoneCountryIso2: z.string().length(2),
-  secondaryPhone: z.string().trim().min(8).max(40).optional(),
-  secondaryPhoneCountryIso2: z.string().length(2).optional(),
-  messengers: z.array(z.enum(socialValues)).min(1),
-  fleetSize: z.number().int().min(1).max(10000),
-  fleetAgeRange: z.enum(fleetAgeValues),
-  countryIso2s: z.array(z.string().length(2)).min(1),
-});
+const applicationSchema = z
+  .object({
+    firstName: z.string().trim().min(1).max(80),
+    lastName: z.string().trim().min(1).max(80),
+    kind: z.enum(["COMPANY", "PRIVATE"]),
+    identificationNumber: z.string().trim().min(5).max(40),
+    email: z.string().email(),
+    phone: z.string().trim().min(8).max(40),
+    phoneCountryIso2: z.string().length(2),
+    secondaryPhone: z.string().trim().min(8).max(40).optional(),
+    secondaryPhoneCountryIso2: z.string().length(2).optional(),
+    messengers: z.array(z.enum(socialValues)).min(1),
+    fleetSize: z.number().int().min(1).max(10000),
+    fleetAgeRange: z.enum(fleetAgeValues),
+    countryIso2s: z.array(z.string().length(2)).min(1),
+    password: z.string().min(6).max(128),
+    confirmPassword: z.string().min(6).max(128),
+  })
+  .refine((value) => value.password === value.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  })
+  .refine((value) => isStrongPartnerPassword(value.password), {
+    message: "Password must be at least 6 characters and include uppercase, lowercase, and a number",
+    path: ["password"],
+  });
+
+async function rememberPartnerPassword(partnerId: string, email: string, password: string) {
+  try {
+    const { setPartnerCredentials } = await import("@/lib/server/partner-credentials-store");
+    await setPartnerCredentials(partnerId, email, password);
+  } catch (error) {
+    console.warn("[partners] could not store cabinet password:", error);
+  }
+}
 
 async function saveViaFile(input: {
   snapshot: PartnerApplicationMessageSnapshot;
   contactName: string;
   secondaryPhone: string | null;
   secondaryPhoneCountryIso2: string | null;
+  password: string;
 }) {
   try {
     const { partner, reapplied } = await createOrReapplyFilePartner(input);
+    try {
+      const { setPartnerCredentials } = await import("@/lib/server/partner-credentials-store");
+      await setPartnerCredentials(partner.id, input.snapshot.email, input.password);
+    } catch {
+      /* cabinet password is applied again when an admin approves */
+    }
     return NextResponse.json(
       {
         partnerId: partner.id,
@@ -86,7 +113,7 @@ async function saveViaFile(input: {
   }
 }
 
-/** Step 1 — public partner application (no password yet). */
+/** Public partner application. The email and password become the cabinet login after approval. */
 export async function POST(req: Request) {
   try {
     const body = applicationSchema.parse(await req.json());
@@ -143,6 +170,7 @@ export async function POST(req: Request) {
       contactName,
       secondaryPhone: secondaryPhone || null,
       secondaryPhoneCountryIso2: body.secondaryPhoneCountryIso2?.toUpperCase() || null,
+      password: body.password,
     };
 
     try {
@@ -241,6 +269,8 @@ export async function POST(req: Request) {
           console.warn("[partners] could not attach airports yet:", locError);
         }
 
+        await rememberPartnerPassword(updated.id, email, body.password);
+
         return NextResponse.json(
           {
             partnerId: updated.id,
@@ -289,6 +319,8 @@ export async function POST(req: Request) {
         console.warn("[partners] could not attach airports yet:", locError);
       }
 
+      await rememberPartnerPassword(partner.id, email, body.password);
+
       return NextResponse.json(
         {
           partnerId: partner.id,
@@ -330,6 +362,7 @@ export async function POST(req: Request) {
               sequentialNumber,
             },
           });
+          await rememberPartnerPassword(partner.id, email, body.password);
           return NextResponse.json(
             {
               partnerId: partner.id,

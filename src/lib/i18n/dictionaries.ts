@@ -182,6 +182,8 @@ export type Dictionary = {
     firstName: string;
     lastName: string;
     email: string;
+    password: string;
+    confirmPassword: string;
     entityType: string;
     companyType: string;
     companyHint: string;
@@ -535,6 +537,8 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       firstName: "First name",
       lastName: "Last name",
       email: "Email address",
+      password: "Password",
+      confirmPassword: "Confirm password",
       entityType: "Entity type",
       companyType: "Company",
       companyHint: "I have a company",
@@ -561,7 +565,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       noCodes: "No matching country codes.",
       received: "Application received",
       receivedBody:
-        "An administrator will review your request. After approval, the email you provided will receive moderation approval rights so you can complete the final registration step with that email and wait for your personal cabinet to be activated.",
+        "An administrator will review your request. If it is approved, this email and password become your partner cabinet login.",
       done: "Done",
       fillAll: "Please complete every required field before submitting.",
       messengersRequired: "Select at least one active messenger.",
@@ -893,6 +897,8 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       firstName: "სახელი",
       lastName: "გვარი",
       email: "ელფოსტა",
+      password: "პაროლი",
+      confirmPassword: "გაიმეორეთ პაროლი",
       entityType: "სუბიექტის ტიპი",
       companyType: "კომპანია",
       companyHint: "მაქვს კომპანია",
@@ -919,7 +925,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       noCodes: "შესაბამისი ქვეყნის კოდი ვერ მოიძებნა.",
       received: "განაცხადი მიღებულია",
       receivedBody:
-        "ადმინისტრატორი განიხილავს თქვენს მოთხოვნას. დამტკიცების შემდეგ თქვენს მიერ მითითებული მეილი მიიღებს მოდერაციის დამტკიცების უფლებას, რათა აღნიშნული მეილით გაიაროთ რეგისტრაციის ბოლო ეტაპი და დაელოდოთ პირადი კაბინეტის გააქტიურებას.",
+        "ადმინისტრატორი განიხილავს განაცხადს. დადებითი მოდერაციის შემდეგ ეს ელფოსტა და პაროლი გახდება პარტნიორის კაბინეტში შესვლის მონაცემები.",
       done: "დასრულებულია",
       fillAll: "გაგზავნამდე შეავსეთ ყველა სავალდებულო ველი.",
       messengersRequired: "აირჩიეთ სულ მცირე ერთი აქტიური მესენჯერი.",
@@ -1253,6 +1259,8 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       firstName: "Имя",
       lastName: "Фамилия",
       email: "Электронная почта",
+      password: "Пароль",
+      confirmPassword: "Повторите пароль",
       entityType: "Тип заявителя",
       companyType: "Компания",
       companyHint: "У меня есть компания",
@@ -1612,6 +1620,8 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       firstName: "Prénom",
       lastName: "Nom",
       email: "Adresse e-mail",
+      password: "Mot de passe",
+      confirmPassword: "Confirmez le mot de passe",
       entityType: "Type d'entité",
       companyType: "Société",
       companyHint: "J'ai une société",
@@ -1971,6 +1981,8 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       firstName: "Vorname",
       lastName: "Nachname",
       email: "E-Mail-Adresse",
+      password: "Passwort",
+      confirmPassword: "Passwort wiederholen",
       entityType: "Art des Antragstellers",
       companyType: "Unternehmen",
       companyHint: "Ich habe ein Unternehmen",
@@ -2330,6 +2342,8 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       firstName: "Imię",
       lastName: "Nazwisko",
       email: "Adres e-mail",
+      password: "Hasło",
+      confirmPassword: "Powtórz hasło",
       entityType: "Typ podmiotu",
       companyType: "Firma",
       companyHint: "Mam firmę",
@@ -2686,6 +2700,8 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       firstName: "الاسم الأول",
       lastName: "اسم العائلة",
       email: "البريد الإلكتروني",
+      password: "كلمة المرور",
+      confirmPassword: "تأكيد كلمة المرور",
       entityType: "نوع الجهة",
       companyType: "شركة",
       companyHint: "لدي شركة",

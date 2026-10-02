@@ -18,9 +18,14 @@ function matchesCountry(country: CountryOption, query: string) {
 export function OperatingCountriesHover({
   countryIso2s,
   onChange,
+  catalog = "active",
+  invalid = false,
 }: {
   countryIso2s: string[];
   onChange: (iso2s: string[]) => void;
+  /** active = countries already on the homepage. europe-asia = every European and Asian country. */
+  catalog?: "active" | "europe-asia";
+  invalid?: boolean;
 }) {
   const { dictionary } = useSurfaceDictionary();
   const t = dictionary.partner;
@@ -33,6 +38,10 @@ export function OperatingCountriesHover({
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (catalog === "europe-asia") {
+      setOptions(europeAndAsiaCountries());
+      return;
+    }
     let cancelled = false;
     fetch("/api/partners/operating-countries")
       .then((res) => (res.ok ? res.json() : null))
@@ -44,7 +53,7 @@ export function OperatingCountriesHover({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [catalog]);
 
   const placePanel = () => {
     const rect = rootRef.current?.getBoundingClientRect();
@@ -165,6 +174,17 @@ export function OperatingCountriesHover({
                 <p className="py-6 text-center text-sm text-slate-500">
                   {t.operatingEmpty.replace("{query}", query)}
                 </p>
+              ) : catalog === "europe-asia" ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <section>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Europe</p>
+                    {renderList(filtered.filter((c) => c.hoverRegion === "Europe"))}
+                  </section>
+                  <section>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Asia</p>
+                    {renderList(filtered.filter((c) => c.hoverRegion === "Asia"))}
+                  </section>
+                </div>
               ) : (
                 renderList(filtered)
               )}
@@ -179,7 +199,11 @@ export function OperatingCountriesHover({
       <div
         className={cn(
           "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm font-semibold",
-          countryIso2s.length ? "border-sky-400 bg-sky-50 text-sky-950" : "border-slate-200 bg-white text-slate-700",
+          invalid
+            ? "border-red-500 bg-red-50 text-red-900 ring-2 ring-red-200"
+            : countryIso2s.length
+              ? "border-sky-400 bg-sky-50 text-sky-950"
+              : "border-slate-200 bg-white text-slate-700",
         )}
       >
         <span className="flex min-w-0 items-start gap-2">

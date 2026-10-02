@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FLEET_AGE_RANGES, type PartnerSocialPlatform } from "@/lib/partner";
+import { Eye, EyeOff } from "lucide-react";
+import { FLEET_AGE_RANGES, isStrongPartnerPassword, type PartnerSocialPlatform } from "@/lib/partner";
 import { cn } from "@/lib/utils";
 import { formatInternationalPhone } from "@/lib/catalog/dial-codes";
 import { PARTNER_LOGIN } from "@/lib/routes";
@@ -43,10 +44,15 @@ export function BecomePartnerModal({
     fleetSize: "1",
     fleetAgeRange: "AGE_0_5",
     countryIso2s: [] as string[],
+    password: "",
+    confirmPassword: "",
   });
   const [error, setError] = useState("");
   const [ok, setOk] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -59,6 +65,20 @@ export function BecomePartnerModal({
 
   if (!open) return null;
 
+  const phoneValue = formatInternationalPhone(form.phoneIso2, form.phoneNational);
+  const emailInvalid = submitted && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
+  const passwordWeak = submitted && !isStrongPartnerPassword(form.password);
+  const passwordsDiffer = submitted && form.password !== form.confirmPassword;
+  const passwordInvalid = passwordWeak || passwordsDiffer;
+  const confirmInvalid = submitted && (!form.confirmPassword || form.password !== form.confirmPassword);
+  const firstNameInvalid = submitted && !form.firstName.trim();
+  const lastNameInvalid = submitted && !form.lastName.trim();
+  const idInvalid = submitted && form.identificationNumber.trim().length < 5;
+  const phoneInvalid = submitted && !phoneValue;
+  const messengersInvalid = submitted && form.messengers.length === 0;
+  const fleetInvalid = submitted && !(Number(form.fleetSize) >= 1);
+  const countriesInvalid = submitted && form.countryIso2s.length === 0;
+
   const fleetAgeLabel = (value: string) => {
     if (value === "AGE_0_5") return t.fleetAge0_5;
     if (value === "AGE_6_9") return t.fleetAge6_9;
@@ -66,8 +86,16 @@ export function BecomePartnerModal({
     return value;
   };
 
+  const inputClass = (invalid: boolean, extra?: string) =>
+    cn(
+      "w-full rounded-xl border p-3 font-normal outline-none",
+      extra,
+      invalid ? "border-red-500 bg-red-50 ring-2 ring-red-200" : "border-slate-200",
+    );
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitted(true);
     setError("");
     const firstName = form.firstName.trim();
     const lastName = form.lastName.trim();
@@ -76,11 +104,16 @@ export function BecomePartnerModal({
     const fleetSize = Number(form.fleetSize);
     const phone = formatInternationalPhone(form.phoneIso2, form.phoneNational);
 
+    const password = form.password;
+    const confirmPassword = form.confirmPassword;
+    const passwordsDiffer = password !== confirmPassword;
+
     if (
       !firstName ||
       !lastName ||
       !email ||
-      !identificationNumber ||
+      identificationNumber.length < 5 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
       !form.kind ||
       !form.phoneIso2 ||
       !phone ||
@@ -88,7 +121,8 @@ export function BecomePartnerModal({
       !Number.isFinite(fleetSize) ||
       fleetSize < 1 ||
       !form.fleetAgeRange ||
-      !form.countryIso2s.length
+      !form.countryIso2s.length ||
+      !isStrongPartnerPassword(password)
     ) {
       setError(
         !form.messengers.length
@@ -97,8 +131,14 @@ export function BecomePartnerModal({
             ? t.countriesRequired
             : !phone
               ? t.phoneRequired
-              : t.fillAll,
+              : !isStrongPartnerPassword(password)
+                ? t.passwordHint
+                : t.fillAll,
       );
+      return;
+    }
+    if (passwordsDiffer) {
+      setError(t.passwordsMismatch);
       return;
     }
 
@@ -119,6 +159,8 @@ export function BecomePartnerModal({
           fleetSize,
           fleetAgeRange: form.fleetAgeRange,
           countryIso2s: form.countryIso2s,
+          password,
+          confirmPassword,
         }),
       });
       const data = await res.json();
@@ -187,9 +229,10 @@ export function BecomePartnerModal({
                 {t.firstName}
                 <RequiredMark />
                 <input
-                  className="mt-1 w-full rounded-xl border p-3 font-normal"
+                  className={inputClass(firstNameInvalid, "mt-1")}
                   required
                   autoComplete="given-name"
+                  aria-invalid={firstNameInvalid || undefined}
                   value={form.firstName}
                   onChange={(e) => setForm({ ...form, firstName: e.target.value })}
                 />
@@ -198,9 +241,10 @@ export function BecomePartnerModal({
                 {t.lastName}
                 <RequiredMark />
                 <input
-                  className="mt-1 w-full rounded-xl border p-3 font-normal"
+                  className={inputClass(lastNameInvalid, "mt-1")}
                   required
                   autoComplete="family-name"
+                  aria-invalid={lastNameInvalid || undefined}
                   value={form.lastName}
                   onChange={(e) => setForm({ ...form, lastName: e.target.value })}
                 />
@@ -212,12 +256,71 @@ export function BecomePartnerModal({
               <RequiredMark />
               <input
                 type="email"
-                className="mt-1 w-full rounded-xl border p-3 font-normal"
+                className={inputClass(emailInvalid, "mt-1")}
                 required
                 autoComplete="email"
+                aria-invalid={emailInvalid || undefined}
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
+            </label>
+
+            <label className="block text-sm font-semibold text-slate-800">
+              {t.password}
+              <RequiredMark />
+              <div className="relative mt-1">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  className={inputClass(passwordInvalid, "pe-12")}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  aria-invalid={passwordInvalid || undefined}
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 end-0 flex items-center px-3 text-slate-500 hover:text-slate-800"
+                  aria-label={showPassword ? t.hidePassword : t.showPassword}
+                  onClick={() => setShowPassword((open) => !open)}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" aria-hidden /> : <Eye className="h-5 w-5" aria-hidden />}
+                </button>
+              </div>
+              <span className={cn("mt-1 block text-xs font-normal", passwordWeak ? "text-red-600" : "text-slate-500")}>
+                {t.passwordHint}
+              </span>
+            </label>
+
+            <label className="block text-sm font-semibold text-slate-800">
+              {t.confirmPassword}
+              <RequiredMark />
+              <div className="relative mt-1">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  className={inputClass(confirmInvalid, "pe-12")}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  aria-invalid={confirmInvalid || undefined}
+                  value={form.confirmPassword}
+                  onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 end-0 flex items-center px-3 text-slate-500 hover:text-slate-800"
+                  aria-label={showConfirmPassword ? t.hidePassword : t.showPassword}
+                  onClick={() => setShowConfirmPassword((open) => !open)}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-5 w-5" aria-hidden />
+                  ) : (
+                    <Eye className="h-5 w-5" aria-hidden />
+                  )}
+                </button>
+              </div>
+              {passwordsDiffer ? <span className="mt-1 block text-xs font-normal text-red-600">{t.passwordsMismatch}</span> : null}
             </label>
 
             <fieldset>
@@ -254,8 +357,9 @@ export function BecomePartnerModal({
               {form.kind === "COMPANY" ? t.companyTaxId : t.personalId}
               <RequiredMark />
               <input
-                className="mt-1 w-full rounded-xl border p-3 font-normal"
+                className={inputClass(idInvalid, "mt-1")}
                 required
+                aria-invalid={idInvalid || undefined}
                 value={form.identificationNumber}
                 onChange={(e) => setForm({ ...form, identificationNumber: e.target.value })}
               />
@@ -264,6 +368,7 @@ export function BecomePartnerModal({
             <PhoneCountryField
               label={t.primaryPhone}
               required
+              invalid={phoneInvalid}
               iso2={form.phoneIso2}
               national={form.phoneNational}
               onIso2Change={(phoneIso2) => setForm({ ...form, phoneIso2 })}
@@ -271,6 +376,7 @@ export function BecomePartnerModal({
             >
               <SocialPlatformPicker
                 compact
+                invalid={messengersInvalid}
                 selected={form.messengers}
                 onChange={(messengers) => setForm({ ...form, messengers })}
               />
@@ -283,8 +389,9 @@ export function BecomePartnerModal({
                 <input
                   type="number"
                   min={1}
-                  className="mt-1 w-full rounded-xl border p-3 font-normal"
+                  className={inputClass(fleetInvalid, "mt-1")}
                   required
+                  aria-invalid={fleetInvalid || undefined}
                   value={form.fleetSize}
                   onChange={(e) => setForm({ ...form, fleetSize: e.target.value })}
                 />
@@ -308,6 +415,8 @@ export function BecomePartnerModal({
             </div>
 
             <OperatingCountriesHover
+              catalog="europe-asia"
+              invalid={countriesInvalid}
               countryIso2s={form.countryIso2s}
               onChange={(countryIso2s) => setForm((prev) => ({ ...prev, countryIso2s }))}
             />
