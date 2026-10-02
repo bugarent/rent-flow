@@ -5,7 +5,6 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { PopularAirportCard } from "@/lib/catalog/popular-airports";
 import type { PopularAirportsLayout } from "@/lib/catalog/popular-airports-layout";
-import { defaultSearchDateRange } from "@/lib/catalog/default-search-dates";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { airportCarsLabel } from "@/lib/i18n/airport-cars-label";
 import { placeLabel } from "@/lib/i18n/place-label";
@@ -19,8 +18,7 @@ function AirportCard({
   airport: PopularAirportCard;
   locale: string;
 }) {
-  const { startDate, endDate } = defaultSearchDateRange();
-  const href = `/cars?pickup=${encodeURIComponent(airport.iata)}&dropoff=${encodeURIComponent(airport.iata)}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
+  const href = `/airport/${encodeURIComponent(airport.iata)}`;
   return (
     <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="h-40 bg-slate-200 sm:h-44">

@@ -247,6 +247,8 @@ export type AdminDictionary = {
     addAirportCard: string;
     updateAirportCard: string;
     airportTitlePh: string;
+    airportInfoLabel: string;
+    airportInfoPh: string;
     iataPh: string;
     orUploadImage: string;
     deleteCategoryConfirm: string;
@@ -576,6 +578,8 @@ const en: AdminDictionary = {
     addAirportCard: "Add airport card",
     updateAirportCard: "Update airport card",
     airportTitlePh: "Title, e.g. Kutaisi International Airport (KUT)",
+    airportInfoLabel: "Information text",
+    airportInfoPh: "Shown when this airport's button is opened, instead of the car list.",
     iataPh: "IATA code (KUT)",
     orUploadImage: "Or upload image",
     deleteCategoryConfirm: "Delete this category from the homepage?",
@@ -906,6 +910,8 @@ const ka: AdminDictionary = {
     addAirportCard: "აეროპორტის ბარათი",
     updateAirportCard: "ბარათის განახლება",
     airportTitlePh: "სათაური, მაგ. Kutaisi International Airport (KUT)",
+    airportInfoLabel: "საინფორმაციო ტექსტი",
+    airportInfoPh: "ეს ტექსტი გამოჩნდება ამ აეროპორტის ღილაკზე დაჭერისას, მანქანების სიის ნაცვლად.",
     iataPh: "IATA კოდი (KUT)",
     orUploadImage: "ან ატვირთეთ სურათი",
     deleteCategoryConfirm: "წაიშალოს ეს კატეგორია მთავარი გვერდიდან?",
@@ -1236,6 +1242,8 @@ const ru: AdminDictionary = {
     addAirportCard: "Карточка аэропорта",
     updateAirportCard: "Обновить карточку",
     airportTitlePh: "Название, напр. Kutaisi International Airport (KUT)",
+    airportInfoLabel: "Информационный текст",
+    airportInfoPh: "Этот текст откроется по кнопке аэропорта вместо списка машин.",
     iataPh: "Код IATA (KUT)",
     orUploadImage: "Или загрузите изображение",
     deleteCategoryConfirm: "Удалить эту категорию с главной?",

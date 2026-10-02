@@ -17,6 +17,7 @@ const schema = z.object({
   title: z.string().trim().min(1).max(120),
   iata: z.string().trim().min(2).max(8),
   imageUrl: z.string().trim().min(1),
+  infoText: z.string().trim().max(8000).optional(),
 });
 
 export async function GET() {
@@ -58,6 +59,7 @@ export async function POST(req: Request) {
       title: body.title,
       iata: body.iata,
       imageUrl: body.imageUrl,
+      infoText: body.infoText,
     });
     return NextResponse.json(row, { status: 201 });
   } catch (error) {

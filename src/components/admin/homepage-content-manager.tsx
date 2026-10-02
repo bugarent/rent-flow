@@ -18,7 +18,7 @@ type Category = {
   mappedModels?: MappedCarModel[];
   isActive?: boolean;
 };
-type Airport = { id: string; iata: string; title: string; imageUrl: string };
+type Airport = { id: string; iata: string; title: string; imageUrl: string; infoText: string };
 
 function blankCategoryForm() {
   return { name: "", imageUrl: "", mappedModels: [] as MappedCarModel[] };
@@ -52,7 +52,7 @@ export function HomepageContentManager({
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [panelForm, setPanelForm] = useState(blankCategoryForm);
   const [savingPanelCategory, setSavingPanelCategory] = useState(false);
-  const [airForm, setAirForm] = useState({ title: "", iata: "", imageUrl: "" });
+  const [airForm, setAirForm] = useState({ title: "", iata: "", imageUrl: "", infoText: "" });
   const [editingAirport, setEditingAirport] = useState<Airport | null>(null);
 
   const visibleCategories = categories.filter((c) => c.isActive !== false);
@@ -245,6 +245,7 @@ export function HomepageContentManager({
           title: payload.title.trim(),
           iata: payload.iata.trim(),
           imageUrl: payload.imageUrl.trim(),
+          infoText: (payload.infoText || "").trim(),
         }),
       });
       const data = await readJsonResponse<Airport & { error?: string }>(res);
@@ -263,7 +264,7 @@ export function HomepageContentManager({
         }
         return [...prev, data];
       });
-      setAirForm({ title: "", iata: "", imageUrl: "" });
+      setAirForm({ title: "", iata: "", imageUrl: "", infoText: "" });
       setEditingAirport(null);
       try {
         await refreshAirports();
@@ -289,7 +290,7 @@ export function HomepageContentManager({
       setAirports((prev) => prev.filter((a) => a.id !== id));
       if (editingAirport?.id === id) {
         setEditingAirport(null);
-        setAirForm({ title: "", iata: "", imageUrl: "" });
+        setAirForm({ title: "", iata: "", imageUrl: "", infoText: "" });
       }
       try {
         await refreshAirports();
@@ -694,6 +695,20 @@ export function HomepageContentManager({
               className="h-16 w-full max-w-xs rounded-lg object-cover"
             />
           ) : null}
+          <label className="block text-xs font-bold text-[#0b1f4b]">
+            {e.airportInfoLabel}
+            <textarea
+              className="mt-1 w-full rounded-lg border bg-white p-2 text-xs font-normal"
+              rows={5}
+              placeholder={e.airportInfoPh}
+              value={editingAirport ? editingAirport.infoText || "" : airForm.infoText}
+              onChange={(event) =>
+                editingAirport
+                  ? setEditingAirport({ ...editingAirport, infoText: event.target.value })
+                  : setAirForm((prev) => ({ ...prev, infoText: event.target.value }))
+              }
+            />
+          </label>
           <div className="flex gap-2">
             <button
               type="submit"
@@ -708,7 +723,7 @@ export function HomepageContentManager({
                 className="rounded-lg border px-3 py-1.5 text-xs font-semibold"
                 onClick={() => {
                   setEditingAirport(null);
-                  setAirForm({ title: "", iata: "", imageUrl: "" });
+                  setAirForm({ title: "", iata: "", imageUrl: "", infoText: "" });
                 }}
               >
                 {ui.cancel}

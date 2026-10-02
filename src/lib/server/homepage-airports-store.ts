@@ -12,6 +12,7 @@ export type StoredHomepageAirport = {
   iata: string;
   title: string;
   imageUrl: string;
+  infoText: string;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -35,6 +36,7 @@ function defaultAirports(): StoredHomepageAirport[] {
     iata: a.iata,
     title: a.name,
     imageUrl: a.image,
+    infoText: "",
     sortOrder: index,
     createdAt: now,
     updatedAt: now,
@@ -53,6 +55,7 @@ async function readFileStore(): Promise<StoredHomepageAirport[]> {
         iata: String(item.iata || "").toUpperCase(),
         title: String(item.title || "Airport"),
         imageUrl: String(item.imageUrl || ""),
+        infoText: String(item.infoText || ""),
         sortOrder: typeof item.sortOrder === "number" ? item.sortOrder : index,
         createdAt: String(item.createdAt || new Date().toISOString()),
         updatedAt: String(item.updatedAt || new Date().toISOString()),
@@ -69,9 +72,20 @@ async function writeFileStore(rows: StoredHomepageAirport[]) {
   revalidatePublishedContent();
 }
 
-async function publishFromDb(db: AirportDelegate) {
-  const rows = await db.findMany({ orderBy: { sortOrder: "asc" } });
-  await writeFileStore(rows.map(toStored));
+async function publishFromDb(db: AirportDelegate, saved?: StoredHomepageAirport) {
+  const previous = await readFileStore();
+  const infoById = new Map(previous.map((row) => [row.id, row.infoText]));
+  const rows = (await db.findMany({ orderBy: { sortOrder: "asc" } })).map((row) => {
+    const stored = toStored(row);
+    return { ...stored, infoText: infoById.get(stored.id) || "" };
+  });
+  if (saved) {
+    const index = rows.findIndex((row) => row.id === saved.id);
+    if (index >= 0) rows[index] = { ...rows[index], ...saved };
+    else rows.push(saved);
+    rows.sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+  await writeFileStore(rows);
 }
 
 function getDbDelegate(): AirportDelegate | null {
@@ -93,6 +107,7 @@ function toStored(row: Record<string, unknown>): StoredHomepageAirport {
     iata: String(row.iata).toUpperCase(),
     title: String(row.title),
     imageUrl: String(row.imageUrl),
+    infoText: String(row.infoText || ""),
     sortOrder: typeof row.sortOrder === "number" ? row.sortOrder : 0,
     createdAt:
       row.createdAt instanceof Date
@@ -109,6 +124,7 @@ async function createInFileStore(input: {
   title: string;
   iata: string;
   imageUrl: string;
+  infoText: string;
 }): Promise<StoredHomepageAirport> {
   const rows = await readFileStore();
   const now = new Date().toISOString();
@@ -117,6 +133,7 @@ async function createInFileStore(input: {
     title: input.title,
     iata: input.iata.toUpperCase(),
     imageUrl: input.imageUrl,
+    infoText: input.infoText,
     sortOrder: rows.reduce((max, r) => Math.max(max, r.sortOrder), -1) + 1,
     createdAt: now,
     updatedAt: now,
@@ -154,11 +171,13 @@ export async function createHomepageAirport(input: {
   title: string;
   iata: string;
   imageUrl: string;
+  infoText?: string;
 }): Promise<StoredHomepageAirport> {
   const payload = {
     title: input.title.trim(),
     iata: input.iata.trim().toUpperCase(),
     imageUrl: input.imageUrl.trim(),
+    infoText: input.infoText?.trim() ?? "",
   };
 
   const db = getDbDelegate();
@@ -168,12 +187,15 @@ export async function createHomepageAirport(input: {
     const max = await db.aggregate({ _max: { sortOrder: true } });
     const row = await db.create({
       data: {
-        ...payload,
+        title: payload.title,
+        iata: payload.iata,
+        imageUrl: payload.imageUrl,
         sortOrder: (max._max.sortOrder ?? -1) + 1,
       },
     });
-    await publishFromDb(db);
-    return toStored(row);
+    const stored = { ...toStored(row), infoText: payload.infoText };
+    await publishFromDb(db, stored);
+    return stored;
   } catch (error) {
     console.warn("[homepage-airports] DB create failed, using file store:", error);
     return createInFileStore(payload);
@@ -186,6 +208,7 @@ export async function updateHomepageAirport(
     title?: string;
     iata?: string;
     imageUrl?: string;
+    infoText?: string;
   },
 ): Promise<StoredHomepageAirport> {
   const applyFileUpdate = async () => {
@@ -198,6 +221,7 @@ export async function updateHomepageAirport(
       title: input.title?.trim() ?? current.title,
       iata: input.iata ? input.iata.trim().toUpperCase() : current.iata,
       imageUrl: input.imageUrl?.trim() ?? current.imageUrl,
+      infoText: input.infoText?.trim() ?? current.infoText,
       updatedAt: new Date().toISOString(),
     };
     rows[index] = updated;
@@ -217,8 +241,13 @@ export async function updateHomepageAirport(
         imageUrl: input.imageUrl?.trim(),
       },
     });
-    await publishFromDb(db);
-    return toStored(row);
+    const previous = (await readFileStore()).find((row) => row.id === id);
+    const stored = {
+      ...toStored(row),
+      infoText: input.infoText?.trim() ?? previous?.infoText ?? "",
+    };
+    await publishFromDb(db, stored);
+    return stored;
   } catch (error) {
     console.warn("[homepage-airports] DB update failed, using file store:", error);
     return applyFileUpdate();

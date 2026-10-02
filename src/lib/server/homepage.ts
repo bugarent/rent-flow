@@ -23,6 +23,7 @@ export type HomepageAirportCard = {
   iata: string;
   title: string;
   imageUrl: string;
+  infoText: string;
 };
 
 export async function ensureHomepageDefaults() {
@@ -124,6 +125,7 @@ export async function getHomepageAirports(): Promise<HomepageAirportCard[]> {
         iata: a.iata,
         title: a.name,
         imageUrl: a.image,
+        infoText: "",
       }));
     }
     return rows.map((a) => ({
@@ -131,6 +133,7 @@ export async function getHomepageAirports(): Promise<HomepageAirportCard[]> {
       iata: a.iata,
       title: a.title,
       imageUrl: a.imageUrl,
+      infoText: a.infoText,
     }));
   } catch {
     return getStaticPopularAirports().map((a) => ({
@@ -138,6 +141,7 @@ export async function getHomepageAirports(): Promise<HomepageAirportCard[]> {
       iata: a.iata,
       title: a.name,
       imageUrl: a.image,
+      infoText: "",
     }));
   }
 }
