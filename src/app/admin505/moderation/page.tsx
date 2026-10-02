@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { ListingStatus } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { prisma, reopenDbCircuit } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guards";
 import { dbOfflineMessage, isDbOfflineError, shortPrismaError } from "@/lib/server/db-errors";
 import {
@@ -376,6 +376,7 @@ async function loadProfiles(): Promise<{
 
 export default async function AdminModerationPage() {
   await requireAdmin();
+  reopenDbCircuit();
   const locale = await readAdminLocale();
   const t = getAdminDictionary(locale);
   const [listings, reviewData, profileData, partnerRows] = await Promise.all([

@@ -31,6 +31,11 @@ export function isDbCircuitOpen() {
   return Date.now() < (globalForPrisma.dbOfflineUntil ?? 0);
 }
 
+/** Let the next query reach the hosted database after a short timeout elsewhere. */
+export function reopenDbCircuit() {
+  globalForPrisma.dbOfflineUntil = 0;
+}
+
 /**
  * Mark Postgres unreachable for a short cooldown and log once.
  * Prefer this over noteDbOfflineOnce alone — logging without opening the circuit

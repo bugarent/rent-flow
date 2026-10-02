@@ -1,3 +1,5 @@
+import { databaseHost } from "@/lib/database-url";
+
 function errorText(error: unknown): string {
   if (!error || typeof error !== "object") return String(error ?? "");
   const err = error as { code?: string; message?: string; cause?: { code?: string; message?: string } };
@@ -61,6 +63,11 @@ export function isDbOfflineError(error: unknown): boolean {
 }
 
 export function dbOfflineMessage(area: string): string {
+  const host = databaseHost();
+  const remote = host && host !== "localhost" && host !== "127.0.0.1";
+  if (remote) {
+    return `The online database did not answer in time while loading ${area}. Refresh the page — the site is already connected to the hosted database.`;
+  }
   return `PostgreSQL is not reachable on localhost:5432 (ECONNREFUSED). Prisma reports this as an “Invalid findMany() invocation”, but the ${area} query relations match the schema. Start the DB (docker compose up -d or npm run db:up), run npx prisma db push, then refresh.`;
 }
 

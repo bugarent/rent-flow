@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prisma, reopenDbCircuit } from "@/lib/prisma";
 import { partnerDisplayName, partnerStatusLabel, formatPartnerCode } from "@/lib/partner";
 import { dbOfflineMessage, isDbOfflineError, shortPrismaError } from "@/lib/server/db-errors";
 import { listFilePartnerApplications } from "@/lib/server/partner-applications-store";
@@ -56,6 +56,7 @@ export async function loadAdminPartnerRows(): Promise<{
   let dbOffline = false;
   let queryError = "";
 
+  reopenDbCircuit();
   try {
     const partners = await prisma.partner.findMany({
       include: {

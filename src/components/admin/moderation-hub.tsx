@@ -274,7 +274,7 @@ export function ModerationHub({
               className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
             >
               <p className="font-semibold">
-                {partnersDbOffline ? "Database offline — using local partner applications" : "Could not load partners"}
+                {partnersDbOffline ? "Partner list could not be loaded from the online database" : "Could not load partners"}
               </p>
               <p className="mt-1 leading-relaxed">{partnersError}</p>
             </div>

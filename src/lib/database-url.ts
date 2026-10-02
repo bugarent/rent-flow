@@ -14,3 +14,14 @@ export function databaseUrl(): string {
   }
   return value;
 }
+
+/** Hostname only, so error text can tell a hosted database from a local one. */
+export function databaseHost(): string {
+  const url = databaseUrl();
+  if (!url) return "";
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "";
+  }
+}
