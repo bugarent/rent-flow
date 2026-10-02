@@ -47,6 +47,62 @@ function whenLine(instant: Date, iata: string) {
   return `${pad(parts.day)}.${pad(parts.month)}.${parts.year} ${pad(parts.hour)}:${pad(parts.minute)}`;
 }
 
+function dateOnly(instant: Date, iata: string) {
+  const code = String(iata || "").trim().toUpperCase();
+  const airport = CATALOG_AIRPORTS.find((row) => row.iata === code);
+  const parts = getZonedParts(instant, airport?.timezone || DEFAULT_AIRPORT_TIMEZONE);
+  return `${pad(parts.day)}.${pad(parts.month)}.${parts.year}`;
+}
+
+function cityName(iata: string) {
+  const code = String(iata || "").trim().toUpperCase();
+  const airport = CATALOG_AIRPORTS.find((row) => row.iata === code);
+  return airport?.cityName.en || findSearchPlace(code)?.cityName || code || "—";
+}
+
+function usdAmount(value: number) {
+  return (Number.isFinite(value) ? value : 0).toFixed(2);
+}
+
+export type ReservationTelegramInput = {
+  event: "BOOKING_NEW" | "BOOKING_EDITED" | "BOOKING_CANCELLED";
+  reference: string;
+  carName: string;
+  plate: string;
+  pickupAt: Date;
+  dropoffAt: Date;
+  pickupIata: string;
+  dropoffIata: string;
+  totalUsd: number;
+  advanceUsd: number;
+  /** Included only on the administrator copy. */
+  sitePercent?: number;
+  siteUsd?: number;
+};
+
+/** Partner copy, or the same text plus the site commission for the administrator. */
+export function reservationTelegramText(input: ReservationTelegramInput, forAdmin = false) {
+  const vehicle = [input.carName, input.plate].filter(Boolean).join(" ").replace(/\s+/g, " ").trim() || "—";
+  const ref = input.reference.trim() || "—";
+  const trip = `From ${dateOnly(input.pickupAt, input.pickupIata)} (${cityName(input.pickupIata)}) to ${dateOnly(input.dropoffAt, input.dropoffIata)} (${cityName(input.dropoffIata)})`;
+  const total = `Total: ${usdAmount(input.totalUsd)} $`;
+  const title =
+    input.event === "BOOKING_CANCELLED"
+      ? `Reservation cancelled No ${ref}`
+      : input.event === "BOOKING_EDITED"
+        ? `Reservation edited No ${ref}`
+        : `New reservation: #${ref}`;
+  const lines =
+    input.event === "BOOKING_NEW"
+      ? [title, `Car ${vehicle}`, trip, total, `Advance payment: ${usdAmount(input.advanceUsd)} $`]
+      : [title, vehicle, trip, total];
+  if (forAdmin) {
+    const percent = Math.round(Number(input.sitePercent) || 0);
+    lines.push(`Site commission: ${percent}% · ${usdAmount(input.siteUsd || 0)} $`);
+  }
+  return lines.join("\n");
+}
+
 export function bookingBotMessage(
   notice: BookingBotNotice & { headline?: string; reference?: string },
 ) {

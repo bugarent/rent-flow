@@ -4,8 +4,9 @@ import { formatBookingRef } from "@/lib/ids";
 import { sendTelegramMessage } from "@/lib/telegram/bot";
 import { sendPartnerMail } from "@/lib/mail";
 import { normalizeLogin } from "@/lib/crypto";
+import { displayBookingCharges } from "@/lib/bookings/booking-money";
 import { parsePartnerMessengers } from "@/lib/partner";
-import { bookingBotMessage } from "@/lib/telegram/notify-booking-bot";
+import { bookingBotMessage, reservationTelegramText, sendBookingNoticeToBot } from "@/lib/telegram/notify-booking-bot";
 import { getPlatformSettings } from "@/lib/server/platform-settings-store";
 import {
   listStoredPartnerChatIds,
@@ -32,6 +33,8 @@ type NoticeSnapshot = {
   guestEmail: string;
   messengers: string[];
   carLabel: string;
+  carPlate: string;
+  depositPercent: number;
   totalPriceEur: number;
   depositPaidEur: number;
   balanceDueEur: number;
@@ -161,40 +164,46 @@ async function deliverBookingNotice(input: {
     }
   }
 
-  if (input.event === "BOOKING_NEW") {
+  if (input.event === "BOOKING_NEW" || input.event === "BOOKING_EDITED" || input.event === "BOOKING_CANCELLED") {
     try {
-      const { sendBookingNoticeToBot } = await import("@/lib/telegram/notify-booking-bot");
-      await sendBookingNoticeToBot(text);
-    } catch (error) {
-      console.warn("[notify] booking bot failed", error);
-    }
-  }
-
-  const chats = [...new Set([...input.partnerChatIds, ...(await adminChatIds())].map((id) => id.trim()).filter(Boolean))];
-  for (const chatId of chats) {
-    const sent = await sendTelegramMessage(chatId, text);
-    try {
-      await prisma.notificationLog.create({
-        data: {
-          userId: input.userId ?? undefined,
-          bookingId: input.booking.id,
-          channel: "TELEGRAM",
-          event: input.event,
-          recipient: chatId,
-          payload: {
-            reference,
-            ok: sent.ok,
-            error: sent.error ?? null,
-            ...(input.refundEur != null ? { refundEur: input.refundEur } : {}),
-          },
-        },
+      const { getFxRates } = await import("@/lib/server/preferences");
+      const rate = (await getFxRates()).eurUsd;
+      const usd = Number.isFinite(rate) && rate > 0 ? rate : 1;
+      const toUsd = (eur: number) => Math.round((Number(eur) || 0) * usd * 100) / 100;
+      const charges = displayBookingCharges({
+        totalPriceEur: input.booking.totalPriceEur,
+        depositPaidEur: input.booking.depositPaidEur,
+        balanceDueEur: input.booking.balanceDueEur,
       });
-    } catch {
-      console.info("[notify] telegram", { chatId, ok: sent.ok, error: sent.error ?? null, event: input.event });
+      const telegram = {
+        event: input.event,
+        reference: reference || String(input.booking.sequentialNumber || ""),
+        carName: input.booking.carLabel.replace(/\s+(19|20)\d{2}$/, "").trim(),
+        plate: String(input.booking.carPlate || "").trim(),
+        pickupAt: input.booking.pickupAt,
+        dropoffAt: input.booking.dropoffAt,
+        pickupIata: input.booking.pickupIata,
+        dropoffIata: input.booking.dropoffIata,
+        totalUsd: toUsd(charges.totalEur),
+        advanceUsd: toUsd(charges.paidEur),
+        sitePercent: input.booking.depositPercent,
+        siteUsd: toUsd(charges.siteFeeEur),
+      };
+      const partnerText = reservationTelegramText(telegram, false);
+      const adminText = reservationTelegramText(telegram, true);
+      const adminIds = new Set((await adminChatIds()).map((id) => id.trim()).filter(Boolean));
+      const partnerIds = [...new Set(input.partnerChatIds.map((id) => id.trim()).filter((id) => id && !adminIds.has(id)))];
+
+      await sendBookingNoticeToBot(adminText);
+      for (const chatId of partnerIds) {
+        await sendTelegramMessage(chatId, partnerText);
+      }
+      for (const chatId of adminIds) {
+        await sendTelegramMessage(chatId, adminText);
+      }
+    } catch (error) {
+      console.warn("[notify] booking telegram failed", error);
     }
-  }
-  if (!chats.length) {
-    console.info("[notify] no telegram chat for partner or admin", { bookingId: input.booking.id, event: input.event });
   }
 }
 
@@ -267,6 +276,8 @@ export async function notifyBookingEvent(
       guestEmail: booking.guestEmail,
       messengers,
       carLabel: `${booking.car.make} ${booking.car.model} ${booking.car.year}`.trim(),
+      carPlate: String(booking.car.registrationNumber || "").trim(),
+      depositPercent: Number(booking.depositPercent) || 0,
       totalPriceEur: Number(booking.totalPriceEur),
       depositPaidEur: Number(booking.depositPaidEur),
       balanceDueEur: Number(booking.balanceDueEur),
@@ -296,6 +307,7 @@ export async function notifyFileBookingEvent(
   const fileCar = await getFileCar(booking.carId);
   if (!fileCar) {
     let carLabel = booking.carId;
+    let carPlate = "";
     let partnerEmail = "";
     const chatIds = new Set<string>();
     try {
@@ -305,10 +317,14 @@ export async function notifyFileBookingEvent(
           make: true,
           model: true,
           year: true,
+          registrationNumber: true,
           partner: { select: { id: true, email: true, telegramChatId: true } },
         },
       });
-      if (car) carLabel = `${car.make} ${car.model} ${car.year}`.replace(/\s+/g, " ").trim();
+      if (car) {
+        carLabel = `${car.make} ${car.model} ${car.year}`.replace(/\s+/g, " ").trim();
+        carPlate = String(car.registrationNumber || "").trim();
+      }
       partnerEmail = car?.partner?.email?.trim() || "";
       const partnerChat = car?.partner?.telegramChatId?.trim();
       if (partnerChat) chatIds.add(partnerChat);
@@ -345,6 +361,8 @@ export async function notifyFileBookingEvent(
         guestEmail: booking.guestEmail,
         messengers: parsePartnerMessengers(booking.guestMessengers, booking.guestMessenger),
         carLabel,
+        carPlate,
+        depositPercent: Number(booking.depositPercent) || 0,
         totalPriceEur: Number(booking.totalPriceEur) || 0,
         depositPaidEur: Number(booking.depositPaidEur) || 0,
         balanceDueEur: Number(booking.balanceDueEur) || 0,
@@ -417,6 +435,8 @@ export async function notifyFileBookingEvent(
       guestEmail: booking.guestEmail,
       messengers,
       carLabel: `${fileCar.make} ${fileCar.model} ${fileCar.year}`.replace(/\s+/g, " ").trim(),
+      carPlate: String(fileCar.registrationNumber || "").trim(),
+      depositPercent: Number(booking.depositPercent) || 0,
       totalPriceEur: Number(booking.totalPriceEur) || 0,
       depositPaidEur: Number(booking.depositPaidEur) || 0,
       balanceDueEur: Number(booking.balanceDueEur) || 0,
