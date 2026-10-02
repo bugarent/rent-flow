@@ -2,6 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { NextResponse } from "next/server";
 import { uploadRoot } from "@/lib/persistent-paths";
+import { readHostedFile } from "@/lib/server/durable-fs";
 
 const TYPES: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -34,7 +35,7 @@ export async function GET(
   if (!type) return new NextResponse("Not found", { status: 404 });
   try {
     const info = await stat(file);
-    if (!info.isFile()) return new NextResponse("Not found", { status: 404 });
+    if (!info.isFile()) throw new Error("missing");
     const body = await readFile(file);
     return new NextResponse(body, {
       headers: {
@@ -43,6 +44,13 @@ export async function GET(
       },
     });
   } catch {
-    return new NextResponse("Not found", { status: 404 });
+    const hosted = await readHostedFile(rel.replace(/\\/g, "/"));
+    if (!hosted) return new NextResponse("Not found", { status: 404 });
+    return new NextResponse(new Uint8Array(hosted.bytes), {
+      headers: {
+        "Content-Type": hosted.contentType || type,
+        "Cache-Control": "public, max-age=86400",
+      },
+    });
   }
 }

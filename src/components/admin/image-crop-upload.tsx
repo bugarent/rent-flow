@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useAdminLocale } from "@/components/providers/admin-locale-context";
 
 type CropState = {
   src: string;
@@ -33,6 +35,40 @@ export function ImageCropUpload({
   const [natural, setNatural] = useState({ w: 0, h: 0 });
   const [viewportSize, setViewportSize] = useState({ w: 0, h: 0 });
   const [busy, setBusy] = useState(false);
+  const { locale } = useAdminLocale();
+  const copy =
+    locale === "ka"
+      ? {
+          adjust: "სურათის მორგება",
+          hint: "გაადიდეთ და გადაადგილეთ, რომ სურათი ჩარჩოში მოხვდეს.",
+          zoom: "მასშტაბი",
+          cancel: "გაუქმება",
+          apply: "ატვირთვა",
+          uploading: "იტვირთება…",
+          notImage: "აირჩიეთ სურათის ფაილი",
+          failed: "სურათი ვერ აიტვირთა",
+        }
+      : locale === "ru"
+        ? {
+            adjust: "Кадрирование",
+            hint: "Увеличьте и перетащите, чтобы кадр совпал с карточкой.",
+            zoom: "Масштаб",
+            cancel: "Отмена",
+            apply: "Загрузить",
+            uploading: "Загрузка…",
+            notImage: "Выберите файл изображения",
+            failed: "Не удалось загрузить изображение",
+          }
+        : {
+            adjust: "Adjust image",
+            hint: "Zoom and drag to frame the card.",
+            zoom: "Zoom",
+            cancel: "Cancel",
+            apply: "Apply & upload",
+            uploading: "Uploading…",
+            notImage: "Please choose an image file",
+            failed: "Upload failed",
+          };
 
   useEffect(() => {
     return () => {
@@ -45,9 +81,13 @@ export function ImageCropUpload({
     const node = viewportRef.current;
     const measure = () => setViewportSize({ w: node.clientWidth, h: node.clientHeight });
     measure();
+    const frame = window.requestAnimationFrame(measure);
     const observer = new ResizeObserver(measure);
     observer.observe(node);
-    return () => observer.disconnect();
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
   }, [crop]);
 
   const close = () => {
@@ -61,8 +101,8 @@ export function ImageCropUpload({
 
   const onFile = (file: File | undefined) => {
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      onError("Please choose an image file");
+    if (!file.type.startsWith("image/") && !/\.(jpe?g|png|gif|webp|bmp|heic|heif)$/i.test(file.name)) {
+      onError(copy.notImage);
       return;
     }
     const src = URL.createObjectURL(file);
@@ -95,13 +135,20 @@ export function ImageCropUpload({
   const onPointerUp = () => setDragging(false);
 
   const exportAndUpload = async () => {
-    if (!crop || !viewportSize.w || !natural.w) return;
+    const node = viewportRef.current;
+    const vw = viewportSize.w || node?.clientWidth || 0;
+    const vh = viewportSize.h || node?.clientHeight || 0;
+    if (!crop || !vw || !vh || !natural.w) {
+      onError(copy.failed);
+      return;
+    }
     setBusy(true);
     try {
-      const vw = viewportSize.w;
-      const vh = viewportSize.h;
-      const dx = (vw - drawW) / 2 + offset.x;
-      const dy = (vh - drawH) / 2 + offset.y;
+      const cover = Math.max(vw / natural.w, vh / natural.h);
+      const drawnW = natural.w * cover * zoom;
+      const drawnH = natural.h * cover * zoom;
+      const dx = (vw - drawnW) / 2 + offset.x;
+      const dy = (vh - drawnH) / 2 + offset.y;
 
       const outH = Math.round(outputWidth / aspect);
       const canvas = document.createElement("canvas");
@@ -121,7 +168,7 @@ export function ImageCropUpload({
       const scaleY = outH / vh;
       ctx.fillStyle = "#0f172a";
       ctx.fillRect(0, 0, outputWidth, outH);
-      ctx.drawImage(img, dx * scaleX, dy * scaleY, drawW * scaleX, drawH * scaleY);
+      ctx.drawImage(img, dx * scaleX, dy * scaleY, drawnW * scaleX, drawnH * scaleY);
 
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Crop failed"))), "image/jpeg", 0.92);
@@ -133,12 +180,12 @@ export function ImageCropUpload({
       const data = new FormData();
       data.append("file", file);
       const res = await fetch("/api/admin/uploads", { method: "POST", body: data });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Upload failed");
-      onUploaded(json.url as string);
+      const json = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!res.ok || !json.url) throw new Error(json.error || copy.failed);
+      onUploaded(json.url);
       close();
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Upload failed");
+      onError(err instanceof Error ? err.message : copy.failed);
     } finally {
       setBusy(false);
     }
@@ -157,11 +204,12 @@ export function ImageCropUpload({
         />
       </label>
 
-      {crop ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      {crop && typeof document !== "undefined"
+        ? createPortal(
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl">
-            <h3 className="mb-1 text-lg font-bold text-slate-900">Adjust image</h3>
-            <p className="mb-4 text-sm text-slate-500">Zoom and drag to frame the category card.</p>
+            <h3 className="mb-1 text-lg font-bold text-slate-900">{copy.adjust}</h3>
+            <p className="mb-4 text-sm text-slate-500">{copy.hint}</p>
 
             <div
               ref={viewportRef}
@@ -193,7 +241,7 @@ export function ImageCropUpload({
             </div>
 
             <label className="mt-4 block text-sm font-semibold text-slate-700">
-              Zoom
+              {copy.zoom}
               <input
                 type="range"
                 min={1}
@@ -212,7 +260,7 @@ export function ImageCropUpload({
                 onClick={close}
                 disabled={busy}
               >
-                Cancel
+                {copy.cancel}
               </button>
               <button
                 type="button"
@@ -220,12 +268,14 @@ export function ImageCropUpload({
                 onClick={() => void exportAndUpload()}
                 disabled={busy || !natural.w}
               >
-                {busy ? "Uploading…" : "Apply & upload"}
+                {busy ? copy.uploading : copy.apply}
               </button>
             </div>
           </div>
-        </div>
-      ) : null}
+        </div>,
+        document.body,
+      )
+        : null}
     </div>
   );
 }

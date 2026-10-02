@@ -322,6 +322,76 @@ export function existsSync(path: string): boolean {
   return fsExistsSync(path);
 }
 
+let fileTableReady: Promise<void> | null = null;
+
+async function ensureFileTable(pool: Pool): Promise<void> {
+  if (!fileTableReady) {
+    fileTableReady = pool
+      .query(
+        `CREATE TABLE IF NOT EXISTS "HostedFile" (
+          "key" TEXT NOT NULL,
+          "contentType" TEXT NOT NULL,
+          "bytes" BYTEA NOT NULL,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "HostedFile_pkey" PRIMARY KEY ("key")
+        )`,
+      )
+      .then(() => undefined)
+      .catch((error: unknown) => {
+        fileTableReady = null;
+        throw error;
+      });
+  }
+  await fileTableReady;
+}
+
+/** Keep uploaded images in Postgres so Netlify's temporary disk does not drop them. */
+export async function saveHostedFile(key: string, contentType: string, bytes: Buffer): Promise<boolean> {
+  const pool = storePool();
+  if (!pool) return false;
+  try {
+    await ensureFileTable(pool);
+    await pool.query(
+      `INSERT INTO "HostedFile" ("key", "contentType", "bytes", "updatedAt")
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+       ON CONFLICT ("key") DO UPDATE
+       SET "contentType" = EXCLUDED."contentType",
+           "bytes" = EXCLUDED."bytes",
+           "updatedAt" = CURRENT_TIMESTAMP`,
+      [key, contentType, bytes],
+    );
+    return true;
+  } catch (error) {
+    noteStoreError(error);
+    console.warn("[hosted-file] write failed", key, error);
+    return false;
+  }
+}
+
+export async function readHostedFile(
+  key: string,
+): Promise<{ contentType: string; bytes: Buffer } | null> {
+  const pool = storePool();
+  if (!pool) return null;
+  try {
+    await ensureFileTable(pool);
+    const result = await pool.query<{ contentType: string; bytes: Buffer | Uint8Array }>(
+      `SELECT "contentType", "bytes" FROM "HostedFile" WHERE "key" = $1 LIMIT 1`,
+      [key],
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return {
+      contentType: row.contentType,
+      bytes: Buffer.isBuffer(row.bytes) ? row.bytes : Buffer.from(row.bytes),
+    };
+  } catch (error) {
+    noteStoreError(error);
+    console.warn("[hosted-file] read failed", key, error);
+    return null;
+  }
+}
+
 export async function hydrateJsonStoreFiles() {
   const pool = storePool();
   if (!pool) return;

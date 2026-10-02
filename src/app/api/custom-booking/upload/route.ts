@@ -1,7 +1,6 @@
-import { uploadDir } from "@/lib/persistent-paths";
 import { NextResponse } from "next/server";
-import { mkdir, writeFile } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { extname } from "node:path";
+import { persistUploadedFile } from "@/lib/server/persist-upload";
 import { getAdminSession } from "@/lib/auth/sessions";
 import { getCustomBookingChatByCode } from "@/lib/server/custom-booking-chat-store";
 import { parseCustomBookingCode } from "@/lib/catalog/custom-booking-chat";
@@ -43,13 +42,23 @@ export async function POST(req: Request) {
     }
 
     const bytes = Buffer.from(await file.arrayBuffer());
-    const dir = uploadDir("custom-booking");
-    await mkdir(dir, { recursive: true });
     const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
-    await writeFile(join(dir, filename), bytes);
+    const contentType =
+      ext === ".png"
+        ? "image/png"
+        : ext === ".webp"
+          ? "image/webp"
+          : ext === ".gif"
+            ? "image/gif"
+            : "image/jpeg";
+    await persistUploadedFile(["custom-booking", filename], bytes, contentType);
     return NextResponse.json({ url: `/uploads/custom-booking/${filename}` });
   } catch (error) {
     console.error("[custom-booking/upload]", error);
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Upload failed";
+    return NextResponse.json(
+      { error: message === "Could not save the image" ? message : "Upload failed" },
+      { status: 500 },
+    );
   }
 }
