@@ -163,7 +163,7 @@ function ApplicationSnapshotView({ snapshot }: { snapshot: PartnerApplicationMes
   );
 }
 
-type PartnersManagerMode = "directory" | "queue";
+type PartnersManagerMode = "directory" | "queue" | "primary";
 
 export function PartnersManager({
   initialPartners,
@@ -176,7 +176,9 @@ export function PartnersManager({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { locale } = useAdminLocale();
-  const [filter, setFilter] = useState<Filter>(mode === "queue" ? "PENDING" : "PRIMARY");
+  const [filter, setFilter] = useState<Filter>(
+    mode === "queue" ? "PENDING" : mode === "primary" ? "PRIMARY" : "DIRECTORY",
+  );
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -274,7 +276,9 @@ export function PartnersManager({
     const defs: Filter[] =
       mode === "queue"
         ? ["PENDING"]
-        : ["PRIMARY", "COMPANY", "PRIVATE", "REJECTED", "DIRECTORY"];
+        : mode === "primary"
+          ? ["PRIMARY"]
+          : ["COMPANY", "PRIVATE", "REJECTED", "DIRECTORY"];
     return Object.fromEntries(
       defs.map((key) => [key, tabBadge(partnersInFilter(initialPartners, key))]),
     ) as Record<Filter, { count: number; pending: number }>;
@@ -300,6 +304,7 @@ export function PartnersManager({
 
   const reviewHref = (id: string) => {
     const base = `${ADMIN_BASE}/moderation/partners/${encodeURIComponent(id)}`;
+    if (mode === "primary") return `${base}?returnTab=primary`;
     if (mode === "directory" && (filter === "COMPANY" || filter === "PRIVATE")) {
       return `${base}?returnTab=${filter.toLowerCase()}`;
     }
@@ -324,7 +329,6 @@ export function PartnersManager({
     const partnerTab = searchParams.get("partnerTab")?.trim().toUpperCase();
     const legacyTab = searchParams.get("tab")?.trim().toLowerCase();
     if (
-      partnerTab === "PRIMARY" ||
       partnerTab === "COMPANY" ||
       partnerTab === "PRIVATE" ||
       partnerTab === "REJECTED" ||
@@ -387,7 +391,7 @@ export function PartnersManager({
         } else if (nextStatus === "REJECTED") {
           setFilter("REJECTED");
         }
-      } else if (PENDING_STATUSES.has(nextStatus)) {
+      } else if (mode === "queue" && PENDING_STATUSES.has(nextStatus)) {
         setFilter("PENDING");
       }
       router.refresh();
@@ -407,13 +411,14 @@ export function PartnersManager({
   const filters: Array<{ value: Filter; label: string }> =
     mode === "queue"
       ? [{ value: "PENDING", label: t.pending }]
-      : [
-          { value: "PRIMARY", label: t.primary },
-          { value: "COMPANY", label: t.company },
-          { value: "PRIVATE", label: t.private },
-          { value: "REJECTED", label: t.rejected },
-          { value: "DIRECTORY", label: t.directory },
-        ];
+      : mode === "primary"
+        ? [{ value: "PRIMARY", label: t.primary }]
+        : [
+            { value: "COMPANY", label: t.company },
+            { value: "PRIVATE", label: t.private },
+            { value: "REJECTED", label: t.rejected },
+            { value: "DIRECTORY", label: t.directory },
+          ];
 
   return (
     <div>

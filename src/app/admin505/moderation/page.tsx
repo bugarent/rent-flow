@@ -406,6 +406,9 @@ export default async function AdminModerationPage() {
           partnersTab: "პარტნიორები",
           partnersTitle: t.pages.partners.title,
           partnersBody: t.pages.partners.body,
+          primaryTab: "პირველადი მოდერაცია",
+          primaryTitle: "პირველადი მოდერაცია",
+          primaryBody: "ახალი პარტნიორის განაცხადები, რომლებიც პირველ გადამოწმებას ელოდება.",
           listingsTab: "განცხადებები",
           listingsTitle: "განცხადებების მოდერაცია",
           listingsBody: "დაამტკიცეთ ან უარყავით მანქანების განცხადებები.",
@@ -416,13 +419,16 @@ export default async function AdminModerationPage() {
           openPartner: "განხილვის გახსნა",
           rejectProfile: "უარყოფა",
           moderationBody:
-            "აირჩიეთ ქვეფანჯარა: პარტნიორები, მანქანების განცხადებები, პროფილები ან შეფასებები.",
+            "აირჩიეთ ქვეფანჯარა: პარტნიორები, პირველადი მოდერაცია, განცხადებები, პროფილები ან შეფასებები.",
         }
       : locale === "ru"
         ? {
             partnersTab: "Партнёры",
             partnersTitle: t.pages.partners.title,
             partnersBody: t.pages.partners.body,
+            primaryTab: "Первичная модерация",
+            primaryTitle: "Первичная модерация",
+            primaryBody: "Новые заявки партнёров, которые ждут первой проверки.",
             listingsTab: "Объявления",
             listingsTitle: "Модерация объявлений",
             listingsBody: "Одобрение или отклонение автомобилей.",
@@ -433,12 +439,15 @@ export default async function AdminModerationPage() {
             openPartner: "Открыть проверку",
             rejectProfile: "Отклонить",
             moderationBody:
-              "Выберите раздел: партнёры, объявления, профили или отзывы.",
+              "Выберите раздел: партнёры, первичная модерация, объявления, профили или отзывы.",
           }
         : {
             partnersTab: "Partners",
             partnersTitle: t.pages.partners.title,
             partnersBody: t.pages.partners.body,
+            primaryTab: "Primary moderation",
+            primaryTitle: "Primary moderation",
+            primaryBody: "New partner applications waiting for a first review.",
             listingsTab: "Listings",
             listingsTitle: "Listing moderation",
             listingsBody: "Approve or reject car listings waiting for review.",
@@ -448,7 +457,8 @@ export default async function AdminModerationPage() {
             noProfiles: "No profile changes awaiting review.",
             openPartner: "Open review",
             rejectProfile: "Reject",
-            moderationBody: "Choose a section: partners, car listings, profiles, or reviews.",
+            moderationBody:
+              "Choose a section: partners, primary moderation, car listings, profiles, or reviews.",
           };
 
   return (
@@ -478,6 +488,9 @@ export default async function AdminModerationPage() {
           partnersTab: tabLabels.partnersTab,
           partnersTitle: tabLabels.partnersTitle,
           partnersBody: tabLabels.partnersBody,
+          primaryTab: tabLabels.primaryTab,
+          primaryTitle: tabLabels.primaryTitle,
+          primaryBody: tabLabels.primaryBody,
           listingsTab: tabLabels.listingsTab,
           reviewsTab: t.nav.reviews,
           profilesTab: tabLabels.profilesTab,

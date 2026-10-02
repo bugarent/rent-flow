@@ -84,6 +84,9 @@ type Labels = {
   partnersTab: string;
   partnersTitle: string;
   partnersBody: string;
+  primaryTab: string;
+  primaryTitle: string;
+  primaryBody: string;
   listingsTab: string;
   reviewsTab: string;
   profilesTab: string;
@@ -119,11 +122,26 @@ type Props = {
   labels: Labels;
 };
 
-type TabId = "partners" | "listings" | "reviews" | "profiles";
+type TabId = "partners" | "primary" | "listings" | "reviews" | "profiles";
+
+const PRIMARY_STATUSES = new Set(["PENDING", "INVITED", "PENDING_FINAL", "NEEDS_CORRECTION"]);
+
+function partnerAttention(p: ModerationPartnerRow) {
+  const unread = Number(p.unreadForAdmin) || Number(p.unreadReapplyCount) || 0;
+  if (unread > 0) return unread;
+  if (
+    p.status === "PENDING" ||
+    p.status === "PENDING_FINAL" ||
+    p.status === "NEEDS_CORRECTION" ||
+    p.status === "PENDING_REMODERATION"
+  ) {
+    return 1;
+  }
+  return 0;
+}
 
 export function ModerationHub({
   partners,
-  partnersBadgeCount,
   partnersError,
   partnersDbOffline,
   cars,
@@ -145,9 +163,11 @@ export function ModerationHub({
 
   const tab: TabId = useMemo(() => {
     const raw = searchParams.get("tab");
+    const partnerTab = searchParams.get("partnerTab")?.trim().toLowerCase();
     if (raw === "reviews") return "reviews";
     if (raw === "profiles") return "profiles";
     if (raw === "listings") return "listings";
+    if (raw === "primary" || partnerTab === "primary") return "primary";
     return "partners";
   }, [searchParams]);
 
@@ -156,21 +176,29 @@ export function ModerationHub({
       const params = new URLSearchParams(searchParams.toString());
       if (next === "partners") params.delete("tab");
       else params.set("tab", next);
+      if (next !== "partners" || params.get("partnerTab")?.trim().toLowerCase() === "primary") {
+        params.delete("partnerTab");
+      }
       const qs = params.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
     [pathname, router, searchParams],
   );
 
+  const primaryPartners = partners.filter((p) => PRIMARY_STATUSES.has(p.status));
+  const directoryPartners = partners.filter((p) => !PRIMARY_STATUSES.has(p.status));
+
   const tabCounts = {
-    partners: partners.length,
+    partners: directoryPartners.length,
+    primary: primaryPartners.length,
     listings: cars.length,
     profiles: profiles.length,
     reviews: reviews.length,
   } as const;
 
   const tabPending = {
-    partners: partnersBadgeCount ?? 0,
+    partners: directoryPartners.reduce((sum, p) => sum + partnerAttention(p), 0),
+    primary: primaryPartners.reduce((sum, p) => sum + partnerAttention(p), 0),
     listings: cars.length,
     profiles: profiles.length,
     reviews: reviewsBadgeCount ?? reviews.filter((r) => r.status === "PENDING").length,
@@ -182,13 +210,14 @@ export function ModerationHub({
       <p className="mb-5 text-sm text-slate-600">{labels.body}</p>
 
       <div
-        className="mb-6 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm sm:grid-cols-4 sm:max-w-3xl"
+        className="mb-6 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm sm:grid-cols-3 lg:grid-cols-5 lg:max-w-5xl"
         role="tablist"
         aria-label={labels.title}
       >
         {(
           [
             ["partners", labels.partnersTab],
+            ["primary", labels.primaryTab],
             ["listings", labels.listingsTab],
             ["profiles", labels.profilesTab],
             ["reviews", labels.reviewsTab],
@@ -205,7 +234,7 @@ export function ModerationHub({
               aria-selected={selected}
               onClick={() => setTab(id)}
               className={cn(
-                "rounded-lg px-2 py-2.5 text-sm font-bold transition sm:px-3",
+                "rounded-lg px-2 py-2.5 text-center text-sm font-bold leading-snug transition sm:px-3",
                 selected && !hasPending && "bg-[#0b1f4b] text-white",
                 selected && hasPending && "bg-amber-400 text-amber-950 ring-2 ring-amber-500",
                 !selected && !hasPending && "text-slate-600 hover:bg-slate-50",
@@ -252,6 +281,14 @@ export function ModerationHub({
           )}
 
           <PartnersManager initialPartners={partners} mode="directory" />
+        </section>
+      ) : null}
+
+      {tab === "primary" ? (
+        <section role="tabpanel" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <h2 className="text-lg font-extrabold text-[#0b1f4b]">{labels.primaryTitle}</h2>
+          <p className="mt-1 mb-4 text-sm text-slate-500">{labels.primaryBody}</p>
+          <PartnersManager initialPartners={partners} mode="primary" />
         </section>
       ) : null}
 
