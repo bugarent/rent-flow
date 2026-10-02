@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
-import { signIn } from "next-auth/react";
 import { BrandLogo } from "@/components/brand/brand-logo";
+import { signInOnPortal } from "@/lib/auth/portal-sign-in";
 import { LocaleFlag } from "@/components/brand/locale-flag";
 import { PartnerLanguageSelect } from "@/components/partner/partner-language-select";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
@@ -130,12 +130,7 @@ export function PartnerCompanyAuthScreen(_props?: { initialMode?: Mode }) {
     e.preventDefault();
     setLoading(true);
     setError("");
-    const res = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-      callbackUrl,
-    });
+    const res = await signInOnPortal("partner", email, password, callbackUrl);
     if (res?.error) {
       setLoading(false);
       try {

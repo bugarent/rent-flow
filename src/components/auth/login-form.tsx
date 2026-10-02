@@ -3,49 +3,10 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { usePreferences } from "@/components/providers/preferences-context";
+import { signInOnPortal, type PortalSignIn } from "@/lib/auth/portal-sign-in";
 import { safePortalCallback } from "@/lib/routes";
 
-type Portal = "admin" | "partner";
-
-const PORTAL_AUTH_BASE = {
-  admin: "/api/auth/admin",
-  partner: "/api/auth/partner",
-} as const;
-
-async function signInOnPortal(
-  portal: Portal,
-  email: string,
-  password: string,
-  callbackUrl: string,
-) {
-  const basePath = PORTAL_AUTH_BASE[portal];
-  const csrfRes = await fetch(`${basePath}/csrf`, { credentials: "same-origin" });
-  if (!csrfRes.ok) return { error: "CredentialsSignin" };
-  const csrf = (await csrfRes.json()) as { csrfToken?: string };
-  const res = await fetch(`${basePath}/callback/credentials`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    credentials: "same-origin",
-    body: new URLSearchParams({
-      csrfToken: csrf.csrfToken ?? "",
-      email,
-      password,
-      callbackUrl,
-      json: "true",
-    }),
-  });
-  const data = (await res.json().catch(() => null)) as { url?: string } | null;
-  let error: string | null = null;
-  if (data?.url) {
-    try {
-      error = new URL(data.url, window.location.origin).searchParams.get("error");
-    } catch {
-      error = "CredentialsSignin";
-    }
-  }
-  if (!res.ok || error) return { error: error || "CredentialsSignin" };
-  return { error: null };
-}
+type Portal = PortalSignIn;
 
 export function LoginForm({
   portal,
