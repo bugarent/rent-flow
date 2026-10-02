@@ -9,6 +9,7 @@ import {
   type LegalPageContent,
   type LegalPagesConfig,
 } from "@/lib/catalog/legal-pages";
+import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
 
 export type { LegalPageContent, LegalPagesConfig };
 
@@ -35,12 +36,9 @@ function normalize(parsed: Partial<LegalPagesConfig> | null | undefined): LegalP
 }
 
 async function writeConfig(config: LegalPagesConfig) {
-  try {
-    await mkdir(DATA_DIR, { recursive: true });
-    await writeFile(DATA_FILE, JSON.stringify(config, null, 2), "utf8");
-  } catch {
-    /* Hosted filesystem is read-only. */
-  }
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(DATA_FILE, JSON.stringify(config, null, 2), "utf8");
+  revalidatePublishedContent();
 }
 
 export async function getLegalPagesConfig(): Promise<LegalPagesConfig> {
@@ -48,9 +46,7 @@ export async function getLegalPagesConfig(): Promise<LegalPagesConfig> {
     const raw = await readFile(DATA_FILE, "utf8");
     return normalize(JSON.parse(raw) as Partial<LegalPagesConfig>);
   } catch {
-    const empty = emptyLegalPages();
-    await writeConfig(empty);
-    return empty;
+    return emptyLegalPages();
   }
 }
 

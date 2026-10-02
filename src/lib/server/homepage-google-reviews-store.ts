@@ -18,6 +18,7 @@ import {
   type GoogleReviewRatingOption,
 } from "@/lib/catalog/homepage-google-reviews";
 import { createTtlCache } from "@/lib/server/ttl-cache";
+import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
 
 export type { HomepageGoogleReviewsConfig, GoogleReviewItem, PublicHomepageGoogleReviews };
 
@@ -85,13 +86,10 @@ function visibleReviews(
 }
 
 async function writeConfig(config: HomepageGoogleReviewsConfig) {
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(DATA_FILE, JSON.stringify(config, null, 2), "utf8");
   cache.set(config);
-  try {
-    await mkdir(DATA_DIR, { recursive: true });
-    await writeFile(DATA_FILE, JSON.stringify(config, null, 2), "utf8");
-  } catch {
-    /* Hosted filesystem is read-only. */
-  }
+  revalidatePublishedContent();
 }
 
 export async function getHomepageGoogleReviewsConfig(): Promise<HomepageGoogleReviewsConfig> {
@@ -103,9 +101,7 @@ export async function getHomepageGoogleReviewsConfig(): Promise<HomepageGoogleRe
     cache.set(next);
     return next;
   } catch {
-    const empty = emptyConfig();
-    await writeConfig(empty);
-    return empty;
+    return emptyConfig();
   }
 }
 
@@ -197,9 +193,10 @@ export async function getPublicHomepageGoogleReviews(): Promise<PublicHomepageGo
   const config = await getHomepageGoogleReviewsConfig();
   if (!config.enabled) return null;
   const reviews = visibleReviews(config.reviews, config.allowedRatings);
-  if (!reviews.length) return null;
+  const mapsUrl = (config.placeUrl || config.mapsUrl || "").trim();
+  if (!reviews.length && !mapsUrl) return null;
   return {
-    mapsUrl: config.placeUrl || config.mapsUrl,
+    mapsUrl,
     placeName: config.placeName,
     placeRating: config.placeRating,
     placeUrl: config.placeUrl,

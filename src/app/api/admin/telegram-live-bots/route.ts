@@ -10,7 +10,7 @@ import {
 
 const botSchema = z.object({
   id: z.string().min(1).max(80).optional(),
-  label: z.string().trim().min(1).max(80),
+  label: z.string().trim().max(80).optional().default(""),
   botUsername: z.string().trim().max(64).optional().default(""),
   botToken: z.string().trim().max(200).optional().default(""),
   chatId: z.string().trim().max(64),
@@ -55,7 +55,7 @@ export async function PUT(req: Request) {
       if (active) activeCount += 1;
       return {
         id: row.id || prev?.id || `bot-${Date.now()}-${index}`,
-        label: row.label.trim(),
+        label: row.label.trim() || (row.botUsername || "").trim().replace(/^@/, "") || `Bot ${index + 1}`,
         botUsername: (row.botUsername || "").trim().replace(/^@/, ""),
         botToken: token,
         chatId: row.chatId.trim(),

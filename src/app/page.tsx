@@ -21,11 +21,7 @@ import { getPopularAirports as getStaticPopularAirports } from "@/lib/catalog/po
 import { VEHICLE_CATEGORIES } from "@/lib/catalog/categories";
 import { summarizeMappedModels } from "@/lib/cars/category-mapping";
 
-export const revalidate = 60;
-
-function openCircuitOnTimeout() {
-  void import("@/lib/prisma").then((m) => m.markDbCircuitOpen("homepage-soft-timeout")).catch(() => undefined);
-}
+export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const categoryFallback = VEHICLE_CATEGORIES.map((c) => ({
@@ -45,10 +41,10 @@ export default async function Home() {
 
   const [options, popularAirports, categories, airportsLayout, infoContent, googleReviews, bookingChannels] =
     await Promise.all([
-      softTimeout(getSearchDeliveryAirports(), [], 2000, openCircuitOnTimeout),
-      softTimeout(getHomepageAirports(), airportFallback, 2000, openCircuitOnTimeout),
-      softTimeout(getHomepageCategories(), categoryFallback, 2000, openCircuitOnTimeout),
-      softTimeout(getPopularAirportsLayoutSetting(), "grid" as const, 1500, openCircuitOnTimeout),
+      softTimeout(getSearchDeliveryAirports(), [], 2000),
+      softTimeout(getHomepageAirports(), airportFallback, 2000),
+      softTimeout(getHomepageCategories(), categoryFallback, 2000),
+      softTimeout(getPopularAirportsLayoutSetting(), "grid" as const, 1500),
       softTimeout(getHomepageInfoContent(), defaultHomepageInfoContent(), 1500),
       softTimeout(getPublicHomepageGoogleReviews(), null, 1500),
       softTimeout(getPublicCustomBookingChannels(), DEFAULT_CUSTOM_BOOKING_CHANNELS, 1500),

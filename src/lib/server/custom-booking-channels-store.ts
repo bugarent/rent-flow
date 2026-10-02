@@ -9,6 +9,7 @@ import {
   type CustomBookingChannelsConfig,
 } from "@/lib/catalog/custom-booking-channels";
 import { createTtlCache } from "@/lib/server/ttl-cache";
+import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
 
 const DATA_DIR = dataRoot();
 const DATA_FILE = join(DATA_DIR, "custom-booking-channels.json");
@@ -28,13 +29,10 @@ function normalizeChannel(
 }
 
 async function writeConfig(config: CustomBookingChannelsConfig) {
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(DATA_FILE, JSON.stringify(config, null, 2), "utf8");
   cache.set(config);
-  try {
-    await mkdir(DATA_DIR, { recursive: true });
-    await writeFile(DATA_FILE, JSON.stringify(config, null, 2), "utf8");
-  } catch {
-    /* Hosted filesystem is read-only. */
-  }
+  revalidatePublishedContent();
 }
 
 export async function getCustomBookingChannelsConfig(): Promise<CustomBookingChannelsConfig> {
@@ -56,12 +54,10 @@ export async function getCustomBookingChannelsConfig(): Promise<CustomBookingCha
     cache.set(next);
     return next;
   } catch {
-    const defaults = {
+    return {
       ...DEFAULT_CUSTOM_BOOKING_CHANNELS,
       updatedAt: new Date().toISOString(),
     };
-    await writeConfig(defaults);
-    return defaults;
   }
 }
 

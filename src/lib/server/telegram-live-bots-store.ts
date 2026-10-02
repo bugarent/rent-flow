@@ -6,6 +6,7 @@ import { mkdir, readFile, writeFile } from "@/lib/server/durable-fs";
 import { join } from "node:path";
 import type { TelegramLiveBot, TelegramLiveBotsConfig } from "@/lib/catalog/telegram-live-bots";
 import { createTtlCache } from "@/lib/server/ttl-cache";
+import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
 
 const DATA_DIR = dataRoot();
 const DATA_FILE = join(DATA_DIR, "telegram-live-bots.json");
@@ -54,20 +55,15 @@ async function readFileStore(): Promise<TelegramLiveBotsConfig> {
     const raw = await readFile(DATA_FILE, "utf8");
     return normalize(JSON.parse(raw) as Partial<TelegramLiveBotsConfig>);
   } catch {
-    const next = empty();
-    await writeFileStore(next);
-    return next;
+    return empty();
   }
 }
 
 async function writeFileStore(config: TelegramLiveBotsConfig) {
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(DATA_FILE, JSON.stringify(config, null, 2), "utf8");
   cache.set(config);
-  try {
-    await mkdir(DATA_DIR, { recursive: true });
-    await writeFile(DATA_FILE, JSON.stringify(config, null, 2), "utf8");
-  } catch {
-    /* Hosted filesystem is read-only. */
-  }
+  revalidatePublishedContent();
 }
 
 export async function getTelegramLiveBotsConfig(): Promise<TelegramLiveBotsConfig> {

@@ -173,7 +173,22 @@ export function GoogleReviewsCarousel({
     return () => window.clearInterval(id);
   }, [items.length, paused]);
 
-  if (!items.length) return null;
+  if (!items.length) {
+    const href = mapsUrl.trim();
+    if (!href) return null;
+    return (
+      <section
+        id="testimonials"
+        className="relative w-full min-w-0 overflow-x-clip px-4 pb-4 pt-1 sm:px-6 sm:pb-5"
+      >
+        <div className="relative mx-auto max-w-6xl rounded-[22px] border border-slate-200 bg-white px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-6 sm:py-5">
+          <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2">
+            <GoogleWordmark />
+          </a>
+        </div>
+      </section>
+    );
+  }
 
   const visibleCount = Math.min(3, items.length);
   const visible = Array.from({ length: visibleCount }, (_, offset) => items[(index + offset) % items.length]);

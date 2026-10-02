@@ -11,6 +11,7 @@ import {
   type HelpTopic,
 } from "@/lib/catalog/help-center";
 import { DEFAULT_HELP_CENTER } from "@/lib/catalog/help-center-defaults";
+import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
 import type { HelpFaqItem } from "@/lib/catalog/help-faq";
 
 const DATA_DIR = dataRoot();
@@ -108,9 +109,6 @@ export async function getHelpCenterConfig(): Promise<HelpCenterConfig> {
 
   const seeded = { ...DEFAULT_HELP_CENTER, updatedAt: new Date().toISOString() };
   setCache(seeded);
-  void writeConfig(seeded).catch(() => {
-    /* ignore seed write errors on hot path */
-  });
   return seeded;
 }
 
@@ -127,6 +125,7 @@ export async function saveHelpCenterConfig(
   };
   await writeConfig(next);
   setCache(next);
+  revalidatePublishedContent();
   return next;
 }
 

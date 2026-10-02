@@ -8,6 +8,7 @@ import {
   type PopularAirportsLayout,
 } from "@/lib/catalog/popular-airports-layout";
 import { prisma } from "@/lib/prisma";
+import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
 
 export type { PopularAirportsLayout };
 
@@ -15,29 +16,29 @@ const DATA_DIR = dataRoot();
 const DATA_FILE = join(DATA_DIR, "homepage-airports-layout.json");
 const DEFAULT_LAYOUT: PopularAirportsLayout = "grid";
 
-async function readFileStore(): Promise<PopularAirportsLayout> {
+async function readFileStore(): Promise<PopularAirportsLayout | null> {
   try {
     const raw = await readFile(DATA_FILE, "utf8");
     const parsed = JSON.parse(raw) as { layout?: unknown };
+    if (!parsed || typeof parsed !== "object" || parsed.layout == null) return null;
     return normalizePopularAirportsLayout(parsed.layout);
   } catch {
-    await writeFileStore(DEFAULT_LAYOUT);
-    return DEFAULT_LAYOUT;
+    return null;
   }
 }
 
 async function writeFileStore(layout: PopularAirportsLayout) {
-  try {
-    await mkdir(DATA_DIR, { recursive: true });
-    await writeFile(DATA_FILE, JSON.stringify({ layout }, null, 2), "utf8");
-  } catch {
-    /* Hosted filesystem is read-only. */
-  }
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(DATA_FILE, JSON.stringify({ layout }, null, 2), "utf8");
+  revalidatePublishedContent();
 }
 
 export async function getPopularAirportsLayout(): Promise<PopularAirportsLayout> {
+  const published = await readFileStore();
+  if (published) return published;
+
   const { isDbCircuitOpen, markDbCircuitOpen } = await import("@/lib/prisma");
-  if (isDbCircuitOpen()) return readFileStore();
+  if (isDbCircuitOpen()) return DEFAULT_LAYOUT;
 
   try {
     const settings = await prisma.platformSetting.findUnique({ where: { id: "default" } });
@@ -52,7 +53,7 @@ export async function getPopularAirportsLayout(): Promise<PopularAirportsLayout>
       console.warn("[homepage-airports-layout] DB read failed, using file store:", error);
     }
   }
-  return readFileStore();
+  return (await readFileStore()) ?? DEFAULT_LAYOUT;
 }
 
 export async function setPopularAirportsLayout(

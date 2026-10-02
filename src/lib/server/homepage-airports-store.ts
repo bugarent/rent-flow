@@ -5,6 +5,7 @@ import { mkdir, readFile, writeFile } from "@/lib/server/durable-fs";
 import { join } from "node:path";
 import { getPopularAirports as getStaticPopularAirports } from "@/lib/catalog/popular-airports";
 import { prisma } from "@/lib/prisma";
+import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
 
 export type StoredHomepageAirport = {
   id: string;
@@ -58,19 +59,19 @@ async function readFileStore(): Promise<StoredHomepageAirport[]> {
       };
     });
   } catch {
-    const defaults = defaultAirports();
-    await writeFileStore(defaults);
-    return defaults;
+    return [];
   }
 }
 
 async function writeFileStore(rows: StoredHomepageAirport[]) {
-  try {
-    await mkdir(DATA_DIR, { recursive: true });
-    await writeFile(DATA_FILE, JSON.stringify(rows, null, 2), "utf8");
-  } catch {
-    /* Hosted filesystem is read-only. */
-  }
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(DATA_FILE, JSON.stringify(rows, null, 2), "utf8");
+  revalidatePublishedContent();
+}
+
+async function publishFromDb(db: AirportDelegate) {
+  const rows = await db.findMany({ orderBy: { sortOrder: "asc" } });
+  await writeFileStore(rows.map(toStored));
 }
 
 function getDbDelegate(): AirportDelegate | null {
@@ -126,8 +127,11 @@ async function createInFileStore(input: {
 }
 
 export async function listHomepageAirports(): Promise<StoredHomepageAirport[]> {
+  const published = await readFileStore();
+  if (published.length) return published;
+
   const { isDbCircuitOpen, markDbCircuitOpen } = await import("@/lib/prisma");
-  if (isDbCircuitOpen()) return readFileStore();
+  if (isDbCircuitOpen()) return published;
 
   const db = getDbDelegate();
   if (!db) return readFileStore();
@@ -168,6 +172,7 @@ export async function createHomepageAirport(input: {
         sortOrder: (max._max.sortOrder ?? -1) + 1,
       },
     });
+    await publishFromDb(db);
     return toStored(row);
   } catch (error) {
     console.warn("[homepage-airports] DB create failed, using file store:", error);
@@ -212,6 +217,7 @@ export async function updateHomepageAirport(
         imageUrl: input.imageUrl?.trim(),
       },
     });
+    await publishFromDb(db);
     return toStored(row);
   } catch (error) {
     console.warn("[homepage-airports] DB update failed, using file store:", error);
@@ -233,6 +239,7 @@ export async function deleteHomepageAirport(id: string): Promise<void> {
 
   try {
     await db.delete({ where: { id } });
+    await publishFromDb(db);
   } catch (error) {
     console.warn("[homepage-airports] DB delete failed, using file store:", error);
     await deleteFromFile();
@@ -266,6 +273,7 @@ export async function reorderHomepageAirports(orderedIds: string[]): Promise<Sto
     await Promise.all(
       orderedIds.map((id, index) => db.update({ where: { id }, data: { sortOrder: index } })),
     );
+    await publishFromDb(db);
     return listHomepageAirports();
   } catch (error) {
     console.warn("[homepage-airports] DB reorder failed, using file store:", error);

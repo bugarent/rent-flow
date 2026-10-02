@@ -12,6 +12,7 @@ import type {
   HomepageInfoSection,
 } from "@/lib/catalog/homepage-info";
 import { createTtlCache } from "@/lib/server/ttl-cache";
+import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
 
 export type { HomepageInfoBlock, HomepageInfoContent, HomepageInfoSection };
 
@@ -148,13 +149,10 @@ function normalizeContent(raw: unknown): HomepageInfoContent {
 }
 
 async function writeStore(content: HomepageInfoContent) {
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(DATA_FILE, JSON.stringify(content, null, 2), "utf8");
   cache.set(content);
-  try {
-    await mkdir(DATA_DIR, { recursive: true });
-    await writeFile(DATA_FILE, JSON.stringify(content, null, 2), "utf8");
-  } catch {
-    /* Hosted filesystem is read-only. */
-  }
+  revalidatePublishedContent();
 }
 
 export async function getHomepageInfoContent(): Promise<HomepageInfoContent> {
@@ -166,9 +164,7 @@ export async function getHomepageInfoContent(): Promise<HomepageInfoContent> {
     cache.set(content);
     return content;
   } catch {
-    const defaults = defaultHomepageInfoContent();
-    await writeStore(defaults);
-    return defaults;
+    return defaultHomepageInfoContent();
   }
 }
 

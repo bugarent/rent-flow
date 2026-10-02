@@ -99,11 +99,6 @@ export async function ensureHomepageDefaults() {
 
 export async function getHomepageCategories(): Promise<HomepageCategoryCard[]> {
   try {
-    try {
-      await ensureHomepageDefaults();
-    } catch {
-      /* DB offline — listHomepageCategories falls back to file store */
-    }
     const rows = await listHomepageCategories();
     if (rows.length === 0) {
       return VEHICLE_CATEGORIES.map((c) => ({
@@ -139,11 +134,6 @@ export async function getHomepageCategories(): Promise<HomepageCategoryCard[]> {
 
 export async function getHomepageAirports(): Promise<HomepageAirportCard[]> {
   try {
-    try {
-      await ensureHomepageDefaults();
-    } catch {
-      /* DB offline — listHomepageAirports falls back to file store */
-    }
     const { listHomepageAirports } = await import("@/lib/server/homepage-airports-store");
     const rows = await listHomepageAirports();
     if (rows.length === 0) {

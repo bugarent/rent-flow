@@ -200,20 +200,62 @@ export async function mkdir(path: string, options?: { recursive?: boolean }): Pr
   }
 }
 
+function preferDatabaseCopy(path: string): boolean {
+  const normalized = path.replace(/\\/g, "/");
+  return isServerlessHost() || normalized.startsWith("/tmp/rentairportcars");
+}
+
+function textFromDbPayload(fromDb: string, encoding?: BufferEncoding): string | Buffer {
+  if (!encoding || encoding === "utf8") return fromDb;
+  return Buffer.from(fromDb, "utf8");
+}
+
+/**
+ * On Netlify the JSON file in /tmp disappears between instances.
+ * Prefer the Postgres copy there so admin settings see the last saved value.
+ */
+export async function readDurableText(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, "utf8");
+  } catch {
+    return null;
+  }
+}
+
 export async function readFile(path: string, encoding: "utf8"): Promise<string>;
 export async function readFile(path: string, encoding?: BufferEncoding): Promise<string | Buffer>;
 export async function readFile(path: string, encoding?: BufferEncoding): Promise<string | Buffer> {
+  // Local files are read synchronously so a slow database call on the same page
+  // cannot let the homepage timeout discard contact details and reviews.
+  if (!preferDatabaseCopy(path)) {
+    try {
+      return encoding ? fsReadFileSync(path, encoding) : fsReadFileSync(path);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT" && (error as NodeJS.ErrnoException).code !== "EACCES") {
+        throw error;
+      }
+      const fromDb = await readFromDb(path);
+      if (fromDb == null) throw error;
+      void hydrateFile(path, fromDb);
+      return textFromDbPayload(fromDb, encoding);
+    }
+  }
+
+  const fromDb = await Promise.race([
+    readFromDb(path),
+    new Promise<string | null>((resolve) => setTimeout(() => resolve(null), 1200)),
+  ]);
+  if (fromDb != null) {
+    void hydrateFile(path, fromDb);
+    return textFromDbPayload(fromDb, encoding);
+  }
   try {
     return encoding ? await fsReadFile(path, encoding) : await fsReadFile(path);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT" && (error as NodeJS.ErrnoException).code !== "EACCES") {
       throw error;
     }
-    const fromDb = await readFromDb(path);
-    if (fromDb == null) throw error;
-    void hydrateFile(path, fromDb);
-    if (!encoding || encoding === "utf8") return fromDb;
-    return Buffer.from(fromDb, "utf8");
+    throw error;
   }
 }
 

@@ -5,6 +5,7 @@ import { mkdir, readFile, writeFile } from "@/lib/server/durable-fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
+import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
 import { CATALOG_AIRPORTS } from "@/lib/catalog/airports";
 import {
   findSearchPlace,
@@ -74,6 +75,7 @@ async function readFileStore(): Promise<StoredDeliveryLocation[]> {
 async function writeFileStore(rows: StoredDeliveryLocation[]) {
   await mkdir(DATA_DIR, { recursive: true });
   await writeFile(DATA_FILE, JSON.stringify(rows, null, 2), "utf8");
+  revalidatePublishedContent();
 }
 
 /** Countries that currently have approved partners (via partner airport locations). */

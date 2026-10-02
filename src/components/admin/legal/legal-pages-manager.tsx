@@ -65,8 +65,14 @@ export function LegalPagesManager({ initial }: Props) {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          terms: { body: termsEdits.ka ?? termsSource, fileUrl: termsFile },
-          privacy: { body: privacyEdits.ka ?? privacySource, fileUrl: privacyFile },
+          terms: {
+            body: locale === "ka" ? terms.body : (termsEdits.ka ?? termsSource),
+            fileUrl: terms.fileUrl,
+          },
+          privacy: {
+            body: locale === "ka" ? privacy.body : (privacyEdits.ka ?? privacySource),
+            fileUrl: privacy.fileUrl,
+          },
         }),
       });
       const data = (await res.json()) as LegalPagesConfig & { error?: string };

@@ -5,6 +5,7 @@ import { mkdir, readFile, writeFile } from "@/lib/server/durable-fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { DEFAULT_HELP_FAQ, type HelpFaqConfig, type HelpFaqItem } from "@/lib/catalog/help-faq";
+import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
 
 const DATA_DIR = dataRoot();
 const DATA_FILE = join(DATA_DIR, "help-faq.json");
@@ -37,18 +38,14 @@ export async function getHelpFaqConfig(): Promise<HelpFaqConfig> {
           .sort((a, b) => a.sortOrder - b.sortOrder)
       : [];
     if (!items.length) {
-      const seeded = { ...DEFAULT_HELP_FAQ, updatedAt: new Date().toISOString() };
-      await writeConfig(seeded);
-      return seeded;
+      return { ...DEFAULT_HELP_FAQ, updatedAt: new Date().toISOString() };
     }
     return {
       items,
       updatedAt: String(parsed.updatedAt || new Date().toISOString()),
     };
   } catch {
-    const seeded = { ...DEFAULT_HELP_FAQ, updatedAt: new Date().toISOString() };
-    await writeConfig(seeded);
-    return seeded;
+    return { ...DEFAULT_HELP_FAQ, updatedAt: new Date().toISOString() };
   }
 }
 
@@ -62,6 +59,7 @@ export async function saveHelpFaqConfig(itemsInput: Array<Partial<HelpFaqItem>>)
     updatedAt: new Date().toISOString(),
   };
   await writeConfig(next);
+  revalidatePublishedContent();
   return next;
 }
 

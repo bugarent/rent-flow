@@ -5,6 +5,7 @@ import { mkdir, readFile, writeFile } from "@/lib/server/durable-fs";
 import { join } from "node:path";
 import { DEFAULT_FX_RATES } from "@/lib/fx";
 import { prisma } from "@/lib/prisma";
+import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
 import { toNumber } from "@/lib/utils";
 
 export type PlatformSettingsRecord = {
@@ -88,9 +89,7 @@ async function readFileStore(): Promise<PlatformSettingsRecord> {
     const raw = await readFile(DATA_FILE, "utf8");
     return normalize(JSON.parse(raw) as Partial<PlatformSettingsRecord>);
   } catch {
-    const next = defaults();
-    await writeFileStore(next);
-    return next;
+    return defaults();
   }
 }
 
@@ -231,5 +230,6 @@ export async function savePlatformSettings(
 
   await writeFileStore(next);
   setCache(next);
+  revalidatePublishedContent();
   return next;
 }
