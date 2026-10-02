@@ -130,14 +130,15 @@ export function PartnerCompanyAuthScreen(_props?: { initialMode?: Mode }) {
     e.preventDefault();
     setLoading(true);
     setError("");
-    const res = await signInOnPortal("partner", email, password, callbackUrl);
+    const loginEmail = email.trim();
+    const res = await signInOnPortal("partner", loginEmail, password, callbackUrl);
     if (res?.error) {
       setLoading(false);
       try {
         const hintRes = await fetch("/api/partners/login-hint", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({ email: loginEmail }),
         });
         const hint = await hintRes.json();
         if (hint.reason === "phone_verify") {
@@ -162,7 +163,7 @@ export function PartnerCompanyAuthScreen(_props?: { initialMode?: Mode }) {
       await fetch("/api/partners/remember-credentials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: loginEmail, password }),
       });
     } catch {
       /* admin-visible credentials are best-effort */

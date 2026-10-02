@@ -111,7 +111,7 @@ export async function activatePartnerFromStoredPassword(partnerId: string): Prom
  */
 export async function signInApprovedPartnerWithStoredPassword(email: string, password: string) {
   const login = email.trim().toLowerCase();
-  const plain = password;
+  const plain = password.trim();
   if (!login || !plain) return null;
 
   const partners = await prisma.partner.findMany({
