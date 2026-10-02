@@ -47,9 +47,12 @@ function whenLine(instant: Date, iata: string) {
   return `${pad(parts.day)}.${pad(parts.month)}.${parts.year} ${pad(parts.hour)}:${pad(parts.minute)}`;
 }
 
-export function bookingBotMessage(notice: BookingBotNotice) {
+export function bookingBotMessage(
+  notice: BookingBotNotice & { headline?: string; reference?: string },
+) {
   return [
-    "ახალი ჯავშანი",
+    notice.headline?.trim() || "ახალი ჯავშანი",
+    notice.reference?.trim() ? `რეფერენსი: ${notice.reference.trim()}` : null,
     `მანქანა: ${notice.carLabel.trim() || "—"}`,
     `აღების ადგილი: ${placeLine(notice.pickupIata, notice.pickupAddress) || "—"}`,
     `აღების თარიღი და დრო: ${whenLine(notice.pickupAt, notice.pickupIata)}`,
@@ -58,13 +61,22 @@ export function bookingBotMessage(notice: BookingBotNotice) {
     `სულ ჯავშანი: ${money(notice.totalPriceEur)}`,
     `გადახდილია: ${money(notice.paidEur)}`,
     `ადგილზე გადასახდელი: ${money(notice.dueOnSiteEur)}`,
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/** Sends the booking notice to the single bot saved in the admin homepage panel. */
+export async function sendBookingNoticeToBot(text: string) {
+  const body = text.trim();
+  if (!body) return;
+  const bot = await getActiveTelegramLiveBot();
+  if (!bot?.botToken.trim() || !bot.chatId.trim()) return;
+  const sent = await sendTelegramMessageWithToken(bot.botToken, bot.chatId, body);
+  if (!sent.ok) console.warn("[booking-bot] telegram", sent.error);
 }
 
 /** Sends a new-booking summary to the single bot saved in the admin homepage panel. */
 export async function notifyBookingTelegramBot(notice: BookingBotNotice) {
-  const bot = await getActiveTelegramLiveBot();
-  if (!bot?.botToken.trim() || !bot.chatId.trim()) return;
-  const sent = await sendTelegramMessageWithToken(bot.botToken, bot.chatId, bookingBotMessage(notice));
-  if (!sent.ok) console.warn("[booking-bot] telegram", sent.error);
+  await sendBookingNoticeToBot(bookingBotMessage(notice));
 }

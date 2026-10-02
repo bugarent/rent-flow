@@ -4,9 +4,8 @@ import { formatBookingRef } from "@/lib/ids";
 import { sendTelegramMessage } from "@/lib/telegram/bot";
 import { sendPartnerMail } from "@/lib/mail";
 import { normalizeLogin } from "@/lib/crypto";
-import { storedTripAndPickupDue } from "@/lib/bookings/booking-money";
-import { composeLocationAddress, findSearchPlace } from "@/lib/catalog/search-places";
 import { parsePartnerMessengers } from "@/lib/partner";
+import { bookingBotMessage } from "@/lib/telegram/notify-booking-bot";
 import { getPlatformSettings } from "@/lib/server/platform-settings-store";
 import {
   listStoredPartnerChatIds,
@@ -39,10 +38,6 @@ type NoticeSnapshot = {
   extras: Array<{ label: string; priceEur: number }>;
 };
 
-function formatWhen(d: Date) {
-  return d.toISOString().replace("T", " ").slice(0, 16) + " UTC";
-}
-
 function messengerLabel(platform: string) {
   const key = platform.toUpperCase();
   if (key === "VIBER") return "ვიბერი";
@@ -58,14 +53,6 @@ function noticeSubject(event: BookingNoticeEvent, reference: string | null) {
   return `ახალი ჯავშანი${ref}`;
 }
 
-function noticePlace(iata: string, address: string) {
-  const code = String(iata || "").trim();
-  const street = String(address || "").trim();
-  const city = findSearchPlace(code)?.cityName || "";
-  const full = street ? composeLocationAddress(city, street) : "";
-  return [code, full].filter(Boolean).join(" — ");
-}
-
 function noticeHeadline(event: BookingNoticeEvent) {
   if (event === "BOOKING_EDITED") return "მოხდა ცვლილება";
   if (event === "BOOKING_CANCELLED") return "ჯავშანი გაუქმდა";
@@ -79,26 +66,27 @@ function noticeText(
   extras?: { cancellationReason?: string; refundEur?: number },
 ) {
   const reference = formatBookingRef(booking.sequentialNumber) || `#${booking.sequentialNumber}`;
-  const money = storedTripAndPickupDue({
+  const facts = bookingBotMessage({
+    headline: `${noticeHeadline(event)} · ${siteName}`,
+    reference,
+    carLabel: booking.carLabel,
+    pickupIata: booking.pickupIata,
+    dropoffIata: booking.dropoffIata,
+    pickupAddress: booking.pickupAddress,
+    dropoffAddress: booking.dropoffAddress,
+    pickupAt: booking.pickupAt,
+    dropoffAt: booking.dropoffAt,
     totalPriceEur: booking.totalPriceEur,
-    depositPaidEur: booking.depositPaidEur,
-    balanceDueEur: booking.balanceDueEur,
+    paidEur: booking.depositPaidEur,
+    dueOnSiteEur: booking.balanceDueEur,
   });
-  const pickup = noticePlace(booking.pickupIata, booking.pickupAddress);
-  const dropoff = noticePlace(booking.dropoffIata, booking.dropoffAddress);
   const extrasLines = booking.extras.filter((ex) => ex.label.trim());
   const messengerLine = booking.messengers.map(messengerLabel).join(", ");
   const reason = String(extras?.cancellationReason || "").trim();
   const refundEur = Number(extras?.refundEur) || 0;
 
   return [
-    `${noticeHeadline(event)} · ${siteName}`,
-    `რეფერენსი: ${reference}`,
-    `მანქანა: ${booking.carLabel}`,
-    `აღება: ${pickup || "—"}`,
-    `  ${formatWhen(booking.pickupAt)}`,
-    `დაბრუნება: ${dropoff || "—"}`,
-    `  ${formatWhen(booking.dropoffAt)}`,
+    facts,
     booking.flightNumber ? `რეისი: ${booking.flightNumber}` : null,
     `კლიენტი: ${`${booking.guestFirstName} ${booking.guestLastName}`.trim() || "—"}`,
     `ტელეფონი: ${booking.guestPhone || "—"}`,
@@ -107,8 +95,6 @@ function noticeText(
     extrasLines.length
       ? `მომსახურება:\n${extrasLines.map((ex) => `  ${ex.label} — €${Number(ex.priceEur || 0).toFixed(2)}`).join("\n")}`
       : "მომსახურება: არ არის არჩეული",
-    `ჯამური ფასი: €${money.tripEur.toFixed(2)}`,
-    `მანქანის აღებისას გადასახდელი: €${money.dueAtPickupEur.toFixed(2)}`,
     event === "BOOKING_CANCELLED" && reason ? `გაუქმების მიზეზი: ${reason}` : null,
     event === "BOOKING_CANCELLED" && refundEur > 0
       ? `დასაბრუნებელი (საიტის საკომისიო): €${refundEur.toFixed(2)}`
@@ -177,19 +163,8 @@ async function deliverBookingNotice(input: {
 
   if (input.event === "BOOKING_NEW") {
     try {
-      const { notifyBookingTelegramBot } = await import("@/lib/telegram/notify-booking-bot");
-      await notifyBookingTelegramBot({
-        carLabel: input.booking.carLabel,
-        pickupIata: input.booking.pickupIata,
-        dropoffIata: input.booking.dropoffIata,
-        pickupAddress: input.booking.pickupAddress,
-        dropoffAddress: input.booking.dropoffAddress,
-        pickupAt: input.booking.pickupAt,
-        dropoffAt: input.booking.dropoffAt,
-        totalPriceEur: input.booking.totalPriceEur,
-        paidEur: input.booking.depositPaidEur,
-        dueOnSiteEur: input.booking.balanceDueEur,
-      });
+      const { sendBookingNoticeToBot } = await import("@/lib/telegram/notify-booking-bot");
+      await sendBookingNoticeToBot(text);
     } catch (error) {
       console.warn("[notify] booking bot failed", error);
     }
@@ -321,34 +296,64 @@ export async function notifyFileBookingEvent(
   const fileCar = await getFileCar(booking.carId);
   if (!fileCar) {
     let carLabel = booking.carId;
+    let partnerEmail = "";
+    const chatIds = new Set<string>();
     try {
       const car = await prisma.car.findUnique({
         where: { id: booking.carId },
-        select: { make: true, model: true, year: true },
+        select: {
+          make: true,
+          model: true,
+          year: true,
+          partner: { select: { id: true, email: true, telegramChatId: true } },
+        },
       });
       if (car) carLabel = `${car.make} ${car.model} ${car.year}`.replace(/\s+/g, " ").trim();
-    } catch {
-      /* booking notice still goes out with the car id */
-    }
-    if (event === "BOOKING_NEW") {
-      try {
-        const { notifyBookingTelegramBot } = await import("@/lib/telegram/notify-booking-bot");
-        await notifyBookingTelegramBot({
-          carLabel,
-          pickupIata: booking.pickupAirportIata,
-          dropoffIata: booking.dropoffAirportIata,
-          pickupAddress: booking.pickupAddress,
-          dropoffAddress: booking.dropoffAddress,
-          pickupAt: new Date(booking.pickupAt),
-          dropoffAt: new Date(booking.dropoffAt),
-          totalPriceEur: Number(booking.totalPriceEur) || 0,
-          paidEur: Number(booking.depositPaidEur) || 0,
-          dueOnSiteEur: Number(booking.balanceDueEur) || 0,
-        });
-      } catch (error) {
-        console.warn("[notify] booking bot failed", error);
+      partnerEmail = car?.partner?.email?.trim() || "";
+      const partnerChat = car?.partner?.telegramChatId?.trim();
+      if (partnerChat) chatIds.add(partnerChat);
+      if (car?.partner) {
+        for (const chatId of await listStoredPartnerChatIds({
+          partnerId: car.partner.id,
+          email: partnerEmail,
+        })) {
+          chatIds.add(chatId);
+        }
       }
+    } catch (error) {
+      console.warn("[notify] prisma car lookup failed", error);
     }
+    await deliverBookingNotice({
+      event,
+      partnerEmails: partnerEmail ? [partnerEmail] : [],
+      partnerChatIds: [...chatIds],
+      cancellationReason: opts?.cancellationReason,
+      refundEur: opts?.refundEur,
+      booking: {
+        id: booking.id,
+        sequentialNumber: booking.sequentialNumber,
+        flightNumber: booking.flightNumber,
+        pickupAt: new Date(booking.pickupAt),
+        dropoffAt: new Date(booking.dropoffAt),
+        pickupAddress: booking.pickupAddress,
+        dropoffAddress: booking.dropoffAddress,
+        pickupIata: booking.pickupAirportIata,
+        dropoffIata: booking.dropoffAirportIata,
+        guestFirstName: booking.guestFirstName,
+        guestLastName: booking.guestLastName,
+        guestPhone: booking.guestPhone,
+        guestEmail: booking.guestEmail,
+        messengers: parsePartnerMessengers(booking.guestMessengers, booking.guestMessenger),
+        carLabel,
+        totalPriceEur: Number(booking.totalPriceEur) || 0,
+        depositPaidEur: Number(booking.depositPaidEur) || 0,
+        balanceDueEur: Number(booking.balanceDueEur) || 0,
+        extras: (booking.extras || []).map((extra) => ({
+          label: extra.label,
+          priceEur: Number(extra.priceEur) || 0,
+        })),
+      },
+    });
     return;
   }
 
