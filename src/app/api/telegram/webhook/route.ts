@@ -157,8 +157,6 @@ export async function POST(req: Request) {
     const copy = telegramBotCopy(bound.locale);
     if (bound.ok) {
       await sendTelegramMessage(chatId, copy.dashboardVerified);
-    } else if (bound.reason === "NO_PENDING") {
-      await sendTelegramMessage(chatId, copy.dashboardNeedButton);
     } else if (bound.reason === "DB_OFFLINE") {
       await sendTelegramMessage(chatId, copy.dashboardExpired);
     } else {
