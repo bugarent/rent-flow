@@ -92,11 +92,9 @@ function CurrencyToggle({
 
 export function DeliveryLocationsManager({
   initialLocations,
-  partnerCountries,
   fxRates = DEFAULT_FX_RATES,
 }: {
   initialLocations: DeliveryLocationView[];
-  partnerCountries: string[];
   fxRates?: FxRates;
 }) {
   const rates = fxRates;
@@ -112,11 +110,6 @@ export function DeliveryLocationsManager({
   const [showInactive, setShowInactive] = useState(false);
 
   const symbol = currencySymbol(currency);
-
-  const countryHint = useMemo(
-    () => (partnerCountries.length ? partnerCountries.join(", ") : "GE"),
-    [partnerCountries],
-  );
 
   const activeLocations = useMemo(
     () => sortLocationsByCountry(locations.filter((l) => l.isActive)),
@@ -443,21 +436,6 @@ export function DeliveryLocationsManager({
 
   return (
     <div className="space-y-8">
-      <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
-        Airports are limited to countries with approved partners (currently: <strong>{countryHint}</strong>). When
-        partners from new countries are approved, their airports appear here automatically.
-      </p>
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-slate-600">
-          Locations are grouped by <strong>country</strong>. Inactive locations stay hidden from this list. Change{" "}
-          <strong>Max delivery {symbol}</strong> and <strong>Free after days</strong>, then press <strong>Save</strong>.
-          After that many rental days, delivery becomes free. A partner who enters a longer period is corrected to this
-          number. Amounts are stored in EUR
-          {currency === "USD" ? ` (rate 1€ = ${rates.eurUsd}$)` : ""}.
-        </p>
-      </div>
-
       {error ? <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</p> : null}
       {message ? <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p> : null}
 
