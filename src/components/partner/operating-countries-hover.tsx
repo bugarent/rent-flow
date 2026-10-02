@@ -198,7 +198,7 @@ export function OperatingCountriesHover({
     <div ref={rootRef} className="relative">
       <div
         className={cn(
-          "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm font-semibold",
+          "flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm font-semibold",
           invalid
             ? "border-red-500 bg-red-50 text-red-900 ring-2 ring-red-200"
             : countryIso2s.length

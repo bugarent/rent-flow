@@ -238,6 +238,7 @@ export type Dictionary = {
     showPassword: string;
     hidePassword: string;
     passwordHint: string;
+    passwordShort: string;
     telegramUnverifiedBanner: string;
     telegramVerifyButton: string;
     telegramVerifiedShort: string;
@@ -597,6 +598,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       showPassword: "Show",
       hidePassword: "Hide",
       passwordHint: "At least 6 characters, with uppercase, lowercase, and a number",
+      passwordShort: "At least 6 characters",
       telegramUnverifiedBanner:
         "Telegram is not verified. Verify Telegram to receive booking notifications.",
       telegramVerifyButton: "Verify Telegram",
@@ -957,6 +959,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       showPassword: "ჩვენება",
       hidePassword: "დამალვა",
       passwordHint: "მინიმუმ 6 სიმბოლო, დიდი და პატარა ასო და ციფრი",
+      passwordShort: "მინიმუმ 6 სიმბოლო",
       telegramUnverifiedBanner:
         "Telegram არ არის დადასტურებული. დაადასტურეთ Telegram, რომ მიიღოთ შეტყობინებები ჯავშნებზე.",
       telegramVerifyButton: "Telegram-ის დადასტურება",
@@ -1319,6 +1322,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       showPassword: "Показать",
       hidePassword: "Скрыть",
       passwordHint: "Не менее 6 символов, заглавная и строчная буква и цифра",
+      passwordShort: "Не менее 6 символов",
       telegramUnverifiedBanner:
         "Telegram не подтверждён. Подтвердите Telegram, чтобы получать уведомления о бронированиях.",
       telegramVerifyButton: "Подтвердить Telegram",
@@ -1680,6 +1684,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       showPassword: "Afficher",
       hidePassword: "Masquer",
       passwordHint: "Au moins 6 caractères, avec majuscule, minuscule et un chiffre",
+      passwordShort: "Au moins 6 caractères",
       telegramUnverifiedBanner:
         "Telegram n'est pas vérifié. Vérifiez Telegram pour recevoir les notifications de réservation.",
       telegramVerifyButton: "Vérifier Telegram",
@@ -2041,6 +2046,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       showPassword: "Anzeigen",
       hidePassword: "Verbergen",
       passwordHint: "Mindestens 6 Zeichen, mit Groß- und Kleinbuchstaben sowie einer Zahl",
+      passwordShort: "Mindestens 6 Zeichen",
       telegramUnverifiedBanner:
         "Telegram ist nicht verifiziert. Verifizieren Sie Telegram, um Buchungsbenachrichtigungen zu erhalten.",
       telegramVerifyButton: "Telegram verifizieren",
@@ -2402,6 +2408,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       showPassword: "Pokaż",
       hidePassword: "Ukryj",
       passwordHint: "Co najmniej 6 znaków, wielka i mała litera oraz cyfra",
+      passwordShort: "Co najmniej 6 znaków",
       telegramUnverifiedBanner:
         "Telegram nie jest zweryfikowany. Zweryfikuj Telegram, aby otrzymywać powiadomienia o rezerwacjach.",
       telegramVerifyButton: "Zweryfikuj Telegram",
@@ -2760,6 +2767,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       showPassword: "إظهار",
       hidePassword: "إخفاء",
       passwordHint: "6 أحرف على الأقل، حرف كبير وصغير ورقم",
+      passwordShort: "6 أحرف على الأقل",
       telegramUnverifiedBanner:
         "تيليجرام غير مؤكد. أكّد تيليجرام لاستلام إشعارات الحجوزات.",
       telegramVerifyButton: "تأكيد تيليجرام",

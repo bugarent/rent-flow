@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import { FLEET_AGE_RANGES, isStrongPartnerPassword, type PartnerSocialPlatform } from "@/lib/partner";
+import { FLEET_AGE_RANGES, type PartnerSocialPlatform } from "@/lib/partner";
 import { cn } from "@/lib/utils";
 import { formatInternationalPhone } from "@/lib/catalog/dial-codes";
 import { PARTNER_LOGIN } from "@/lib/routes";
@@ -67,9 +67,9 @@ export function BecomePartnerModal({
 
   const phoneValue = formatInternationalPhone(form.phoneIso2, form.phoneNational);
   const emailInvalid = submitted && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
-  const passwordWeak = submitted && !isStrongPartnerPassword(form.password);
+  const passwordTooShort = submitted && form.password.length < 6;
   const passwordsDiffer = submitted && form.password !== form.confirmPassword;
-  const passwordInvalid = passwordWeak || passwordsDiffer;
+  const passwordInvalid = passwordTooShort || passwordsDiffer;
   const confirmInvalid = submitted && (!form.confirmPassword || form.password !== form.confirmPassword);
   const firstNameInvalid = submitted && !form.firstName.trim();
   const lastNameInvalid = submitted && !form.lastName.trim();
@@ -88,7 +88,7 @@ export function BecomePartnerModal({
 
   const inputClass = (invalid: boolean, extra?: string) =>
     cn(
-      "w-full rounded-xl border p-3 font-normal outline-none",
+      "w-full rounded-xl border px-3 py-2 font-normal outline-none",
       extra,
       invalid ? "border-red-500 bg-red-50 ring-2 ring-red-200" : "border-slate-200",
     );
@@ -122,7 +122,7 @@ export function BecomePartnerModal({
       fleetSize < 1 ||
       !form.fleetAgeRange ||
       !form.countryIso2s.length ||
-      !isStrongPartnerPassword(password)
+      password.length < 6
     ) {
       setError(
         !form.messengers.length
@@ -131,8 +131,8 @@ export function BecomePartnerModal({
             ? t.countriesRequired
             : !phone
               ? t.phoneRequired
-              : !isStrongPartnerPassword(password)
-                ? t.passwordHint
+              : password.length < 6
+                ? t.passwordShort
                 : t.fillAll,
       );
       return;
@@ -198,10 +198,10 @@ export function BecomePartnerModal({
       onClick={onClose}
     >
       <div
-        className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white text-slate-900 shadow-2xl"
+        className="max-h-[calc(100vh-1.5rem)] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white text-slate-900 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between border-b px-5 py-4">
+        <div className="flex items-start justify-between border-b px-5 py-3">
           <h2 className="text-xl font-extrabold text-[#0b1f4b]">{t.title}</h2>
           <button
             type="button"
@@ -221,37 +221,35 @@ export function BecomePartnerModal({
             </button>
           </div>
         ) : (
-          <form onSubmit={submit} noValidate className="space-y-4 p-5">
-            {error ? <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</p> : null}
-
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block text-sm font-semibold text-slate-800">
-                {t.firstName}
-                <RequiredMark />
-                <input
-                  className={inputClass(firstNameInvalid, "mt-1")}
-                  required
-                  autoComplete="given-name"
-                  aria-invalid={firstNameInvalid || undefined}
-                  value={form.firstName}
-                  onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                />
-              </label>
-              <label className="block text-sm font-semibold text-slate-800">
-                {t.lastName}
-                <RequiredMark />
-                <input
-                  className={inputClass(lastNameInvalid, "mt-1")}
-                  required
-                  autoComplete="family-name"
-                  aria-invalid={lastNameInvalid || undefined}
-                  value={form.lastName}
-                  onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                />
-              </label>
-            </div>
+          <form onSubmit={submit} noValidate className="grid grid-cols-1 gap-x-4 gap-y-1.5 px-4 py-3 md:grid-cols-2">
+            {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 md:col-span-2">{error}</p> : null}
 
             <label className="block text-sm font-semibold text-slate-800">
+              {t.firstName}
+              <RequiredMark />
+              <input
+                className={inputClass(firstNameInvalid, "mt-1")}
+                required
+                autoComplete="given-name"
+                aria-invalid={firstNameInvalid || undefined}
+                value={form.firstName}
+                onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+              />
+            </label>
+            <label className="block text-sm font-semibold text-slate-800">
+              {t.lastName}
+              <RequiredMark />
+              <input
+                className={inputClass(lastNameInvalid, "mt-1")}
+                required
+                autoComplete="family-name"
+                aria-invalid={lastNameInvalid || undefined}
+                value={form.lastName}
+                onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+              />
+            </label>
+
+            <label className="block text-sm font-semibold text-slate-800 md:col-span-2">
               {t.email}
               <RequiredMark />
               <input
@@ -288,9 +286,9 @@ export function BecomePartnerModal({
                   {showPassword ? <EyeOff className="h-5 w-5" aria-hidden /> : <Eye className="h-5 w-5" aria-hidden />}
                 </button>
               </div>
-              <span className={cn("mt-1 block text-xs font-normal", passwordWeak ? "text-red-600" : "text-slate-500")}>
-                {t.passwordHint}
-              </span>
+              {passwordTooShort ? (
+                <span className="mt-1 block text-xs font-normal text-red-600">{t.passwordShort}</span>
+              ) : null}
             </label>
 
             <label className="block text-sm font-semibold text-slate-800">
@@ -323,12 +321,12 @@ export function BecomePartnerModal({
               {passwordsDiffer ? <span className="mt-1 block text-xs font-normal text-red-600">{t.passwordsMismatch}</span> : null}
             </label>
 
-            <fieldset>
+            <fieldset className="md:col-span-2">
               <legend className="text-sm font-semibold text-slate-800">
                 {t.entityType}
                 <RequiredMark />
               </legend>
-              <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="mt-1 grid grid-cols-2 gap-2">
                 {(
                   [
                     { value: "COMPANY" as const, label: t.companyType, sub: t.companyHint },
@@ -340,14 +338,14 @@ export function BecomePartnerModal({
                     type="button"
                     onClick={() => setForm({ ...form, kind: opt.value })}
                     className={cn(
-                      "rounded-xl border px-3 py-3 text-left text-sm transition",
+                      "rounded-xl border px-3 py-2 text-left text-sm transition",
                       form.kind === opt.value
                         ? "border-sky-500 bg-sky-50 font-bold text-sky-900"
                         : "border-slate-200 bg-white text-slate-700",
                     )}
                   >
                     <span className="block">{opt.label}</span>
-                    <span className="mt-0.5 block text-xs font-normal text-slate-500">{opt.sub}</span>
+                    <span className="block text-xs font-normal text-slate-500">{opt.sub}</span>
                   </button>
                 ))}
               </div>
@@ -373,63 +371,65 @@ export function BecomePartnerModal({
               national={form.phoneNational}
               onIso2Change={(phoneIso2) => setForm({ ...form, phoneIso2 })}
               onNationalChange={(phoneNational) => setForm({ ...form, phoneNational })}
-            >
+            />
+
+            <div className="md:col-span-2">
               <SocialPlatformPicker
                 compact
                 invalid={messengersInvalid}
                 selected={form.messengers}
                 onChange={(messengers) => setForm({ ...form, messengers })}
               />
-            </PhoneCountryField>
-
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block text-sm font-semibold text-slate-800">
-                {t.fleetSize}
-                <RequiredMark />
-                <input
-                  type="number"
-                  min={1}
-                  className={inputClass(fleetInvalid, "mt-1")}
-                  required
-                  aria-invalid={fleetInvalid || undefined}
-                  value={form.fleetSize}
-                  onChange={(e) => setForm({ ...form, fleetSize: e.target.value })}
-                />
-              </label>
-              <label className="block text-sm font-semibold text-slate-800">
-                {t.fleetAge}
-                <RequiredMark />
-                <select
-                  className="mt-1 w-full rounded-xl border p-3 font-normal"
-                  required
-                  value={form.fleetAgeRange}
-                  onChange={(e) => setForm({ ...form, fleetAgeRange: e.target.value })}
-                >
-                  {FLEET_AGE_RANGES.map((r) => (
-                    <option key={r.value} value={r.value}>
-                      {fleetAgeLabel(r.value)}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
 
-            <OperatingCountriesHover
-              catalog="europe-asia"
-              invalid={countriesInvalid}
-              countryIso2s={form.countryIso2s}
-              onChange={(countryIso2s) => setForm((prev) => ({ ...prev, countryIso2s }))}
-            />
+            <label className="block text-sm font-semibold text-slate-800">
+              {t.fleetSize}
+              <RequiredMark />
+              <input
+                type="number"
+                min={1}
+                className={inputClass(fleetInvalid, "mt-1")}
+                required
+                aria-invalid={fleetInvalid || undefined}
+                value={form.fleetSize}
+                onChange={(e) => setForm({ ...form, fleetSize: e.target.value })}
+              />
+            </label>
+            <label className="block text-sm font-semibold text-slate-800">
+              {t.fleetAge}
+              <RequiredMark />
+              <select
+                className="mt-1 w-full rounded-xl border px-3 py-2 font-normal"
+                required
+                value={form.fleetAgeRange}
+                onChange={(e) => setForm({ ...form, fleetAgeRange: e.target.value })}
+              >
+                {FLEET_AGE_RANGES.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {fleetAgeLabel(r.value)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="md:col-span-2">
+              <OperatingCountriesHover
+                catalog="europe-asia"
+                invalid={countriesInvalid}
+                countryIso2s={form.countryIso2s}
+                onChange={(countryIso2s) => setForm((prev) => ({ ...prev, countryIso2s }))}
+              />
+            </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-xl bg-[#22c55e] py-3 font-bold text-white hover:bg-[#16a34a] disabled:bg-slate-400"
+              className="w-full rounded-xl bg-[#22c55e] py-2.5 font-bold text-white hover:bg-[#16a34a] disabled:bg-slate-400 md:col-span-2"
             >
               {loading ? t.submitting : t.submit}
             </button>
 
-            <p className="text-center text-sm text-slate-600">
+            <p className="text-center text-sm text-slate-600 md:col-span-2">
               {t.passedModerationPrompt}{" "}
               <a
                 href={PARTNER_LOGIN}

@@ -69,15 +69,14 @@ export function SocialPlatformPicker({
   return (
     <fieldset
       className={cn(
-        compact ? "mt-3" : undefined,
-        invalid ? "rounded-xl border border-red-500 bg-red-50/60 p-3" : undefined,
+        invalid ? "rounded-xl border border-red-500 bg-red-50/60 p-2" : undefined,
       )}
     >
       <legend className="text-sm font-semibold text-slate-800">
         {t.messengers} <span className="text-red-500">*</span>
       </legend>
-      <p className="mt-1 text-xs font-normal text-slate-500">{t.messengersHint}</p>
-      <div className="mt-2 flex flex-wrap gap-2">
+      {compact ? null : <p className="mt-1 text-xs font-normal text-slate-500">{t.messengersHint}</p>}
+      <div className={cn("flex flex-wrap gap-2", compact ? "mt-1" : "mt-2")}>
         {PARTNER_SOCIAL_PLATFORMS.map((platform) => {
           const Icon = ICONS[platform.value];
           const active = selected.includes(platform.value);

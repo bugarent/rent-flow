@@ -2,7 +2,7 @@ import type { Messenger } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { FLEET_AGE_RANGES, PARTNER_SOCIAL_PLATFORMS, isStrongPartnerPassword } from "@/lib/partner";
+import { FLEET_AGE_RANGES, PARTNER_SOCIAL_PLATFORMS } from "@/lib/partner";
 import { setPartnerAirports } from "@/lib/server/partner-airports";
 import { airportsForCountries } from "@/lib/catalog/operating-regions";
 import { formatInternationalPhone } from "@/lib/catalog/dial-codes";
@@ -46,10 +46,6 @@ const applicationSchema = z
   .refine((value) => value.password === value.confirmPassword, {
     message: "Passwords do not match",
     path: ["confirmPassword"],
-  })
-  .refine((value) => isStrongPartnerPassword(value.password), {
-    message: "Password must be at least 6 characters and include uppercase, lowercase, and a number",
-    path: ["password"],
   });
 
 async function rememberPartnerPassword(partnerId: string, email: string, password: string) {
