@@ -16,6 +16,7 @@ import { LOCALES, LOCALE_LABELS } from "@/lib/i18n/config";
 import { PARTNER_SOCIAL_PLATFORMS, type PartnerSocialPlatform } from "@/lib/partner";
 import {
   defaultCompanySettings,
+  joinPersonName,
   parseCompanySettings,
   type PartnerCompanySettings,
 } from "@/lib/partners/company-settings";
@@ -406,6 +407,8 @@ export function AdminPartnerReviewPanel({
         cars: "მანქანების ჩამონათვალი",
         brandName: "საფირმო სახელი",
         legalName: "იურიდიული სახელი",
+        firstName: "სახელი",
+        lastName: "გვარი",
         country: "ქვეყანა",
         centralOffice: "ცენტრალური ოფისის მდებარეობა",
         address: "ცენტრალური ოფისის მისამართი",
@@ -455,6 +458,8 @@ export function AdminPartnerReviewPanel({
         cars: "Список автомобилей",
         brandName: "Фирменное название",
         legalName: "Юридическое название",
+        firstName: "Имя",
+        lastName: "Фамилия",
         country: "Страна",
         centralOffice: "Центральный офис",
         address: "Адрес центрального офиса",
@@ -503,6 +508,8 @@ export function AdminPartnerReviewPanel({
       cars: "Uploaded cars",
       brandName: "Brand name",
       legalName: "Legal name",
+      firstName: "First name",
+      lastName: "Last name",
       country: "Country",
       centralOffice: "Central office location",
       address: "Central office address",
@@ -620,12 +627,20 @@ export function AdminPartnerReviewPanel({
   const settings: PartnerCompanySettings = draft ?? resolveSettingsFromDetail(detail);
 
   const patchDraft = (partial: Partial<PartnerCompanySettings>) => {
-    setDraft((prev) => ({ ...(prev ?? resolveSettingsFromDetail(detail)), ...partial }));
+    setDraft((prev) => {
+      const next = { ...(prev ?? resolveSettingsFromDetail(detail)), ...partial };
+      if ("firstName" in partial || "lastName" in partial) {
+        next.legalName = joinPersonName(next.firstName, next.lastName);
+      }
+      return next;
+    });
   };
 
   const mainChanged = useMemo(() => {
     const keys = [
       "title",
+      "firstName",
+      "lastName",
       "legalName",
       "address",
       "logoUrl",
@@ -1051,24 +1066,44 @@ export function AdminPartnerReviewPanel({
                     previous={ch("title")?.from}
                   />
                 )}
-                {editable ? (
-                  <EditField
-                    label={labels.legalName}
-                    required
-                    value={settings.legalName || ""}
-                    onChange={(legalName) => patchDraft({ legalName })}
-                    changed={Boolean(ch("legalName"))}
-                    previous={ch("legalName")?.from}
-                  />
-                ) : (
-                  <ReadField
-                    label={labels.legalName}
-                    required
-                    value={settings.legalName || detail.companyName}
-                    changed={Boolean(ch("legalName"))}
-                    previous={ch("legalName")?.from}
-                  />
-                )}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {editable ? (
+                    <EditField
+                      label={labels.firstName}
+                      required
+                      value={settings.firstName || ""}
+                      onChange={(firstName) => patchDraft({ firstName })}
+                      changed={Boolean(ch("firstName"))}
+                      previous={ch("firstName")?.from}
+                    />
+                  ) : (
+                    <ReadField
+                      label={labels.firstName}
+                      required
+                      value={settings.firstName || "—"}
+                      changed={Boolean(ch("firstName"))}
+                      previous={ch("firstName")?.from}
+                    />
+                  )}
+                  {editable ? (
+                    <EditField
+                      label={labels.lastName}
+                      required
+                      value={settings.lastName || ""}
+                      onChange={(lastName) => patchDraft({ lastName })}
+                      changed={Boolean(ch("lastName"))}
+                      previous={ch("lastName")?.from}
+                    />
+                  ) : (
+                    <ReadField
+                      label={labels.lastName}
+                      required
+                      value={settings.lastName || "—"}
+                      changed={Boolean(ch("lastName"))}
+                      previous={ch("lastName")?.from}
+                    />
+                  )}
+                </div>
                 {editable ? (
                   <EditField
                     label={labels.email}

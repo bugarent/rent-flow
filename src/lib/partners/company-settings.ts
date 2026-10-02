@@ -68,6 +68,9 @@ export function tariffPlusFromDays(tariffs: TariffInterval[]): number {
 export type PartnerCompanySettings = {
   /** Public brand / trade name shown on car listings with the logo. */
   title: string;
+  /** Person name. `legalName` stays the joined value for invoices and older readers. */
+  firstName: string;
+  lastName: string;
   legalName: string;
   country: string;
   centralOffice: string;
@@ -189,6 +192,8 @@ export function defaultCompanySettings(
   const secondaryMessengers = parsePartnerMessengers(seed?.secondaryMessengers);
   return {
     title: seed?.companyName ?? "",
+    firstName: "",
+    lastName: "",
     legalName: seed?.companyName ?? "",
     country: "GE",
     centralOffice: "Kutaisi",
@@ -226,6 +231,17 @@ export function defaultCompanySettings(
     partnerContractActive: false,
     useSiteContract: true,
   };
+}
+
+export function splitPersonName(value: string): { firstName: string; lastName: string } {
+  const parts = value.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return { firstName: "", lastName: "" };
+  if (parts.length === 1) return { firstName: parts[0], lastName: "" };
+  return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
+}
+
+export function joinPersonName(firstName: string, lastName: string): string {
+  return [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
 }
 
 export function parseCompanySettings(raw: unknown, seed?: Parameters<typeof defaultCompanySettings>[0]): PartnerCompanySettings {
@@ -281,9 +297,21 @@ export function parseCompanySettings(raw: unknown, seed?: Parameters<typeof defa
     clientLanguages = [mapped];
   }
 
+  const storedFirst = typeof o.firstName === "string" ? o.firstName : undefined;
+  const storedLast = typeof o.lastName === "string" ? o.lastName : undefined;
+  const hasPersonName = storedFirst !== undefined || storedLast !== undefined;
+  const split = splitPersonName(String(o.legalName ?? base.legalName));
+  const firstName = (hasPersonName ? storedFirst ?? "" : split.firstName).trim();
+  const lastName = (hasPersonName ? storedLast ?? "" : split.lastName).trim();
+  const legalName = hasPersonName
+    ? joinPersonName(firstName, lastName)
+    : joinPersonName(firstName, lastName) || String(o.legalName ?? base.legalName).trim();
+
   return {
     title: String(o.title ?? base.title),
-    legalName: String(o.legalName ?? base.legalName),
+    firstName,
+    lastName,
+    legalName,
     country: String(o.country ?? base.country),
     centralOffice: String(o.centralOffice ?? base.centralOffice),
     address: String(o.address ?? base.address),

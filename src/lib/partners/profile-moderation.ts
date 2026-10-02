@@ -175,6 +175,8 @@ export function diffCompanySettings(
   const changes: ProfileFieldChange[] = [];
   const scalarKeys: Array<keyof PartnerCompanySettings> = [
     "title",
+    "firstName",
+    "lastName",
     "legalName",
     "country",
     "centralOffice",

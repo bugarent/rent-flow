@@ -14,6 +14,7 @@ import {
   PERSONAL_INFO_SECTIONS,
   RENT_PAYMENT_OPTIONS,
   WORKING_DAY_LABELS,
+  joinPersonName,
   normalizeContractSelection,
   type PartnerCompanySettings,
   type PartnerPricingCurrency,
@@ -277,6 +278,8 @@ export function PartnerPersonalInfoForm({
       "main-information": [
         "logoUrl",
         "title",
+        "firstName",
+        "lastName",
         "legalName",
         "country",
         "centralOffice",
@@ -417,7 +420,13 @@ export function PartnerPersonalInfoForm({
   };
 
   const patch = (partial: Partial<PartnerCompanySettings>) => {
-    setSettings((prev) => ({ ...prev, ...partial }));
+    setSettings((prev) => {
+      const next = { ...prev, ...partial };
+      if ("firstName" in partial || "lastName" in partial) {
+        next.legalName = joinPersonName(next.firstName, next.lastName);
+      }
+      return next;
+    });
     setInvalidFields((prev) => {
       if (!prev.size) return prev;
       const next = new Set(prev);
@@ -459,7 +468,8 @@ export function PartnerPersonalInfoForm({
     const missing = new Set<string>();
     if (!settings.logoUrl.trim()) missing.add("logoUrl");
     if (!settings.title.trim()) missing.add("title");
-    if (!settings.legalName.trim()) missing.add("legalName");
+    if (!settings.firstName.trim()) missing.add("firstName");
+    if (!settings.lastName.trim()) missing.add("lastName");
     if (!officeCountryIso2.trim()) missing.add("country");
     if (!settings.centralOffice.trim() && !officeCities[0]?.name) missing.add("centralOffice");
     if (!settings.address.trim()) missing.add("address");
@@ -506,7 +516,8 @@ export function PartnerPersonalInfoForm({
   const MAIN_INFO_KEYS = [
     "logoUrl",
     "title",
-    "legalName",
+    "firstName",
+    "lastName",
     "country",
     "centralOffice",
     "address",
@@ -544,8 +555,11 @@ export function PartnerPersonalInfoForm({
       case "title":
         markFieldInvalid(key, !settings.title.trim());
         break;
-      case "legalName":
-        markFieldInvalid(key, !settings.legalName.trim());
+      case "firstName":
+        markFieldInvalid(key, !settings.firstName.trim());
+        break;
+      case "lastName":
+        markFieldInvalid(key, !settings.lastName.trim());
         break;
       case "address":
         markFieldInvalid(key, !settings.address.trim());
@@ -580,7 +594,8 @@ export function PartnerPersonalInfoForm({
     const order = [
       "logoUrl",
       "title",
-      "legalName",
+      "firstName",
+      "lastName",
       "country",
       "centralOffice",
       "address",
@@ -919,7 +934,8 @@ export function PartnerPersonalInfoForm({
         const m = new Set<string>();
         if (!settingsForSave.logoUrl.trim()) m.add("logoUrl");
         if (!settingsForSave.title.trim()) m.add("title");
-        if (!settingsForSave.legalName.trim()) m.add("legalName");
+        if (!settingsForSave.firstName.trim()) m.add("firstName");
+        if (!settingsForSave.lastName.trim()) m.add("lastName");
         if (!officeCountryIso2.trim()) m.add("country");
         if (!settingsForSave.centralOffice.trim() && !officeCities[0]?.name) m.add("centralOffice");
         if (!settingsForSave.address.trim()) m.add("address");
@@ -1002,7 +1018,8 @@ export function PartnerPersonalInfoForm({
         }
         if (/title|name|brand/i.test(errMsg)) {
           highlight.add("title");
-          highlight.add("legalName");
+          highlight.add("firstName");
+          highlight.add("lastName");
         }
         if (/address/i.test(errMsg)) highlight.add("address");
         if (/language/i.test(errMsg)) highlight.add("clientLanguages");
@@ -1286,22 +1303,43 @@ export function PartnerPersonalInfoForm({
                   />
                 </Field>
               </div>
-              <div data-field="legalName" className={wrapChanged("legalName")}>
-                <Field
-                  label={pi.legalName}
-                  required
-                  invalid={invalidFields.has("legalName")}
-                  error={fieldError("legalName")}
-                  changed={isChanged("legalName")}
-                  previous={fieldChange("legalName")?.from}
-                >
-                  <input
-                    className={fieldClass("legalName")}
-                    value={settings.legalName}
-                    onChange={(e) => patch({ legalName: e.target.value })}
-                    onBlur={() => validateFieldLive("legalName")}
-                  />
-                </Field>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div data-field="firstName" className={wrapChanged("firstName")}>
+                  <Field
+                    label={pi.firstName}
+                    required
+                    invalid={invalidFields.has("firstName")}
+                    error={fieldError("firstName")}
+                    changed={isChanged("firstName")}
+                    previous={fieldChange("firstName")?.from}
+                  >
+                    <input
+                      className={fieldClass("firstName")}
+                      value={settings.firstName}
+                      onChange={(e) => patch({ firstName: e.target.value })}
+                      onBlur={() => validateFieldLive("firstName")}
+                      autoComplete="given-name"
+                    />
+                  </Field>
+                </div>
+                <div data-field="lastName" className={wrapChanged("lastName")}>
+                  <Field
+                    label={pi.lastName}
+                    required
+                    invalid={invalidFields.has("lastName")}
+                    error={fieldError("lastName")}
+                    changed={isChanged("lastName")}
+                    previous={fieldChange("lastName")?.from}
+                  >
+                    <input
+                      className={fieldClass("lastName")}
+                      value={settings.lastName}
+                      onChange={(e) => patch({ lastName: e.target.value })}
+                      onBlur={() => validateFieldLive("lastName")}
+                      autoComplete="family-name"
+                    />
+                  </Field>
+                </div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div data-field="country" className={wrapChanged("country")}>

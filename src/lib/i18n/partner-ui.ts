@@ -32,6 +32,8 @@ export type PartnerPersonalInfoCopy = {
   logoHint: string;
   brandName: string;
   legalName: string;
+  firstName: string;
+  lastName: string;
   country: string;
   centralOffice: string;
   address: string;
@@ -318,6 +320,8 @@ export const partnerUiEn: PartnerUiPack = {
     logoHint: "Square PNG/JPG",
     brandName: "Brand name",
     legalName: "Legal name",
+    firstName: "First name",
+    lastName: "Last name",
     country: "Country",
     centralOffice: "Central office location",
     address: "Central office address",
@@ -602,6 +606,8 @@ export const partnerUiKa: PartnerUiPack = {
     logoHint: "კვადრატული PNG/JPG",
     brandName: "საფირმო სახელი",
     legalName: "იურიდიული სახელი",
+    firstName: "სახელი",
+    lastName: "გვარი",
     country: "ქვეყანა",
     centralOffice: "ცენტრალური ოფისის მდებარეობა",
     address: "ცენტრალური ოფისის მისამართი",
@@ -886,6 +892,8 @@ export const partnerUiRu: PartnerUiPack = {
     logoHint: "Квадратный PNG/JPG",
     brandName: "Фирменное название",
     legalName: "Юридическое название",
+    firstName: "Имя",
+    lastName: "Фамилия",
     country: "Страна",
     centralOffice: "Центральный офис",
     address: "Адрес центрального офиса",
