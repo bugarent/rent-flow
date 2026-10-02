@@ -501,15 +501,15 @@ export function PartnersManager({
       <ResponsiveDataList
         desktop={
           <div className="overflow-x-auto rounded-xl border bg-white">
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-left text-xs">
               <thead className="bg-slate-100">
                 <tr>
-                  <th className="p-3">{t.idCol}</th>
-                  <th className="p-3">{t.nameCol}</th>
-                  <th className="p-3">{t.typeCol}</th>
-                  <th className="p-3">{t.fleetCol}</th>
-                  <th className="p-3">{t.statusCol}</th>
-                  <th className="p-3">{t.actionsCol}</th>
+                  <th className="whitespace-nowrap px-2 py-1">{t.idCol}</th>
+                  <th className="whitespace-nowrap px-2 py-1">{t.nameCol}</th>
+                  <th className="whitespace-nowrap px-2 py-1">{t.typeCol}</th>
+                  <th className="whitespace-nowrap px-2 py-1">{t.fleetCol}</th>
+                  <th className="whitespace-nowrap px-2 py-1">{t.statusCol}</th>
+                  <th className="whitespace-nowrap px-2 py-1">{t.actionsCol}</th>
                 </tr>
               </thead>
               <tbody>
@@ -538,36 +538,36 @@ export function PartnersManager({
                         >
                           <td
                             className={cn(
-                              "p-3 font-mono font-bold",
+                              "whitespace-nowrap px-2 py-0.5 align-middle font-mono font-bold leading-none",
                               attention > 0 ? "text-orange-950" : "",
                             )}
                           >
-                            <div>{p.idNumber}</div>
+                            <span>{p.idNumber}</span>
                             {p.partnerCodeLabel ? (
                               mode === "queue" ? (
                                 <button
                                   type="button"
                                   onClick={() => openDetail(p.id)}
-                                  className="mt-0.5 block text-[11px] font-bold text-emerald-800 hover:underline"
+                                  className="ml-2 text-[10px] font-bold text-emerald-800 hover:underline"
                                 >
                                   {p.partnerCodeLabel}
                                 </button>
                               ) : (
-                                <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
+                                <span className="ml-2 text-[10px] font-semibold text-slate-500">
                                   {p.partnerCodeLabel}
-                                </p>
+                                </span>
                               )
                             ) : mode === "queue" ? (
                               <button
                                 type="button"
                                 onClick={() => openDetail(p.id)}
-                                className="mt-0.5 block text-[11px] font-bold text-emerald-800 hover:underline"
+                                className="ml-2 text-[10px] font-bold text-emerald-800 hover:underline"
                               >
                                 Open review
                               </button>
                             ) : null}
                           </td>
-                          <td className="p-3">
+                          <td className="max-w-[16rem] px-2 py-0.5 align-middle leading-none">
                             <button
                               type="button"
                               onClick={() => openDetail(p.id)}
@@ -578,28 +578,28 @@ export function PartnersManager({
                             >
                               {p.displayName}
                             </button>
-                            <p
+                            <span
                               className={cn(
-                                "text-xs",
+                                "ml-2 text-[10px]",
                                 attention > 0 ? "font-semibold text-orange-900/80" : "text-slate-500",
                               )}
                             >
                               {p.email}
-                            </p>
+                            </span>
                           </td>
-                          <td className={cn("p-3", attention > 0 && "font-semibold text-orange-950")}>
+                          <td className={cn("whitespace-nowrap px-2 py-0.5 align-middle", attention > 0 && "font-semibold text-orange-950")}>
                             {p.kind === "COMPANY" ? t.companyType : t.privateType}
                           </td>
-                          <td className={cn("p-3", attention > 0 && "font-semibold text-orange-950")}>
+                          <td className={cn("whitespace-nowrap px-2 py-0.5 align-middle", attention > 0 && "font-semibold text-orange-950")}>
                             <span className="font-bold">{p.fleet.primary}</span>
                             {p.fleet.hint ? (
-                              <p className="text-[11px] font-medium text-slate-500">{p.fleet.hint}</p>
+                              <span className="ml-1 text-[10px] font-medium text-slate-500">{p.fleet.hint}</span>
                             ) : null}
                           </td>
-                          <td className="p-3">
+                          <td className="whitespace-nowrap px-2 py-0.5 align-middle">
                             <span
                               className={cn(
-                                "inline-flex items-center gap-2 rounded-full px-2 py-1 text-xs font-semibold",
+                                "inline-flex items-center gap-1 rounded-full px-1.5 py-0 text-[10px] font-semibold leading-4",
                                 p.status === "REJECTED"
                                   ? "bg-red-600 text-white"
                                   : p.status === "APPROVED" || p.status === "SUSPENDED"
@@ -626,8 +626,8 @@ export function PartnersManager({
                               ) : null}
                             </span>
                           </td>
-                          <td className="p-3">
-                            <div className="flex flex-wrap gap-2">
+                          <td className="whitespace-nowrap px-2 py-0.5 align-middle">
+                            <div className="flex flex-nowrap items-center gap-1">
                               {filter === "REJECTED" || unread > 0 ? (
                                 <button
                                   type="button"
@@ -670,6 +670,7 @@ export function PartnersManager({
                                 </button>
                               ) : null}
                               <PartnerRowActions
+                                compact
                                 partnerId={p.id}
                                 email={p.email}
                                 phone={p.phone}

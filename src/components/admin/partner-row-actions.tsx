@@ -67,6 +67,7 @@ export function PartnerRowActions({
   returnTab = "directory",
   locale,
   className,
+  compact = false,
 }: {
   partnerId: string;
   email?: string;
@@ -75,6 +76,7 @@ export function PartnerRowActions({
   returnTab?: string;
   locale?: string;
   className?: string;
+  compact?: boolean;
 }) {
   const router = useRouter();
   const adminLocale = useAdminLocale().locale;
@@ -160,13 +162,16 @@ export function PartnerRowActions({
 
   return (
     <>
-      <div className={cn("flex flex-wrap items-center justify-end gap-1.5", className)}>
+      <div className={cn("flex items-center justify-end", compact ? "flex-nowrap gap-1" : "flex-wrap gap-1.5", className)}>
         <button
           type="button"
           onClick={openDetails}
-          className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+          className={cn(
+            "inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white font-bold text-slate-700 hover:bg-slate-50",
+            compact ? "h-6 px-1.5 text-[11px]" : "h-8 px-2.5 text-xs",
+          )}
         >
-          <Eye className="h-3.5 w-3.5" />
+          <Eye className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} />
           {t.details}
         </button>
         {blocked ? (
@@ -174,7 +179,10 @@ export function PartnerRowActions({
             type="button"
             disabled={busy}
             onClick={() => void unblock()}
-            className="inline-flex h-8 items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+            className={cn(
+              "inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 font-bold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50",
+              compact ? "h-6 px-1.5 text-[11px]" : "h-8 px-2.5 text-xs",
+            )}
           >
             {t.unblock}
           </button>
@@ -183,9 +191,12 @@ export function PartnerRowActions({
             type="button"
             disabled={busy}
             onClick={() => setBlockOpen(true)}
-            className="inline-flex h-8 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-xs font-bold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+            className={cn(
+              "inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 font-bold text-amber-900 hover:bg-amber-100 disabled:opacity-50",
+              compact ? "h-6 px-1.5 text-[11px]" : "h-8 px-2.5 text-xs",
+            )}
           >
-            <Ban className="h-3.5 w-3.5" />
+            <Ban className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} />
             {t.block}
           </button>
         )}
@@ -193,9 +204,12 @@ export function PartnerRowActions({
           type="button"
           disabled={busy}
           onClick={() => void deletePartner()}
-          className="inline-flex h-8 items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+          className={cn(
+            "inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50",
+            compact ? "h-6 px-1.5 text-[11px]" : "h-8 px-2.5 text-xs",
+          )}
         >
-          <Trash2 className="h-3.5 w-3.5" />
+          <Trash2 className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} />
           {t.delete}
         </button>
       </div>
