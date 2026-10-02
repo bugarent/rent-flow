@@ -101,7 +101,7 @@ export async function getHomepageGoogleReviewsConfig(): Promise<HomepageGoogleRe
     cache.set(next);
     return next;
   } catch {
-    return emptyConfig();
+    return cache.peek() ?? emptyConfig();
   }
 }
 

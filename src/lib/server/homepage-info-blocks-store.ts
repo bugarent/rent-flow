@@ -164,7 +164,7 @@ export async function getHomepageInfoContent(): Promise<HomepageInfoContent> {
     cache.set(content);
     return content;
   } catch {
-    return defaultHomepageInfoContent();
+    return cache.peek() ?? defaultHomepageInfoContent();
   }
 }
 

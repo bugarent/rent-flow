@@ -42,7 +42,7 @@ export async function getFooterContactConfig(): Promise<FooterContactConfig> {
     cache.set(next);
     return next;
   } catch {
-    return emptyFooterContact();
+    return cache.peek() ?? emptyFooterContact();
   }
 }
 

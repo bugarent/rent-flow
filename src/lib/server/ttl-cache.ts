@@ -6,10 +6,13 @@ export function createTtlCache<T>(ttlMs: number) {
     get(): T | null {
       if (!entry) return null;
       if (Date.now() - entry.at >= ttlMs) {
-        entry = null;
         return null;
       }
       return entry.value;
+    },
+    /** Last successful value, including after the TTL, so a slow read cannot blank the page. */
+    peek(): T | null {
+      return entry?.value ?? null;
     },
     set(value: T) {
       entry = { at: Date.now(), value };

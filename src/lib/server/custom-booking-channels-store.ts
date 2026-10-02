@@ -54,10 +54,12 @@ export async function getCustomBookingChannelsConfig(): Promise<CustomBookingCha
     cache.set(next);
     return next;
   } catch {
-    return {
-      ...DEFAULT_CUSTOM_BOOKING_CHANNELS,
-      updatedAt: new Date().toISOString(),
-    };
+    return (
+      cache.peek() ?? {
+        ...DEFAULT_CUSTOM_BOOKING_CHANNELS,
+        updatedAt: new Date().toISOString(),
+      }
+    );
   }
 }
 

@@ -241,8 +241,9 @@ export async function readFile(path: string, encoding?: BufferEncoding): Promise
     }
   }
 
+  const pending = readFromDb(path);
   const fromDb = await Promise.race([
-    readFromDb(path),
+    pending,
     new Promise<string | null>((resolve) => setTimeout(() => resolve(null), 1200)),
   ]);
   if (fromDb != null) {
@@ -254,6 +255,13 @@ export async function readFile(path: string, encoding?: BufferEncoding): Promise
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT" && (error as NodeJS.ErrnoException).code !== "EACCES") {
       throw error;
+    }
+    // A cold Netlify instance has an empty /tmp. Wait for Postgres instead of
+    // treating the saved homepage text as missing.
+    const late = await pending;
+    if (late != null) {
+      void hydrateFile(path, late);
+      return textFromDbPayload(late, encoding);
     }
     throw error;
   }

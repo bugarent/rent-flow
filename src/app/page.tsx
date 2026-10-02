@@ -41,13 +41,13 @@ export default async function Home() {
 
   const [options, popularAirports, categories, airportsLayout, infoContent, googleReviews, bookingChannels] =
     await Promise.all([
-      softTimeout(getSearchDeliveryAirports(), [], 2000),
-      softTimeout(getHomepageAirports(), airportFallback, 2000),
-      softTimeout(getHomepageCategories(), categoryFallback, 2000),
-      softTimeout(getPopularAirportsLayoutSetting(), "grid" as const, 1500),
-      softTimeout(getHomepageInfoContent(), defaultHomepageInfoContent(), 1500),
-      softTimeout(getPublicHomepageGoogleReviews(), null, 1500),
-      softTimeout(getPublicCustomBookingChannels(), DEFAULT_CUSTOM_BOOKING_CHANNELS, 1500),
+      softTimeout(getSearchDeliveryAirports(), [], 6000),
+      softTimeout(getHomepageAirports(), airportFallback, 6000),
+      softTimeout(getHomepageCategories(), categoryFallback, 6000),
+      softTimeout(getPopularAirportsLayoutSetting(), "grid" as const, 6000),
+      softTimeout(getHomepageInfoContent(), defaultHomepageInfoContent(), 6000),
+      softTimeout(getPublicHomepageGoogleReviews(), null, 6000),
+      softTimeout(getPublicCustomBookingChannels(), DEFAULT_CUSTOM_BOOKING_CHANNELS, 6000),
     ]);
 
   return (

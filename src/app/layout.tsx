@@ -77,7 +77,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const { emptyFooterContact } = await import("@/lib/catalog/footer-contact");
   const [fxRates, footerContact] = await Promise.all([
     softTimeout(getFxRates(), defaultFxRates(), 1500),
-    softTimeout(getPublicFooterContact(), emptyFooterContact(), 1500),
+    softTimeout(getPublicFooterContact(), emptyFooterContact(), 6000),
   ]);
   const dir = isRtl(locale) ? "rtl" : "ltr";
 
