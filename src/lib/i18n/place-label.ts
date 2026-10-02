@@ -204,6 +204,20 @@ function withCode(name: string, code: string) {
   return code ? `${name} (${code})` : name;
 }
 
+function catalogBases(airport: (typeof CATALOG_AIRPORTS)[number]) {
+  const bases = new Set<string>();
+  for (const value of Object.values(airport.name)) {
+    if (value) bases.add(value);
+  }
+  const extra = EXTRA[airport.iata];
+  if (extra) {
+    for (const value of Object.values(extra)) {
+      if (value) bases.add(value);
+    }
+  }
+  return bases;
+}
+
 /** Show a catalog airport or country label in the selected language. */
 export function placeLabel(locale: string, label: string): string {
   const raw = String(label || "").trim();
@@ -213,6 +227,8 @@ export function placeLabel(locale: string, label: string): string {
     CATALOG_AIRPORTS.find((item) => item.iata === code) ||
     CATALOG_AIRPORTS.find((item) => item.name.en === base);
   if (!airport) return raw;
+  // Admin titles that only share the airport code stay exactly as saved.
+  if (base && !catalogBases(airport).has(base)) return raw;
   const stored = airport.name[locale as Locale];
   if (stored) return withCode(stored, code || airport.iata);
   const extra = EXTRA[airport.iata]?.[locale as Locale];
