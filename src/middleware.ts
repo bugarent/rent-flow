@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getPortalToken } from "@/lib/auth/portals";
+import { getPartnerAccessToken, getPortalToken } from "@/lib/auth/portals";
 import { apiRateLimitFor, takeRateLimit } from "@/lib/rate-limit";
 import {
   ADMIN_BASE,
@@ -106,7 +106,7 @@ export async function middleware(req: NextRequest) {
   }
 
   if (isPartnerPath(pathname)) {
-    const token = await getPortalToken(req, "partner");
+    const token = await getPartnerAccessToken(req);
     const isPublic = isPartnerPublicPath(pathname);
     if (isPublic) {
       if (pathname === PARTNER_LOGIN && token?.role === "VENDOR") {

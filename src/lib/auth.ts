@@ -118,6 +118,18 @@ async function authorizeForPortal(
         } catch {
           /* credentials mirror is best-effort for admin display */
         }
+      } else if (user.role === "VENDOR") {
+        // The public session provider can send this form to the customer
+        // auth route. An approved partner must still be accepted there.
+        const { partnerCanAccessPortal } = await import("@/lib/auth/partner-access");
+        let partner = await prisma.partner.findUnique({ where: { userId: user.id } });
+        if (!partner) {
+          partner = await prisma.partner.findFirst({
+            where: { email: user.email },
+            orderBy: { updatedAt: "desc" },
+          });
+        }
+        if (!partner || !partnerCanAccessPortal(partner.status)) return null;
       } else if (user.role !== "CUSTOMER") {
         return null;
       }
@@ -218,6 +230,18 @@ async function authorizeForPortal(
       if (opened) return opened;
     } catch {
       /* application password is used only when the cabinet user is missing or stale */
+    }
+  }
+
+  if (portal === "customer") {
+    try {
+      const { signInApprovedPartnerWithStoredPassword } = await import(
+        "@/lib/server/activate-partner-login"
+      );
+      const opened = await signInApprovedPartnerWithStoredPassword(login, credentials.password);
+      if (opened) return opened;
+    } catch {
+      /* same application password, even if the form posted to the customer route */
     }
   }
 

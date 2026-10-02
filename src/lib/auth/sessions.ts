@@ -13,7 +13,11 @@ export async function getAdminSession() {
 }
 
 export async function getPartnerSession() {
-  return getServerSession(partnerAuthOptions);
+  const partner = await getServerSession(partnerAuthOptions);
+  if (partner?.user?.role === "VENDOR" || partner?.user?.id === LOCAL_PARTNER_ID) return partner;
+  const customer = await getServerSession(customerAuthOptions);
+  if (customer?.user?.role === "VENDOR") return customer;
+  return partner;
 }
 
 export async function requireAdminApi() {

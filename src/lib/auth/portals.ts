@@ -46,3 +46,12 @@ export async function getPortalToken(req: NextRequest, portal: AuthPortal): Prom
     cookieName: sessionCookieName(portal),
   });
 }
+
+/** Partner cabinet session, including a vendor login that was stored on the customer cookie. */
+export async function getPartnerAccessToken(req: NextRequest): Promise<JWT | null> {
+  const partner = await getPortalToken(req, "partner");
+  if (partner?.role === "VENDOR") return partner;
+  const customer = await getPortalToken(req, "customer");
+  if (customer?.role === "VENDOR") return customer;
+  return null;
+}
