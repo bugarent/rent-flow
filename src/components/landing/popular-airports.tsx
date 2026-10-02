@@ -7,17 +7,16 @@ import type { PopularAirportCard } from "@/lib/catalog/popular-airports";
 import type { PopularAirportsLayout } from "@/lib/catalog/popular-airports-layout";
 import { defaultSearchDateRange } from "@/lib/catalog/default-search-dates";
 import { usePreferences } from "@/components/providers/preferences-context";
+import { airportCarsLabel } from "@/lib/i18n/airport-cars-label";
 import { placeLabel } from "@/lib/i18n/place-label";
 
 const PAGE_SIZE = 3;
 
 function AirportCard({
   airport,
-  viewLabel,
   locale,
 }: {
   airport: PopularAirportCard;
-  viewLabel: string;
   locale: string;
 }) {
   const { startDate, endDate } = defaultSearchDateRange();
@@ -40,7 +39,7 @@ function AirportCard({
           href={href}
           className="mt-auto inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#1d6fe8] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#1558c0]"
         >
-          {viewLabel}
+          {airportCarsLabel(locale, airport.iata)}
         </Link>
       </div>
     </article>
@@ -109,7 +108,6 @@ export function PopularAirports({
               key={`${airport.iata}-${airport.rank}-${airport.name}-${safePage}`}
               airport={airport}
               locale={locale}
-              viewLabel={dictionary.home.viewVehicles}
             />
           ))}
         </div>
