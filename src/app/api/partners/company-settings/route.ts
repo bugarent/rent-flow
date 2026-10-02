@@ -220,7 +220,7 @@ export async function PATCH(req: Request) {
     const newPassword = String(body?.newPassword || "").trim();
     const confirmPassword = String(body?.confirmPassword || "").trim();
     let passwordChanged = false;
-    if (oldPassword || newPassword || confirmPassword) {
+    if (newPassword || confirmPassword) {
       if (!newPassword || newPassword.length < 6) {
         return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
       }

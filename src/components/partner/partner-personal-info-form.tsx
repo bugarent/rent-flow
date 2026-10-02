@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Plus, Trash2, Upload } from "lucide-react";
+import { Check, Eye, EyeOff, Plus, Trash2, Upload } from "lucide-react";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { PartnerCurrencySelect } from "@/components/partner/partner-currency-select";
 import { cn } from "@/lib/utils";
@@ -223,6 +223,7 @@ export function PartnerPersonalInfoForm({
   const [adminNote, setAdminNote] = useState("");
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [oldPassword, setOldPassword] = useState("");
+  const [showOldPassword, setShowOldPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [logoUploading, setLogoUploading] = useState(false);
@@ -965,16 +966,17 @@ export function PartnerPersonalInfoForm({
       }
       setInvalidFields(new Set());
       setInvalidLocationCountries(new Set());
-      if (oldPassword || newPassword || confirmPassword) {
+      const changingPassword = Boolean(newPassword.trim() || confirmPassword.trim());
+      if (changingPassword) {
         if (newPassword !== confirmPassword) {
           setError(pi.passwordMismatch);
           return;
         }
-        if (!newPassword || newPassword.length < 6) {
+        if (newPassword.trim().length < 6) {
           setError(pi.passwordTooShort);
           return;
         }
-        if (!oldPassword) {
+        if (!oldPassword.trim()) {
           setError(pi.passwordMismatch);
           return;
         }
@@ -996,7 +998,7 @@ export function PartnerPersonalInfoForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           settings: payload,
-          ...(newPassword
+          ...(changingPassword
             ? { oldPassword, newPassword, confirmPassword }
             : {}),
         }),
@@ -2197,7 +2199,35 @@ export function PartnerPersonalInfoForm({
             <div className="grid gap-8 lg:grid-cols-2">
               <div className="space-y-3">
                 <Field label={pi.oldPassword}>
-                  <input className={inputClass} type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} />
+                  <div className="relative">
+                    <input
+                      className={cn(inputClass, "pe-10")}
+                      type={showOldPassword ? "text" : "password"}
+                      value={oldPassword}
+                      onChange={(e) => setOldPassword(e.target.value)}
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 end-0 flex items-center px-3 text-slate-400 hover:text-slate-600"
+                      onClick={() => setShowOldPassword((open) => !open)}
+                      aria-label={
+                        showOldPassword
+                          ? locale === "ka"
+                            ? "პაროლის დამალვა"
+                            : locale === "ru"
+                              ? "Скрыть пароль"
+                              : "Hide password"
+                          : locale === "ka"
+                            ? "პაროლის ჩვენება"
+                            : locale === "ru"
+                              ? "Показать пароль"
+                              : "Show password"
+                      }
+                    >
+                      {showOldPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </Field>
                 <Field label={pi.newPassword}>
                   <input className={inputClass} type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
