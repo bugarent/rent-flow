@@ -85,6 +85,18 @@ export async function PUT(req: Request) {
           { status: 400 },
         );
       }
+      if (b.active && b.botToken.trim()) {
+        const { telegramTokenIsValid } = await import("@/lib/telegram/bot");
+        if (!(await telegramTokenIsValid(b.botToken))) {
+          return NextResponse.json(
+            {
+              error:
+                "ბოტის ტოკენი Telegram-მა არ მიიღო. ჩაწერეთ BotFather-ის ტოკენი თავიდან და შეინახეთ.",
+            },
+            { status: 400 },
+          );
+        }
+      }
     }
 
     const saved = await saveTelegramLiveBotsConfig({ bots });

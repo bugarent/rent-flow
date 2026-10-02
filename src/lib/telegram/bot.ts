@@ -4,7 +4,7 @@ import { getPlatformSettings } from "@/lib/server/platform-settings-store";
 
 const API = "https://api.telegram.org";
 
-/** Resolve bot token: platform settings file → TELEGRAM_BOT_TOKEN env. */
+/** Resolve bot token: platform settings, then env, then the saved booking bot. */
 export async function resolveTelegramBotToken(): Promise<string | null> {
   try {
     const settings = await getPlatformSettings();
@@ -14,7 +14,15 @@ export async function resolveTelegramBotToken(): Promise<string | null> {
     /* ignore */
   }
   const fromEnv = process.env.TELEGRAM_BOT_TOKEN?.trim();
-  return fromEnv || null;
+  if (fromEnv) return fromEnv;
+  try {
+    const { getActiveTelegramLiveBot } = await import("@/lib/server/telegram-live-bots-store");
+    const saved = (await getActiveTelegramLiveBot())?.botToken.trim();
+    if (saved) return saved;
+  } catch {
+    /* booking bot is optional */
+  }
+  return null;
 }
 
 export function telegramBotToken(): string | null {
@@ -65,8 +73,26 @@ export async function ensureTelegramWebhook(req?: Request): Promise<{ ok: boolea
   const webhookUrl = `${telegramPublicOrigin(req)}/api/telegram/webhook`;
   const secretToken = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
   const result = await setTelegramWebhook(webhookUrl, secretToken);
-  if (!result.ok) return { ok: false, error: result.description || "Could not connect the bot" };
+  if (!result.ok) {
+    const description = result.description || "";
+    const error = /unauthorized/i.test(description)
+      ? "შენახული ბოტის ტოკენი Telegram-მა არ მიიღო. ადმინში ჩაწერეთ BotFather-ის ტოკენი თავიდან და შეინახეთ."
+      : description || "Could not connect the bot";
+    return { ok: false, error };
+  }
   return { ok: true };
+}
+
+export async function telegramTokenIsValid(token: string): Promise<boolean> {
+  const t = token.trim();
+  if (!t) return false;
+  try {
+    const res = await fetch(`${API}/bot${t}/getMe`);
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean };
+    return Boolean(data.ok);
+  } catch {
+    return false;
+  }
 }
 
 type TelegramApiResult = {
