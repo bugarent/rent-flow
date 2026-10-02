@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendTelegramMessage, telegramBotToken } from "@/lib/telegram/bot";
+import { resolveTelegramBotToken, sendTelegramMessage } from "@/lib/telegram/bot";
 import { extractStartPayload, markTelegramVerified } from "@/lib/telegram/verification-store";
 import {
   consumePartnerTelegramBindPending,
@@ -33,11 +33,7 @@ async function bindPartnerDashboard(input: {
   username?: string | null;
 }) {
   const pending = await consumePartnerTelegramBindPending(input.partnerId);
-  if (!pending) {
-    return { ok: false as const, reason: "NO_PENDING" as const, locale: "en" as const };
-  }
-
-  const locale = resolveTelegramLocale(pending.locale);
+  const locale = resolveTelegramLocale(pending?.locale);
   const local = loadLocalPartner();
   const localEmail =
     local && (local.id === input.partnerId || input.partnerId === "local-partner") ? local.email : "";
@@ -78,7 +74,7 @@ async function bindPartnerDashboard(input: {
 }
 
 export async function POST(req: Request) {
-  if (!telegramBotToken()) {
+  if (!(await resolveTelegramBotToken())) {
     return NextResponse.json({ ok: false, error: "Bot token missing" }, { status: 503 });
   }
   if (!webhookSecretOk(req)) {
@@ -195,7 +191,7 @@ export async function POST(req: Request) {
 export async function GET() {
   return NextResponse.json({
     ok: true,
-    configured: Boolean(telegramBotToken()),
+    configured: Boolean(await resolveTelegramBotToken()),
     path: "/api/telegram/webhook",
   });
 }

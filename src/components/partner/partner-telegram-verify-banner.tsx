@@ -150,14 +150,14 @@ export function PartnerTelegramVerifyBanner({ variant = "banner", className }: P
       >
         {busy ? "…" : t.verifyButton}
       </button>
-      <a
-        href={botUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-[11px] font-semibold text-red-800 underline hover:text-red-950"
+      <button
+        type="button"
+        onClick={() => void onActivate()}
+        disabled={busy}
+        className="text-[11px] font-semibold text-red-800 underline hover:text-red-950 disabled:opacity-60"
       >
         {t.openBot}
-      </a>
+      </button>
     </div>
   );
 }

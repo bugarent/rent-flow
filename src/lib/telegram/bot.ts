@@ -39,12 +39,34 @@ export function telegramBotUsername(): string {
   return raw.replace(/^@/, "");
 }
 
-export function telegramBotDeepLink(startPayload?: string): string {
-  const user = telegramBotUsername();
+export function telegramBotDeepLink(startPayload?: string, username?: string): string {
+  const user = (username || telegramBotUsername()).replace(/^@/, "");
   if (startPayload) {
     return `https://t.me/${user}?start=${encodeURIComponent(startPayload)}`;
   }
   return `https://t.me/${user}`;
+}
+
+/** Public HTTPS origin. Ignores an http://localhost NEXTAUTH_URL. */
+export function telegramPublicOrigin(req?: Request): string {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "") || "";
+  if (configured.startsWith("https://")) return configured;
+  const host = (req?.headers.get("x-forwarded-host") || req?.headers.get("host") || "")
+    .split(",")[0]
+    .trim();
+  if (host && !/localhost|127\.0\.0\.1/i.test(host)) return `https://${host}`;
+  return "https://rentairportcars.com";
+}
+
+/** Point Telegram updates at this site so /start can verify the partner. */
+export async function ensureTelegramWebhook(req?: Request): Promise<{ ok: boolean; error?: string }> {
+  const token = await resolveTelegramBotToken();
+  if (!token) return { ok: false, error: "Bot token is not saved" };
+  const webhookUrl = `${telegramPublicOrigin(req)}/api/telegram/webhook`;
+  const secretToken = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+  const result = await setTelegramWebhook(webhookUrl, secretToken);
+  if (!result.ok) return { ok: false, error: result.description || "Could not connect the bot" };
+  return { ok: true };
 }
 
 type TelegramApiResult = {

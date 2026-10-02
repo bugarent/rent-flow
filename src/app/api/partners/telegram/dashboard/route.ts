@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requirePartnerApi } from "@/lib/auth/sessions";
 import { prisma } from "@/lib/prisma";
-import { telegramBotDeepLink } from "@/lib/telegram/bot";
+import { ensureTelegramWebhook, resolveTelegramBotUsername, telegramBotDeepLink } from "@/lib/telegram/bot";
 import {
   createPartnerTelegramBindPending,
   partnerVerifyStartPayload,
@@ -75,11 +75,19 @@ export async function POST(req: Request) {
 
   await createPartnerTelegramBindPending({ partnerId: partner.id, locale });
   const start = partnerVerifyStartPayload(partner.id);
+  const username = await resolveTelegramBotUsername();
+  const webhook = await ensureTelegramWebhook(req);
+  if (!webhook.ok) {
+    return NextResponse.json(
+      { error: webhook.error || "Could not connect the Telegram bot", verified: false },
+      { status: 503 },
+    );
+  }
   return NextResponse.json({
     verified: false,
     partnerId: partner.id,
     startPayload: start,
-    botUrl: telegramBotDeepLink(start),
+    botUrl: telegramBotDeepLink(start, username),
     expiresInMinutes: 45,
   });
 }
