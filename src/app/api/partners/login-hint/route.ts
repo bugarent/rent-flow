@@ -15,6 +15,17 @@ export async function POST(req: Request) {
       include: { partner: true },
     });
     if (!user?.partner) {
+      const partner = await prisma.partner.findFirst({
+        where: { email: normalizeLogin(email) },
+        orderBy: { updatedAt: "desc" },
+      });
+      if (!partner) return NextResponse.json({ reason: "unknown" });
+      if (["PENDING", "INVITED", "PENDING_FINAL", "NEEDS_CORRECTION"].includes(partner.status)) {
+        return NextResponse.json({ reason: "pending_approval" });
+      }
+      if (partner.status === "REJECTED" || partner.status === "SUSPENDED") {
+        return NextResponse.json({ reason: "rejected" });
+      }
       return NextResponse.json({ reason: "unknown" });
     }
     if (user.status === "PENDING_OTP") {

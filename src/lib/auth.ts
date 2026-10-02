@@ -95,8 +95,20 @@ async function authorizeForPortal(
         }
       } else if (portal === "partner") {
         if (user.role !== "VENDOR") return null;
-        const partner = await prisma.partner.findUnique({ where: { userId: user.id } });
         const { partnerCanAccessPortal } = await import("@/lib/auth/partner-access");
+        let partner = await prisma.partner.findUnique({ where: { userId: user.id } });
+        if (!partner) {
+          partner = await prisma.partner.findFirst({
+            where: { email: user.email },
+            orderBy: { updatedAt: "desc" },
+          });
+          if (partner && partnerCanAccessPortal(partner.status)) {
+            await prisma.partner.update({
+              where: { id: partner.id },
+              data: { userId: user.id, status: "APPROVED" },
+            });
+          }
+        }
         if (!partner || !partnerCanAccessPortal(partner.status)) return null;
         try {
           const { rememberPartnerPortalPassword } = await import(
@@ -196,6 +208,16 @@ async function authorizeForPortal(
           role: localPartner.role,
         };
       }
+    }
+
+    try {
+      const { signInApprovedPartnerWithStoredPassword } = await import(
+        "@/lib/server/activate-partner-login"
+      );
+      const opened = await signInApprovedPartnerWithStoredPassword(login, credentials.password);
+      if (opened) return opened;
+    } catch {
+      /* application password is used only when the cabinet user is missing or stale */
     }
   }
 

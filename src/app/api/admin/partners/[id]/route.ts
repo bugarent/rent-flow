@@ -37,6 +37,7 @@ import {
 } from "@/lib/server/partner-company-settings-store";
 import { parseCompanySettings } from "@/lib/partners/company-settings";
 import { loadLocalPartner, LOCAL_PARTNER_ID, saveLocalPartner } from "@/lib/auth/local-partner-store";
+import { activatePartnerFromStoredPassword } from "@/lib/server/activate-partner-login";
 import {
   getPartnerCredentials,
   setPartnerCredentials,
@@ -708,6 +709,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         });
       }
       if (action === "FINAL_APPROVE" || (action === "APPROVED" && file.status === "PENDING_FINAL")) {
+        try {
+          await activatePartnerFromStoredPassword(id);
+        } catch {
+          /* cabinet login is opened when the database is reachable */
+        }
         const updated = await updateFilePartnerStatus(id, "APPROVED", null);
         await markFilePartnerRead(id);
         const seq =
@@ -726,6 +732,27 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         });
       }
       if (action === "INVITE" || action === "APPROVED") {
+        try {
+          const activated = await activatePartnerFromStoredPassword(id);
+          if (activated.ok) {
+            const updated = await updateFilePartnerStatus(id, "APPROVED", null);
+            await markFilePartnerRead(id);
+            return NextResponse.json({
+              id,
+              status: "APPROVED",
+              message: "Approved. The email and password from the application are now the partner cabinet login.",
+              partner: updated ? filePartnerDetail(updated) : null,
+            });
+          }
+          if (activated.reason === "email-taken") {
+            return NextResponse.json(
+              { error: "This email already belongs to another account, so the cabinet could not be opened." },
+              { status: 409 },
+            );
+          }
+        } catch {
+          /* database is offline — fall through to the invite mark */
+        }
         const updated = await updateFilePartnerStatus(id, "INVITED", null);
         await markFilePartnerRead(id);
         return NextResponse.json({
@@ -870,8 +897,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     process.env.NEXT_PUBLIC_SITE_URL ||
     "http://localhost:3000";
 
-  // Step 1 approve → send invite email with unique registration link
+  // Step 1 approve → open the cabinet when the application already has a password, otherwise send an invite.
   if (action === "INVITE" || (action === "APPROVED" && existing.status === "PENDING")) {
+    const activated = await activatePartnerFromStoredPassword(existing.id);
+    if (activated.ok) {
+      return NextResponse.json({
+        id: activated.partnerId,
+        status: "APPROVED",
+        message: "Approved. The email and password from the application are now the partner cabinet login.",
+      });
+    }
+    if (activated.reason === "email-taken") {
+      return NextResponse.json(
+        { error: "This email already belongs to another account, so the cabinet could not be opened." },
+        { status: 409 },
+      );
+    }
     const token = randomBytes(24).toString("hex");
     const expires = new Date(Date.now() + PARTNER_INVITE_TTL_DAYS * 24 * 60 * 60 * 1000);
     const partner = await prisma.partner.update({
@@ -962,10 +1003,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     });
   }
 
-  // Final approve after registration
+  // Final approve after registration. Application email and password become the cabinet login.
   if (action === "APPROVED" || action === "FINAL_APPROVE") {
     if (!["PENDING_FINAL", "NEEDS_CORRECTION", "INVITED", "PENDING", "PENDING_REMODERATION", "APPROVED"].includes(existing.status)) {
       // still allow re-approve
+    }
+    const activatedNow = await activatePartnerFromStoredPassword(existing.id);
+    if (activatedNow.ok) {
+      existing = await prisma.partner.findUnique({ where: { id } });
+      if (!existing) return NextResponse.json({ error: "Partner not found" }, { status: 404 });
+    } else if (activatedNow.reason === "email-taken") {
+      return NextResponse.json(
+        { error: "This email already belongs to another account, so the cabinet could not be opened." },
+        { status: 409 },
+      );
     }
     if (!existing.userId && existing.status !== "PENDING") {
       // registration not completed — only invite path should be used for PENDING
@@ -982,8 +1033,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       sequentialNumber = await nextPartnerSequentialNumber();
     }
 
-    // If still PENDING without registration, treat as invite
+    // If still PENDING without registration, open the cabinet or send an invite.
     if (existing.status === "PENDING" && !existing.userId) {
+      const activated = await activatePartnerFromStoredPassword(existing.id);
+      if (activated.ok) {
+        return NextResponse.json({
+          id: activated.partnerId,
+          status: "APPROVED",
+          message: "Approved. The email and password from the application are now the partner cabinet login.",
+        });
+      }
+      if (activated.reason === "email-taken") {
+        return NextResponse.json(
+          { error: "This email already belongs to another account, so the cabinet could not be opened." },
+          { status: 409 },
+        );
+      }
       const token = randomBytes(24).toString("hex");
       const expires = new Date(Date.now() + PARTNER_INVITE_TTL_DAYS * 24 * 60 * 60 * 1000);
       const partner = await prisma.partner.update({

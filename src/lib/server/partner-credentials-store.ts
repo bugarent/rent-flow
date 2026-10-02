@@ -168,6 +168,14 @@ export async function rememberPartnerPortalPassword(
   await setPartnerCredentials(partnerId, mail, plain);
 }
 
+/** Application password saved for this partner id, or any record with the same email. */
+export async function findStoredPartnerPassword(partnerId: string, email: string): Promise<string> {
+  const byId = await getPartnerCredentials(partnerId);
+  if (byId?.password?.trim()) return byId.password.trim();
+  const store = await readStore();
+  return passwordForEmail(store, email);
+}
+
 export async function setPartnerCredentialsByEmail(email: string, password: string, partnerId?: string) {
   const normalized = normalizeEmail(email);
   const store = await readStore();
