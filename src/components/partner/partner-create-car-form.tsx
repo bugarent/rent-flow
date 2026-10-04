@@ -848,7 +848,7 @@ export function PartnerCreateCarForm({
             })),
           );
         }
-        if (meRes.ok && Array.isArray(me.deliveryCatalog)) {
+        if (meRes.ok && Array.isArray(me.deliveryCatalog) && me.deliveryCatalog.length) {
           const delivery = (me.deliveryCatalog as DeliveryLocationView[]).map((loc) => {
             const airport = Array.isArray(me.airports)
               ? me.airports.find(
@@ -1090,7 +1090,7 @@ export function PartnerCreateCarForm({
           }
 
           let deliveryList =
-            meRes.ok && Array.isArray(me.deliveryCatalog)
+            meRes.ok && Array.isArray(me.deliveryCatalog) && me.deliveryCatalog.length
               ? (me.deliveryCatalog as DeliveryLocationView[])
               : initialDeliveryCatalog;
           if (isAdminReview && !deliveryList.length) {
@@ -1186,8 +1186,11 @@ export function PartnerCreateCarForm({
         }
       } finally {
         // Always clear boot UI — partner APIs can hang when DB is offline; admin path must not stick.
-        setLocationsReady(true);
-        setBooting(false);
+        // A cancelled run must not flag locations as ready while the live run is still loading them.
+        if (!cancelled) {
+          setLocationsReady(true);
+          setBooting(false);
+        }
       }
     })();
     return () => {

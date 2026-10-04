@@ -131,7 +131,7 @@ export function PartnerPickupDropoffSection({
   const { dictionary } = usePartnerLocale();
   const pickup = dictionary.createCar.pickup;
 
-  const locationIds = selectedLocationIds || [];
+  const locationIds = useMemo(() => selectedLocationIds || [], [selectedLocationIds]);
   const selectedSet = useMemo(() => new Set(locationIds), [locationIds]);
 
   const setLocationIds = (ids: string[]) => {
@@ -171,7 +171,13 @@ export function PartnerPickupDropoffSection({
         {pickup.addLocation} <span className="text-[#e11d48]">*</span>
       </p>
 
-      {catalogReady && !catalog.length ? (
+      {!catalogReady && !catalog.length ? (
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-10 animate-pulse rounded-md border border-[#e2e8f0] bg-slate-100" />
+          ))}
+        </div>
+      ) : !catalog.length ? (
         <p
           className={cn(
             "rounded-lg border border-dashed p-4 text-sm",

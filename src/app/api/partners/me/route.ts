@@ -3,7 +3,8 @@ import { requirePartnerApi } from "@/lib/auth/sessions";
 import { formatPartnerCode } from "@/lib/ids";
 import { prisma } from "@/lib/prisma";
 import { getPartnerOperatingAirports } from "@/lib/server/partner-airports";
-import { listPartnerScopedDeliveryLocations } from "@/lib/server/delivery-locations";
+import { loadPartnerDeliveryCatalog } from "@/lib/server/partner-delivery-catalog";
+import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import { resolvePartnerSeasonalPricing } from "@/lib/server/partner-seasonal-pricing-store";
 import { emptySeasonalPricing } from "@/lib/partners/seasonal-pricing";
 import {
@@ -118,7 +119,7 @@ export async function GET() {
     ];
     let pricingCurrency: PartnerPricingCurrency = DEFAULT_PARTNER_PRICING_CURRENCY;
     let deliveryLocationIds: string[] = [];
-    let deliveryCatalog: Awaited<ReturnType<typeof listPartnerScopedDeliveryLocations>> = [];
+    let deliveryCatalog: DeliveryLocationView[] = [];
 
     try {
       const company = partnerRow
@@ -151,37 +152,7 @@ export async function GET() {
       /* defaults */
     }
 
-    try {
-      deliveryCatalog = await listPartnerScopedDeliveryLocations(partnerId);
-    } catch {
-      deliveryCatalog = [];
-    }
-
-    // If scoped catalog empty but personal-info has ids, resolve existing locations only (no create-on-read).
-    if (!deliveryCatalog.length && deliveryLocationIds.length) {
-      try {
-        const { listDeliveryLocations } = await import("@/lib/server/delivery-locations");
-        const { normalizeLocationCode } = await import("@/lib/catalog/search-places");
-        const all = await listDeliveryLocations({ activeOnly: false });
-        const byId = new Map(all.map((l) => [l.id, l]));
-        const byCode = new Map(
-          all.map((l) => [normalizeLocationCode(l.iata).toUpperCase(), l]),
-        );
-        const out = [];
-        const seen = new Set<string>();
-        for (const id of deliveryLocationIds) {
-          const hit =
-            byId.get(id) ||
-            byCode.get(normalizeLocationCode(id).toUpperCase());
-          if (!hit || seen.has(hit.id)) continue;
-          seen.add(hit.id);
-          out.push(hit);
-        }
-        deliveryCatalog = out;
-      } catch {
-        /* keep empty */
-      }
-    }
+    deliveryCatalog = await loadPartnerDeliveryCatalog(partnerId, deliveryLocationIds);
 
     // Read-only on GET — do not assign sequential codes here (that was a write on every page open).
     const seq = sequentialNumber;
