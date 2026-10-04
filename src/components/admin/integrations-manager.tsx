@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ADMIN_BASE } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import type { PartnerIntegrationRecord } from "@/lib/integrations/types";
@@ -11,8 +10,132 @@ import {
   MobileDataCard,
   MobileDataRow,
 } from "@/components/ui/responsive-data-list";
+import {
+  useIntegrationActions,
+  type IntegrationBusy,
+  type IntegrationNotice,
+} from "@/components/admin/use-integration-actions";
 
 type PartnerOption = { id: string; label: string };
+
+function Spinner() {
+  return (
+    <span
+      aria-hidden
+      className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"
+    />
+  );
+}
+
+function NoticeText({ notice, className }: { notice?: IntegrationNotice; className?: string }) {
+  if (!notice) return null;
+  return (
+    <p
+      role="status"
+      className={cn(
+        "break-words text-xs font-semibold",
+        notice.ok ? "text-emerald-700" : "text-red-700",
+        className,
+      )}
+    >
+      {notice.text}
+    </p>
+  );
+}
+
+function StatusBadge({ status }: { status: PartnerIntegrationRecord["status"] }) {
+  return (
+    <span
+      className={cn(
+        "rounded-full px-2 py-1 text-xs font-bold",
+        status === "LIVE"
+          ? "bg-emerald-100 text-emerald-900"
+          : status === "TESTING"
+            ? "bg-amber-100 text-amber-900"
+            : "bg-slate-100 text-slate-700",
+      )}
+    >
+      {status}
+    </span>
+  );
+}
+
+function LastRun({ row }: { row: PartnerIntegrationRecord }) {
+  return (
+    <>
+      <div>
+        Test:{" "}
+        {row.lastTestAt
+          ? `${row.lastTestOk ? "OK" : "FAIL"} · ${new Date(row.lastTestAt).toLocaleString()}`
+          : "—"}
+      </div>
+      <div>Sync: {row.lastSyncAt ? new Date(row.lastSyncAt).toLocaleString() : "—"}</div>
+    </>
+  );
+}
+
+function OverrideButton({
+  row,
+  busy,
+  onToggle,
+  className,
+}: {
+  row: PartnerIntegrationRecord;
+  busy: IntegrationBusy;
+  onToggle: () => void;
+  className?: string;
+}) {
+  const loading = busy?.id === row.id && busy.action === "override";
+  return (
+    <button
+      type="button"
+      disabled={busy?.id === row.id}
+      onClick={onToggle}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold disabled:opacity-60",
+        row.manualOverride
+          ? "bg-orange-500 text-white"
+          : "border border-slate-300 bg-white text-slate-700",
+        className,
+      )}
+    >
+      {loading ? <Spinner /> : null}
+      {row.manualOverride ? "ON" : "Off"}
+    </button>
+  );
+}
+
+function RowActions({
+  row,
+  busy,
+  onRun,
+  compact,
+}: {
+  row: PartnerIntegrationRecord;
+  busy: IntegrationBusy;
+  onRun: (action: "test" | "sync") => void;
+  compact?: boolean;
+}) {
+  const rowBusy = busy?.id === row.id;
+  const btn = compact
+    ? "inline-flex items-center justify-center gap-1.5 rounded border bg-white px-2 py-1 text-xs font-bold hover:bg-slate-50 disabled:opacity-60"
+    : "inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded border bg-white px-3 text-xs font-bold disabled:opacity-60";
+  return (
+    <>
+      <button type="button" disabled={rowBusy} className={btn} onClick={() => onRun("test")}>
+        {rowBusy && busy?.action === "test" ? <Spinner /> : null}
+        {rowBusy && busy?.action === "test" ? "Testing…" : "Test"}
+      </button>
+      <button type="button" disabled={rowBusy} className={btn} onClick={() => onRun("sync")}>
+        {rowBusy && busy?.action === "sync" ? <Spinner /> : null}
+        {rowBusy && busy?.action === "sync" ? "Syncing…" : "Sync"}
+      </button>
+      <Link href={`${ADMIN_BASE}/integrations/${row.id}`} className={btn}>
+        Details
+      </Link>
+    </>
+  );
+}
 
 export function IntegrationsManager({
   initialIntegrations,
@@ -21,112 +144,54 @@ export function IntegrationsManager({
   initialIntegrations: PartnerIntegrationRecord[];
   partnerOptions: PartnerOption[];
 }) {
-  const router = useRouter();
-  const [rows, setRows] = useState(initialIntegrations);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
-  const [apiKeyOnce, setApiKeyOnce] = useState("");
+  const {
+    rows,
+    busy,
+    refreshing,
+    creating,
+    notice,
+    rowNotices,
+    apiKeyOnce,
+    refresh,
+    create,
+    run,
+    toggleOverride,
+  } = useIntegrationActions(initialIntegrations);
   const [partnerId, setPartnerId] = useState(partnerOptions[0]?.id || "local-partner");
   const [name, setName] = useState("Channel connection");
   const [webhookUrl, setWebhookUrl] = useState("");
-  const [creating, setCreating] = useState(false);
-
-  useEffect(() => {
-    setRows(initialIntegrations);
-  }, [initialIntegrations]);
-
-  const refresh = useCallback(async () => {
-    const res = await fetch("/api/admin/integrations");
-    const data = await res.json();
-    if (res.ok) setRows(data.integrations || []);
-    router.refresh();
-  }, [router]);
-
-  const create = async () => {
-    setCreating(true);
-    setMessage("");
-    setApiKeyOnce("");
-    try {
-      const res = await fetch("/api/admin/integrations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          partnerId,
-          name,
-          webhookUrl: webhookUrl.trim() || null,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Create failed");
-      setApiKeyOnce(data.apiKey || "");
-      setMessage(data.message || "Created");
-      await refresh();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Create failed");
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const run = async (id: string, path: string, body?: unknown) => {
-    setBusyId(id);
-    setMessage("");
-    try {
-      const res = await fetch(`/api/admin/integrations/${id}${path}`, {
-        method: "POST",
-        headers: body ? { "Content-Type": "application/json" } : undefined,
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || data.error || "Request failed");
-      setMessage(data.message || JSON.stringify(data.steps || data));
-      await refresh();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Request failed");
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const toggleOverride = async (row: PartnerIntegrationRecord) => {
-    setBusyId(row.id);
-    try {
-      const res = await fetch(`/api/admin/integrations/${row.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ manualOverride: !row.manualOverride }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Update failed");
-      await refresh();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Update failed");
-    } finally {
-      setBusyId(null);
-    }
-  };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-2">
         <Link
           href={`${ADMIN_BASE}/integrations/sandbox`}
-          className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-white hover:bg-amber-600"
+          className="inline-flex min-h-10 items-center rounded-lg bg-amber-500 px-4 text-sm font-bold text-white hover:bg-amber-600"
         >
           Open sandbox simulator
         </Link>
         <button
           type="button"
+          disabled={refreshing}
           onClick={() => void refresh()}
-          className="rounded-lg border bg-white px-4 py-2 text-sm font-semibold"
+          className="inline-flex min-h-10 items-center gap-2 rounded-lg border bg-white px-4 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60"
         >
-          Refresh
+          {refreshing ? <Spinner /> : null}
+          {refreshing ? "Refreshing…" : "Refresh"}
         </button>
       </div>
 
-      {message ? (
-        <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800">
-          {message}
+      {notice ? (
+        <p
+          role="status"
+          className={cn(
+            "rounded-xl border px-4 py-3 text-sm font-semibold",
+            notice.ok
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              : "border-red-200 bg-red-50 text-red-800",
+          )}
+        >
+          {notice.text}
         </p>
       ) : null}
       {apiKeyOnce ? (
@@ -142,7 +207,7 @@ export function IntegrationsManager({
           <label className="text-sm">
             <span className="mb-1 block font-semibold text-slate-600">Partner</span>
             <select
-              className="w-full rounded-md border border-slate-300 px-3 py-2"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-base sm:text-sm"
               value={partnerId}
               onChange={(e) => setPartnerId(e.target.value)}
             >
@@ -156,7 +221,7 @@ export function IntegrationsManager({
           <label className="text-sm">
             <span className="mb-1 block font-semibold text-slate-600">Name</span>
             <input
-              className="w-full rounded-md border border-slate-300 px-3 py-2"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-base sm:text-sm"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -164,7 +229,9 @@ export function IntegrationsManager({
           <label className="text-sm sm:col-span-2">
             <span className="mb-1 block font-semibold text-slate-600">Partner webhook base URL (optional)</span>
             <input
-              className="w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs"
+              type="url"
+              inputMode="url"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-base sm:text-xs"
               placeholder="https://partner.example.com/api/rac"
               value={webhookUrl}
               onChange={(e) => setWebhookUrl(e.target.value)}
@@ -174,9 +241,10 @@ export function IntegrationsManager({
         <button
           type="button"
           disabled={creating || !partnerId || !name.trim()}
-          onClick={() => void create()}
-          className="mt-4 rounded-lg bg-[#0b1f4b] px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+          onClick={() => void create({ partnerId, name, webhookUrl })}
+          className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0b1f4b] px-4 text-sm font-bold text-white disabled:opacity-50"
         >
+          {creating ? <Spinner /> : null}
           {creating ? "Creating…" : "Generate API key & connection"}
         </button>
       </section>
@@ -224,69 +292,20 @@ export function IntegrationsManager({
                         <div className="text-slate-500">{row.syncMode}</div>
                       </td>
                       <td className="p-3">
-                        <span
-                          className={cn(
-                            "rounded-full px-2 py-1 text-xs font-bold",
-                            row.status === "LIVE"
-                              ? "bg-emerald-100 text-emerald-900"
-                              : row.status === "TESTING"
-                                ? "bg-amber-100 text-amber-900"
-                                : "bg-slate-100 text-slate-700",
-                          )}
-                        >
-                          {row.status}
-                        </span>
+                        <StatusBadge status={row.status} />
                       </td>
                       <td className="p-3 font-mono text-[11px]">{row.apiKeyPrefix}…</td>
                       <td className="p-3 text-xs text-slate-600">
-                        <div>
-                          Test:{" "}
-                          {row.lastTestAt
-                            ? `${row.lastTestOk ? "OK" : "FAIL"} · ${new Date(row.lastTestAt).toLocaleString()}`
-                            : "—"}
-                        </div>
-                        <div>Sync: {row.lastSyncAt ? new Date(row.lastSyncAt).toLocaleString() : "—"}</div>
+                        <LastRun row={row} />
                       </td>
                       <td className="p-3">
-                        <button
-                          type="button"
-                          disabled={busyId === row.id}
-                          onClick={() => void toggleOverride(row)}
-                          className={cn(
-                            "rounded-full px-3 py-1 text-xs font-bold",
-                            row.manualOverride
-                              ? "bg-orange-500 text-white"
-                              : "border border-slate-300 bg-white text-slate-700",
-                          )}
-                        >
-                          {row.manualOverride ? "ON" : "Off"}
-                        </button>
+                        <OverrideButton row={row} busy={busy} onToggle={() => void toggleOverride(row)} />
                       </td>
-                      <td className="p-3">
+                      <td className="max-w-[16rem] p-3">
                         <div className="flex flex-wrap gap-1">
-                          <button
-                            type="button"
-                            disabled={busyId === row.id}
-                            className="rounded border px-2 py-1 text-xs font-bold"
-                            onClick={() => void run(row.id, "/test")}
-                          >
-                            Test
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busyId === row.id}
-                            className="rounded border px-2 py-1 text-xs font-bold"
-                            onClick={() => void run(row.id, "/sync", { mode: "both" })}
-                          >
-                            Sync
-                          </button>
-                          <Link
-                            href={`${ADMIN_BASE}/integrations/${row.id}`}
-                            className="rounded border px-2 py-1 text-xs font-bold"
-                          >
-                            Details
-                          </Link>
+                          <RowActions row={row} busy={busy} onRun={(a) => void run(row, a)} compact />
                         </div>
+                        <NoticeText notice={rowNotices[row.id]} className="mt-1.5" />
                       </td>
                     </tr>
                   ))
@@ -325,72 +344,28 @@ export function IntegrationsManager({
                   </div>
                 </MobileDataRow>
                 <MobileDataRow label="Status">
-                  <span
-                    className={cn(
-                      "rounded-full px-2 py-1 text-xs font-bold",
-                      row.status === "LIVE"
-                        ? "bg-emerald-100 text-emerald-900"
-                        : row.status === "TESTING"
-                          ? "bg-amber-100 text-amber-900"
-                          : "bg-slate-100 text-slate-700",
-                    )}
-                  >
-                    {row.status}
-                  </span>
+                  <StatusBadge status={row.status} />
                 </MobileDataRow>
                 <MobileDataRow label="Key">
                   <span className="font-mono text-[11px]">{row.apiKeyPrefix}…</span>
                 </MobileDataRow>
                 <MobileDataRow label="Last test / sync">
                   <div className="text-end text-xs text-slate-600">
-                    <div>
-                      Test:{" "}
-                      {row.lastTestAt
-                        ? `${row.lastTestOk ? "OK" : "FAIL"} · ${new Date(row.lastTestAt).toLocaleString()}`
-                        : "—"}
-                    </div>
-                    <div>Sync: {row.lastSyncAt ? new Date(row.lastSyncAt).toLocaleString() : "—"}</div>
+                    <LastRun row={row} />
                   </div>
                 </MobileDataRow>
                 <MobileDataRow label="Override">
-                  <button
-                    type="button"
-                    disabled={busyId === row.id}
-                    onClick={() => void toggleOverride(row)}
-                    className={cn(
-                      "min-h-11 rounded-full px-3 text-xs font-bold",
-                      row.manualOverride
-                        ? "bg-orange-500 text-white"
-                        : "border border-slate-300 bg-white text-slate-700",
-                    )}
-                  >
-                    {row.manualOverride ? "ON" : "Off"}
-                  </button>
+                  <OverrideButton
+                    row={row}
+                    busy={busy}
+                    onToggle={() => void toggleOverride(row)}
+                    className="min-h-11"
+                  />
                 </MobileDataRow>
                 <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                  <button
-                    type="button"
-                    disabled={busyId === row.id}
-                    className="min-h-11 flex-1 rounded border px-3 text-xs font-bold"
-                    onClick={() => void run(row.id, "/test")}
-                  >
-                    Test
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busyId === row.id}
-                    className="min-h-11 flex-1 rounded border px-3 text-xs font-bold"
-                    onClick={() => void run(row.id, "/sync", { mode: "both" })}
-                  >
-                    Sync
-                  </button>
-                  <Link
-                    href={`${ADMIN_BASE}/integrations/${row.id}`}
-                    className="inline-flex min-h-11 flex-1 items-center justify-center rounded border px-3 text-xs font-bold"
-                  >
-                    Details
-                  </Link>
+                  <RowActions row={row} busy={busy} onRun={(a) => void run(row, a)} />
                 </div>
+                <NoticeText notice={rowNotices[row.id]} className="mt-2" />
               </MobileDataCard>
             ))
           )

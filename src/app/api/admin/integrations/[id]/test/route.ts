@@ -7,6 +7,14 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (!session) return NextResponse.json({ error: "Admin access required" }, { status: 403 });
 
   const { id } = await params;
-  const result = await testConnection(id);
-  return NextResponse.json(result, { status: result.ok ? 200 : 400 });
+  try {
+    const result = await testConnection(id);
+    return NextResponse.json(result, { status: result.ok ? 200 : 400 });
+  } catch (error) {
+    console.error("[admin/integrations test]", error);
+    return NextResponse.json(
+      { ok: false, latencyMs: 0, message: "Test failed on the server" },
+      { status: 500 },
+    );
+  }
 }

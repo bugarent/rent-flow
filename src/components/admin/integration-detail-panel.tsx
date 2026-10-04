@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ADMIN_BASE } from "@/lib/routes";
+import { requestJson } from "@/lib/http/request-json";
 import { cn } from "@/lib/utils";
 import {
   MobileDataCard,
@@ -17,7 +17,6 @@ import type {
 } from "@/lib/integrations/types";
 
 export function IntegrationDetailPanel({ integrationId }: { integrationId: string }) {
-  const router = useRouter();
   const [integration, setIntegration] = useState<PartnerIntegrationRecord | null>(null);
   const [mappings, setMappings] = useState<IntegrationMappingRecord[]>([]);
   const [logs, setLogs] = useState<IntegrationSyncLogRecord[]>([]);
@@ -28,13 +27,18 @@ export function IntegrationDetailPanel({ integrationId }: { integrationId: strin
   const [apiKeyOnce, setApiKeyOnce] = useState("");
   const [busy, setBusy] = useState(false);
   const [mapDraft, setMapDraft] = useState("");
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const load = async () => {
-    const res = await fetch(`/api/admin/integrations/${integrationId}`);
-    const data = await res.json();
-    if (!res.ok) {
-      setMessage(data.error || "Failed to load");
-      setIntegration(null);
+    const res = await requestJson<{
+      integration: PartnerIntegrationRecord;
+      mappings?: IntegrationMappingRecord[];
+      logs?: IntegrationSyncLogRecord[];
+    }>(`/api/admin/integrations/${encodeURIComponent(integrationId)}`);
+    const data = res.data;
+    if (!res.ok || !data?.integration) {
+      setMessage(res.error || "Failed to load");
+      setLoadFailed(true);
       return;
     }
     setIntegration(data.integration);
@@ -68,52 +72,82 @@ export function IntegrationDetailPanel({ integrationId }: { integrationId: strin
   const save = async (extra?: Record<string, unknown>) => {
     setBusy(true);
     setMessage("");
-    try {
-      const res = await fetch(`/api/admin/integrations/${integrationId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          webhookUrl: webhookUrl.trim() || null,
-          status,
-          ...extra,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Save failed");
-      if (data.apiKey) setApiKeyOnce(data.apiKey);
-      setMessage(data.message || "Saved");
-      await load();
-      router.refresh();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setBusy(false);
+    const res = await requestJson<{
+      integration?: PartnerIntegrationRecord;
+      apiKey?: string;
+      message?: string;
+    }>(`/api/admin/integrations/${encodeURIComponent(integrationId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        webhookUrl: webhookUrl.trim() || null,
+        status,
+        ...extra,
+      }),
+    });
+    if (res.ok && res.data) {
+      if (res.data.apiKey) setApiKeyOnce(res.data.apiKey);
+      if (res.data.integration) setIntegration(res.data.integration);
+      setMessage(res.data.message || "Saved");
+    } else {
+      setMessage(res.error || "Save failed");
     }
+    setBusy(false);
   };
 
   const saveMappings = async () => {
     setBusy(true);
     setMessage("");
+    let parsed: unknown;
     try {
-      const parsed = JSON.parse(mapDraft);
-      const res = await fetch(`/api/admin/integrations/${integrationId}/mappings`, {
+      parsed = JSON.parse(mapDraft);
+    } catch {
+      setMessage("Mappings JSON is invalid");
+      setBusy(false);
+      return;
+    }
+    const res = await requestJson<{ mappings?: IntegrationMappingRecord[] }>(
+      `/api/admin/integrations/${encodeURIComponent(integrationId)}/mappings`,
+      {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mappings: parsed }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Mapping save failed");
-      setMappings(data.mappings || []);
+      },
+    );
+    if (res.ok) {
+      setMappings(res.data?.mappings || []);
       setMessage("Mappings saved");
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Mapping save failed");
-    } finally {
-      setBusy(false);
+    } else {
+      setMessage(res.error || "Mapping save failed");
     }
+    setBusy(false);
   };
 
   if (!integration) {
-    return <p className="px-4 py-10 text-sm text-slate-500">{message || "Loading…"}</p>;
+    return (
+      <div className="mx-auto max-w-6xl space-y-3 px-4 py-10">
+        <Link href={`${ADMIN_BASE}/integrations`} className="text-sm font-bold text-sky-800 underline">
+          ← Integrations
+        </Link>
+        {loadFailed ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <p className="font-semibold">{message || "Failed to load"}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setLoadFailed(false);
+                void load();
+              }}
+              className="mt-2 min-h-10 rounded-lg border border-red-300 bg-white px-4 text-sm font-bold"
+            >
+              Try again
+            </button>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">Loading…</p>
+        )}
+      </div>
+    );
   }
 
   return (

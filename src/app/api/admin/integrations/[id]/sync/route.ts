@@ -7,24 +7,32 @@ const schema = z.object({
   mode: z.enum(["fleet", "availability", "both"]).default("both"),
 });
 
+type Step = { ok: boolean; message: string };
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await requireAdminApi();
   if (!session) return NextResponse.json({ error: "Admin access required" }, { status: 403 });
 
   const { id } = await params;
-  const body = schema.parse(await req.json().catch(() => ({})));
-  const steps: Record<string, unknown> = {};
+  try {
+    const parsed = schema.safeParse(await req.json().catch(() => ({})));
+    const mode = parsed.success ? parsed.data.mode : "both";
+    const steps: { fleet?: Step; availability?: Step } = {};
 
-  if (body.mode === "fleet" || body.mode === "both") {
-    steps.fleet = await pullFleet(id);
+    if (mode === "fleet" || mode === "both") steps.fleet = await pullFleet(id);
+    if (mode === "availability" || mode === "both") steps.availability = await pullAvailability(id);
+
+    const ok = (steps.fleet?.ok ?? true) && (steps.availability?.ok ?? true);
+    const message = [
+      steps.fleet ? `Fleet: ${steps.fleet.message}` : "",
+      steps.availability ? `Availability: ${steps.availability.message}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+    return NextResponse.json({ ok, steps, message }, { status: ok ? 200 : 400 });
+  } catch (error) {
+    console.error("[admin/integrations sync]", error);
+    return NextResponse.json({ ok: false, message: "Sync failed on the server" }, { status: 500 });
   }
-  if (body.mode === "availability" || body.mode === "both") {
-    steps.availability = await pullAvailability(id);
-  }
-
-  const ok =
-    (steps.fleet ? (steps.fleet as { ok: boolean }).ok : true) &&
-    (steps.availability ? (steps.availability as { ok: boolean }).ok : true);
-
-  return NextResponse.json({ ok, steps }, { status: ok ? 200 : 400 });
 }

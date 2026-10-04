@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ADMIN_BASE } from "@/lib/routes";
+import { requestJson } from "@/lib/http/request-json";
 
 export function IntegrationSandboxPanel() {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{
     ok?: boolean;
@@ -21,20 +20,14 @@ export function IntegrationSandboxPanel() {
   const run = async () => {
     setBusy(true);
     setResult(null);
-    try {
-      const res = await fetch("/api/admin/integrations/sandbox/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vehicleCount: 3 }),
-      });
-      const data = await res.json();
-      setResult(data);
-      router.refresh();
-    } catch (err) {
-      setResult({ error: err instanceof Error ? err.message : "Sandbox failed" });
-    } finally {
-      setBusy(false);
-    }
+    const res = await requestJson<NonNullable<typeof result>>("/api/admin/integrations/sandbox/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ vehicleCount: 3 }),
+      timeoutMs: 90_000,
+    });
+    setResult(res.data ?? { error: res.error || "Sandbox failed" });
+    setBusy(false);
   };
 
   return (
