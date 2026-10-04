@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams, type useRouter } from "next/navigation";
 import { RouteLoadingSpinner } from "@/components/layout/route-loading-spinner";
+import { estimateRouteMs, recordRouteMs } from "@/lib/navigation/route-timing-store";
 
 const SHOW_DELAY_MS = 120;
 const MAX_VISIBLE_MS = 15000;
+const MIN_COUNTDOWN_MS = 1000;
 const PATCHED = Symbol.for("rentairportcars.route-loading");
 
 type PatchableRouter = ReturnType<typeof useRouter> & { [PATCHED]?: boolean };
@@ -34,7 +36,9 @@ function announceRouterNavigations() {
   const router = (window as { next?: { router?: PatchableRouter } }).next?.router;
   if (!router || router[PATCHED]) return;
   const onStart = (href: unknown) => {
-    if (leadsToOtherPage(String(href))) window.dispatchEvent(new Event(START_EVENT));
+    if (leadsToOtherPage(String(href))) {
+      window.dispatchEvent(new CustomEvent(START_EVENT, { detail: String(href) }));
+    }
   };
   const push = router.push.bind(router);
   const replace = router.replace.bind(router);
@@ -55,41 +59,68 @@ function announceRouterNavigations() {
 
 if (typeof window !== "undefined") announceRouterNavigations();
 
+type PendingNavigation = { startedAt: number; estimateMs: number | null };
+
+function secondsLeft(pending: PendingNavigation): number | null {
+  if (pending.estimateMs === null || pending.estimateMs < MIN_COUNTDOWN_MS) return null;
+  const left = pending.estimateMs - (performance.now() - pending.startedAt);
+  return Math.max(0, Math.ceil(left / 1000));
+}
+
 export function RouteLoadingIndicator() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [visible, setVisible] = useState(false);
+  const [seconds, setSeconds] = useState<number | null>(null);
   const showTimer = useRef<number | null>(null);
   const hideTimer = useRef<number | null>(null);
-  const startRef = useRef<() => void>(() => {});
-  const stopRef = useRef<() => void>(() => {});
+  const tickTimer = useRef<number | null>(null);
+  const pendingRef = useRef<PendingNavigation | null>(null);
+  const startRef = useRef<(href: string) => void>(() => {});
+  const stopRef = useRef<(arrived: boolean) => void>(() => {});
 
   useEffect(() => {
     const clearTimers = () => {
       if (showTimer.current) window.clearTimeout(showTimer.current);
       if (hideTimer.current) window.clearTimeout(hideTimer.current);
+      if (tickTimer.current) window.clearInterval(tickTimer.current);
       showTimer.current = null;
       hideTimer.current = null;
+      tickTimer.current = null;
     };
-    stopRef.current = () => {
+    stopRef.current = (arrived) => {
+      const pending = pendingRef.current;
+      pendingRef.current = null;
+      if (arrived && pending) {
+        recordRouteMs(window.location.href, performance.now() - pending.startedAt);
+      }
       clearTimers();
       setVisible(false);
+      setSeconds(null);
     };
-    startRef.current = () => {
+    startRef.current = (href) => {
       clearTimers();
-      showTimer.current = window.setTimeout(() => setVisible(true), SHOW_DELAY_MS);
-      hideTimer.current = window.setTimeout(() => stopRef.current(), MAX_VISIBLE_MS);
+      const pending = { startedAt: performance.now(), estimateMs: estimateRouteMs(href) };
+      pendingRef.current = pending;
+      showTimer.current = window.setTimeout(() => {
+        setSeconds(secondsLeft(pending));
+        setVisible(true);
+        if (pending.estimateMs !== null && pending.estimateMs >= MIN_COUNTDOWN_MS) {
+          tickTimer.current = window.setInterval(() => setSeconds(secondsLeft(pending)), 200);
+        }
+      }, SHOW_DELAY_MS);
+      hideTimer.current = window.setTimeout(() => stopRef.current(false), MAX_VISIBLE_MS);
     };
     return clearTimers;
   }, []);
 
   useEffect(() => {
-    stopRef.current();
+    stopRef.current(true);
   }, [pathname, searchParams]);
 
   useEffect(() => {
     announceRouterNavigations();
-    const onStart = () => startRef.current();
+    const onStart = (event: Event) => startRef.current(String((event as CustomEvent).detail ?? ""));
     window.addEventListener(START_EVENT, onStart);
     return () => window.removeEventListener(START_EVENT, onStart);
   }, []);
@@ -106,9 +137,9 @@ export function RouteLoadingIndicator() {
       const target = anchor.getAttribute("target");
       if (target && target !== "_self") return;
       if (!leadsToOtherPage(anchor.href)) return;
-      startRef.current();
+      startRef.current(anchor.href);
     };
-    const onPageShow = () => stopRef.current();
+    const onPageShow = () => stopRef.current(false);
 
     document.addEventListener("click", onClick, true);
     window.addEventListener("pageshow", onPageShow);
@@ -120,5 +151,5 @@ export function RouteLoadingIndicator() {
     };
   }, []);
 
-  return visible ? <RouteLoadingSpinner /> : null;
+  return visible ? <RouteLoadingSpinner seconds={seconds} /> : null;
 }
