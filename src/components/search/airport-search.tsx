@@ -17,6 +17,7 @@ import { CalendarDays, ChevronDown, Clock3, Globe, MapPin, PlaneTakeoff, BadgeCh
 import type { CatalogAirport } from "@/lib/catalog/airports";
 import { isCityLocationCode } from "@/lib/catalog/search-places";
 import { defaultSearchDateRange } from "@/lib/catalog/default-search-dates";
+import { setHomeCountry } from "@/lib/catalog/home-country-store";
 import { worldCountryName } from "@/lib/catalog/world-countries";
 import { placeLabel, regionName } from "@/lib/i18n/place-label";
 import { CountryFlag } from "@/components/ui/country-flag";
@@ -742,6 +743,10 @@ export function AirportSearch({
       setCountryIso2(countries[0].iso2);
     }
   }, [countries, countryIso2]);
+
+  useEffect(() => {
+    setHomeCountry(countryIso2);
+  }, [countryIso2]);
 
   // Keep pickup/dropoff inside the selected country's active locations.
   useEffect(() => {

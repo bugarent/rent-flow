@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { prismaWhereForMappedModels } from "@/lib/server/category-mapping";
 import { readPreferences } from "@/lib/server/preferences";
 import { toNumber } from "@/lib/utils";
 import { getDictionary } from "@/lib/i18n/dictionaries";
@@ -125,6 +124,7 @@ export default async function CarsPage({
     pickup?: string;
     dropoff?: string;
     category?: string;
+    country?: string;
     pickupAddress?: string;
     dropoffAddress?: string;
   }>;
@@ -132,10 +132,14 @@ export default async function CarsPage({
   // Expired-insurance cars are filtered out below; the status write itself does not block the page.
   scheduleInsuranceRemoderation();
 
-  const [{ startDate, endDate, pickup, dropoff, category, pickupAddress, dropoffAddress }, { locale }] =
-    await Promise.all([searchParams, readPreferences()]);
+  const [
+    { startDate, endDate, pickup, dropoff, category, country, pickupAddress, dropoffAddress },
+    { locale },
+  ] = await Promise.all([searchParams, readPreferences()]);
   const dictionary = getDictionary(locale);
   const pickupCode = pickup?.trim();
+  // Country-wide browse only applies until a concrete pickup is chosen.
+  const countryIso2 = pickupCode ? "" : String(country || "").trim().toUpperCase().slice(0, 2);
 
   // Independent reads start together instead of one after another.
   const expiredIdsPromise = loadExpiredInsuranceIds();
@@ -203,18 +207,10 @@ export default async function CarsPage({
 
     if (category?.trim()) {
       const homepageCategory = allCategories.find((c) => c.slug === category.trim());
-      if (homepageCategory) {
-        categoryName = homepageCategory.name;
-        const mapped = homepageCategory.mappedModels;
-        const modelFilter = prismaWhereForMappedModels(mapped);
-        if (modelFilter) Object.assign(where, modelFilter);
-        else where.id = "__none__";
-      } else {
-        where.categorySlug = category.trim();
-      }
+      if (homepageCategory) categoryName = homepageCategory.name;
     }
   } catch {
-    if (category?.trim()) where.categorySlug = category.trim();
+    /* categories optional — results are matched by effective slug below */
   }
 
   type DbCar = {
@@ -406,6 +402,16 @@ export default async function CarsPage({
     }
   }
 
+  if (countryIso2) {
+    cars = cars.filter((car) =>
+      (car.deliveryPrices ?? []).some(
+        (row) =>
+          row.deliveryLocation?.isActive &&
+          row.deliveryLocation.airport?.city?.country?.iso2?.toUpperCase() === countryIso2,
+      ),
+    );
+  }
+
   if (unavailable.size) cars = cars.filter((car) => !unavailable.has(car.id));
   const periodByCar = periodMap;
 
@@ -445,7 +451,7 @@ export default async function CarsPage({
     /* partner settings optional */
   }
 
-  const results: SearchResultCar[] = cars.map((car) => {
+  let results: SearchResultCar[] = cars.map((car) => {
     const details = parseCarDetails(car.description);
     const depositRaw = details?.deposit != null ? Number(details.deposit) : null;
     const slug = resolveEffectiveCategorySlug(
@@ -524,6 +530,10 @@ export default async function CarsPage({
     };
   });
 
+  // Same slug as the card badge: partner-assigned category first, then admin model mapping.
+  const categorySlug = category?.trim() || "";
+  if (categorySlug) results = results.filter((car) => car.categorySlug === categorySlug);
+
   results.sort((a, b) => {
     const da = listingDailyWithDeliveryEur({
       dailyRateEur: a.dailyRateEur,
@@ -596,6 +606,7 @@ export default async function CarsPage({
       pickupAddress={pickupAddress || ""}
       dropoffAddress={dropoffAddress || ""}
       category={category || ""}
+      country={countryIso2}
       emptyMessage={emptyMessage}
       siteDiscountPercent={siteDiscountPercent}
     />

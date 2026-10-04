@@ -90,13 +90,27 @@ function buildCarsSearchQuery(input: {
   dropoffAddress?: string;
   pickupIsCity?: boolean;
   dropoffIsCity?: boolean;
+  /** Country-wide browse (category link from home) while no pickup is chosen yet. */
+  country?: string;
 }): string | null {
   const { pickup, pickupDate, dropoffDate, pickupTime, dropoffTime } = input;
-  if (!pickup || !pickupDate || !dropoffDate) return null;
+  const country = input.country?.trim().toUpperCase() || "";
+  if ((!pickup && !country) || !pickupDate || !dropoffDate) return null;
   const slot = clampPickupSelection(pickupDate, pickupTime, TIME_OPTIONS);
   const safePickupDate = slot.date;
   const safeDropoffDate = clampDateToMin(dropoffDate, safePickupDate);
   if (safeDropoffDate === safePickupDate && dropoffTime <= slot.time) return null;
+
+  if (!pickup) {
+    const params = new URLSearchParams({
+      country,
+      startDate: `${safePickupDate}T${slot.time}`,
+      endDate: `${safeDropoffDate}T${dropoffTime}`,
+      time: slot.time,
+    });
+    if (input.category?.trim()) params.set("category", input.category.trim());
+    return params.toString();
+  }
 
   const resolvedDropoff = input.dropoff === SAME_AS_PICKUP ? pickup : input.dropoff;
   const params = new URLSearchParams({
@@ -125,9 +139,11 @@ export function CarsSearchTripEditor({
   pickupAddress: initialPickupAddress = "",
   dropoffAddress: initialDropoffAddress = "",
   category,
+  country = "",
   filtersSlot,
 }: {
   options: SearchAirportOption[];
+  country?: string;
   pickup: string;
   dropoff: string;
   startDate: string;
@@ -200,10 +216,10 @@ export function CarsSearchTripEditor({
 
   const activeCountryIso2 = useMemo(() => {
     const code = (pickup || initialPickup || "").trim().toUpperCase();
-    if (!code) return "";
+    if (!code) return country.trim().toUpperCase();
     const match = options.find((o) => o.iata.toUpperCase() === code);
-    return match?.countryIso2?.trim().toUpperCase() || "";
-  }, [options, pickup, initialPickup]);
+    return match?.countryIso2?.trim().toUpperCase() || country.trim().toUpperCase();
+  }, [options, pickup, initialPickup, country]);
 
   const { pickupChoices, dropoffChoices, useLocationGroups } = useMemo(() => {
     const preferred = activeCountryIso2;
@@ -305,8 +321,10 @@ export function CarsSearchTripEditor({
         dropoffAddress,
         pickupIsCity,
         dropoffIsCity,
+        country,
       }),
     [
+      country,
       pickup,
       dropoff,
       pickupDate,
@@ -349,8 +367,10 @@ export function CarsSearchTripEditor({
       dropoffAddress: initialDropoffAddress,
       pickupIsCity: urlPickupIsCity,
       dropoffIsCity: urlDropoffIsCity,
+      country,
     });
   }, [
+    country,
     initialPickup,
     initialDropoff,
     initialStart,

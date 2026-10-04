@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { knownText } from "@/lib/i18n/known-record-text";
 import { defaultSearchDateRange } from "@/lib/catalog/default-search-dates";
+import { useHomeCountry } from "@/lib/catalog/home-country-store";
 
 const AUTO_MS = 4000;
 const SLIDE_MS = 600;
@@ -20,9 +21,10 @@ function CategoryCard({
   viewLabel: string;
 }) {
   const { locale } = usePreferences();
+  const country = useHomeCountry();
   const { startDate, endDate } = defaultSearchDateRange();
   const name = knownText(locale, category.name);
-  const href = `/cars?category=${encodeURIComponent(category.slug)}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
+  const href = `/cars?category=${encodeURIComponent(category.slug)}${country ? `&country=${encodeURIComponent(country)}` : ""}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
   return (
     <article className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="h-36 bg-slate-100">

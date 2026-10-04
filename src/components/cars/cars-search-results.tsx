@@ -874,9 +874,12 @@ export function CarsSearchResults({
   pickupAddress,
   dropoffAddress,
   category = "",
+  country = "",
   emptyMessage,
   siteDiscountPercent = 0,
 }: {
+  /** ISO2 country scope when browsing a category without a pickup location. */
+  country?: string;
   cars: SearchResultCar[];
   categories?: SearchFilterCategory[];
   extrasCatalog?: SearchFilterExtra[];
@@ -1200,6 +1203,7 @@ export function CarsSearchResults({
           pickupAddress={pickupAddress}
           dropoffAddress={dropoffAddress}
           category={category}
+          country={country}
           filtersSlot={
             <button
               type="button"
