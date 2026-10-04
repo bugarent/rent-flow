@@ -418,7 +418,9 @@ export function PartnersManager({
       ? [{ value: "PENDING", label: t.pending }]
       : mode === "primary"
         ? [{ value: "PRIMARY", label: t.primary }]
-        : [
+        : mode === "catalog"
+          ? [{ value: "DIRECTORY", label: t.directory }]
+          : [
             { value: "COMPANY", label: t.company },
             { value: "PRIVATE", label: t.private },
             { value: "REJECTED", label: t.rejected },
@@ -434,7 +436,7 @@ export function PartnersManager({
       {mode === "directory" || filters.length > 1 ? (
       <div className="mb-4 flex flex-wrap gap-2">
         {filters.map((item) => {
-          const badge = filterBadges[item.value];
+          const badge = filterBadges[item.value] ?? { count: 0, pending: 0 };
           const hasPending = badge.pending > 0;
           const count = badge.count;
           return (
