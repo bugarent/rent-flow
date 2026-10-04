@@ -158,6 +158,7 @@ export type CheckoutCopy = {
   rentalRequirementsTitle: string;
   rentalRequirementsMinAge: string;
   rentalRequirementsMinExperience: string;
+  partnerLanguagesLabel: string;
   rentalRequirementsAgeValue: string;
   rentalRequirementsExperienceValue: string;
   bookingTermsModalTitle: string;
@@ -502,6 +503,7 @@ const enBase: CheckoutCopyBase = {
   rentalRequirementsTitle: "Rental requirements and conditions",
   rentalRequirementsMinAge: "Minimum age",
   rentalRequirementsMinExperience: "Minimum experience",
+  partnerLanguagesLabel: "Languages spoken by the rental company",
   rentalRequirementsAgeValue: "{n} years old",
   rentalRequirementsExperienceValue: "{n} years",
   bookingTermsModalTitle: "Terms and conditions",
@@ -784,6 +786,7 @@ const kaBase: CheckoutCopyBase = {
   rentalRequirementsTitle: "ქირავნობის მოთხოვნები და პირობები",
   rentalRequirementsMinAge: "მინიმალური ასაკი",
   rentalRequirementsMinExperience: "მინიმალური გამოცდილება",
+  partnerLanguagesLabel: "კომპანიის წარმომადგენელთან სასაუბრო ენები",
   rentalRequirementsAgeValue: "{n} წლის",
   rentalRequirementsExperienceValue: "{n} წელი",
   bookingTermsModalTitle: "წესები და პირობები",
@@ -1065,6 +1068,7 @@ const ruBase: CheckoutCopyBase = {
   rentalRequirementsTitle: "Требования и условия аренды",
   rentalRequirementsMinAge: "Минимальный возраст",
   rentalRequirementsMinExperience: "Минимальный стаж",
+  partnerLanguagesLabel: "Языки общения с представителем компании",
   rentalRequirementsAgeValue: "{n} лет",
   rentalRequirementsExperienceValue: "{n} года",
   bookingTermsModalTitle: "Правила и условия",
@@ -1347,6 +1351,7 @@ const frBase: CheckoutCopyBase = {
   rentalRequirementsTitle: "Exigences et conditions de location",
   rentalRequirementsMinAge: "Âge minimum",
   rentalRequirementsMinExperience: "Expérience minimum",
+  partnerLanguagesLabel: "Langues parlées par le loueur",
   rentalRequirementsAgeValue: "{n} ans",
   rentalRequirementsExperienceValue: "{n} ans",
   bookingTermsModalTitle: "Conditions générales",
@@ -1629,6 +1634,7 @@ const deBase: CheckoutCopyBase = {
   rentalRequirementsTitle: "Mietvoraussetzungen und -bedingungen",
   rentalRequirementsMinAge: "Mindestalter",
   rentalRequirementsMinExperience: "Mindesterfahrung",
+  partnerLanguagesLabel: "Sprachen des Vermieters",
   rentalRequirementsAgeValue: "{n} Jahre",
   rentalRequirementsExperienceValue: "{n} Jahre",
   bookingTermsModalTitle: "Bedingungen",
@@ -1910,6 +1916,7 @@ const plBase: CheckoutCopyBase = {
   rentalRequirementsTitle: "Wymagania i warunki najmu",
   rentalRequirementsMinAge: "Minimalny wiek",
   rentalRequirementsMinExperience: "Minimalne doświadczenie",
+  partnerLanguagesLabel: "Języki obsługi u wypożyczającego",
   rentalRequirementsAgeValue: "{n} lat",
   rentalRequirementsExperienceValue: "{n} lata",
   bookingTermsModalTitle: "Regulamin",
@@ -2188,6 +2195,7 @@ const arBase: CheckoutCopyBase = {
   rentalRequirementsTitle: "متطلبات وشروط التأجير",
   rentalRequirementsMinAge: "الحد الأدنى للعمر",
   rentalRequirementsMinExperience: "الحد الأدنى للخبرة",
+  partnerLanguagesLabel: "لغات التواصل مع شركة التأجير",
   rentalRequirementsAgeValue: "{n} سنة",
   rentalRequirementsExperienceValue: "{n} سنة",
   bookingTermsModalTitle: "الشروط والأحكام",

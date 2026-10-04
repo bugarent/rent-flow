@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Award, ChevronDown, Info, User } from "lucide-react";
+import { Award, ChevronDown, Info, Languages, User } from "lucide-react";
 import type { CheckoutCopy } from "@/lib/i18n/checkout-copy";
+import { isLocale, LOCALE_LABELS } from "@/lib/i18n/config";
 import { cn } from "@/lib/utils";
 import { RentalTermsList } from "@/components/cars/rental-terms-list";
 import type { RentalTermsItem } from "@/components/cars/rental-terms-list";
@@ -12,13 +13,24 @@ export function CheckoutRentalRequirements({
   minDriverAge,
   minLicenseYears,
   termsItems,
+  partnerLanguages = [],
 }: {
   copy: CheckoutCopy;
   minDriverAge: number;
   minLicenseYears: number;
   termsItems: RentalTermsItem[];
+  /** Locale codes the partner speaks with clients (personal-info setting). */
+  partnerLanguages?: string[];
 }) {
   const [open, setOpen] = useState(false);
+  const languageLabels = [
+    ...new Set(
+      partnerLanguages
+        .map((code) => String(code).trim().toLowerCase())
+        .filter(Boolean)
+        .map((code) => (isLocale(code) ? LOCALE_LABELS[code] : code.toUpperCase())),
+    ),
+  ];
   const age = Math.max(0, Math.floor(Number(minDriverAge) || 0));
   const experience = Math.max(0, Math.floor(Number(minLicenseYears) || 0));
 
@@ -67,6 +79,27 @@ export function CheckoutRentalRequirements({
           </div>
         </div>
       </div>
+
+      {languageLabels.length > 0 ? (
+        <div className="flex items-start gap-3 border-t border-slate-100 px-4 py-3.5">
+          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-sky-50 text-sky-700">
+            <Languages className="h-4 w-4" aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-slate-500">{copy.partnerLanguagesLabel}</p>
+            <ul className="mt-1.5 flex flex-wrap gap-1.5">
+              {languageLabels.map((label) => (
+                <li
+                  key={label}
+                  className="rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800"
+                >
+                  {label}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : null}
 
       {open && termsItems.length > 0 ? (
         <div className="border-t border-slate-200">

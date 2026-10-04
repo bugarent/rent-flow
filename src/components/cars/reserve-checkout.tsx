@@ -127,6 +127,7 @@ type CarPayload = {
   };
   rentPaymentMethods?: string[];
   contractUrl?: string;
+  partnerClientLanguages?: string[];
 };
 
 export function ReserveCheckout({
@@ -1194,6 +1195,7 @@ export function ReserveCheckout({
                 minDriverAge={Number(details?.minDriverAge ?? 18)}
                 minLicenseYears={Number(details?.minLicenseYears ?? 0)}
                 termsItems={rentalTermsItems}
+                partnerLanguages={car?.partnerClientLanguages}
               />
 
               <CheckoutInsurancePanel
