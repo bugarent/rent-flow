@@ -34,6 +34,7 @@ import {
   resolveCategorySlugForCar,
 } from "@/lib/server/category-mapping";
 import {
+  clearPublicCarCache,
   enrichPublicCarPayload,
   loadPublicCarPayload,
   PUBLIC_CAR_INCLUDE,
@@ -206,6 +207,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!partnerSession && !adminSession) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
+  clearPublicCarCache(id);
   let car: any = null;
   try {
     car = await prisma.car.findUnique({
@@ -681,6 +683,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
+  clearPublicCarCache(id);
 
   let car: { partner?: { userId?: string | null } | null; partnerId?: string } | null = null;
   try {

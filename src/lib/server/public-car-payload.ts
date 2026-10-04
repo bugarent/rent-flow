@@ -201,8 +201,16 @@ export async function shapeFileCarForApi(
   };
 }
 
-const PUBLIC_TTL_MS = 30_000;
+const PUBLIC_TTL_MS = 15_000;
 const publicCache = new Map<string, { at: number; value: Promise<Record<string, unknown> | null> }>();
+
+/** Drop cached public payloads for a car (all date ranges) after it is edited or deleted. */
+export function clearPublicCarCache(carId: string) {
+  const prefix = `${carId}|`;
+  for (const key of publicCache.keys()) {
+    if (key.startsWith(prefix)) publicCache.delete(key);
+  }
+}
 
 async function buildPublicCarPayload(
   id: string,

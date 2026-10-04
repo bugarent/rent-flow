@@ -130,6 +130,13 @@ type CarPayload = {
   contractUrl?: string;
 };
 
+/** Must match the key built by `app/cars/[id]/page.tsx` (date part only; search links carry `T10:00`). */
+function carRangeKey(startDate: string, endDate: string) {
+  const start = String(startDate || "").slice(0, 10);
+  const end = String(endDate || "").slice(0, 10) || start;
+  return `${start}|${end}`;
+}
+
 function deriveCarState(payload: CarPayload, prevQty: Record<string, number>) {
   const paid = listPaidExtras(payload);
   const insurance = listInsuranceExtras(payload);
@@ -200,7 +207,7 @@ export function ReserveCheckout({
   const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [carLoading, setCarLoading] = useState(
-    () => !(initialCar && initialRange === `${initialStart}|${initialEnd || initialStart}`),
+    () => !(initialCar && initialRange === carRangeKey(initialStart, initialEnd)),
   );
   const [checkoutStep, setCheckoutStep] = useState<"details" | "payment">("details");
   const [guestNoticeOpen, setGuestNoticeOpen] = useState(false);
@@ -234,7 +241,7 @@ export function ReserveCheckout({
   }, [loadPreviewBookingRef]);
 
   const [seed] = useState(() =>
-    initialCar && initialRange === `${initialStart}|${initialEnd || initialStart}`
+    initialCar && initialRange === carRangeKey(initialStart, initialEnd)
       ? deriveCarState(initialCar as unknown as CarPayload, {})
       : null,
   );
