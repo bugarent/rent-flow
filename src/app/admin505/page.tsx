@@ -22,6 +22,11 @@ import { FooterContactManager } from "@/components/admin/footer-contact-manager"
 import { LegalPagesManager } from "@/components/admin/legal-pages-manager";
 import { CustomBookingChannelsManager } from "@/components/admin/custom-booking-channels-manager";
 import { TelegramLiveBotsManager } from "@/components/admin/telegram-live-bots-manager";
+import { LiveChatTelegramBotManager } from "@/components/admin/live-chat-telegram-bot-manager";
+import {
+  getLiveChatTelegramBot,
+  liveChatBotForAdminUi,
+} from "@/lib/server/live-chat-telegram-bot-store";
 import { HomepageSearchCountries } from "@/components/admin/homepage-search-countries";
 import { AdminPageHeading, AdminSearchCountriesHeading } from "@/components/admin/admin-page-heading";
 
@@ -40,6 +45,7 @@ export default async function AdminOperationsHomePage() {
     googleReviews,
     bookingChannels,
     telegramLiveBots,
+    liveChatBot,
     footerContact,
     legalPages,
     searchLocations,
@@ -51,6 +57,7 @@ export default async function AdminOperationsHomePage() {
     getHomepageGoogleReviewsConfig(),
     getCustomBookingChannelsConfig(),
     getTelegramLiveBotsConfig().then(botsForAdminUi),
+    getLiveChatTelegramBot().then(liveChatBotForAdminUi),
     getFooterContactConfig(),
     getLegalPagesConfig(),
     listDeliveryLocations(),
@@ -61,8 +68,9 @@ export default async function AdminOperationsHomePage() {
       <AdminPageHeading page="homepage" />
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <div className="min-w-0">
+        <div className="min-w-0 space-y-3">
           <TelegramLiveBotsManager initial={telegramLiveBots} />
+          <LiveChatTelegramBotManager initial={liveChatBot} />
         </div>
         <div className="min-w-0">
           <HomepageGoogleReviewsManager initial={googleReviews} />

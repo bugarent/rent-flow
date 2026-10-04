@@ -45,7 +45,17 @@ function activeConfirm(locale: string): string {
 }
 
 async function notifyLiveChatTelegram(text: string): Promise<boolean> {
-  // The homepage bot is reserved for booking notices. Live chat uses the platform admin chat.
+  const { getActiveLiveChatTelegramBot } = await import(
+    "@/lib/server/live-chat-telegram-bot-store"
+  );
+  const liveBot = await getActiveLiveChatTelegramBot();
+  if (liveBot) {
+    const r = await sendTelegramMessageWithToken(liveBot.botToken, liveBot.chatId, text);
+    if (r.ok) return true;
+    console.warn("[live-chat] dedicated bot send failed", r.error);
+  }
+
+  // Without a dedicated live-chat bot, use the platform admin chat (booking bot stays separate).
   const { sent } = await notifyAdminTelegram(text);
   if (sent > 0) return true;
 
