@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Pencil, Plus, X } from "lucide-react";
+import { ArrowLeft, Lock, Pencil, Plus, X } from "lucide-react";
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
 import {
   capPartnerMaxPeriod,
@@ -122,6 +122,9 @@ function uiCopy(locale: string) {
       adminNoCap: "ზღვარი არ არის",
       mandatoryFree: "უფასო · სავალდებულო შეთავაზება",
       mandatoryPriced: "სავალდებულო შეთავაზება",
+      mandatoryBadge: "სავალდებულო",
+      setPrice: "ფასის დაწესება",
+      mandatoryLockedTitle: "ადმინისტრატორმა სერვისი სავალდებულოდ მონიშნა — გამორთვა ან შეცვლა შეუძლებელია",
       mandatoryPricedHint:
         "ადმინის მიერ სავალდებულოა — სერვისი ყოველთვის ჩართულია. 0 = მომხმარებლისთვის უფასო, ან დააწესეთ ფასი ლიმიტამდე.",
     };
@@ -171,6 +174,9 @@ function uiCopy(locale: string) {
       adminNoCap: "лимита нет",
       mandatoryFree: "Бесплатно · обязательное предложение",
       mandatoryPriced: "Обязательное предложение",
+      mandatoryBadge: "Обязательно",
+      setPrice: "Указать цену",
+      mandatoryLockedTitle: "Администратор сделал услугу обязательной — отключить или изменить нельзя",
       mandatoryPricedHint:
         "Обязательно по решению админа — услуга всегда включена. 0 = бесплатно для клиента, или задайте цену до лимита.",
     };
@@ -219,6 +225,9 @@ function uiCopy(locale: string) {
     adminNoCap: "no limit",
     mandatoryFree: "Free · mandatory offer",
     mandatoryPriced: "Mandatory offer",
+    mandatoryBadge: "Mandatory",
+    setPrice: "Set price",
+    mandatoryLockedTitle: "The admin made this service mandatory — it cannot be turned off or changed",
     mandatoryPricedHint:
       "Mandatory by admin — this service is always on. 0 = free for the customer, or set a price up to the limit.",
   };
@@ -1085,7 +1094,11 @@ export function PartnerEquipmentServicePanel({
                           key={row.service.id}
                           className={cn(
                             "border-t border-slate-100",
-                            idx % 2 === 0 ? "bg-white" : "bg-[#fafbfd]",
+                            mandatoryAny
+                              ? "border-l-4 border-l-emerald-500 bg-emerald-50"
+                              : idx % 2 === 0
+                                ? "bg-white"
+                                : "bg-[#fafbfd]",
                           )}
                         >
                           <td className="px-3 py-3 align-top">
@@ -1153,14 +1166,36 @@ export function PartnerEquipmentServicePanel({
                             )}
                           </td>
                           <td className="px-3 py-3 align-top text-right">
-                            <button
-                              type="button"
-                              onClick={() => setEditingId(row.service.id)}
-                              className="inline-flex items-center gap-1 text-sm font-bold text-[#1d6fe8] hover:underline"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                              {t.edit}
-                            </button>
+                            {mandatoryAny ? (
+                              <div className="flex flex-col items-end gap-1.5">
+                                <span
+                                  title={t.mandatoryLockedTitle}
+                                  className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-extrabold text-white"
+                                >
+                                  <Lock className="h-3.5 w-3.5" />
+                                  {t.mandatoryBadge}
+                                </span>
+                                {!mandatory ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingId(row.service.id)}
+                                    className="inline-flex items-center gap-1 text-xs font-bold text-[#1d6fe8] hover:underline"
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                    {t.setPrice}
+                                  </button>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setEditingId(row.service.id)}
+                                className="inline-flex items-center gap-1 text-sm font-bold text-[#1d6fe8] hover:underline"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                {t.edit}
+                              </button>
+                            )}
                           </td>
                         </tr>
                       );
@@ -1220,7 +1255,10 @@ export function PartnerEquipmentServicePanel({
                     const carsLabel = carSummary(row.carIds, cars, t.carsCount);
                     const colon = carsLabel.indexOf(":");
                     return (
-                      <MobileDataCard key={row.service.id}>
+                      <MobileDataCard
+                        key={row.service.id}
+                        className={mandatoryAny ? "border-l-4 border-l-emerald-500 bg-emerald-50" : undefined}
+                      >
                         <MobileDataRow label={t.colService}>
                           <div className="text-end">
                             <p className="font-bold text-[#0b1f4b]">{knownText(locale, row.service.name)}</p>
@@ -1295,15 +1333,26 @@ export function PartnerEquipmentServicePanel({
                             )}
                           </span>
                         </MobileDataRow>
-                        <div className="pt-2">
-                          <button
-                            type="button"
-                            onClick={() => setEditingId(row.service.id)}
-                            className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-md border border-[#1d6fe8]/30 bg-[#1d6fe8]/5 px-3 text-sm font-bold text-[#1d6fe8]"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                            {t.edit}
-                          </button>
+                        <div className="flex flex-col gap-2 pt-2">
+                          {mandatoryAny ? (
+                            <span
+                              title={t.mandatoryLockedTitle}
+                              className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-3 text-sm font-extrabold text-white"
+                            >
+                              <Lock className="h-4 w-4" />
+                              {t.mandatoryBadge}
+                            </span>
+                          ) : null}
+                          {!mandatoryAny || !mandatory ? (
+                            <button
+                              type="button"
+                              onClick={() => setEditingId(row.service.id)}
+                              className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-md border border-[#1d6fe8]/30 bg-[#1d6fe8]/5 px-3 text-sm font-bold text-[#1d6fe8]"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              {mandatoryAny ? t.setPrice : t.edit}
+                            </button>
+                          ) : null}
                         </div>
                       </MobileDataCard>
                     );
