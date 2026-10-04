@@ -1903,12 +1903,13 @@ function CarResultCard({
           </div>
         )}
 
+        {siteDiscountPercent > 0 ? (
+          <span className="absolute left-0 top-3 z-[5] max-w-[85%] truncate rounded-r-md bg-orange-500 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white shadow-md">
+            {copy.siteDiscount.replace("{n}", String(siteDiscountPercent))}
+          </span>
+        ) : null}
+
         <div className="absolute bottom-3 right-0 z-[5] flex flex-col items-end gap-1.5">
-          {siteDiscountPercent > 0 ? (
-            <span className="origin-bottom-right -rotate-6 rounded-sm bg-orange-500 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-md">
-              {copy.siteDiscount.replace("{n}", String(siteDiscountPercent))}
-            </span>
-          ) : null}
           {noDeposit ? (
             <span className="origin-bottom-right -rotate-6 rounded-sm bg-[#39ff14] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-black shadow-md">
               {copy.noDeposit}
