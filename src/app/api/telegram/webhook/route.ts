@@ -27,11 +27,19 @@ function webhookSecretOk(req: Request): boolean {
   return got === expected;
 }
 
+type PartnerDashboardBindResult =
+  | { ok: true; locale: ReturnType<typeof resolveTelegramLocale> }
+  | {
+      ok: false;
+      reason: "UNKNOWN" | "DB_OFFLINE";
+      locale: ReturnType<typeof resolveTelegramLocale>;
+    };
+
 async function bindPartnerDashboard(input: {
   partnerId: string;
   chatId: string | number;
   username?: string | null;
-}) {
+}): Promise<PartnerDashboardBindResult> {
   const pending = await consumePartnerTelegramBindPending(input.partnerId);
   const locale = resolveTelegramLocale(pending?.locale);
   const local = loadLocalPartner();
