@@ -5,10 +5,11 @@ import dynamic from "next/dynamic";
 import { MessageCircle, X } from "lucide-react";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { subscribeLiveChatWidget } from "@/components/live-chat/live-chat-widget-bus";
+import { RouteLoadingSpinner } from "@/components/layout/route-loading-spinner";
 
 const LiveChatPanel = dynamic(
   () => import("@/components/live-chat/live-chat-panel").then((m) => m.LiveChatPanel),
-  { ssr: false },
+  { ssr: false, loading: () => <RouteLoadingSpinner /> },
 );
 
 export function FloatingOnlineChat({

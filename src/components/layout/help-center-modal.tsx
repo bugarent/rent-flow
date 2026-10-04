@@ -6,17 +6,18 @@ import Link from "next/link";
 import { CalendarDays, FileText, MessageCircle, X } from "lucide-react";
 import { SUPPORT_EMAIL } from "@/lib/brand";
 import { usePreferences } from "@/components/providers/preferences-context";
+import { RouteLoadingSpinner } from "@/components/layout/route-loading-spinner";
 
 const ManageBookingModal = dynamic(
   () =>
     import("@/components/layout/manage-booking-modal").then((m) => m.ManageBookingModal),
-  { ssr: false },
+  { ssr: false, loading: () => <RouteLoadingSpinner /> },
 );
 
 const ContactOptionsModal = dynamic(
   () =>
     import("@/components/contact/contact-options-modal").then((m) => m.ContactOptionsModal),
-  { ssr: false },
+  { ssr: false, loading: () => <RouteLoadingSpinner /> },
 );
 
 export function HelpCenterModal({

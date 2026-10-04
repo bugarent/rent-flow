@@ -3,11 +3,12 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { usePreferences } from "@/components/providers/preferences-context";
+import { RouteLoadingSpinner } from "@/components/layout/route-loading-spinner";
 
 const ContactOptionsModal = dynamic(
   () =>
     import("@/components/contact/contact-options-modal").then((m) => m.ContactOptionsModal),
-  { ssr: false },
+  { ssr: false, loading: () => <RouteLoadingSpinner /> },
 );
 
 export function ContactCta({

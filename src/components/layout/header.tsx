@@ -11,11 +11,12 @@ import { BrandLogo } from "@/components/brand/brand-logo";
 import { CurrencySelect, LanguageSelect, headerChipClass } from "@/components/layout/header-selects";
 import { getBusinessPartnershipCopy } from "@/lib/i18n/business-partnership-copy";
 import { BUSINESS_PARTNER_LOGIN } from "@/lib/routes";
+import { RouteLoadingSpinner } from "@/components/layout/route-loading-spinner";
 
 const ManageBookingModal = dynamic(
   () =>
     import("@/components/layout/manage-booking-modal").then((m) => m.ManageBookingModal),
-  { ssr: false },
+  { ssr: false, loading: () => <RouteLoadingSpinner /> },
 );
 
 const navLinkClass = `${headerChipClass} whitespace-nowrap`;

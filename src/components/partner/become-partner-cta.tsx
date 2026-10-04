@@ -3,11 +3,12 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { useSurfaceDictionary } from "@/components/providers/use-surface-dictionary";
+import { RouteLoadingSpinner } from "@/components/layout/route-loading-spinner";
 
 const BecomePartnerModal = dynamic(
   () =>
     import("@/components/partner/become-partner-modal").then((m) => m.BecomePartnerModal),
-  { ssr: false },
+  { ssr: false, loading: () => <RouteLoadingSpinner /> },
 );
 
 export function BecomePartnerCta({
