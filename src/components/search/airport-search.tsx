@@ -318,7 +318,16 @@ export type LocationChoice = {
   kind?: "airport" | "city" | "special";
   countryIso2?: string;
   country?: string;
+  /** Lower ranks list first within their group (popular airports); unranked sort by label. */
+  rank?: number;
 };
+
+function compareLocationChoices(a: LocationChoice, b: LocationChoice) {
+  const ar = a.rank ?? Number.POSITIVE_INFINITY;
+  const br = b.rank ?? Number.POSITIVE_INFINITY;
+  if (ar !== br) return ar - br;
+  return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
+}
 
 function locationMatchesQuery(option: LocationChoice, query: string) {
   const q = query.trim().toLowerCase();
@@ -387,12 +396,8 @@ function groupLocationsByCountry(options: LocationChoice[]): {
 
   const countries = countryOrder.map((iso2) => {
     const group = byIso.get(iso2)!;
-    group.airports.sort((a, b) =>
-      a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
-    );
-    group.cities.sort((a, b) =>
-      a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
-    );
+    group.airports.sort(compareLocationChoices);
+    group.cities.sort(compareLocationChoices);
     return group;
   });
   return { special, countries, ungrouped };
@@ -660,12 +665,23 @@ export function AirportSearch({
   options,
   onPickupChange,
   customBookingChannels,
+  popularIatas = [],
 }: {
   options: SearchAirportOption[];
   onPickupChange?: (pickupIata: string) => void;
   customBookingChannels?: CustomBookingChannelsConfig;
+  /** Homepage popular airports order — these list first in the selected country. */
+  popularIatas?: string[];
 }) {
   const router = useRouter();
+  const popularKey = popularIatas.map((code) => code.trim().toUpperCase()).join(",");
+  const popularRank = useMemo(() => {
+    const map = new Map<string, number>();
+    popularKey.split(",").forEach((code, index) => {
+      if (code && !map.has(code)) map.set(code, index);
+    });
+    return map;
+  }, [popularKey]);
   const { dictionary, locale } = usePreferences();
   const countries = useMemo(() => countriesFromOptions(options, locale), [options, locale]);
   const locked = countries.length <= 1;
@@ -678,13 +694,18 @@ export function AirportSearch({
     const filtered = preferred
       ? options.filter((o) => o.countryIso2?.toUpperCase() === preferred)
       : options;
+    const rankOf = (o: SearchAirportOption) =>
+      popularRank.get(String(o.iata || "").toUpperCase()) ?? Number.POSITIVE_INFINITY;
     return [...filtered].sort((a, b) => {
       const aCity = a.kind === "city" || isCityLocationCode(a.iata) ? 1 : 0;
       const bCity = b.kind === "city" || isCityLocationCode(b.iata) ? 1 : 0;
       if (aCity !== bCity) return aCity - bCity;
+      const ar = rankOf(a);
+      const br = rankOf(b);
+      if (ar !== br) return ar - br;
       return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
     });
-  }, [options, countryIso2]);
+  }, [options, countryIso2, popularRank]);
 
   const [pickup, setPickup] = useState("");
   const [dropoff, setDropoff] = useState(SAME_AS_PICKUP);
@@ -759,9 +780,10 @@ export function AirportSearch({
             : undefined,
       countryIso2: o.countryIso2,
       country: regionName(locale, o.countryIso2, o.country || worldCountryName(o.countryIso2)),
+      rank: isCityLocationCode(o.iata) ? undefined : popularRank.get(String(o.iata || "").toUpperCase()),
     });
     return locations.map(mapOption);
-  }, [locations, locale]);
+  }, [locations, locale, popularRank]);
   const dropoffChoices = useMemo<LocationChoice[]>(
     () => [
       { value: SAME_AS_PICKUP, label: dictionary.home.sameAsPickup, kind: "special" },

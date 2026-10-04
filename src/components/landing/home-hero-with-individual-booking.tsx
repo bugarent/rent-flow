@@ -7,9 +7,13 @@ import type { CustomBookingChannelsConfig } from "@/lib/catalog/custom-booking-c
 export function HomeHeroWithIndividualBooking({
   airports,
   channels,
+  popularIatas,
 }: {
   airports: SearchAirportOption[];
   channels: CustomBookingChannelsConfig;
+  popularIatas?: string[];
 }) {
-  return <AirportHero airports={airports} customBookingChannels={channels} />;
+  return (
+    <AirportHero airports={airports} customBookingChannels={channels} popularIatas={popularIatas} />
+  );
 }

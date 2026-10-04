@@ -8,10 +8,12 @@ export function AirportHero({
   airports,
   onPickupChange,
   customBookingChannels,
+  popularIatas,
 }: {
   airports: SearchAirportOption[];
   onPickupChange?: (pickupIata: string) => void;
   customBookingChannels?: CustomBookingChannelsConfig;
+  popularIatas?: string[];
 }) {
   return (
     <section className="relative isolate w-full overflow-x-clip">
@@ -28,6 +30,7 @@ export function AirportHero({
             options={airports}
             onPickupChange={onPickupChange}
             customBookingChannels={customBookingChannels}
+            popularIatas={popularIatas}
           />
         </div>
       </div>

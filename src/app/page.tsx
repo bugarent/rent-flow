@@ -52,7 +52,11 @@ export default async function Home() {
 
   return (
     <div className="flex w-full min-w-0 flex-col overflow-x-clip">
-      <HomeHeroWithIndividualBooking airports={options} channels={bookingChannels} />
+      <HomeHeroWithIndividualBooking
+        airports={options}
+        channels={bookingChannels}
+        popularIatas={popularAirports.map((a) => a.iata)}
+      />
       <CategorySlider categories={categories} />
       <HowItWorksPanel content={infoContent} />
       <PopularAirports
