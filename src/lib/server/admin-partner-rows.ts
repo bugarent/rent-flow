@@ -3,6 +3,7 @@ import { partnerDisplayName, partnerStatusLabel, formatPartnerCode, parseIso2Lis
 import { worldCountryName } from "@/lib/catalog/world-countries";
 import { dbOfflineMessage, isDbOfflineError, shortPrismaError } from "@/lib/server/db-errors";
 import { listFilePartnerApplications } from "@/lib/server/partner-applications-store";
+import { listFileCarsForPartner } from "@/lib/server/partner-cars-store";
 
 export type AdminPartnerRow = {
   id: string;
@@ -64,12 +65,14 @@ export async function loadAdminPartnerRows(): Promise<{
   let initialPartners: AdminPartnerRow[] = [];
   let dbOffline = false;
   let queryError = "";
+  const dbCarRefs = new Map<string, { userId: string | null; carIds: string[] }>();
 
   reopenDbCircuit();
   try {
     const partners = await prisma.partner.findMany({
       include: {
         user: true,
+        cars: { select: { id: true } },
         _count: {
           select: {
             cars: true,
@@ -81,6 +84,9 @@ export async function loadAdminPartnerRows(): Promise<{
       orderBy: [{ sequentialNumber: "asc" }, { createdAt: "desc" }],
     });
 
+    for (const p of partners) {
+      dbCarRefs.set(p.id, { userId: p.userId, carIds: p.cars.map((c) => c.id) });
+    }
     initialPartners = partners.map((p) => {
       const unreadReapply = (p as { unreadReapplyCount?: number }).unreadReapplyCount ?? 0;
       const unreadForAdmin = needsAdminAction(p.status)
@@ -216,6 +222,23 @@ export async function loadAdminPartnerRows(): Promise<{
     }
   } catch (profileError) {
     console.warn("[admin/partners] profile moderation files", profileError);
+  }
+
+  try {
+    initialPartners = await Promise.all(
+      initialPartners.map(async (p) => {
+        const refs = dbCarRefs.get(p.id);
+        const fileCars = await listFileCarsForPartner({
+          partnerId: p.id,
+          userId: refs?.userId || undefined,
+          email: p.email,
+        });
+        const ids = new Set([...(refs?.carIds || []), ...fileCars.map((c) => c.id)]);
+        return { ...p, carCount: Math.max(p.carCount, ids.size) };
+      }),
+    );
+  } catch (carsError) {
+    console.warn("[admin/partners] file cars", carsError);
   }
 
   return { partners: initialPartners, dbOffline, queryError };

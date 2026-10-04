@@ -102,13 +102,8 @@ function tabBadge(list: PartnerRow[]) {
   return { count: list.length, pending };
 }
 
-function fleetDisplay(p: { fleetSize: number; carCount: number }) {
-  const declared = Number(p.fleetSize) || 0;
-  const listed = Number(p.carCount) || 0;
-  if (listed > 0 && declared > 0 && listed !== declared) {
-    return { primary: listed, declared: declared as number | null };
-  }
-  return { primary: listed || declared, declared: null as number | null };
+function fleetDisplay(p: { carCount: number }) {
+  return { primary: Number(p.carCount) || 0 };
 }
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
@@ -197,7 +192,7 @@ export function PartnersManager({
         nameCol: "სახელი",
         countryCol: "ქვეყანა",
         typeCol: "ტიპი",
-        fleetCol: "ფლოტის ზომა",
+        fleetCol: "განცხადებები",
         statusCol: "სტატუსი",
         actionsCol: "მოქმედებები",
         companyType: "კომპანია",
@@ -208,9 +203,7 @@ export function PartnersManager({
         listedCars: "განცხადებები / მანქანები",
         noCars: "მანქანის განცხადება ჯერ არ არის",
         fleetDeclared: "ფლოტის ზომა (განაცხადი)",
-        fleetListed: "ჩამონათვალში",
-        fleetInApplication: "განაცხადში",
-        empty: "ამ სიაში პარტნიორი არ არის.",
+        fleetListed: "ჩამონათვალში",        empty: "ამ სიაში პარტნიორი არ არის.",
         taxId: "კომპანიის საგადასახადო / საიდენტიფიკაციო ნომერი",
         personalId: "პირადი ნომერი",
         partnerCode: "პარტნიორის კოდი",
@@ -228,7 +221,7 @@ export function PartnersManager({
         nameCol: "Имя",
         countryCol: "Страна",
         typeCol: "Тип",
-        fleetCol: "Размер флота",
+        fleetCol: "Объявления",
         statusCol: "Статус",
         actionsCol: "Действия",
         companyType: "Компания",
@@ -239,9 +232,7 @@ export function PartnersManager({
         listedCars: "Объявления / автомобили",
         noCars: "Объявлений пока нет",
         fleetDeclared: "Размер флота (заявка)",
-        fleetListed: "В каталоге",
-        fleetInApplication: "в заявке",
-        empty: "В этом списке нет партнёров.",
+        fleetListed: "В каталоге",        empty: "В этом списке нет партнёров.",
         taxId: "Налоговый / идентификационный номер компании",
         personalId: "Личный номер",
         partnerCode: "Код партнёра",
@@ -258,7 +249,7 @@ export function PartnersManager({
       nameCol: "Name",
       countryCol: "Country",
       typeCol: "Type",
-      fleetCol: "Fleet size",
+      fleetCol: "Listings",
       statusCol: "Status",
       actionsCol: "Actions",
       companyType: "Company",
@@ -269,9 +260,7 @@ export function PartnersManager({
       listedCars: "Listings / cars",
       noCars: "No car listings yet",
       fleetDeclared: "Fleet size (application)",
-      fleetListed: "Listed",
-      fleetInApplication: "in application",
-      empty: "No partners in this list.",
+      fleetListed: "Listed",      empty: "No partners in this list.",
       taxId: "Company tax / identification number",
       personalId: "Personal identification number",
       partnerCode: "Partner code",
@@ -602,11 +591,6 @@ export function PartnersManager({
                           </td>
                           <td className={cn("whitespace-nowrap px-2 py-0.5 align-middle", attention > 0 && "font-semibold text-orange-950")}>
                             <span className="font-bold">{p.fleet.primary}</span>
-                            {p.fleet.declared != null ? (
-                              <span className="ml-1 text-[10px] font-medium text-slate-500">
-                                ({t.fleetInApplication}: {p.fleet.declared})
-                              </span>
-                            ) : null}
                           </td>
                           <td className="whitespace-nowrap px-2 py-0.5 align-middle">
                             <span
@@ -843,11 +827,6 @@ export function PartnersManager({
                   <MobileDataRow label={t.fleetCol}>
                     <div className={cn("text-end", attention > 0 && "font-semibold text-orange-950")}>
                       <span className="font-bold">{p.fleet.primary}</span>
-                      {p.fleet.declared != null ? (
-                        <p className="text-[11px] font-medium text-slate-500">
-                          {t.fleetInApplication}: {p.fleet.declared}
-                        </p>
-                      ) : null}
                     </div>
                   </MobileDataRow>
                   <MobileDataRow label={t.statusCol}>
