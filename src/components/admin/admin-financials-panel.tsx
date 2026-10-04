@@ -87,6 +87,7 @@ type FinancialRow = {
   carLabel: string;
   partnerName: string;
   partnerCode: string;
+  partnerKind?: "COMPANY" | "PRIVATE";
   countryIso2: string;
   countryLabel: string;
 };
@@ -184,6 +185,7 @@ export async function AdminFinancialsPanel({
         carLabel: fact.carLabel,
         partnerName: fact.partnerName,
         partnerCode: fact.partnerCode,
+        partnerKind: fact.partnerKind,
         countryIso2: fact.countryIso2,
         countryLabel: fact.countryLabel,
       }));
@@ -361,6 +363,7 @@ export async function AdminFinancialsPanel({
             carLabel: b.carLabel,
             partnerName: b.partnerName,
             partnerCode: b.partnerCode,
+            partnerKind: b.partnerKind,
             countryIso2: b.countryIso2,
             countryLabel: b.countryLabel,
           }))}

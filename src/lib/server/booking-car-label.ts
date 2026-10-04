@@ -15,6 +15,7 @@ export type ResolvedBookingCar = {
   label: string;
   imageUrl: string | null;
   partnerLabel: string;
+  partnerId?: string;
 };
 
 /** Public car name. Make and model win; the saved title covers a row that only has a title. */
@@ -47,6 +48,7 @@ export async function loadCarsByIds(ids: string[]): Promise<Map<string, Resolved
       label: carDisplayName(car),
       imageUrl: car.photos?.[0] || null,
       partnerLabel: car.partnerName || car.partnerEmail || car.partnerId || "",
+      partnerId: car.partnerId || undefined,
     });
   }
 
@@ -63,6 +65,7 @@ export async function loadCarsByIds(ids: string[]): Promise<Map<string, Resolved
         model: true,
         title: true,
         year: true,
+        partnerId: true,
         photos: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
         partner: { select: { companyName: true, email: true } },
       },
@@ -79,6 +82,7 @@ export async function loadCarsByIds(ids: string[]): Promise<Map<string, Resolved
         label,
         imageUrl: car.photos?.[0]?.url || prev?.imageUrl || null,
         partnerLabel: car.partner?.companyName || car.partner?.email || prev?.partnerLabel || "",
+        partnerId: car.partnerId || prev?.partnerId,
       });
     }
   } catch {

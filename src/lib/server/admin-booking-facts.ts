@@ -42,9 +42,37 @@ export type AdminBookingFact = {
   pickupTitle: string;
   partnerName: string;
   partnerCode: string;
+  /** Missing on facts retained before the field existed. */
+  partnerKind?: "COMPANY" | "PRIVATE";
   countryIso2: string;
   countryLabel: string;
 };
+
+function normalizeIso2(value: unknown): string {
+  const iso = String(value ?? "").trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(iso) && iso !== "XX" ? iso : "";
+}
+
+function firstIso2(list: unknown): string {
+  if (!Array.isArray(list)) return "";
+  for (const item of list) {
+    const iso = normalizeIso2(item);
+    if (iso) return iso;
+  }
+  return "";
+}
+
+function settingsCountry(raw: unknown): string {
+  if (!raw || typeof raw !== "object") return "";
+  const row = raw as { country?: unknown; deliveryCountryIso2s?: unknown };
+  return normalizeIso2(row.country) || firstIso2(row.deliveryCountryIso2s);
+}
+
+function countryFields(iso: string) {
+  return iso
+    ? { countryIso2: iso, countryLabel: worldCountryName(iso) || iso }
+    : { countryIso2: "XX", countryLabel: "Unknown" };
+}
 
 async function adminCarCategories(): Promise<ListingFilterCategory[]> {
   try {
@@ -114,7 +142,14 @@ export async function loadAdminBookingFacts(): Promise<AdminBookingFact[]> {
     const partners = partnerIds.length
       ? await prisma.partner.findMany({
           where: { id: { in: partnerIds } },
-          select: { id: true, companyName: true, sequentialNumber: true },
+          select: {
+            id: true,
+            companyName: true,
+            sequentialNumber: true,
+            kind: true,
+            operatingCountryIso2s: true,
+            companySettings: true,
+          },
         })
       : [];
     const partnerById = new Map(partners.map((partner) => [partner.id, partner]));
@@ -163,8 +198,12 @@ export async function loadAdminBookingFacts(): Promise<AdminBookingFact[]> {
         pickupTitle: airportTitle(iata, airportName),
         partnerName: partner?.companyName || "—",
         partnerCode: formatPartnerCode(partner?.sequentialNumber) ?? "",
-        countryIso2: "XX",
-        countryLabel: "Unknown",
+        partnerKind: partner?.kind,
+        ...countryFields(
+          settingsCountry(partner?.companySettings) ||
+            firstIso2(partner?.operatingCountryIso2s) ||
+            normalizeIso2(findSearchPlace(iata)?.countryIso2),
+        ),
       });
     }
   } catch (error) {
@@ -196,35 +235,92 @@ export async function loadAdminBookingFacts(): Promise<AdminBookingFact[]> {
       return row;
     }
 
+    const bareId = (id: string | null | undefined) =>
+      String(id || "").replace(/^file-partner-/, "").trim();
+    const dbPartnerIds = [
+      ...new Set(
+        fileBookings
+          .map((booking) =>
+            bareId(carById.get(booking.carId)?.partnerId || prismaCars.get(booking.carId)?.partnerId),
+          )
+          .filter((id) => id && id !== LOCAL_PARTNER_ID),
+      ),
+    ];
+    const dbPartnerById = new Map<
+      string,
+      {
+        companyName: string;
+        sequentialNumber: number | null;
+        kind: "COMPANY" | "PRIVATE";
+        operatingCountryIso2s: unknown;
+        companySettings: unknown;
+      }
+    >();
+    if (dbPartnerIds.length) {
+      try {
+        const { prisma } = await import("@/lib/prisma");
+        const rows = await prisma.partner.findMany({
+          where: { OR: [{ id: { in: dbPartnerIds } }, { userId: { in: dbPartnerIds } }] },
+          select: {
+            id: true,
+            userId: true,
+            companyName: true,
+            sequentialNumber: true,
+            kind: true,
+            operatingCountryIso2s: true,
+            companySettings: true,
+          },
+        });
+        for (const row of rows) {
+          dbPartnerById.set(row.id, row);
+          if (row.userId) dbPartnerById.set(row.userId, row);
+        }
+      } catch (error) {
+        if (!isDbOfflineError(error)) console.warn("[admin-booking-facts] file partners", error);
+      }
+    }
+
     for (const booking of fileBookings) {
       if (seen.has(booking.id)) continue;
       const car = carById.get(booking.carId);
       const prismaCar = car ? undefined : prismaCars.get(booking.carId);
       let partnerName = car?.partnerName || car?.partnerEmail || car?.partnerId || prismaCar?.partnerLabel || "—";
       let partnerCode = "";
+      let partnerKind: "COMPANY" | "PRIVATE" | undefined;
+      let partnerCountry = "";
+      const ownerId = bareId(car?.partnerId || prismaCar?.partnerId);
+      const dbPartner = ownerId ? dbPartnerById.get(ownerId) : undefined;
       const partnerIds = [
         car?.partnerId,
-        car?.partnerId?.startsWith("file-partner-")
-          ? car.partnerId.replace(/^file-partner-/, "")
-          : "",
-        LOCAL_PARTNER_ID,
+        ownerId,
+        dbPartner ? "" : LOCAL_PARTNER_ID,
       ].filter(Boolean) as string[];
       for (const partnerId of partnerIds) {
         const settings = await companySettings(partnerId);
         if (settings) {
           partnerName = settings.legalName || settings.title || partnerName;
+          partnerCountry = settingsCountry(settings);
           break;
         }
       }
-      if (local && (!car?.partnerId || String(car.partnerId).includes("local-partner"))) {
+      if (dbPartner) {
+        partnerName = dbPartner.companyName || partnerName;
+        partnerCode = formatPartnerCode(dbPartner.sequentialNumber) ?? "";
+        partnerKind = dbPartner.kind;
+        partnerCountry =
+          settingsCountry(dbPartner.companySettings) ||
+          firstIso2(dbPartner.operatingCountryIso2s) ||
+          partnerCountry;
+      } else if (local && (!ownerId || ownerId.includes("local-partner"))) {
         partnerName = local.companyName || partnerName;
         partnerCode = formatPartnerCode(local.sequentialNumber) ?? "";
+        partnerKind = "COMPANY";
       }
 
-      let countryIso2 = "XX";
-      let countryLabel = "Unknown";
+      let { countryIso2, countryLabel } = countryFields(partnerCountry);
       const details = parseCarDetails(car?.description);
-      const places = Array.isArray(details?.pickupPlaces) ? details.pickupPlaces : [];
+      const places =
+        countryIso2 === "XX" && Array.isArray(details?.pickupPlaces) ? details.pickupPlaces : [];
       for (const place of places) {
         if (!place || typeof place !== "object") continue;
         const row = place as { cityKey?: string; countryIso2?: string };
@@ -248,12 +344,17 @@ export async function loadAdminBookingFacts(): Promise<AdminBookingFact[]> {
           }
         }
       }
+      const iata = booking.pickupAirportIata || "";
+      if (countryIso2 === "XX") {
+        ({ countryIso2, countryLabel } = countryFields(
+          normalizeIso2(findSearchPlace(iata)?.countryIso2),
+        ));
+      }
       if (countryIso2 === "XX" && car?.description) {
         const label = countriesFromCarDescription(car.description);
         if (label && label !== "—") countryLabel = label;
       }
 
-      const iata = booking.pickupAirportIata || "";
       seen.add(booking.id);
       facts.push({
         id: booking.id,
@@ -275,6 +376,7 @@ export async function loadAdminBookingFacts(): Promise<AdminBookingFact[]> {
         pickupTitle: airportTitle(iata, booking.pickupAddress || ""),
         partnerName,
         partnerCode,
+        partnerKind,
         countryIso2,
         countryLabel,
       });

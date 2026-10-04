@@ -4,6 +4,7 @@ import { useState } from "react";
 import { formatBookingRef } from "@/lib/ids";
 import { toNumber } from "@/lib/utils";
 import { AdminMoneyText } from "@/components/admin/admin-money-text";
+import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import {
   ResponsiveDataList,
   MobileDataCard,
@@ -21,9 +22,44 @@ export type FinancialBookingRow = {
   carLabel: string;
   partnerName: string;
   partnerCode: string;
+  partnerKind?: "COMPANY" | "PRIVATE";
   countryIso2: string;
   countryLabel: string;
 };
+
+const PARTNER_KIND_LABELS = {
+  ka: { COMPANY: "კომპანია", PRIVATE: "კერძო" },
+  ru: { COMPANY: "Компания", PRIVATE: "Частное лицо" },
+  en: { COMPANY: "Company", PRIVATE: "Private" },
+} as const;
+
+function PartnerCell({ booking }: { booking: FinancialBookingRow }) {
+  const { locale } = useAdminLocale();
+  const labels = locale === "ka" ? PARTNER_KIND_LABELS.ka : locale === "ru" ? PARTNER_KIND_LABELS.ru : PARTNER_KIND_LABELS.en;
+  const kind = booking.partnerKind;
+  return (
+    <div>
+      <div className="font-medium text-slate-800">{booking.partnerName}</div>
+      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs">
+        {kind ? (
+          <span
+            className={
+              kind === "PRIVATE"
+                ? "rounded bg-violet-50 px-1.5 py-0.5 font-semibold text-violet-700"
+                : "rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-700"
+            }
+          >
+            {labels[kind]}
+          </span>
+        ) : null}
+        {booking.partnerCode ? (
+          <span className="font-semibold text-sky-700">{booking.partnerCode}</span>
+        ) : null}
+        {!kind && !booking.partnerCode ? <span className="text-slate-400">—</span> : null}
+      </div>
+    </div>
+  );
+}
 
 export function AdminFinancialsBookingsTable({
   bookings,
@@ -95,14 +131,7 @@ export function AdminFinancialsBookingsTable({
                       <td className="p-4">{booking.customerName}</td>
                       <td className="p-4">{booking.carLabel}</td>
                       <td className="p-4">
-                        <div className="font-medium text-slate-800">{booking.partnerName}</div>
-                        {booking.partnerCode ? (
-                          <span className="mt-0.5 block text-xs font-semibold text-sky-700">
-                            {booking.partnerCode}
-                          </span>
-                        ) : (
-                          <span className="mt-0.5 block text-xs text-slate-400">—</span>
-                        )}
+                        <PartnerCell booking={booking} />
                       </td>
                       <td className="p-4">
                         {booking.countryLabel} ({booking.countryIso2})
@@ -138,16 +167,7 @@ export function AdminFinancialsBookingsTable({
                   <MobileDataRow label="Customer">{booking.customerName}</MobileDataRow>
                   <MobileDataRow label="Car">{booking.carLabel}</MobileDataRow>
                   <MobileDataRow label="Partner">
-                    <div>
-                      <div className="font-medium text-slate-800">{booking.partnerName}</div>
-                      {booking.partnerCode ? (
-                        <span className="mt-0.5 block text-xs font-semibold text-sky-700">
-                          {booking.partnerCode}
-                        </span>
-                      ) : (
-                        <span className="mt-0.5 block text-xs text-slate-400">—</span>
-                      )}
-                    </div>
+                    <PartnerCell booking={booking} />
                   </MobileDataRow>
                   <MobileDataRow label="Country">
                     {booking.countryLabel} ({booking.countryIso2})
