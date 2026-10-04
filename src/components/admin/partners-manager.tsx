@@ -488,9 +488,9 @@ export function PartnersManager({
       ) : null}
 
       {(() => {
-        const showCountry = filter === "DIRECTORY";
+        const showCountry = filter === "DIRECTORY" || mode === "directory";
         const hideId = filter === "DIRECTORY";
-        const colCount = 6;
+        const colCount = 5 + (hideId ? 0 : 1) + (showCountry ? 1 : 0);
         return (
       <ResponsiveDataList
         desktop={
@@ -771,8 +771,13 @@ export function PartnersManager({
                         : "border-l-transparent",
                   )}
                 >
-                  <MobileDataRow label={showCountry ? t.countryCol : t.idCol}>
-                    {showCountry ? (
+                  {showCountry && !hideId ? (
+                    <MobileDataRow label={t.countryCol}>
+                      <div className="text-end font-semibold text-slate-800">{p.country || "—"}</div>
+                    </MobileDataRow>
+                  ) : null}
+                  <MobileDataRow label={hideId ? t.countryCol : t.idCol}>
+                    {hideId ? (
                       <div className="text-end font-semibold text-slate-800">{p.country || "—"}</div>
                     ) : (
                     <div className={cn("text-end font-mono font-bold", attention > 0 && "text-orange-950")}>

@@ -89,9 +89,6 @@ type Labels = {
   partnersTab: string;
   partnersTitle: string;
   partnersBody: string;
-  directoryTab: string;
-  directoryTitle: string;
-  directoryBody: string;
   primaryTab: string;
   primaryTitle: string;
   primaryBody: string;
@@ -130,7 +127,7 @@ type Props = {
   labels: Labels;
 };
 
-type TabId = "partners" | "directory" | "primary" | "listings" | "reviews" | "profiles";
+type TabId = "partners" | "primary" | "listings" | "reviews" | "profiles";
 
 const PRIMARY_STATUSES = new Set(["PENDING", "INVITED", "PENDING_FINAL", "NEEDS_CORRECTION"]);
 
@@ -177,7 +174,6 @@ export function ModerationHub({
     if (raw === "profiles") return "profiles";
     if (raw === "listings") return "listings";
     if (raw === "primary" || partnerTab === "primary") return "primary";
-    if (raw === "directory" || partnerTab === "directory") return "directory";
     return "partners";
   }, [searchParams]);
 
@@ -202,13 +198,8 @@ export function ModerationHub({
   const primaryPartners = partners.filter((p) => PRIMARY_STATUSES.has(p.status));
   const directoryPartners = partners.filter((p) => !PRIMARY_STATUSES.has(p.status));
 
-  const catalogPartners = partners.filter(
-    (p) => p.status === "APPROVED" || p.status === "SUSPENDED",
-  );
-
   const tabCounts = {
     partners: directoryPartners.length,
-    directory: catalogPartners.length,
     primary: primaryPartners.length,
     listings: visibleCars.length,
     profiles: profiles.length,
@@ -217,7 +208,6 @@ export function ModerationHub({
 
   const tabPending = {
     partners: directoryPartners.reduce((sum, p) => sum + partnerAttention(p), 0),
-    directory: catalogPartners.reduce((sum, p) => sum + partnerAttention(p), 0),
     primary: primaryPartners.reduce((sum, p) => sum + partnerAttention(p), 0),
     listings: visibleCars.length,
     profiles: profiles.length,
@@ -230,14 +220,13 @@ export function ModerationHub({
       <p className="mb-5 text-sm text-slate-600">{labels.body}</p>
 
       <div
-        className="mb-6 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm sm:grid-cols-3 lg:grid-cols-6"
+        className="mb-6 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm sm:grid-cols-3 lg:grid-cols-5"
         role="tablist"
         aria-label={labels.title}
       >
         {(
           [
             ["partners", labels.partnersTab],
-            ["directory", labels.directoryTab],
             ["primary", labels.primaryTab],
             ["listings", labels.listingsTab],
             ["profiles", labels.profilesTab],
@@ -302,14 +291,6 @@ export function ModerationHub({
           )}
 
           <PartnersManager initialPartners={partners} mode="directory" />
-        </section>
-      ) : null}
-
-      {tab === "directory" ? (
-        <section role="tabpanel" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <h2 className="text-lg font-extrabold text-[#0b1f4b]">{labels.directoryTitle}</h2>
-          <p className="mt-1 mb-4 text-sm text-slate-500">{labels.directoryBody}</p>
-          <PartnersManager initialPartners={partners} mode="catalog" />
         </section>
       ) : null}
 

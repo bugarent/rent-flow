@@ -407,9 +407,6 @@ export default async function AdminModerationPage() {
           partnersTab: "პარტნიორები",
           partnersTitle: t.pages.partners.title,
           partnersBody: t.pages.partners.body,
-          directoryTab: "დირექტორია",
-          directoryTitle: "დირექტორია",
-          directoryBody: "დამტკიცებული განაცხადები: სახელი, ქვეყანა, ტიპი, ფლოტი და სტატუსი.",
           primaryTab: "პირველადი მოდერაცია",
           primaryTitle: "პირველადი მოდერაცია",
           primaryBody: "ახალი პარტნიორის განაცხადები, რომლებიც პირველ გადამოწმებას ელოდება.",
@@ -423,16 +420,13 @@ export default async function AdminModerationPage() {
           openPartner: "განხილვის გახსნა",
           rejectProfile: "უარყოფა",
           moderationBody:
-            "აირჩიეთ ქვეფანჯარა: პარტნიორები, დირექტორია, პირველადი მოდერაცია, განცხადებები, პროფილები ან შეფასებები.",
+            "აირჩიეთ ქვეფანჯარა: პარტნიორები, პირველადი მოდერაცია, განცხადებები, პროფილები ან შეფასებები.",
         }
       : locale === "ru"
         ? {
             partnersTab: "Партнёры",
             partnersTitle: t.pages.partners.title,
             partnersBody: t.pages.partners.body,
-            directoryTab: "Каталог",
-            directoryTitle: "Каталог",
-            directoryBody: "Одобренные заявки: имя, страна, тип, флот и статус.",
             primaryTab: "Первичная модерация",
             primaryTitle: "Первичная модерация",
             primaryBody: "Новые заявки партнёров, которые ждут первой проверки.",
@@ -446,15 +440,12 @@ export default async function AdminModerationPage() {
             openPartner: "Открыть проверку",
             rejectProfile: "Отклонить",
             moderationBody:
-              "Выберите раздел: партнёры, каталог, первичная модерация, объявления, профили или отзывы.",
+              "Выберите раздел: партнёры, первичная модерация, объявления, профили или отзывы.",
           }
         : {
             partnersTab: "Partners",
             partnersTitle: t.pages.partners.title,
             partnersBody: t.pages.partners.body,
-            directoryTab: "Directory",
-            directoryTitle: "Directory",
-            directoryBody: "Approved applications: name, country, type, fleet, and status.",
             primaryTab: "Primary moderation",
             primaryTitle: "Primary moderation",
             primaryBody: "New partner applications waiting for a first review.",
@@ -468,7 +459,7 @@ export default async function AdminModerationPage() {
             openPartner: "Open review",
             rejectProfile: "Reject",
             moderationBody:
-              "Choose a section: partners, directory, primary moderation, car listings, profiles, or reviews.",
+              "Choose a section: partners, primary moderation, car listings, profiles, or reviews.",
           };
 
   return (
@@ -498,9 +489,6 @@ export default async function AdminModerationPage() {
           partnersTab: tabLabels.partnersTab,
           partnersTitle: tabLabels.partnersTitle,
           partnersBody: tabLabels.partnersBody,
-          directoryTab: tabLabels.directoryTab,
-          directoryTitle: tabLabels.directoryTitle,
-          directoryBody: tabLabels.directoryBody,
           primaryTab: tabLabels.primaryTab,
           primaryTitle: tabLabels.primaryTitle,
           primaryBody: tabLabels.primaryBody,

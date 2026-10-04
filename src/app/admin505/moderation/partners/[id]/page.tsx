@@ -24,9 +24,6 @@ export default async function AdminPartnerModerationReviewPage({
   } else if (returnTab === "primary") {
     backHref = `${ADMIN_BASE}/moderation?tab=primary`;
     backLabel = "← პირველადი მოდერაცია";
-  } else if (returnTab === "directory") {
-    backHref = `${ADMIN_BASE}/moderation?tab=directory`;
-    backLabel = "← დირექტორია";
   } else if (returnTab === "company") {
     backHref = `${ADMIN_BASE}/moderation?partnerTab=company`;
   } else if (returnTab === "private") {
