@@ -371,7 +371,11 @@ export async function loadAdminBookingFacts(): Promise<AdminBookingFact[]> {
         carModel: car?.model || prismaCar?.model || "",
         carTitle: car?.title || prismaCar?.title || "",
         carLabel: carDisplayName(car) || prismaCar?.label || "—",
-        categorySlug: car ? assignedCategorySlug(car, categories) : null,
+        categorySlug: car
+          ? assignedCategorySlug(car, categories)
+          : prismaCar
+            ? assignedCategorySlug(prismaCar, categories)
+            : null,
         pickupIata: iata,
         pickupTitle: airportTitle(iata, booking.pickupAddress || ""),
         partnerName,
