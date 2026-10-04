@@ -9,6 +9,7 @@ import { isCityLocationCode, parseCityLocationCode } from "@/lib/catalog/search-
 import { loadPublicFileSearchCars } from "@/lib/server/public-file-cars";
 import { parseCarDetails } from "@/lib/cars/car-details";
 import { listingDailyWithDeliveryEur, rentalDayCount } from "@/lib/cars/reserve-pricing";
+import { clampSiteDiscountPercent } from "@/lib/pricing/booking-discount";
 import {
   mergeListingDiscountPercent,
   periodDiscountPercentByCarId,
@@ -545,6 +546,15 @@ export default async function CarsPage({
     searchOptions = [];
   }
 
+  let siteDiscountPercent = 0;
+  try {
+    const { getPlatformSettings } = await import("@/lib/server/platform-settings-store");
+    const settings = await getPlatformSettings();
+    siteDiscountPercent = clampSiteDiscountPercent(settings.siteDiscountPercent, settings.depositPercent);
+  } catch {
+    siteDiscountPercent = 0;
+  }
+
   const emptyMessage = pickupIata
     ? dictionary.common.noCarsDelivery.replace("{airport}", pickupIata)
     : categoryName
@@ -566,6 +576,7 @@ export default async function CarsPage({
       dropoffAddress={dropoffAddress || ""}
       category={category || ""}
       emptyMessage={emptyMessage}
+      siteDiscountPercent={siteDiscountPercent}
     />
   );
 }

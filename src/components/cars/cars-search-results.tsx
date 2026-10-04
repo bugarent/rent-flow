@@ -153,6 +153,7 @@ const COPY: Record<
     luggageMedium: string;
     luggageLarge: string;
     lowDeposit: string;
+    siteDiscount: string;
     freeDelivery: string;
     unlimitedMileage: string;
     freeInsurance: string;
@@ -233,6 +234,7 @@ const COPY: Record<
     luggageMedium: "Medium",
     luggageLarge: "Large",
     lowDeposit: "Low deposit",
+    siteDiscount: "Site discount {n}%",
     freeDelivery: "Free delivery",
     unlimitedMileage: "Unlimited mileage",
     freeInsurance: "Free insurance",
@@ -312,6 +314,7 @@ const COPY: Record<
     luggageMedium: "საშუალო",
     luggageLarge: "დიდი",
     lowDeposit: "დაბალი დეპოზიტი",
+    siteDiscount: "საიტის ფასდაკლება {n}%",
     freeDelivery: "უფასო მიწოდება",
     unlimitedMileage: "ულიმიტო გარბენი",
     freeInsurance: "უფასო დაზღვევა",
@@ -391,6 +394,7 @@ const COPY: Record<
     luggageMedium: "Средний",
     luggageLarge: "Большой",
     lowDeposit: "Низкий депозит",
+    siteDiscount: "Скидка сайта {n}%",
     freeDelivery: "Бесплатная доставка",
     unlimitedMileage: "Пробег без ограничений",
     freeInsurance: "Бесплатная страховка",
@@ -470,6 +474,7 @@ const COPY: Record<
     luggageMedium: "Moyen",
     luggageLarge: "Grand",
     lowDeposit: "Caution faible",
+    siteDiscount: "Remise du site {n}%",
     freeDelivery: "Livraison gratuite",
     unlimitedMileage: "Kilométrage illimité",
     freeInsurance: "Assurance gratuite",
@@ -549,6 +554,7 @@ const COPY: Record<
     luggageMedium: "Mittel",
     luggageLarge: "Groß",
     lowDeposit: "Niedrige Kaution",
+    siteDiscount: "Website-Rabatt {n}%",
     freeDelivery: "Kostenlose Lieferung",
     unlimitedMileage: "Unbegrenzte Kilometer",
     freeInsurance: "Kostenlose Versicherung",
@@ -628,6 +634,7 @@ const COPY: Record<
     luggageMedium: "Średni",
     luggageLarge: "Duży",
     lowDeposit: "Niski depozyt",
+    siteDiscount: "Rabat serwisu {n}%",
     freeDelivery: "Bezpłatna dostawa",
     unlimitedMileage: "Bez limitu kilometrów",
     freeInsurance: "Bezpłatne ubezpieczenie",
@@ -707,6 +714,7 @@ const COPY: Record<
     luggageMedium: "متوسط",
     luggageLarge: "كبير",
     lowDeposit: "تأمين منخفض",
+    siteDiscount: "خصم الموقع {n}%",
     freeDelivery: "توصيل مجاني",
     unlimitedMileage: "كيلومترات غير محدودة",
     freeInsurance: "تأمين مجاني",
@@ -867,6 +875,7 @@ export function CarsSearchResults({
   dropoffAddress,
   category = "",
   emptyMessage,
+  siteDiscountPercent = 0,
 }: {
   cars: SearchResultCar[];
   categories?: SearchFilterCategory[];
@@ -881,9 +890,12 @@ export function CarsSearchResults({
   dropoffAddress: string;
   category?: string;
   emptyMessage: string;
+  /** Admin site discount %; the larger of this and the partner promo applies (no stacking). */
+  siteDiscountPercent?: number;
 }) {
   const { locale, formatPrice, dictionary } = usePreferences();
-  const { discountPercent: referralDiscountPercent } = useBusinessPartnerReferralDiscount();
+  const { discountPercent: bpReferralDiscountPercent } = useBusinessPartnerReferralDiscount();
+  const referralDiscountPercent = Math.max(bpReferralDiscountPercent, siteDiscountPercent);
   const c = t(locale);
   const days = rentalDayCount(startDate, endDate);
   const newCarsFromYear = newCarsMinYear();
@@ -1730,6 +1742,7 @@ export function CarsSearchResults({
               pickup={pickup}
               dropoff={dropoff || pickup}
               referralDiscountPercent={referralDiscountPercent}
+              siteDiscountPercent={siteDiscountPercent}
             />
           ))}
         </div>
@@ -1836,6 +1849,7 @@ function CarResultCard({
   pickup,
   dropoff,
   referralDiscountPercent = 0,
+  siteDiscountPercent = 0,
 }: {
   car: SearchResultCar;
   days: number;
@@ -1845,6 +1859,7 @@ function CarResultCard({
   pickup: string;
   dropoff: string;
   referralDiscountPercent?: number;
+  siteDiscountPercent?: number;
 }) {
   const [photoIndex, setPhotoIndex] = useState(0);
   const photos = Array.isArray(car.photos) ? car.photos.filter(Boolean) : [];
@@ -1889,6 +1904,11 @@ function CarResultCard({
         )}
 
         <div className="absolute bottom-3 right-0 z-[5] flex flex-col items-end gap-1.5">
+          {siteDiscountPercent > 0 ? (
+            <span className="origin-bottom-right -rotate-6 rounded-sm bg-orange-500 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-md">
+              {copy.siteDiscount.replace("{n}", String(siteDiscountPercent))}
+            </span>
+          ) : null}
           {noDeposit ? (
             <span className="origin-bottom-right -rotate-6 rounded-sm bg-[#39ff14] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-black shadow-md">
               {copy.noDeposit}

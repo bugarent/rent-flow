@@ -37,6 +37,8 @@ export type BookingInfoDetailPayload = {
   balanceDueEur: number;
   /** Business-partner promo / referral code when the booking used −5%. */
   promoCode?: string;
+  /** Admin site discount % charged at checkout (replaces the BP −5% when set). */
+  siteDiscountPercent?: number;
   /** Confirmed business-partner code (link, QR, or typed) for admin display. */
   businessPartnerCode?: string;
   guestFirstName: string;

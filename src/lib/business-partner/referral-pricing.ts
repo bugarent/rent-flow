@@ -1,9 +1,15 @@
 import { settleBookingMoney, type SettledBookingMoney } from "@/lib/bookings/booking-money";
 import { centsToMoney, moneyToCents, roundMoney } from "@/lib/cars/reserve-pricing";
 import { CARD_PICKUP_SURCHARGE_PERCENT } from "@/lib/cars/reserve-pricing";
+import { BP_PROMO_DISCOUNT_PERCENT, type BookingDiscount } from "@/lib/pricing/booking-discount";
 
 /** Customer discount on rental + extras (not delivery / return fees). */
-export const BP_CUSTOMER_DISCOUNT_PERCENT = 5;
+export const BP_CUSTOMER_DISCOUNT_PERCENT = BP_PROMO_DISCOUNT_PERCENT;
+
+const BP_DISCOUNT: BookingDiscount = {
+  percent: BP_CUSTOMER_DISCOUNT_PERCENT,
+  cardOnDiscountedFee: false,
+};
 /** Nominal site service share of commissionable (rental + extras). */
 export const BP_SITE_SERVICE_PERCENT = 20;
 /** Site share after funding the customer discount (20% − 5%). */
@@ -25,9 +31,13 @@ export type BusinessPartnerReferralSplit = {
   siteKeptEur: number;
 };
 
-export function applyBusinessPartnerCustomerDiscount(amountEur: number): number {
+export function applyBusinessPartnerCustomerDiscount(
+  amountEur: number,
+  percent: number = BP_CUSTOMER_DISCOUNT_PERCENT,
+): number {
   const base = Math.max(0, Number(amountEur) || 0);
-  return roundMoney(base * (1 - BP_CUSTOMER_DISCOUNT_PERCENT / 100));
+  const pct = Math.min(100, Math.max(0, Number(percent) || 0));
+  return roundMoney(base * (1 - pct / 100));
 }
 
 /** True when this booking was charged with a business-partner promo code. */
@@ -44,6 +54,7 @@ export function reconstructBpPreDiscountRental(input: {
   depositPaidEur: number;
   extrasEur: number;
   deliveryEur: number;
+  discountPercent?: number;
 }): number {
   const depositPaid = roundMoney(Math.max(0, Number(input.depositPaidEur) || 0));
   const depositBase = roundMoney(depositPaid / (1 + CARD_PICKUP_SURCHARGE_PERCENT / 100));
@@ -52,7 +63,7 @@ export function reconstructBpPreDiscountRental(input: {
   const extras = roundMoney(Math.max(0, Number(input.extrasEur) || 0));
   const tripWithoutCard = roundMoney(Math.max(0, (Number(input.totalPriceEur) || 0) - card));
   const discountedCommissionable = roundMoney(Math.max(0, tripWithoutCard - delivery));
-  const factor = 1 - BP_CUSTOMER_DISCOUNT_PERCENT / 100;
+  const factor = 1 - (input.discountPercent ?? BP_CUSTOMER_DISCOUNT_PERCENT) / 100;
   if (factor <= 0) return 0;
   const preCommissionable = roundMoney(discountedCommissionable / factor);
   return roundMoney(Math.max(0, preCommissionable - extras));
@@ -108,6 +119,8 @@ export function settleBusinessPartnerBookingMoney(input: {
   depositPercent?: number;
   /** Override partner share of site’s 15% (volume tier). */
   partnerOfSitePercent?: number;
+  /** Defaults to the BP promo (5%, card on the pre-discount fee). */
+  discount?: BookingDiscount;
 }): SettledBookingMoney & {
   split: BusinessPartnerReferralSplit;
   /** Undiscounted settlement (for strikethrough UI). */
@@ -128,8 +141,9 @@ export function settleBusinessPartnerBookingMoney(input: {
     depositPercent: input.depositPercent,
   });
 
-  const rental = moneyToCents(applyBusinessPartnerCustomerDiscount(rentalPre));
-  const extras = moneyToCents(applyBusinessPartnerCustomerDiscount(extrasPre));
+  const discount = input.discount ?? BP_DISCOUNT;
+  const rental = moneyToCents(applyBusinessPartnerCustomerDiscount(rentalPre, discount.percent));
+  const extras = moneyToCents(applyBusinessPartnerCustomerDiscount(extrasPre, discount.percent));
   // Delivery / return location fees are never discounted.
   const deliveryCents = moneyToCents(delivery);
   const trip = rental + extras + deliveryCents;
@@ -140,8 +154,10 @@ export function settleBusinessPartnerBookingMoney(input: {
   // cannot break the trip invariant when delivery is small.
   const onSite = Math.min(onSiteRaw, trip);
   const site = Math.max(0, trip - onSite);
-  // Card +3% is calculated on the original (pre-discount) site fee — discount does not apply.
-  const card = moneyToCents(beforeDiscount.cardSurchargeEur);
+  // BP promo: card +3% stays on the original (pre-discount) site fee. Site discount: card follows the reduced fee.
+  const card = discount.cardOnDiscountedFee
+    ? Math.round((site * CARD_PICKUP_SURCHARGE_PERCENT) / 100)
+    : moneyToCents(beforeDiscount.cardSurchargeEur);
   const online = site + card;
   const charged = trip + card;
 
@@ -178,6 +194,7 @@ export function computeBpProjectedTripSettlement(input: {
   depositPaidEur: number;
   balanceDueEur?: number;
   depositPercent?: number;
+  discount?: BookingDiscount;
 }): {
   depositPercent: number;
   projectedComponents: number;
@@ -200,12 +217,14 @@ export function computeBpProjectedTripSettlement(input: {
     extrasEur: input.originalExtrasEur,
     deliveryEur: input.originalDeliveryEur,
     depositPercent: input.depositPercent,
+    discount: input.discount,
   });
   const projected = settleBusinessPartnerBookingMoney({
     rentalEur: input.projectedRentalEur,
     extrasEur: input.projectedExtrasEur,
     deliveryEur: input.projectedDeliveryEur,
     depositPercent: input.depositPercent,
+    discount: input.discount,
   });
 
   const surchargeRate = CARD_PICKUP_SURCHARGE_PERCENT / 100;
@@ -262,12 +281,14 @@ export function bpCancelSiteFeeEur(input: {
   extrasEur: number;
   deliveryEur: number;
   depositPercent?: number;
+  discount?: BookingDiscount;
 }): number {
   return settleBusinessPartnerBookingMoney({
     rentalEur: input.rentalEur,
     extrasEur: input.extrasEur,
     deliveryEur: input.deliveryEur,
     depositPercent: input.depositPercent,
+    discount: input.discount,
   }).siteFeeEur;
 }
 

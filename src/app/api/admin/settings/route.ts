@@ -7,8 +7,10 @@ import { savePlatformSettings } from "@/lib/server/platform-settings-store";
 
 const allowedIso2 = new Set(europeAndAsiaCountries().map((c) => c.iso2));
 
-const schema = z.object({
+const schema = z
+  .object({
   depositPercent: z.number().int().min(DEPOSIT_MIN_PERCENT).max(DEPOSIT_MAX_PERCENT),
+  siteDiscountPercent: z.number().int().min(0).max(DEPOSIT_MAX_PERCENT).optional(),
   telegramBotSiteName: z.string().min(2).max(80),
   eurUsdRate: z.number().positive(),
   eurGbpRate: z.number().positive(),
@@ -26,7 +28,11 @@ const schema = z.object({
   telegramBotToken: z.string().max(200).optional(),
   telegramBotUsername: z.string().max(64).optional(),
   openaiApiKey: z.string().max(200).optional(),
-});
+  })
+  .refine((v) => (v.siteDiscountPercent ?? 0) <= v.depositPercent, {
+    path: ["siteDiscountPercent"],
+    message: "Site discount cannot exceed the commission percent",
+  });
 
 export async function PATCH(req: Request) {
   const session = await getAdminSession();
@@ -47,6 +53,9 @@ export async function PATCH(req: Request) {
 
     const settings = await savePlatformSettings({
       depositPercent: body.depositPercent,
+      ...(body.siteDiscountPercent !== undefined
+        ? { siteDiscountPercent: body.siteDiscountPercent }
+        : {}),
       telegramBotSiteName: body.telegramBotSiteName,
       eurUsdRate: body.eurUsdRate,
       eurGbpRate: body.eurGbpRate,
@@ -74,6 +83,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({
       ok: true,
       depositPercent: settings.depositPercent,
+      siteDiscountPercent: settings.siteDiscountPercent,
       telegramBotSiteName: settings.telegramBotSiteName,
       eurUsdRate: settings.eurUsdRate,
       eurGbpRate: settings.eurGbpRate,

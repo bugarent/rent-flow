@@ -48,6 +48,7 @@ import {
 } from "@/lib/cars/reserve-pricing";
 import { settleBookingMoney } from "@/lib/bookings/booking-money";
 import { settleBusinessPartnerBookingMoney } from "@/lib/business-partner/referral-pricing";
+import { clampSiteDiscountPercent } from "@/lib/pricing/booking-discount";
 import { useBusinessPartnerReferralDiscount } from "@/components/business/use-business-partner-referral-discount";
 import { formatInternationalPhone } from "@/lib/catalog/dial-codes";
 import { extraPeriodCharge } from "@/lib/extras/pricing";
@@ -228,6 +229,7 @@ export function ReserveCheckout({
   /** True when promo was auto-filled from partner link / QR (7-minute TTL). */
   const [, setPromoFromReferral] = useState(false);
   const [depositPercent, setDepositPercent] = useState(DEFAULT_DEPOSIT_PERCENT);
+  const [siteDiscountPercent, setSiteDiscountPercent] = useState(0);
   const bpReferral = useBusinessPartnerReferralDiscount(promoCode, {
     disabled: noPromoCode,
   });
@@ -297,9 +299,12 @@ export function ReserveCheckout({
       try {
         const res = await fetch("/api/platform/deposit");
         if (!res.ok || cancelled) return;
-        const data = (await res.json()) as { depositPercent?: number };
+        const data = (await res.json()) as { depositPercent?: number; siteDiscountPercent?: number };
         if (typeof data.depositPercent === "number" && Number.isFinite(data.depositPercent)) {
           setDepositPercent(Math.trunc(data.depositPercent));
+        }
+        if (typeof data.siteDiscountPercent === "number" && Number.isFinite(data.siteDiscountPercent)) {
+          setSiteDiscountPercent(Math.max(0, Math.trunc(data.siteDiscountPercent)));
         }
       } catch {
         /* keep default */
@@ -495,21 +500,26 @@ export function ReserveCheckout({
       deliveryEur: delivery,
       depositPercent,
     });
-    const settled = bpReferral.active
+    const site = clampSiteDiscountPercent(siteDiscountPercent, depositPercent);
+    const siteActive = site > 0 && site > (bpReferral.active ? bpReferral.discountPercent : 0);
+    const discountActive = siteActive || bpReferral.active;
+    const discountPercent = siteActive ? site : bpReferral.discountPercent;
+    const settled = discountActive
       ? settleBusinessPartnerBookingMoney({
           rentalEur: base.rentalTotal,
           extrasEur: base.extrasTotal,
           deliveryEur: delivery,
           depositPercent,
+          discount: siteActive ? { percent: site, cardOnDiscountedFee: true } : undefined,
         })
       : standard;
-    const rentalShown = bpReferral.active
-      ? roundMoney(base.rentalTotal * (1 - bpReferral.discountPercent / 100))
+    const rentalShown = discountActive
+      ? roundMoney(base.rentalTotal * (1 - discountPercent / 100))
       : base.rentalTotal;
-    const extrasShown = bpReferral.active
-      ? roundMoney(base.extrasTotal * (1 - bpReferral.discountPercent / 100))
+    const extrasShown = discountActive
+      ? roundMoney(base.extrasTotal * (1 - discountPercent / 100))
       : base.extrasTotal;
-    const before = (bpReferral.active && "beforeDiscount" in settled
+    const before = (discountActive && "beforeDiscount" in settled
       ? settled.beforeDiscount
       : standard) as { chargedEur: number; onlineEur: number };
     return {
@@ -530,10 +540,12 @@ export function ReserveCheckout({
       payNow: settled.onlineEur,
       payNowBefore: before.onlineEur,
       payAtPickup: settled.onSiteEur,
-      bpDiscountActive: bpReferral.active,
-      bpDiscountPercent: bpReferral.discountPercent,
+      bpDiscountActive: discountActive,
+      bpDiscountPercent: discountPercent,
+      siteDiscountActive: siteActive,
     };
   }, [
+    siteDiscountPercent,
     dailyRate,
     days,
     extrasLineTotal,
@@ -1747,7 +1759,16 @@ export function ReserveCheckout({
                       />
                     </label>
                   </div>
-                  {noPromoCode ? null : totals.bpDiscountActive ? (
+                  {totals.siteDiscountActive ? (
+                    <p className="text-xs font-semibold text-emerald-700">
+                      −{totals.bpDiscountPercent}%{" "}
+                      {locale === "ka"
+                        ? "საიტის ფასდაკლება — მანქანასა და სერვისებზე. მიწოდება/დაბრუნება სრულ ფასად რჩება; ადგილზე გადახდა უცვლელია."
+                        : locale === "ru"
+                          ? "Скидка сайта — на автомобиль и услуги. Доставка/возврат по полной цене; оплата на месте не меняется."
+                          : "Site discount — on car & services. Delivery/return stay full price; pay-on-site unchanged."}
+                    </p>
+                  ) : noPromoCode ? null : totals.bpDiscountActive ? (
                     <p className="text-xs font-semibold text-emerald-700">
                       −{totals.bpDiscountPercent}%{" "}
                       {locale === "ka"

@@ -93,6 +93,8 @@ async function resolveBusinessPartnerCharge(input: {
   extrasEur: number;
   deliveryEur: number;
   depositPercent: number;
+  /** Admin site discount (already clamped to depositPercent). */
+  siteDiscountPercent: number;
   /** Guest checked “I don't have a promo” — do not use the QR cookie. */
   declinePartnerReferral?: boolean;
 }) {
@@ -107,21 +109,48 @@ async function resolveBusinessPartnerCharge(input: {
     computeBusinessPartnerReferralSplit,
   } = await import("@/lib/business-partner/referral-pricing");
 
+  const { BP_PROMO_DISCOUNT_PERCENT, clampSiteDiscountPercent } = await import(
+    "@/lib/pricing/booking-discount"
+  );
+  const siteDiscount = {
+    percent: clampSiteDiscountPercent(input.siteDiscountPercent, input.depositPercent),
+    cardOnDiscountedFee: true,
+  };
+  const settleSiteDiscount = () => {
+    const settled = settleBusinessPartnerBookingMoney({
+      rentalEur: input.rentalEur,
+      extrasEur: input.extrasEur,
+      deliveryEur: input.deliveryEur,
+      depositPercent: input.depositPercent,
+      discount: siteDiscount,
+    });
+    return {
+      totalPriceEur: settled.chargedEur,
+      depositPaidEur: settled.onlineEur,
+      balanceDueEur: settled.onSiteEur,
+      settled: settled as Omit<typeof settled, "split" | "beforeDiscount">,
+    };
+  };
+
   const code = await resolveBusinessPartnerReferralCode(input.promoCode, {
     allowCookieFallback: !input.declinePartnerReferral,
   });
   const partner = code ? await getActiveBusinessPartnerByCode(code) : null;
   if (!partner) {
-    const charge = persistedBookingCharge({
-      rentalEur: input.rentalEur,
-      extrasEur: input.extrasEur,
-      deliveryEur: input.deliveryEur,
-      depositPercent: input.depositPercent,
-    });
+    const useSite = siteDiscount.percent > 0;
+    const charge = useSite
+      ? settleSiteDiscount()
+      : persistedBookingCharge({
+          rentalEur: input.rentalEur,
+          extrasEur: input.extrasEur,
+          deliveryEur: input.deliveryEur,
+          depositPercent: input.depositPercent,
+        });
     return {
       charge,
       split: null as null | ReturnType<typeof settleBusinessPartnerBookingMoney>["split"],
       code: null as string | null,
+      siteDiscountPercent: useSite ? siteDiscount.percent : 0,
     };
   }
 
@@ -134,6 +163,27 @@ async function resolveBusinessPartnerCharge(input: {
   );
 
   try {
+    // Discounts do not stack: a larger site discount replaces the BP promo discount.
+    if (siteDiscount.percent > BP_PROMO_DISCOUNT_PERCENT) {
+      const charge = settleSiteDiscount();
+      // Attribution follows the site fee actually kept after the larger discount.
+      const siteEarnedEur = roundMoney(Math.min(split.siteEarnedEur, charge.settled.siteFeeEur));
+      const partnerEarnedEur = roundMoney((siteEarnedEur * partnerOfSitePercent) / 100);
+      return {
+        charge,
+        split: {
+          ...split,
+          customerDiscountEur: roundMoney(
+            ((input.rentalEur + input.extrasEur) * siteDiscount.percent) / 100,
+          ),
+          siteEarnedEur,
+          partnerEarnedEur,
+          siteKeptEur: roundMoney(siteEarnedEur - partnerEarnedEur),
+        },
+        code: partner.referralCode,
+        siteDiscountPercent: siteDiscount.percent,
+      };
+    }
     const settled = settleBusinessPartnerBookingMoney({
       rentalEur: input.rentalEur,
       extrasEur: input.extrasEur,
@@ -150,6 +200,7 @@ async function resolveBusinessPartnerCharge(input: {
       },
       split: settled.split,
       code: partner.referralCode,
+      siteDiscountPercent: 0,
     };
   } catch (error) {
     console.warn("[bookings] BP settle failed — using standard charge, still attributing", error);
@@ -159,7 +210,7 @@ async function resolveBusinessPartnerCharge(input: {
       deliveryEur: input.deliveryEur,
       depositPercent: input.depositPercent,
     });
-    return { charge, split, code: partner.referralCode };
+    return { charge, split, code: partner.referralCode, siteDiscountPercent: 0 };
   }
 }
 
@@ -205,6 +256,15 @@ export async function POST(req: Request) {
         await saveBookingResidence(bookingId, guestCountry);
       } catch {
         /* residence is also stored on the file booking */
+      }
+    };
+    const rememberSiteDiscount = async (bookingId: string, percent: number) => {
+      if (!(percent > 0)) return;
+      try {
+        const { saveBookingSiteDiscount } = await import("@/lib/server/booking-site-discount-store");
+        await saveBookingSiteDiscount(bookingId, percent);
+      } catch (error) {
+        console.warn("[bookings] saveBookingSiteDiscount", error);
       }
     };
     const bookingPromoCode =
@@ -548,12 +608,18 @@ export async function POST(req: Request) {
           Number.isFinite(platformSettings.depositPercent)
             ? Math.trunc(platformSettings.depositPercent)
             : DEFAULT_DEPOSIT_PERCENT;
-        const { charge, split: bpSplit, code: bpCode } = await resolveBusinessPartnerCharge({
+        const {
+          charge,
+          split: bpSplit,
+          code: bpCode,
+          siteDiscountPercent: appliedSiteDiscount,
+        } = await resolveBusinessPartnerCharge({
           promoCode: declinePartnerReferral ? "" : bookingPromoCode,
           rentalEur: roundMoney(daily * days),
           extrasEur: extrasTotal,
           deliveryEur: deliveryFeeEur,
           depositPercent,
+          siteDiscountPercent: platformSettings.siteDiscountPercent,
           declinePartnerReferral,
         });
         const totalPriceEur = charge.totalPriceEur;
@@ -641,6 +707,7 @@ export async function POST(req: Request) {
 
         await rememberMessengers(booking.id);
         await rememberResidence(booking.id);
+        await rememberSiteDiscount(booking.id, appliedSiteDiscount);
         let bpCredit: { code: string; partnerEarnedEur: number; siteEarnedEur: number } | null =
           null;
         if (bpCode && bpSplit) {
@@ -884,12 +951,18 @@ export async function POST(req: Request) {
       }
     }
 
-    const { charge, split: bpSplit, code: bpCode } = await resolveBusinessPartnerCharge({
+    const {
+      charge,
+      split: bpSplit,
+      code: bpCode,
+      siteDiscountPercent: appliedSiteDiscount,
+    } = await resolveBusinessPartnerCharge({
       promoCode: declinePartnerReferral ? "" : bookingPromoCode,
       rentalEur: roundMoney(daily * days),
       extrasEur: extrasTotal,
       deliveryEur: deliveryFeeEur,
       depositPercent,
+      siteDiscountPercent: platformSettings.siteDiscountPercent,
       declinePartnerReferral,
     });
     const totalPriceEur = charge.totalPriceEur;
@@ -977,6 +1050,7 @@ export async function POST(req: Request) {
       }
       await rememberMessengers(booking.id);
       await rememberResidence(booking.id);
+      await rememberSiteDiscount(booking.id, appliedSiteDiscount);
       let bpCredit: { code: string; partnerEarnedEur: number; siteEarnedEur: number } | null =
         null;
       if (bpCode && bpSplit) {
@@ -1204,6 +1278,7 @@ export async function POST(req: Request) {
 
     await rememberMessengers(booking.id);
     await rememberResidence(booking.id);
+    await rememberSiteDiscount(booking.id, appliedSiteDiscount);
     let bpCredit: { code: string; partnerEarnedEur: number; siteEarnedEur: number } | null =
       null;
     if (bpCode && bpSplit) {

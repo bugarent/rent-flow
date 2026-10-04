@@ -9,8 +9,8 @@ import {
   DEFAULT_DEPOSIT_PERCENT,
   roundMoney,
 } from "@/lib/cars/reserve-pricing";
+import { resolveBookingDiscount } from "@/lib/pricing/booking-discount";
 import {
-  bookingHasBusinessPartnerPromo,
   bpCancelSiteFeeEur,
   computeBpProjectedTripSettlement,
   applyBusinessPartnerCustomerDiscount,
@@ -151,7 +151,16 @@ export function BookingInfoModal({
     Number(booking.delivery?.totalFeeEur) ||
       (Number(booking.delivery?.pickupFeeEur) || 0) + (Number(booking.delivery?.dropoffFeeEur) || 0),
   );
-  const bpPromo = bookingHasBusinessPartnerPromo(booking.promoCode);
+  const bookingDiscount = useMemo(
+    () =>
+      resolveBookingDiscount({
+        promoCode: booking.promoCode,
+        siteDiscountPercent: booking.siteDiscountPercent,
+      }),
+    [booking.promoCode, booking.siteDiscountPercent],
+  );
+  const bpPromo = Boolean(bookingDiscount);
+  const discountPercent = bookingDiscount?.percent ?? 0;
   // Create-booking stores totalPrice = trip components + card surcharge on the deposit.
   const depositPaidHint = roundMoney(booking.depositPaidEur || 0);
   const depositBaseHint = roundMoney(
@@ -171,6 +180,7 @@ export function BookingInfoModal({
         depositPaidEur: booking.depositPaidEur || 0,
         extrasEur: extrasTotal,
         deliveryEur: originalDeliveryHint,
+        discountPercent,
       })
     : rentalFromTotal;
   // Prefer the rate locked into this booking — listing prices change and must not
@@ -463,6 +473,7 @@ export function BookingInfoModal({
           depositPaidEur: booking.depositPaidEur || 0,
           balanceDueEur: booking.balanceDueEur,
           depositPercent,
+          discount: bookingDiscount ?? undefined,
         })
       : computeProjectedTripSettlement({
           originalRentalEur: originalRental,
@@ -487,10 +498,10 @@ export function BookingInfoModal({
     const dueWill = settlement.dueWill;
 
     const displayOriginalRental = bpPromo
-      ? applyBusinessPartnerCustomerDiscount(originalRental)
+      ? applyBusinessPartnerCustomerDiscount(originalRental, discountPercent)
       : originalRental;
     const displayProjectedRental = bpPromo
-      ? applyBusinessPartnerCustomerDiscount(projectedRental)
+      ? applyBusinessPartnerCustomerDiscount(projectedRental, discountPercent)
       : projectedRental;
 
     return {
@@ -507,7 +518,7 @@ export function BookingInfoModal({
       deliveryDelta,
       tripChanged: !tripUnchanged,
       projectedExtras: bpPromo
-        ? applyBusinessPartnerCustomerDiscount(projectedExtras)
+        ? applyBusinessPartnerCustomerDiscount(projectedExtras, discountPercent)
         : projectedExtras,
       originalComponents: settlement.originalComponents,
       projectedComponents: settlement.projectedComponents,
@@ -561,6 +572,8 @@ export function BookingInfoModal({
     booking.delivery?.pickupFeeEur,
     booking.delivery?.dropoffFeeEur,
     bpPromo,
+    bookingDiscount,
+    discountPercent,
   ]);
 
   const liveTotal = extrasPaymentBreakdown.projectedTotal;
@@ -586,6 +599,7 @@ export function BookingInfoModal({
           extrasEur: extrasTotal,
           deliveryEur: originalDeliveryHint,
           depositPercent,
+          discount: bookingDiscount ?? undefined,
         })
       : undefined;
     return guestCancelSettlement({
@@ -604,6 +618,7 @@ export function BookingInfoModal({
     depositPercent,
     originalDeliveryHint,
     bpPromo,
+    bookingDiscount,
     daily,
     days,
     extrasTotal,

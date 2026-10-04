@@ -54,6 +54,7 @@ export default async function AdminSettingsPage() {
         <AdminPlatformTitle />
         <AdminSettingsForm
           depositPercent={settings.depositPercent}
+          siteDiscountPercent={settings.siteDiscountPercent}
           telegramBotSiteName={settings.telegramBotSiteName}
           eurUsdRate={settings.eurUsdRate}
           eurGbpRate={settings.eurGbpRate}

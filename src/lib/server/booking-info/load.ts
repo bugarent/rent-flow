@@ -298,7 +298,9 @@ export async function loadBookingInfoDetail(
         catalogExtras,
         delivery,
       };
-      return withBusinessPartnerCode(await withCancelNote(await withAdminRefundAlerts(prismaDetail)));
+      return withSiteDiscount(
+        await withBusinessPartnerCode(await withCancelNote(await withAdminRefundAlerts(prismaDetail))),
+      );
     }
   } catch (error) {
     if (!isDbOfflineError(error)) {
@@ -314,7 +316,15 @@ export async function loadBookingInfoDetail(
   if (!detail.countryOfResidence) {
     detail.countryOfResidence = await readBookingResidence(file.id);
   }
-  return withBusinessPartnerCode(await withCancelNote(await withAdminRefundAlerts(detail)));
+  return withSiteDiscount(
+    await withBusinessPartnerCode(await withCancelNote(await withAdminRefundAlerts(detail))),
+  );
+}
+
+async function withSiteDiscount(detail: BookingInfoDetailPayload) {
+  const { readBookingSiteDiscount } = await import("@/lib/server/booking-site-discount-store");
+  const percent = await readBookingSiteDiscount(detail.id).catch(() => 0);
+  return percent > 0 ? { ...detail, siteDiscountPercent: percent } : detail;
 }
 
 async function withBusinessPartnerCode(detail: BookingInfoDetailPayload) {

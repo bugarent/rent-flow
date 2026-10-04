@@ -7,6 +7,7 @@ import { DEFAULT_FX_RATES } from "@/lib/fx";
 import { OperatingCountriesSettings } from "@/components/admin/operating-countries-settings";
 import { ADMIN_BASE } from "@/lib/routes";
 import { cn } from "@/lib/utils";
+import { clampSiteDiscountPercent } from "@/lib/pricing/booking-discount";
 
 type GelFxDraft = {
   gelUsd: number;
@@ -16,6 +17,7 @@ type GelFxDraft = {
 
 type FieldKey =
   | "depositPercent"
+  | "siteDiscountPercent"
   | "telegramBotSiteName"
   | "gelUsd"
   | "gelEur"
@@ -61,8 +63,13 @@ function inputClass(invalid: boolean) {
   );
 }
 
+function clampDiscount(value: number, depositPercent: number) {
+  return clampSiteDiscountPercent(Number.isFinite(value) ? value : 0, depositPercent);
+}
+
 export function AdminSettingsForm(props: {
   depositPercent: number;
+  siteDiscountPercent?: number;
   telegramBotSiteName: string;
   eurUsdRate: number;
   eurGbpRate: number;
@@ -79,6 +86,7 @@ export function AdminSettingsForm(props: {
   const L = useBpLabels();
   const [form, setForm] = useState({
     depositPercent: props.depositPercent,
+    siteDiscountPercent: clampDiscount(props.siteDiscountPercent ?? 0, props.depositPercent),
     telegramBotSiteName: props.telegramBotSiteName,
     googleMapsUrl: props.googleMapsUrl,
     partnerOperatingCountryIso2s: props.partnerOperatingCountryIso2s,
@@ -176,6 +184,7 @@ export function AdminSettingsForm(props: {
         if (server.eurGbpRate) next.gelGbp = server.eurGbpRate;
         if (server.eurGelRate) next.gelEur = server.eurGelRate;
         if (server.depositPercent) next.depositPercent = server.depositPercent;
+        if (server.siteDiscountPercent) next.siteDiscountPercent = server.siteDiscountPercent;
         if (server.telegramBotSiteName) next.telegramBotSiteName = server.telegramBotSiteName;
         if (server.googleMapsUrl) next.googleMapsUrl = server.googleMapsUrl;
         if (server.gelUsd) next.gelUsd = server.gelUsd;
@@ -209,11 +218,43 @@ export function AdminSettingsForm(props: {
           value={form.depositPercent}
           onChange={(e) => {
             clearError("depositPercent");
-            setForm({ ...form, depositPercent: Number(e.target.value) });
+            const depositPercent = Number(e.target.value);
+            setForm({
+              ...form,
+              depositPercent,
+              siteDiscountPercent: clampDiscount(form.siteDiscountPercent, depositPercent),
+            });
           }}
         />
         {fieldErrors.depositPercent ? (
           <span className="mt-1 block text-xs font-normal text-red-600">{fieldErrors.depositPercent}</span>
+        ) : null}
+      </label>
+      <label className="block text-sm font-semibold">
+        საიტის ფასდაკლება % (0–{Math.max(0, form.depositPercent || 0)})
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={Math.max(0, form.depositPercent || 0)}
+          className={inputClass(Boolean(fieldErrors.siteDiscountPercent))}
+          value={form.siteDiscountPercent}
+          onChange={(e) => {
+            clearError("siteDiscountPercent");
+            setForm({
+              ...form,
+              siteDiscountPercent: clampDiscount(Number(e.target.value), form.depositPercent),
+            });
+          }}
+        />
+        <span className="mt-1 block text-xs font-normal text-slate-500">
+          აკლდება საიტის საკომისიოს. მაგ.: საკომისიო 20%, ფასდაკლება 10% → 100€-იანი ჯავშანი
+          მომხმარებელს დაუჯდება 90€, საიტს რჩება 10€, პარტნიორის წილი უცვლელია. 0 = გამორთულია.
+        </span>
+        {fieldErrors.siteDiscountPercent ? (
+          <span className="mt-1 block text-xs font-normal text-red-600">
+            {fieldErrors.siteDiscountPercent}
+          </span>
         ) : null}
       </label>
       <label className="block text-sm font-semibold">

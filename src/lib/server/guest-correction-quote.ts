@@ -1,6 +1,7 @@
 import "server-only";
 
-import { bookingHasBusinessPartnerPromo, computeBpProjectedTripSettlement, reconstructBpPreDiscountRental } from "@/lib/business-partner/referral-pricing";
+import { computeBpProjectedTripSettlement, reconstructBpPreDiscountRental } from "@/lib/business-partner/referral-pricing";
+import { resolveBookingDiscount } from "@/lib/pricing/booking-discount";
 import { commissionableTripEur } from "@/lib/bookings/guest-cancellation";
 import {
   computeProjectedTripSettlement,
@@ -24,6 +25,8 @@ type ExtraLine = { id: string; priceEur: number };
 export async function quoteGuestBookingCorrection(input: {
   carId: string;
   promoCode?: string | null;
+  /** Site discount stored for this booking at checkout (0 = none). */
+  siteDiscountPercent?: number;
   depositPercent: number;
   totalPriceEur: number;
   depositPaidEur: number;
@@ -61,13 +64,17 @@ export async function quoteGuestBookingCorrection(input: {
     deliveryFeeEur(input.carId, input.newPickupIata, input.newDropoffIata, newDays),
   ]);
 
-  const bp = bookingHasBusinessPartnerPromo(input.promoCode);
-  const originalRentalEur = bp
+  const discount = resolveBookingDiscount({
+    promoCode: input.promoCode,
+    siteDiscountPercent: input.siteDiscountPercent,
+  });
+  const originalRentalEur = discount
     ? reconstructBpPreDiscountRental({
         totalPriceEur: input.totalPriceEur,
         depositPaidEur: input.depositPaidEur,
         extrasEur: oldExtrasEur,
         deliveryEur: originalDeliveryEur,
+        discountPercent: discount.percent,
       })
     : roundMoney(
         Math.max(
@@ -93,8 +100,8 @@ export async function quoteGuestBookingCorrection(input: {
     balanceDueEur: input.balanceDueEur,
     depositPercent: input.depositPercent,
   };
-  const settlement = bp
-    ? computeBpProjectedTripSettlement(shared)
+  const settlement = discount
+    ? computeBpProjectedTripSettlement({ ...shared, discount })
     : computeProjectedTripSettlement({
         ...shared,
         newExtrasCommissionableEur,

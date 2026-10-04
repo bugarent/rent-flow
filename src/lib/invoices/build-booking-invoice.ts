@@ -6,11 +6,8 @@ import {
   roundMoney,
 } from "@/lib/cars/reserve-pricing";
 import { settleBookingMoney } from "@/lib/bookings/booking-money";
-import {
-  BP_CUSTOMER_DISCOUNT_PERCENT,
-  bookingHasBusinessPartnerPromo,
-  reconstructBpPreDiscountRental,
-} from "@/lib/business-partner/referral-pricing";
+import { reconstructBpPreDiscountRental } from "@/lib/business-partner/referral-pricing";
+import { resolveBookingDiscount } from "@/lib/pricing/booking-discount";
 import {
   expandRefundChangesFromTrip,
   rentalDayCount,
@@ -35,6 +32,8 @@ export type InvoiceBookingInput = {
   depositPaidEur?: number;
   balanceDueEur?: number;
   promoCode?: string | null;
+  /** Site discount % charged at checkout (0/undefined = none). */
+  siteDiscountPercent?: number;
   guestFirstName?: string;
   guestLastName?: string;
   guestEmail?: string;
@@ -96,6 +95,8 @@ type InvoiceMoney = {
   rentalEur: number;
   dailyEur: number;
   promoDiscountEur: number;
+  discountPercent: number;
+  siteDiscount: boolean;
   settled: {
     tripEur: number;
     chargedEur: number;
@@ -132,7 +133,7 @@ function storedInvoiceMoney(input: {
       deliveryEur: input.deliveryEur,
       depositPercent: input.depositPercent,
     });
-    return { rentalEur, dailyEur: daily, promoDiscountEur: 0, settled };
+    return { rentalEur, dailyEur: daily, promoDiscountEur: 0, discountPercent: 0, siteDiscount: false, settled };
   }
 
   const siteFee = roundMoney(depositStored / (1 + CARD_PICKUP_SURCHARGE_PERCENT / 100));
@@ -144,16 +145,20 @@ function storedInvoiceMoney(input: {
       ? roundMoney(Math.max(0, storedBalance))
       : roundMoney(Math.max(0, trip - siteFee));
 
-  const bp = bookingHasBusinessPartnerPromo(b.promoCode);
-  const rentalEur = bp
+  const discount = resolveBookingDiscount({
+    promoCode: b.promoCode,
+    siteDiscountPercent: b.siteDiscountPercent,
+  });
+  const rentalEur = discount
     ? reconstructBpPreDiscountRental({
         totalPriceEur: totalStored,
         depositPaidEur: depositStored,
         extrasEur: input.extrasEur,
         deliveryEur: input.deliveryEur,
+        discountPercent: discount.percent,
       })
     : roundMoney(Math.max(0, trip - input.extrasEur - input.deliveryEur));
-  const promoDiscountEur = bp
+  const promoDiscountEur = discount
     ? roundMoney(Math.max(0, rentalEur + input.extrasEur + input.deliveryEur - trip))
     : 0;
   const dailyEur = input.days > 0 ? roundMoney(rentalEur / input.days) : rentalEur;
@@ -162,6 +167,8 @@ function storedInvoiceMoney(input: {
     rentalEur,
     dailyEur,
     promoDiscountEur,
+    discountPercent: discount?.percent ?? 0,
+    siteDiscount: Boolean(discount?.cardOnDiscountedFee),
     settled: {
       tripEur: trip,
       chargedEur: totalStored,
@@ -222,6 +229,7 @@ export function buildBookingInvoiceDocument(input: {
           balanceMethod: "Pay on site",
           rentalLabel: "Car rental",
           promo: "Promo discount",
+          siteDiscount: "Site discount",
         }
       : locale === "ru"
         ? {
@@ -239,6 +247,7 @@ export function buildBookingInvoiceDocument(input: {
             balanceMethod: "Оплата на месте",
             rentalLabel: "Аренда авто",
             promo: "Скидка по промокоду",
+            siteDiscount: "Скидка сайта",
           }
         : {
             rental: "მანქანის ქირა",
@@ -255,6 +264,7 @@ export function buildBookingInvoiceDocument(input: {
             balanceMethod: "გადახდა ადგილზე",
             rentalLabel: "მანქანის ქირა",
             promo: "პრომო ფასდაკლება",
+            siteDiscount: "საიტის ფასდაკლება",
           };
 
   const lines: InvoiceLineItem[] = [];
@@ -315,7 +325,7 @@ export function buildBookingInvoiceDocument(input: {
   if (money.promoDiscountEur > 0.009) {
     lines.push({
       sku: "PROMO",
-      description: `${L.promo} (−${BP_CUSTOMER_DISCOUNT_PERCENT}%)`,
+      description: `${money.siteDiscount ? L.siteDiscount : L.promo} (−${money.discountPercent}%)`,
       quantity: 1,
       unitPriceEur: -money.promoDiscountEur,
       totalEur: -money.promoDiscountEur,

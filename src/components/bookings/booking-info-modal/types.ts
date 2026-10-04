@@ -25,6 +25,8 @@ export type BookingInfoData = {
   balanceDueEur?: number;
   /** Business-partner promo code when −5% was applied at checkout. */
   promoCode?: string;
+  /** Admin site discount % charged at checkout (replaces the BP −5% when set). */
+  siteDiscountPercent?: number;
   /** Confirmed business-partner code shown to admin. */
   businessPartnerCode?: string;
   guestFirstName?: string;

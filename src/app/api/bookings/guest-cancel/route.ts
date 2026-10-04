@@ -5,6 +5,8 @@ import {
   guestCancelSettlement,
 } from "@/lib/bookings/guest-cancellation";
 import { DEFAULT_DEPOSIT_PERCENT, roundMoney } from "@/lib/cars/reserve-pricing";
+import { resolveBookingDiscount } from "@/lib/pricing/booking-discount";
+import { readBookingSiteDiscount } from "@/lib/server/booking-site-discount-store";
 
 const schema = z.object({
   bookingId: z.string().min(1).max(80),
@@ -116,14 +118,17 @@ export async function POST(req: Request) {
         (s, e) => s + (Number(e.priceEur) || 0),
         0,
       );
-      const bpPromo = Boolean(String(file.promoCode || "").trim());
+      const discount = resolveBookingDiscount({
+        promoCode: file.promoCode,
+        siteDiscountPercent: await readBookingSiteDiscount(file.id),
+      });
       let commissionableEur = commissionableTripEur({
         totalPriceEur: file.totalPriceEur,
         depositPaidEur: file.depositPaidEur,
         deliveryEur,
       });
       let siteFeeEurOverride: number | undefined;
-      if (bpPromo) {
+      if (discount) {
         const { reconstructBpPreDiscountRental, bpCancelSiteFeeEur } = await import(
           "@/lib/business-partner/referral-pricing"
         );
@@ -132,6 +137,7 @@ export async function POST(req: Request) {
           depositPaidEur: file.depositPaidEur,
           extrasEur: extrasTotal,
           deliveryEur,
+          discountPercent: discount.percent,
         });
         commissionableEur = roundMoney(rentalEur + extrasTotal);
         siteFeeEurOverride = bpCancelSiteFeeEur({
@@ -139,6 +145,7 @@ export async function POST(req: Request) {
           extrasEur: extrasTotal,
           deliveryEur,
           depositPercent,
+          discount,
         });
       }
       const settlement = guestCancelSettlement({
@@ -205,14 +212,17 @@ export async function POST(req: Request) {
         (s, e) => s + (Number(e.priceEur) || 0),
         0,
       );
-      const bpPromo = Boolean(String(booking.promoCode || "").trim());
+      const discount = resolveBookingDiscount({
+        promoCode: booking.promoCode,
+        siteDiscountPercent: await readBookingSiteDiscount(booking.id),
+      });
       let commissionableEur = commissionableTripEur({
         totalPriceEur: Number(booking.totalPriceEur) || 0,
         depositPaidEur,
         deliveryEur,
       });
       let siteFeeEurOverride: number | undefined;
-      if (bpPromo) {
+      if (discount) {
         const { reconstructBpPreDiscountRental, bpCancelSiteFeeEur } = await import(
           "@/lib/business-partner/referral-pricing"
         );
@@ -221,6 +231,7 @@ export async function POST(req: Request) {
           depositPaidEur,
           extrasEur: extrasSum,
           deliveryEur,
+          discountPercent: discount.percent,
         });
         commissionableEur = roundMoney(rentalEur + extrasSum);
         siteFeeEurOverride = bpCancelSiteFeeEur({
@@ -228,6 +239,7 @@ export async function POST(req: Request) {
           extrasEur: extrasSum,
           deliveryEur,
           depositPercent,
+          discount,
         });
       }
       const settlement = guestCancelSettlement({

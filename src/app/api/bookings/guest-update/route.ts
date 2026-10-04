@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { computeBufferEndsAt } from "@/lib/calendar/buffer";
 import { roundMoney } from "@/lib/cars/reserve-pricing";
+import { readBookingSiteDiscount } from "@/lib/server/booking-site-discount-store";
 
 const extraSchema = z.object({
   id: z.string().min(1).max(80),
@@ -127,6 +128,7 @@ export async function POST(req: Request) {
       const quote = await quoteGuestBookingCorrection({
         carId: file.carId,
         promoCode: file.promoCode,
+        siteDiscountPercent: await readBookingSiteDiscount(file.id),
         depositPercent: file.depositPercent,
         totalPriceEur: file.totalPriceEur,
         depositPaidEur: file.depositPaidEur,
@@ -290,6 +292,7 @@ export async function POST(req: Request) {
       const quote = await quoteGuestBookingCorrection({
         carId: booking.carId,
         promoCode: booking.promoCode,
+        siteDiscountPercent: await readBookingSiteDiscount(booking.id),
         depositPercent: booking.depositPercent,
         totalPriceEur: Number(booking.totalPriceEur),
         depositPaidEur: Number(booking.depositPaidEur),

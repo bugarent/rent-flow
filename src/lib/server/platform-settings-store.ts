@@ -7,9 +7,12 @@ import { DEFAULT_FX_RATES } from "@/lib/fx";
 import { prisma } from "@/lib/prisma";
 import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
 import { toNumber } from "@/lib/utils";
+import { clampSiteDiscountPercent } from "@/lib/pricing/booking-discount";
 
 export type PlatformSettingsRecord = {
   depositPercent: number;
+  /** Customer discount funded from the site fee (0…depositPercent). File-store field. */
+  siteDiscountPercent: number;
   telegramBotSiteName: string;
   eurUsdRate: number;
   eurGbpRate: number;
@@ -40,6 +43,7 @@ const DATA_FILE = join(DATA_DIR, "platform-settings.json");
 function defaults(): PlatformSettingsRecord {
   return {
     depositPercent: 15,
+    siteDiscountPercent: 0,
     telegramBotSiteName: "rentairportcars.com",
     eurUsdRate: DEFAULT_FX_RATES.eurUsd,
     eurGbpRate: DEFAULT_FX_RATES.eurGbp,
@@ -59,8 +63,10 @@ function defaults(): PlatformSettingsRecord {
 function normalize(raw: Partial<PlatformSettingsRecord> | null | undefined): PlatformSettingsRecord {
   const base = defaults();
   if (!raw || typeof raw !== "object") return base;
+  const depositPercent = Math.trunc(toNumber(raw.depositPercent, base.depositPercent));
   return {
-    depositPercent: Math.trunc(toNumber(raw.depositPercent, base.depositPercent)),
+    depositPercent,
+    siteDiscountPercent: clampSiteDiscountPercent(raw.siteDiscountPercent, depositPercent),
     telegramBotSiteName: String(raw.telegramBotSiteName || base.telegramBotSiteName).trim() || base.telegramBotSiteName,
     eurUsdRate: toNumber(raw.eurUsdRate, base.eurUsdRate),
     eurGbpRate: toNumber(raw.eurGbpRate, base.eurGbpRate),
@@ -167,6 +173,7 @@ export async function getPlatformSettings(): Promise<PlatformSettingsRecord> {
       // File-only fields (not in Prisma platformSetting row).
       const merged = normalize({
         ...next,
+        siteDiscountPercent: fileSettings.siteDiscountPercent,
         siteContractUrl: fileSettings.siteContractUrl || next.siteContractUrl,
         adminTelegramChatId: fileSettings.adminTelegramChatId || next.adminTelegramChatId,
         telegramBotToken: fileSettings.telegramBotToken || next.telegramBotToken,
