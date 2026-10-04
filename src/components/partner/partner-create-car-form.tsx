@@ -350,9 +350,12 @@ async function uploadFile(file: File): Promise<string> {
   return String(data.url);
 }
 
+const NO_DELIVERY_CATALOG: DeliveryLocationView[] = [];
+const NO_EXTRAS_CATALOG: ExtraServicePricing[] = [];
+
 export function PartnerCreateCarForm({
-  initialDeliveryCatalog = [],
-  initialExtrasCatalog = [],
+  initialDeliveryCatalog = NO_DELIVERY_CATALOG,
+  initialExtrasCatalog = NO_EXTRAS_CATALOG,
   carId,
   adminReview = null,
 }: {
