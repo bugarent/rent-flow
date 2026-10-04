@@ -55,7 +55,6 @@ export function HelpCenterManager({ initial }: Props) {
   const c = dictionary.common;
   const labels = helpAdminLabels(locale);
   const [categories, setCategories] = useState<HelpCategory[]>(initial.categories);
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -85,16 +84,14 @@ export function HelpCenterManager({ initial }: Props) {
     }
   };
 
-  const draftKey = (id: string, field: string) => `${locale}:${id}:${field}`;
-  const shown = (id: string, field: string, canonical: string) => {
-    const edited = drafts[draftKey(id, field)];
-    if (edited !== undefined) return edited;
-    return helpText(locale, canonical);
-  };
-  const writeField = (id: string, field: string, value: string, writeCanonical: (value: string) => void) => {
-    if (locale === "en") writeCanonical(value);
-    else setDrafts((prev) => ({ ...prev, [draftKey(id, field)]: value }));
-  };
+  // Built-in English copy is shown translated; whatever the admin types is saved as the text.
+  const shown = (_id: string, _field: string, canonical: string) => helpText(locale, canonical);
+  const writeField = (
+    _id: string,
+    _field: string,
+    value: string,
+    writeCanonical: (value: string) => void,
+  ) => writeCanonical(value);
 
   const updateCategory = (catId: string, patch: Partial<HelpCategory>) => {
     setCategories((prev) => prev.map((cat) => (cat.id === catId ? { ...cat, ...patch } : cat)));
@@ -174,7 +171,7 @@ export function HelpCenterManager({ initial }: Props) {
               <label className="min-w-0 flex-1 text-[11px] font-semibold text-slate-600">
                 {fillHelpCount(labels.category, catIndex + 1)}
                 <input
-                  className="mt-0.5 w-full rounded-lg border p-2 text-sm font-bold text-[#0b1f4b]"
+                  className="mt-0.5 w-full rounded-lg border p-2 text-base font-bold text-[#0b1f4b] sm:text-sm"
                   value={shown(cat.id, "title", cat.title)}
                   disabled={busy}
                   onChange={(e) =>
@@ -205,7 +202,7 @@ export function HelpCenterManager({ initial }: Props) {
                     <label className="min-w-0 flex-1 text-[11px] font-semibold text-slate-600">
                       {fillHelpCount(labels.topic, topicIndex + 1)}
                       <input
-                        className="mt-0.5 w-full rounded-lg border bg-white p-2 text-xs font-bold text-slate-800"
+                        className="mt-0.5 w-full rounded-lg border bg-white p-2 text-base font-bold text-slate-800 sm:text-xs"
                         value={shown(topic.id, "title", topic.title)}
                         disabled={busy}
                         onChange={(e) =>
@@ -271,7 +268,7 @@ export function HelpCenterManager({ initial }: Props) {
                         <label className="block text-[11px] font-semibold text-slate-600">
                           {labels.question}
                           <input
-                            className="mt-0.5 w-full rounded-lg border p-2 text-xs font-normal"
+                            className="mt-0.5 w-full rounded-lg border p-2 text-base font-normal sm:text-xs"
                             value={shown(article.id, "question", article.question)}
                             disabled={busy}
                             onChange={(e) =>
@@ -284,7 +281,7 @@ export function HelpCenterManager({ initial }: Props) {
                         <label className="block text-[11px] font-semibold text-slate-600">
                           {labels.answer}
                           <textarea
-                            className="mt-0.5 min-h-[72px] w-full rounded-lg border p-2 text-xs font-normal"
+                            className="mt-0.5 min-h-[72px] w-full rounded-lg border p-2 text-base font-normal sm:text-xs"
                             value={shown(article.id, "answer", article.answer)}
                             disabled={busy}
                             onChange={(e) =>

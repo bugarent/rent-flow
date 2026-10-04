@@ -1,0 +1,32 @@
+---
+description: Every page, modal, and feature must work and look right on phones as well as desktop
+alwaysApply: true
+---
+
+# Mobile-first responsive UI (rentairportcars.com)
+
+Every change to any page, component, modal, form, table, or new feature — public site, admin (`/admin505`), partner portal, business partner — must look and work as well on a phone (360–430px wide) as on desktop. This applies to existing screens when they are touched and to everything new.
+
+## Layout
+
+- Write mobile styles first, then add `sm:` / `md:` / `lg:` for larger screens. Never rely on a fixed desktop width.
+- No horizontal page scroll at 360px. Avoid fixed `w-[…px]` / `min-w-[…px]` wider than ~320px unless wrapped in a scroll container.
+- Multi-column grids collapse: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-…`. Side-by-side panels stack on mobile (`flex-col lg:flex-row`).
+- Rows of buttons/badges use `flex-wrap` and `gap-*`; long text uses `min-w-0` + `truncate` or `break-words`.
+- Wide data tables: on mobile either render as stacked cards or wrap in `overflow-x-auto` with the important columns first; action buttons must stay reachable.
+
+## Modals and overlays
+
+- Full-width on phones (`w-full max-w-… mx-auto`), height capped (`max-h-[100dvh]` / `max-h-[90dvh]`) with an internal scroll area; header and primary action stay visible.
+- Use `dvh` units, respect safe areas (`pb-[env(safe-area-inset-bottom)]`) for bottom-fixed bars.
+
+## Touch and readability
+
+- Tap targets at least ~40px high; enough spacing between destructive and primary buttons.
+- Inputs at least `text-base` (16px) on mobile to avoid iOS zoom; use proper `type`/`inputMode`.
+- Body text not below `text-xs` for content; keep contrast.
+
+## Verify before finishing
+
+- After UI changes, check the screen at a phone width (~390px) and at desktop. When a browser is available, resize/emulate mobile and take a screenshot; otherwise review classes for the rules above.
+- Report in the summary that mobile was checked (or what could not be checked).
