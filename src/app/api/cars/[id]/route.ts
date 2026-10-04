@@ -150,9 +150,21 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   async function withCompanyPayments<T extends { partnerId?: string; partner?: { id?: string } }>(
     payload: T,
     partnerIdHint?: string,
+  ): Promise<
+    T & { rentPaymentMethods: string[]; contractUrl: string; partnerClientLanguages: string[] }
+  > {
+    const partnerId = String(partnerIdHint || payload.partnerId || payload.partner?.id || "").trim();
+    const { loadPartnerClientLanguages } = await import("@/lib/server/partner-client-languages");
+    const partnerClientLanguages = await loadPartnerClientLanguages(partnerId).catch(() => []);
+    const base = await withPaymentsOnly(payload, partnerId);
+    return { ...base, partnerClientLanguages };
+  }
+
+  async function withPaymentsOnly<T extends object>(
+    payload: T,
+    partnerId: string,
   ): Promise<T & { rentPaymentMethods: string[]; contractUrl: string }> {
     try {
-      const partnerId = String(partnerIdHint || payload.partnerId || payload.partner?.id || "").trim();
       if (!partnerId) return { ...payload, rentPaymentMethods: [], contractUrl: "" };
       const { readCompanySettingsFile } = await import("@/lib/server/partner-company-settings-store");
       const { LOCAL_PARTNER_ID } = await import("@/lib/auth/local-partner-store");

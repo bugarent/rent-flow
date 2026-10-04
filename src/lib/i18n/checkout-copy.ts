@@ -13,6 +13,7 @@ export type CheckoutCopy = {
   forDays: (n: number) => string;
   perDay: string;
   freeCancellation: string;
+  partnerLanguages: string;
   yearLabel: string;
   colorLabel: string;
   bodyTypeLabel: string;
@@ -325,6 +326,7 @@ const enBase: CheckoutCopyBase = {
   forDaysTemplate: "for {n} days",
   perDay: "/ day",
   freeCancellation: "Free cancellation up to 48 hours before pick-up",
+  partnerLanguages: "Languages spoken by the rental company",
   yearLabel: "Year",
   colorLabel: "Color",
   bodyTypeLabel: "Body type",
@@ -604,6 +606,7 @@ const kaBase: CheckoutCopyBase = {
   forDaysTemplate: "{n} დღისთვის",
   perDay: "/ დღე",
   freeCancellation: "უფასო გაუქმება აღებამდე 48 საათით ადრე",
+  partnerLanguages: "კომპანიასთან სასაუბრო ენები",
   yearLabel: "წელი",
   colorLabel: "ფერი",
   bodyTypeLabel: "ტიპი",
@@ -887,6 +890,7 @@ const ruBase: CheckoutCopyBase = {
   forDaysTemplate: "за {n} дн.",
   perDay: "/ день",
   freeCancellation: "Бесплатная отмена за 48 часов до получения",
+  partnerLanguages: "Языки общения с компанией",
   yearLabel: "Год",
   colorLabel: "Цвет",
   bodyTypeLabel: "Тип кузова",
@@ -1165,6 +1169,7 @@ const frBase: CheckoutCopyBase = {
   forDaysTemplate: "pour {n} jours",
   perDay: "/ jour",
   freeCancellation: "Annulation gratuite jusqu'à 48 h avant la prise en charge",
+  partnerLanguages: "Langues parlées par l'agence",
   yearLabel: "Année",
   colorLabel: "Couleur",
   bodyTypeLabel: "Carrosserie",
@@ -1446,6 +1451,7 @@ const deBase: CheckoutCopyBase = {
   forDaysTemplate: "für {n} Tage",
   perDay: "/ Tag",
   freeCancellation: "Kostenlose Stornierung bis 48 Stunden vor Abholung",
+  partnerLanguages: "Sprachen des Vermieters",
   yearLabel: "Baujahr",
   colorLabel: "Farbe",
   bodyTypeLabel: "Karosserie",
@@ -1727,6 +1733,7 @@ const plBase: CheckoutCopyBase = {
   forDaysTemplate: "za {n} dni",
   perDay: "/ dzień",
   freeCancellation: "Bezpłatne anulowanie do 48 godzin przed odbiorem",
+  partnerLanguages: "Języki kontaktu z firmą",
   yearLabel: "Rok",
   colorLabel: "Kolor",
   bodyTypeLabel: "Nadwozie",
@@ -2007,6 +2014,7 @@ const arBase: CheckoutCopyBase = {
   forDaysTemplate: "لمدة {n} أيام",
   perDay: "/ يوم",
   freeCancellation: "إلغاء مجاني حتى 48 ساعة قبل الاستلام",
+  partnerLanguages: "لغات التواصل مع الشركة",
   yearLabel: "السنة",
   colorLabel: "اللون",
   bodyTypeLabel: "نوع الهيكل",
