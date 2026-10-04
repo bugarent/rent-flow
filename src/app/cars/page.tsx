@@ -51,6 +51,60 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
+const INSURANCE_SWEEP_MS = 5 * 60_000;
+let lastInsuranceSweepAt = 0;
+
+/** At most one background sweep per instance every few minutes (the cron job also runs it). */
+function scheduleInsuranceRemoderation() {
+  const now = Date.now();
+  if (now - lastInsuranceSweepAt < INSURANCE_SWEEP_MS) return;
+  lastInsuranceSweepAt = now;
+  void import("@/lib/server/car-insurance-expiry")
+    .then((m) => m.applyExpiredInsuranceRemoderation())
+    .catch((error) => console.warn("[cars page] insurance expiry", error));
+}
+
+async function loadExpiredInsuranceIds(): Promise<Set<string>> {
+  try {
+    const { listExpiredInsuranceCarIds } = await import("@/lib/server/car-insurance-store");
+    return new Set(await listExpiredInsuranceCarIds());
+  } catch {
+    return new Set();
+  }
+}
+
+async function loadSiteDiscountPercent(): Promise<number> {
+  try {
+    const { getPlatformSettings } = await import("@/lib/server/platform-settings-store");
+    const settings = await getPlatformSettings();
+    return clampSiteDiscountPercent(settings.siteDiscountPercent, settings.depositPercent);
+  } catch {
+    return 0;
+  }
+}
+
+async function loadCompanySettingsFiles() {
+  try {
+    const { listCompanySettingsFiles } = await import("@/lib/server/partner-company-settings-store");
+    return await listCompanySettingsFiles();
+  } catch {
+    return [];
+  }
+}
+
+async function loadUnavailableCarIds(startDate?: string, endDate?: string): Promise<Set<string>> {
+  if (!startDate) return new Set();
+  const rangeStart = new Date(startDate);
+  const rangeEnd = endDate ? new Date(endDate) : new Date(rangeStart.getTime() + 24 * 60 * 60 * 1000);
+  if (Number.isNaN(rangeStart.getTime()) || Number.isNaN(rangeEnd.getTime())) return new Set();
+  try {
+    const { carIdsUnavailableInRange } = await import("@/lib/server/car-availability");
+    return await carIdsUnavailableInRange(rangeStart, rangeEnd);
+  } catch {
+    return new Set();
+  }
+}
+
 function resolveDriverRequirement(
   details: ReturnType<typeof parseCarDetails>,
   key: "minDriverAge" | "minLicenseYears",
@@ -75,19 +129,25 @@ export default async function CarsPage({
     dropoffAddress?: string;
   }>;
 }) {
-  try {
-    const { applyExpiredInsuranceRemoderation } = await import(
-      "@/lib/server/car-insurance-expiry"
-    );
-    await applyExpiredInsuranceRemoderation();
-  } catch (error) {
-    console.warn("[cars page] insurance expiry", error);
-  }
+  // Expired-insurance cars are filtered out below; the status write itself does not block the page.
+  scheduleInsuranceRemoderation();
 
-  const { startDate, endDate, pickup, dropoff, category, pickupAddress, dropoffAddress } =
-    await searchParams;
-  const { locale } = await readPreferences();
+  const [{ startDate, endDate, pickup, dropoff, category, pickupAddress, dropoffAddress }, { locale }] =
+    await Promise.all([searchParams, readPreferences()]);
   const dictionary = getDictionary(locale);
+  const pickupCode = pickup?.trim();
+
+  // Independent reads start together instead of one after another.
+  const expiredIdsPromise = loadExpiredInsuranceIds();
+  const fileCarsPromise = loadPublicFileSearchCars({ pickup: pickupCode }).catch(() => []);
+  const extrasCatalogPromise = listExtraServices({ activeOnly: true }).catch(() => null);
+  const searchOptionsPromise = getSearchDeliveryAirports().catch(() => []);
+  const siteDiscountPromise = loadSiteDiscountPercent();
+  const companyFilesPromise = loadCompanySettingsFiles();
+  const unavailablePromise = loadUnavailableCarIds(startDate, endDate);
+  const categoriesPromise = import("@/lib/server/homepage-categories-store").then((m) =>
+    m.listHomepageCategories(),
+  );
 
   const where: Prisma.CarWhereInput = {
     status: "APPROVED",
@@ -130,8 +190,7 @@ export default async function CarsPage({
     mappedModels: Array<{ make: string; model: string }>;
   }> = [];
   try {
-    const { listHomepageCategories } = await import("@/lib/server/homepage-categories-store");
-    const allCategories = await listHomepageCategories();
+    const allCategories = await categoriesPromise;
     for (const cat of allCategories) categoryLabels.set(cat.slug, cat.name);
     filterCategories = allCategories
       .filter((c) => c.isActive !== false)
@@ -223,7 +282,7 @@ export default async function CarsPage({
   }
 
   try {
-    const fileCars = await loadPublicFileSearchCars({ pickup: pickupIata });
+    const fileCars = await fileCarsPromise;
     const seen = new Set(cars.map((car) => car.id));
     for (const fileCar of fileCars) {
       if (seen.has(fileCar.id)) continue;
@@ -268,44 +327,39 @@ export default async function CarsPage({
         .filter(Boolean),
     ),
   ];
-  let prefsByPartner = new Map<string, import("@/lib/server/partner-delivery-prefs-store").PartnerDeliveryPref[]>();
-  try {
-    prefsByPartner = await readPartnerDeliveryPrefsMap(partnerIds);
-  } catch {
-    prefsByPartner = new Map();
-  }
-
-  // Also try local-partner alias for file partners
   const aliasIds = partnerIds.filter((id) => id.startsWith("file-partner-"));
-  if (aliasIds.length) {
-    try {
-      const localPrefs = await readPartnerDeliveryPrefsMap(["local-partner"]);
-      const local = localPrefs.get("local-partner") || [];
-      for (const id of aliasIds) {
-        if (!(prefsByPartner.get(id) || []).length) prefsByPartner.set(id, local);
-      }
-    } catch {
-      /* optional */
+  const extraPrefIds = new Set(partnerIds);
+  for (const pid of partnerIds) {
+    if (pid.startsWith("file-partner-")) {
+      const stripped = pid.replace(/^file-partner-/, "");
+      if (stripped) extraPrefIds.add(stripped);
     }
+    extraPrefIds.add("local-partner");
   }
+  const discountFrom = startDate || new Date().toISOString();
+  const discountTo = endDate || startDate || discountFrom;
+  const [deliveryPrefsMap, extraPrefsMap, periodMap, unavailable, expiredIds] = await Promise.all([
+    readPartnerDeliveryPrefsMap(aliasIds.length ? [...partnerIds, "local-partner"] : partnerIds).catch(
+      () => new Map<string, import("@/lib/server/partner-delivery-prefs-store").PartnerDeliveryPref[]>(),
+    ),
+    readPartnerExtraPrefsMap([...extraPrefIds]).catch(() => new Map<string, PartnerExtraPref[]>()),
+    // When search has no dates (category/airport links), still apply discounts active today.
+    periodDiscountPercentByCarId(discountFrom, discountTo, cars.map((c) => c.id)).catch(
+      () => new Map<string, number>(),
+    ),
+    unavailablePromise,
+    expiredIdsPromise,
+  ]);
 
-  const extrasPrefsByPartner = new Map<string, PartnerExtraPref[]>();
-  try {
-    const ids = new Set(partnerIds);
-    for (const pid of partnerIds) {
-      if (pid.startsWith("file-partner-")) {
-        const stripped = pid.replace(/^file-partner-/, "");
-        if (stripped) ids.add(stripped);
-      }
-      ids.add("local-partner");
+  const prefsByPartner = new Map(deliveryPrefsMap);
+  if (aliasIds.length) {
+    const local = deliveryPrefsMap.get("local-partner") || [];
+    for (const id of aliasIds) {
+      if (!(prefsByPartner.get(id) || []).length) prefsByPartner.set(id, local);
     }
-    const prefsMap = await readPartnerExtraPrefsMap([...ids]);
-    for (const [pid, prefs] of prefsMap) {
-      extrasPrefsByPartner.set(pid, prefs);
-    }
-  } catch {
-    /* optional */
   }
+  const extrasPrefsByPartner = new Map<string, PartnerExtraPref[]>(extraPrefsMap);
+  if (expiredIds.size) cars = cars.filter((car) => !expiredIds.has(car.id));
 
   cars = cars.map((car) => {
     const pid = car.partnerId || car.partner?.id || "";
@@ -352,63 +406,41 @@ export default async function CarsPage({
     }
   }
 
-  if (startDate) {
-    const rangeStart = new Date(startDate);
-    const rangeEnd = endDate ? new Date(endDate) : new Date(rangeStart.getTime() + 24 * 60 * 60 * 1000);
-    if (!Number.isNaN(rangeStart.getTime()) && !Number.isNaN(rangeEnd.getTime())) {
-      try {
-        const { carIdsUnavailableInRange } = await import("@/lib/server/car-availability");
-        const unavailable = await carIdsUnavailableInRange(rangeStart, rangeEnd);
-        if (unavailable.size) cars = cars.filter((car) => !unavailable.has(car.id));
-      } catch {
-        /* availability optional */
-      }
-    }
-  }
-
-  let periodByCar = new Map<string, number>();
-  try {
-    // When search has no dates (category/airport links), still apply discounts active today.
-    const discountFrom = startDate || new Date().toISOString();
-    const discountTo = endDate || startDate || discountFrom;
-    periodByCar = await periodDiscountPercentByCarId(
-      discountFrom,
-      discountTo,
-      cars.map((c) => c.id),
-    );
-  } catch {
-    periodByCar = new Map();
-  }
+  if (unavailable.size) cars = cars.filter((car) => !unavailable.has(car.id));
+  const periodByCar = periodMap;
 
   const rentalDays = startDate && endDate ? rentalDayCount(startDate, endDate) : 1;
 
   const partnerDepositMethods = new Map<string, string[]>();
   const partnerRentPaymentMethods = new Map<string, string[]>();
   try {
-    const { listCompanySettingsFiles, resolveCompanySettings } = await import(
-      "@/lib/server/partner-company-settings-store"
-    );
-    const fileSettings = await listCompanySettingsFiles();
+    const { resolveCompanySettings } = await import("@/lib/server/partner-company-settings-store");
+    const fileSettings = await companyFilesPromise;
     for (const row of fileSettings) {
       partnerDepositMethods.set(row.partnerId, row.settings.depositMethods || []);
       partnerRentPaymentMethods.set(row.partnerId, row.settings.rentPaymentMethods || []);
     }
+    const missing = new Map<string, (typeof cars)[number]>();
     for (const car of cars) {
       const pid = car.partner?.id || car.partnerId || "";
-      if (!pid || partnerDepositMethods.has(pid)) continue;
-      try {
-        const settings = await resolveCompanySettings({
-          id: pid,
-          companySettings: car.partner?.companySettings,
-          companyName: car.partner?.companyName,
-        });
-        partnerDepositMethods.set(pid, settings.depositMethods || []);
-        partnerRentPaymentMethods.set(pid, settings.rentPaymentMethods || []);
-      } catch {
-        partnerDepositMethods.set(pid, ["Cash"]);
-        partnerRentPaymentMethods.set(pid, ["Cash"]);
-      }
+      if (pid && !partnerDepositMethods.has(pid) && !missing.has(pid)) missing.set(pid, car);
     }
+    await Promise.all(
+      [...missing].map(async ([pid, car]) => {
+        try {
+          const settings = await resolveCompanySettings({
+            id: pid,
+            companySettings: car.partner?.companySettings,
+            companyName: car.partner?.companyName,
+          });
+          partnerDepositMethods.set(pid, settings.depositMethods || []);
+          partnerRentPaymentMethods.set(pid, settings.rentPaymentMethods || []);
+        } catch {
+          partnerDepositMethods.set(pid, ["Cash"]);
+          partnerRentPaymentMethods.set(pid, ["Cash"]);
+        }
+      }),
+    );
   } catch {
     /* partner settings optional */
   }
@@ -517,7 +549,7 @@ export default async function CarsPage({
   let filterExtras: Array<{ id: string; slug: string; name: string }> = [];
   let crossBorderFilter: { id: string; name: string } | null = null;
   try {
-    const catalog = await listExtraServices({ activeOnly: true });
+    const catalog = (await extrasCatalogPromise) ?? [];
     for (const service of catalog) {
       if (!service.isActive || service.isTpl) continue;
       if (isCrossBorderExtra(service)) {
@@ -539,21 +571,10 @@ export default async function CarsPage({
     crossBorderFilter = null;
   }
 
-  let searchOptions: Awaited<ReturnType<typeof getSearchDeliveryAirports>> = [];
-  try {
-    searchOptions = await getSearchDeliveryAirports();
-  } catch {
-    searchOptions = [];
-  }
-
-  let siteDiscountPercent = 0;
-  try {
-    const { getPlatformSettings } = await import("@/lib/server/platform-settings-store");
-    const settings = await getPlatformSettings();
-    siteDiscountPercent = clampSiteDiscountPercent(settings.siteDiscountPercent, settings.depositPercent);
-  } catch {
-    siteDiscountPercent = 0;
-  }
+  const [searchOptions, siteDiscountPercent] = await Promise.all([
+    searchOptionsPromise,
+    siteDiscountPromise,
+  ]);
 
   const emptyMessage = pickupIata
     ? dictionary.common.noCarsDelivery.replace("{airport}", pickupIata)

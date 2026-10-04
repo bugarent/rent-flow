@@ -130,6 +130,28 @@ type CarPayload = {
   contractUrl?: string;
 };
 
+function deriveCarState(payload: CarPayload, prevQty: Record<string, number>) {
+  const paid = listPaidExtras(payload);
+  const insurance = listInsuranceExtras(payload);
+  const qty = { ...prevQty };
+  for (const pack of [...insurance, ...paid]) {
+    if (pack.locked) {
+      qty[pack.id] = 1;
+    } else if (qty[pack.id] === undefined) {
+      // Free cancel-48 starts on; paid protection can turn it off.
+      qty[pack.id] = isFreeCancellation48Extra(pack) ? 1 : 0;
+    }
+  }
+  return {
+    car: payload,
+    details: parseCarDetails(payload.description),
+    paid,
+    forbidden: listForbiddenExtras(payload),
+    insurance,
+    qty,
+  };
+}
+
 export function ReserveCheckout({
   carId,
   startDate: initialStart,
@@ -138,6 +160,8 @@ export function ReserveCheckout({
   dropoff: initialDropoff,
   pickupAddress: initialPickupAddress,
   dropoffAddress: initialDropoffAddress,
+  initialCar = null,
+  initialRange = "",
 }: {
   carId: string;
   startDate: string;
@@ -146,6 +170,8 @@ export function ReserveCheckout({
   dropoff: string;
   pickupAddress: string;
   dropoffAddress: string;
+  initialCar?: Record<string, unknown> | null;
+  initialRange?: string;
 }) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -173,7 +199,9 @@ export function ReserveCheckout({
   const [error, setError] = useState("");
   const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
-  const [carLoading, setCarLoading] = useState(true);
+  const [carLoading, setCarLoading] = useState(
+    () => !(initialCar && initialRange === `${initialStart}|${initialEnd || initialStart}`),
+  );
   const [checkoutStep, setCheckoutStep] = useState<"details" | "payment">("details");
   const [guestNoticeOpen, setGuestNoticeOpen] = useState(false);
   const [previewBookingRef, setPreviewBookingRef] = useState("");
@@ -205,12 +233,17 @@ export function ReserveCheckout({
     void loadPreviewBookingRef();
   }, [loadPreviewBookingRef]);
 
-  const [car, setCar] = useState<CarPayload | null>(null);
-  const [details, setDetails] = useState<CarDetailsBlob | null>(null);
-  const [paidExtras, setPaidExtras] = useState<PaidExtra[]>([]);
-  const [forbiddenExtras, setForbiddenExtras] = useState<PaidExtra[]>([]);
-  const [insuranceExtras, setInsuranceExtras] = useState<PaidExtra[]>([]);
-  const [extraQty, setExtraQty] = useState<Record<string, number>>({});
+  const [seed] = useState(() =>
+    initialCar && initialRange === `${initialStart}|${initialEnd || initialStart}`
+      ? deriveCarState(initialCar as unknown as CarPayload, {})
+      : null,
+  );
+  const [car, setCar] = useState<CarPayload | null>(seed?.car ?? null);
+  const [details, setDetails] = useState<CarDetailsBlob | null>(seed?.details ?? null);
+  const [paidExtras, setPaidExtras] = useState<PaidExtra[]>(seed?.paid ?? []);
+  const [forbiddenExtras, setForbiddenExtras] = useState<PaidExtra[]>(seed?.forbidden ?? []);
+  const [insuranceExtras, setInsuranceExtras] = useState<PaidExtra[]>(seed?.insurance ?? []);
+  const [extraQty, setExtraQty] = useState<Record<string, number>>(seed?.qty ?? {});
   const [fullProtection, setFullProtection] = useState(false);
   const [cancellationProtection, setCancellationProtection] = useState(false);
   const [extraDetailId, setExtraDetailId] = useState<string | null>(null);
@@ -316,9 +349,9 @@ export function ReserveCheckout({
   }, []);
 
   useEffect(() => {
+    if (seed) return;
     let cancelled = false;
     (async () => {
-      setCarLoading(true);
       try {
         const q = new URLSearchParams();
         if (startDate) q.set("startDate", startDate);
@@ -327,27 +360,15 @@ export function ReserveCheckout({
         const carRes = await fetch(`/api/cars/${carId}${qs ? `?${qs}` : ""}`);
         if (!carRes.ok || cancelled) return;
         const payload = (await carRes.json()) as CarPayload;
-        setCar(payload);
-        setDetails(parseCarDetails(payload.description));
-        const paid = listPaidExtras(payload);
-        setPaidExtras(paid);
-        setForbiddenExtras(listForbiddenExtras(payload));
-        const insurance = listInsuranceExtras(payload);
-        setInsuranceExtras(insurance);
-        setExtraQty((prev) => {
-          const next = { ...prev };
-          for (const pack of [...insurance, ...paid]) {
-            if (pack.locked) {
-              next[pack.id] = 1;
-            } else if (next[pack.id] === undefined) {
-              // Free cancel-48 starts on; paid protection can turn it off.
-              next[pack.id] = isFreeCancellation48Extra(pack) ? 1 : 0;
-            }
-          }
-          return next;
-        });
-        const fullPack = insurance.find((pack) => pack.checkoutSlot === "full");
-        if (fullPack) setFullProtection(false);
+        if (cancelled) return;
+        const next = deriveCarState(payload, {});
+        setCar(next.car);
+        setDetails(next.details);
+        setPaidExtras(next.paid);
+        setForbiddenExtras(next.forbidden);
+        setInsuranceExtras(next.insurance);
+        setExtraQty(next.qty);
+        if (next.insurance.some((pack) => pack.checkoutSlot === "full")) setFullProtection(false);
       } catch {
         /* optional */
       } finally {
@@ -357,7 +378,7 @@ export function ReserveCheckout({
     return () => {
       cancelled = true;
     };
-  }, [carId, startDate, endDate]);
+  }, [seed, carId, startDate, endDate]);
 
   useEffect(() => {
     const user = session?.user as

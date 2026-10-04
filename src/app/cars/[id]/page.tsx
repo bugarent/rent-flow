@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import { CarBookingClient } from "@/components/cars/car-booking-client";
 import { JsonLd } from "@/components/seo/json-ld";
 import { readPreferences } from "@/lib/server/preferences";
@@ -8,9 +9,12 @@ import { buildBreadcrumbJsonLd, buildProductVehicleJsonLd } from "@/lib/seo/json
 import { carDetailSeo } from "@/lib/seo/pages";
 import { toNumber } from "@/lib/utils";
 
-type Props = { params: Promise<{ id: string }> };
+type Props = {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
-async function loadCarSeo(id: string) {
+const loadCarSeo = cache(async (id: string) => {
   try {
     const { prisma } = await import("@/lib/prisma");
     const car = await prisma.car.findUnique({
@@ -33,6 +37,20 @@ async function loadCarSeo(id: string) {
     });
     return car;
   } catch {
+    return null;
+  }
+});
+
+function firstParam(value: string | string[] | undefined) {
+  return String(Array.isArray(value) ? value[0] : value || "").slice(0, 10);
+}
+
+async function loadInitialCar(id: string, startDate: string, endDate: string) {
+  try {
+    const { loadPublicCarPayload } = await import("@/lib/server/public-car-payload");
+    return await loadPublicCarPayload(id, { rangeFrom: startDate, rangeTo: endDate || startDate });
+  } catch (error) {
+    console.warn("[cars/[id]] initial car", error);
     return null;
   }
 }
@@ -69,9 +87,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function CarBookingPage({ params }: Props) {
+export default async function CarBookingPage({ params, searchParams }: Props) {
   const { id } = await params;
-  const car = await loadCarSeo(id);
+  const query = await searchParams;
+  const startDate = firstParam(query.startDate);
+  const endDate = firstParam(query.endDate) || startDate;
+  const [car, initialCar] = await Promise.all([
+    loadCarSeo(id),
+    loadInitialCar(id, startDate, endDate),
+  ]);
   const path = `/cars/${encodeURIComponent(id)}`;
   const url = absoluteUrl(path);
 
@@ -101,7 +125,11 @@ export default async function CarBookingPage({ params }: Props) {
   return (
     <>
       {schemas.length ? <JsonLd data={schemas} /> : null}
-      <CarBookingClient params={params} />
+      <CarBookingClient
+        params={params}
+        initialCar={initialCar ? JSON.parse(JSON.stringify(initialCar)) : null}
+        initialRange={`${startDate}|${endDate}`}
+      />
     </>
   );
 }

@@ -33,6 +33,12 @@ import {
   normalizePartnerCategorySlug,
   resolveCategorySlugForCar,
 } from "@/lib/server/category-mapping";
+import {
+  enrichPublicCarPayload,
+  loadPublicCarPayload,
+  PUBLIC_CAR_INCLUDE,
+  shapeFileCarForApi,
+} from "@/lib/server/public-car-payload";
 
 async function resolveCarExtras(rawExtras: unknown) {
   const catalog = await listExtraServices({ activeOnly: true });
@@ -59,144 +65,17 @@ async function resolveCarExtras(rawExtras: unknown) {
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const partnerSession = await getPartnerSession();
-  const adminSession = await getAdminSession();
+  const [partnerSession, adminSession] = await Promise.all([getPartnerSession(), getAdminSession()]);
   const isAdmin = adminSession?.user.role === "ADMIN";
   const isVendor = partnerSession?.user.role === "VENDOR";
   const url = new URL(req.url);
   const rangeFrom = String(url.searchParams.get("startDate") || "").slice(0, 10);
   const rangeTo = String(url.searchParams.get("endDate") || rangeFrom).slice(0, 10);
 
-  async function withPeriodDiscount<T extends { discountPercent?: unknown }>(payload: T): Promise<T> {
-    if (!rangeFrom) return payload;
-    try {
-      const {
-        mergeListingDiscountPercent,
-        periodDiscountPercentByCarId,
-      } = await import("@/lib/server/partner-period-discounts-store");
-      const map = await periodDiscountPercentByCarId(rangeFrom, rangeTo || rangeFrom, [id]);
-      const base = Number(payload.discountPercent) || 0;
-      return {
-        ...payload,
-        discountPercent: mergeListingDiscountPercent(base, map.get(id) ?? 0),
-      };
-    } catch {
-      return payload;
-    }
-  }
-
-  async function withDeliveryPrefs<T extends {
-    partnerId?: string;
-    partner?: { id?: string };
-    deliveryPrices?: unknown;
-  }>(payload: T, partnerIdHint?: string): Promise<T> {
-    try {
-      const partnerId =
-        partnerIdHint ||
-        payload.partnerId ||
-        payload.partner?.id ||
-        "";
-      if (!partnerId) return payload;
-      const { readPartnerDeliveryPrefs } = await import("@/lib/server/partner-delivery-prefs-store");
-      const { mergeDeliveryPrefsIntoRows } = await import("@/lib/delivery/trip-fees");
-      let prefs = await readPartnerDeliveryPrefs(partnerId);
-      if (!prefs.length && partnerId.startsWith("file-partner-")) {
-        prefs = await readPartnerDeliveryPrefs("local-partner");
-      }
-      if (!prefs.length || !Array.isArray(payload.deliveryPrices)) return payload;
-      return {
-        ...payload,
-        deliveryPrices: mergeDeliveryPrefsIntoRows(
-          payload.deliveryPrices as Array<Record<string, unknown>>,
-          prefs,
-        ),
-      };
-    } catch {
-      return payload;
-    }
-  }
-
-  async function withHydratedExtras<T extends {
-    id?: string;
-    extras?: unknown;
-    partnerId?: string;
-    partner?: { id?: string };
-  }>(payload: T, partnerIdHint?: string): Promise<T> {
-    try {
-      const {
-        hydrateListingExtras,
-        mergeFreeInsuranceExtras,
-        applyPartnerExtraOfferModes,
-        mergePartnerOfferedExtras,
-      } = await import("@/lib/server/extras-store");
-      const partnerId =
-        partnerIdHint ||
-        payload.partnerId ||
-        payload.partner?.id ||
-        "";
-      const carId = String(payload.id || "").trim();
-      const hydrated = await hydrateListingExtras(payload.extras);
-      const withPrefs = await applyPartnerExtraOfferModes(hydrated, partnerId, carId);
-      const withOffered = await mergePartnerOfferedExtras(withPrefs, partnerId, carId);
-      return {
-        ...payload,
-        extras: await mergeFreeInsuranceExtras(withOffered),
-      };
-    } catch {
-      return payload;
-    }
-  }
-
-  async function withCompanyPayments<T extends { partnerId?: string; partner?: { id?: string } }>(
-    payload: T,
-    partnerIdHint?: string,
-  ): Promise<
-    T & { rentPaymentMethods: string[]; contractUrl: string; partnerClientLanguages: string[] }
-  > {
-    const partnerId = String(partnerIdHint || payload.partnerId || payload.partner?.id || "").trim();
-    const { loadPartnerClientLanguages } = await import("@/lib/server/partner-client-languages");
-    const partnerClientLanguages = await loadPartnerClientLanguages(partnerId).catch(() => []);
-    const base = await withPaymentsOnly(payload, partnerId);
-    return { ...base, partnerClientLanguages };
-  }
-
-  async function withPaymentsOnly<T extends object>(
-    payload: T,
-    partnerId: string,
-  ): Promise<T & { rentPaymentMethods: string[]; contractUrl: string }> {
-    try {
-      if (!partnerId) return { ...payload, rentPaymentMethods: [], contractUrl: "" };
-      const { readCompanySettingsFile } = await import("@/lib/server/partner-company-settings-store");
-      const { LOCAL_PARTNER_ID } = await import("@/lib/auth/local-partner-store");
-      const { getPlatformSettings } = await import("@/lib/server/platform-settings-store");
-      const { resolveActiveContractUrl } = await import("@/lib/partners/company-settings");
-      const ids = [partnerId];
-      if (partnerId.startsWith("file-partner-")) {
-        const stripped = partnerId.replace(/^file-partner-/, "");
-        if (stripped && !ids.includes(stripped)) ids.push(stripped);
-      }
-      if (!ids.includes(LOCAL_PARTNER_ID)) ids.push(LOCAL_PARTNER_ID);
-      const siteContractUrl = (await getPlatformSettings()).siteContractUrl || "";
-      for (const id of ids) {
-        const settings = await readCompanySettingsFile(id);
-        if (settings) {
-          return {
-            ...payload,
-            rentPaymentMethods: Array.isArray(settings.rentPaymentMethods)
-              ? settings.rentPaymentMethods.map(String)
-              : [],
-            contractUrl: resolveActiveContractUrl(settings, siteContractUrl),
-          };
-        }
-      }
-      return {
-        ...payload,
-        rentPaymentMethods: [],
-        contractUrl: siteContractUrl,
-      };
-    } catch {
-      return { ...payload, rentPaymentMethods: [], contractUrl: "" };
-    }
+  if (!partnerSession && !adminSession) {
+    const publicCar = await loadPublicCarPayload(id, { rangeFrom, rangeTo });
+    if (!publicCar) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json(publicCar);
   }
 
   async function withPublishedSnapshotForAdmin<T extends object>(
@@ -223,13 +102,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   async function enrichPublicCar<T extends object>(payload: T, partnerIdHint?: string) {
-    return withCompanyPayments(
-      await withHydratedExtras(
-        await withDeliveryPrefs(await withPeriodDiscount(payload), partnerIdHint),
-        partnerIdHint,
-      ),
+    return enrichPublicCarPayload(payload, {
+      carId: id,
       partnerIdHint,
-    );
+      rangeFrom,
+      rangeTo,
+    });
   }
 
   let car: any = null;
@@ -237,25 +115,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     car = await prisma.car.findUnique({
       where: { id },
       include: {
-        photos: { orderBy: { sortOrder: "asc" } },
-        extras: { include: { extraService: true } },
-        deliveryPrices: {
-          include: {
-            deliveryLocation: {
-              include: { airport: { include: { city: { include: { country: true } } } } },
-            },
-          },
-        },
-        partner: {
-          select: {
-            id: true,
-            companyName: true,
-            logoUrl: true,
-            status: true,
-            userId: true,
-            reviews: { where: { status: "APPROVED" }, select: { averageRating: true } },
-          },
-        },
+        ...PUBLIC_CAR_INCLUDE,
         ...(isAdmin || isVendor ? { passport: true } : {}),
       },
     });
@@ -272,42 +132,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     const insuranceDoc = await readCarInsuranceDoc(id);
-    const insuranceUrl = insuranceDoc?.insuranceUrl || null;
-    const insuranceExpiresAt = insuranceDoc?.insuranceExpiresAt || null;
-    const { listDeliveryLocations } = await import("@/lib/server/delivery-locations");
-    const { normalizeLocationCode } = await import("@/lib/catalog/search-places");
-    const locations = await listDeliveryLocations({ activeOnly: false });
-    const byId = new Map(locations.map((l) => [l.id, l]));
-    const shaped = fileCarToApiShape(fileCar, insuranceUrl, insuranceExpiresAt);
-    const enrichedPrices = (fileCar.deliveryPrices || []).map((row) => {
-      const loc = byId.get(row.deliveryLocationId);
-      const iata = (loc?.iata || normalizeLocationCode(row.deliveryLocationId) || "").toUpperCase();
-      return {
-        deliveryLocationId: row.deliveryLocationId,
-        priceEur: row.priceEur,
-        freeAfterDays: row.freeAfterDays ?? null,
-        travelTimeMinutes: row.travelTimeMinutes ?? 0,
-        deliveryLocation: {
-          id: loc?.id || row.deliveryLocationId,
-          isActive: loc ? loc.isActive !== false : Boolean(iata),
-          airport: iata
-            ? {
-                iata,
-                city: { country: { iso2: (loc?.countryIso2 || "").toUpperCase() } },
-              }
-            : null,
-        },
-      };
-    });
-    const payload = await enrichPublicCar(
-      {
-        ...shaped,
-        partnerId: fileCar.partnerId,
-        extras: fileCar.extras || [],
-        deliveryPrices: enrichedPrices,
-      },
-      fileCar.partnerId,
+    const shaped = await shapeFileCarForApi(
+      fileCar,
+      insuranceDoc?.insuranceUrl || null,
+      insuranceDoc?.insuranceExpiresAt || null,
     );
+    const payload = await enrichPublicCar(shaped, fileCar.partnerId);
     if (!isAdmin && !isOwner) {
       const { passport: _passport, insuranceUrl: _insurance, ...publicPayload } = payload;
       return NextResponse.json(publicPayload);
