@@ -10,6 +10,7 @@ import { AdminFinancialsCountryBreakdown } from "@/components/admin/admin-financ
 import { AdminFinancialsBookingsTable } from "@/components/admin/admin-financials-bookings-table";
 import { AdminFinancialsFilters } from "@/components/admin/admin-financials-filters";
 import { AdminMoneyText } from "@/components/admin/admin-money-text";
+import { AdminPeriodPurgePanel } from "@/components/admin/admin-period-purge-panel";
 
 type FinanceView = "active" | "partner-cancelled";
 
@@ -373,6 +374,8 @@ export async function AdminFinancialsPanel({
                 : `No active bookings in this period${countryFilter ? ` for ${selectedCountryLabel}` : ""}.`
           }
         />
+
+        <AdminPeriodPurgePanel from={from} to={to} />
     </div>
   );
 }

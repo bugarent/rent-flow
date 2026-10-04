@@ -293,8 +293,17 @@ export async function loadAdminBookingFacts(): Promise<AdminBookingFact[]> {
     console.warn("[admin-booking-facts] retained", error);
   }
 
-  facts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  return facts;
+  let excluded = new Set<string>();
+  try {
+    const { listFinanceExcludedIds } = await import("@/lib/server/finance-excluded-bookings");
+    excluded = await listFinanceExcludedIds();
+  } catch (error) {
+    console.warn("[admin-booking-facts] finance exclusions", error);
+  }
+
+  const visible = excluded.size ? facts.filter((fact) => !excluded.has(fact.id)) : facts;
+  visible.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return visible;
 }
 
 /** Freeze the booking for finance and statistics before it leaves the live list. */

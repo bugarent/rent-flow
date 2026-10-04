@@ -41,7 +41,19 @@ export async function listRetainedBookingFacts(): Promise<AdminBookingFact[]> {
   return store.facts;
 }
 
-/** Insert or replace. Existing retained rows are never dropped. */
+/** Admin period cleanup: drop finance copies by id. Returns how many were removed. */
+export async function deleteRetainedBookingFacts(ids: readonly string[]): Promise<number> {
+  if (!ids.length) return 0;
+  const drop = new Set(ids);
+  const store = await readStore();
+  const before = store.facts.length;
+  store.facts = store.facts.filter((row) => !drop.has(row.id));
+  const removed = before - store.facts.length;
+  if (removed) await writeStore(store);
+  return removed;
+}
+
+/** Insert or replace. Existing retained rows are kept unless the admin deletes them. */
 export async function saveRetainedBookingFact(fact: AdminBookingFact): Promise<void> {
   const store = await readStore();
   const idx = store.facts.findIndex((row) => row.id === fact.id);
