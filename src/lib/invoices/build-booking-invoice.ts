@@ -1,7 +1,16 @@
 import { formatBookingRef, formatPartnerCode } from "@/lib/ids";
 import { pickServiceLabel } from "@/lib/extras/service-label";
-import { DEFAULT_DEPOSIT_PERCENT, roundMoney } from "@/lib/cars/reserve-pricing";
+import {
+  CARD_PICKUP_SURCHARGE_PERCENT,
+  DEFAULT_DEPOSIT_PERCENT,
+  roundMoney,
+} from "@/lib/cars/reserve-pricing";
 import { settleBookingMoney } from "@/lib/bookings/booking-money";
+import {
+  BP_CUSTOMER_DISCOUNT_PERCENT,
+  bookingHasBusinessPartnerPromo,
+  reconstructBpPreDiscountRental,
+} from "@/lib/business-partner/referral-pricing";
 import {
   expandRefundChangesFromTrip,
   rentalDayCount,
@@ -25,6 +34,7 @@ export type InvoiceBookingInput = {
   depositPercent?: number;
   depositPaidEur?: number;
   balanceDueEur?: number;
+  promoCode?: string | null;
   guestFirstName?: string;
   guestLastName?: string;
   guestEmail?: string;
@@ -82,6 +92,89 @@ function placeLabel(opts: {
   return iata || opts.fallback || "—";
 }
 
+type InvoiceMoney = {
+  rentalEur: number;
+  dailyEur: number;
+  promoDiscountEur: number;
+  settled: {
+    tripEur: number;
+    chargedEur: number;
+    depositPercent: number;
+    siteFeeEur: number;
+    cardSurchargeEur: number;
+    cardSurchargePercent: number;
+    onlineEur: number;
+    onSiteEur: number;
+  };
+};
+
+/**
+ * Money as stored on the booking (locked rate, corrections, promo), not the live listing price.
+ * stored total = trip + card fee; stored deposit = site fee + card fee; stored balance = on site.
+ */
+function storedInvoiceMoney(input: {
+  booking: InvoiceBookingInput;
+  days: number;
+  extrasEur: number;
+  deliveryEur: number;
+  depositPercent: number;
+}): InvoiceMoney {
+  const b = input.booking;
+  const totalStored = roundMoney(Math.max(0, Number(b.totalPriceEur) || 0));
+  const depositStored = roundMoney(Math.max(0, Number(b.depositPaidEur) || 0));
+
+  if (totalStored <= 0.02 || depositStored <= 0.02) {
+    const daily = roundMoney(Number(b.car.dailyRateEur) || 0);
+    const rentalEur = roundMoney(daily * input.days);
+    const settled = settleBookingMoney({
+      rentalEur,
+      extrasEur: input.extrasEur,
+      deliveryEur: input.deliveryEur,
+      depositPercent: input.depositPercent,
+    });
+    return { rentalEur, dailyEur: daily, promoDiscountEur: 0, settled };
+  }
+
+  const siteFee = roundMoney(depositStored / (1 + CARD_PICKUP_SURCHARGE_PERCENT / 100));
+  const card = roundMoney(Math.max(0, depositStored - siteFee));
+  const trip = roundMoney(Math.max(0, totalStored - card));
+  const storedBalance = Number(b.balanceDueEur);
+  const onSite =
+    Number.isFinite(storedBalance) && Math.abs(storedBalance + siteFee - trip) <= 0.05
+      ? roundMoney(Math.max(0, storedBalance))
+      : roundMoney(Math.max(0, trip - siteFee));
+
+  const bp = bookingHasBusinessPartnerPromo(b.promoCode);
+  const rentalEur = bp
+    ? reconstructBpPreDiscountRental({
+        totalPriceEur: totalStored,
+        depositPaidEur: depositStored,
+        extrasEur: input.extrasEur,
+        deliveryEur: input.deliveryEur,
+      })
+    : roundMoney(Math.max(0, trip - input.extrasEur - input.deliveryEur));
+  const promoDiscountEur = bp
+    ? roundMoney(Math.max(0, rentalEur + input.extrasEur + input.deliveryEur - trip))
+    : 0;
+  const dailyEur = input.days > 0 ? roundMoney(rentalEur / input.days) : rentalEur;
+
+  return {
+    rentalEur,
+    dailyEur,
+    promoDiscountEur,
+    settled: {
+      tripEur: trip,
+      chargedEur: totalStored,
+      depositPercent: input.depositPercent,
+      siteFeeEur: siteFee,
+      cardSurchargeEur: card,
+      cardSurchargePercent: CARD_PICKUP_SURCHARGE_PERCENT,
+      onlineEur: depositStored,
+      onSiteEur: onSite,
+    },
+  };
+}
+
 export function buildBookingInvoiceDocument(input: {
   booking: InvoiceBookingInput;
   issuer: InvoiceIssuer;
@@ -90,10 +183,26 @@ export function buildBookingInvoiceDocument(input: {
 }): BookingInvoiceDocument {
   const b = input.booking;
   const days = rentalDayCount(b.pickupAt, b.dropoffAt);
-  const daily = roundMoney(Number(b.car.dailyRateEur) || 0);
-  const rentalTotal = roundMoney(daily > 0 ? daily * days : 0);
   const deliveryTotal = roundMoney(Number(b.delivery?.totalFeeEur) || 0);
   const extras = Array.isArray(b.extras) ? b.extras : [];
+  const pickupFee = roundMoney(Math.max(0, Number(b.delivery?.pickupFeeEur) || 0));
+  const dropoffFee = roundMoney(Math.max(0, Number(b.delivery?.dropoffFeeEur) || 0));
+  const deliveryCharged =
+    pickupFee + dropoffFee > 0 ? roundMoney(pickupFee + dropoffFee) : deliveryTotal;
+  const extrasCharged = roundMoney(
+    extras.reduce((sum, ex) => sum + Math.max(0, Number(ex.priceEur) || 0), 0),
+  );
+  const rawPercent = Number(b.depositPercent);
+  const depositPercent = Number.isFinite(rawPercent) ? rawPercent : DEFAULT_DEPOSIT_PERCENT;
+  const money = storedInvoiceMoney({
+    booking: b,
+    days,
+    extrasEur: extrasCharged,
+    deliveryEur: deliveryCharged,
+    depositPercent,
+  });
+  const daily = money.dailyEur;
+  const rentalTotal = money.rentalEur;
 
   const locale = input.locale || "ka";
   const L =
@@ -112,6 +221,7 @@ export function buildBookingInvoiceDocument(input: {
           balance: "Balance due at pick-up",
           balanceMethod: "Pay on site",
           rentalLabel: "Car rental",
+          promo: "Promo discount",
         }
       : locale === "ru"
         ? {
@@ -128,6 +238,7 @@ export function buildBookingInvoiceDocument(input: {
             balance: "К оплате при получении",
             balanceMethod: "Оплата на месте",
             rentalLabel: "Аренда авто",
+            promo: "Скидка по промокоду",
           }
         : {
             rental: "მანქანის ქირა",
@@ -143,6 +254,7 @@ export function buildBookingInvoiceDocument(input: {
             balance: "ადგილზე გადახდილია",
             balanceMethod: "გადახდა ადგილზე",
             rentalLabel: "მანქანის ქირა",
+            promo: "პრომო ფასდაკლება",
           };
 
   const lines: InvoiceLineItem[] = [];
@@ -156,8 +268,6 @@ export function buildBookingInvoiceDocument(input: {
       totalEur: rentalTotal,
     });
   }
-  const pickupFee = roundMoney(Math.max(0, Number(b.delivery?.pickupFeeEur) || 0));
-  const dropoffFee = roundMoney(Math.max(0, Number(b.delivery?.dropoffFeeEur) || 0));
   const pickupPlace = String(b.delivery?.pickupLabel || b.pickupAirport?.iata || "").trim();
   const dropoffPlace = String(b.delivery?.dropoffLabel || b.dropoffAirport?.iata || "").trim();
   if (pickupFee + dropoffFee > 0) {
@@ -188,19 +298,27 @@ export function buildBookingInvoiceDocument(input: {
       totalEur: deliveryTotal,
     });
   }
-  let paidExtrasTotal = 0;
   for (const ex of extras) {
     const description = pickServiceLabel(ex.label);
     if (!description) continue;
     const total = roundMoney(Math.max(0, Number(ex.priceEur) || 0));
     const qty = Math.max(1, Number(ex.qty) || 1);
-    if (total > 0) paidExtrasTotal = roundMoney(paidExtrasTotal + total);
     lines.push({
       sku: `EXTRA-${ex.id}`.slice(0, 40),
       description,
       quantity: qty,
       unitPriceEur: qty > 0 ? roundMoney(total / qty) : 0,
       totalEur: total,
+    });
+  }
+
+  if (money.promoDiscountEur > 0.009) {
+    lines.push({
+      sku: "PROMO",
+      description: `${L.promo} (−${BP_CUSTOMER_DISCOUNT_PERCENT}%)`,
+      quantity: 1,
+      unitPriceEur: -money.promoDiscountEur,
+      totalEur: -money.promoDiscountEur,
     });
   }
 
@@ -213,16 +331,7 @@ export function buildBookingInvoiceDocument(input: {
     });
   }
 
-  const rawPercent = Number(b.depositPercent);
-  const depositPercent = Number.isFinite(rawPercent) ? rawPercent : DEFAULT_DEPOSIT_PERCENT;
-  const deliveryCharged = pickupFee + dropoffFee > 0 ? roundMoney(pickupFee + dropoffFee) : deliveryTotal;
-  const settled = settleBookingMoney({
-    rentalEur: rentalTotal,
-    extrasEur: paidExtrasTotal,
-    deliveryEur: deliveryCharged,
-    depositPercent,
-  });
-  const totalEur = settled.tripEur;
+  const settled = money.settled;
   const depositPaidEur = settled.siteFeeEur;
   const balanceDueEur = settled.onSiteEur;
 
