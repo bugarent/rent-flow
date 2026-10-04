@@ -57,7 +57,7 @@ export async function catalogExtrasForCar(carId: string): Promise<
     minPeriodEur?: number | null;
   }>
 > {
-  const { isMandatoryFreeExtra } = await import("@/lib/extras/pricing");
+  const { isMandatoryExtra } = await import("@/lib/extras/pricing");
   try {
     const fileCar = await getFileCar(carId);
     if (fileCar?.extras?.length) {
@@ -73,7 +73,7 @@ export async function catalogExtrasForCar(carId: string): Promise<
           id: e.extraServiceId,
           label: pickServiceLabel(localizedLabel(e.extraService?.name, "")),
           priceEurPerDay: Number(e.priceEur) || 0,
-          locked: e.extraService ? isMandatoryFreeExtra(e.extraService) : false,
+          locked: e.extraService ? isMandatoryExtra(e.extraService) : false,
           maxPeriodEur: e.extraService?.maxPeriodEur ?? null,
           minPeriodEur: e.extraService?.minPeriodEur ?? null,
         }));
@@ -130,7 +130,7 @@ export async function catalogExtrasForCar(carId: string): Promise<
         maxPeriodEur: bounds.maxPeriodEur,
         minPeriodEur: bounds.minPeriodEur,
         locked: r.extraService
-          ? isMandatoryFreeExtra({
+          ? isMandatoryExtra({
               isTpl: r.extraService.isTpl,
               minPriceEur: r.extraService.minPriceEur == null ? null : Number(r.extraService.minPriceEur),
               maxPriceEur: r.extraService.maxPriceEur == null ? null : Number(r.extraService.maxPriceEur),

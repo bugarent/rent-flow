@@ -16,6 +16,7 @@ import { listFileCarsForPartner } from "@/lib/server/partner-cars-store";
 import {
   capPartnerMaxPeriod,
   clampPartnerDailyPrice,
+  isMandatoryExtra,
   isMandatoryFreeExtra,
   isPeriodForcedFreeExtra,
   optionalPeriodMoney,
@@ -188,17 +189,20 @@ export async function GET() {
         return Boolean(pref?.enabled) && !pref?.forbidden;
       })
       .map((service) => {
-      const mandatory = isMandatoryFreeExtra(service);
+      const mandatory = isMandatoryExtra(service);
+      const mandatoryFree = isMandatoryFreeExtra(service);
       const pref = prefById.get(service.id);
       const max = service.maxPriceEur;
       const forbidden = mandatory ? false : Boolean(pref?.forbidden);
       const defaultPrice =
-        mandatory || forbidden || isPeriodForcedFreeExtra(service)
+        mandatoryFree || forbidden || isPeriodForcedFreeExtra(service)
           ? 0
           : clampPartnerDailyPrice(
               service.minPriceEur,
               max,
-              pref?.priceEur ?? service.defaultPriceEur ?? service.minPriceEur ?? 0,
+              mandatory
+                ? pref?.priceEur ?? 0
+                : pref?.priceEur ?? service.defaultPriceEur ?? service.minPriceEur ?? 0,
             );
       const carIds = Array.isArray(pref?.carIds) ? pref.carIds.map(String) : allCarIds;
       return {
@@ -207,8 +211,8 @@ export async function GET() {
         forbidden,
         priceEur: defaultPrice,
         maxPriceEur: max,
-        minPeriodEur: mandatory || forbidden ? null : pref?.minPeriodEur ?? null,
-        maxPeriodEur: mandatory || forbidden ? null : pref?.maxPeriodEur ?? null,
+        minPeriodEur: mandatoryFree || forbidden ? null : pref?.minPeriodEur ?? null,
+        maxPeriodEur: mandatoryFree || forbidden ? null : pref?.maxPeriodEur ?? null,
         carIds: mandatory ? allCarIds : carIds,
       };
     });
@@ -240,7 +244,8 @@ export async function PUT(req: Request) {
       const id = String(row?.extraServiceId || "").trim();
       const service = byId.get(id);
       if (!service) continue;
-      const mandatory = isMandatoryFreeExtra(service);
+      const mandatory = isMandatoryExtra(service);
+      const mandatoryFree = isMandatoryFreeExtra(service);
       const forbidden = mandatory ? false : Boolean(row?.forbidden);
       const cleanedIds = cleanCarIds(row?.carIds, allowedCarIds);
       // undefined = legacy "all cars"; [] = explicitly none; otherwise filtered list.
@@ -250,14 +255,14 @@ export async function PUT(req: Request) {
           ? cleanedIds
           : [...allowedCarIds];
       let minPeriodEur =
-        mandatory || forbidden || isPeriodForcedFreeExtra(service)
+        mandatoryFree || forbidden || isPeriodForcedFreeExtra(service)
           ? null
           : optionalPeriodMoney(row?.minPeriodEur);
       let maxPeriodEur =
-        mandatory || forbidden || isPeriodForcedFreeExtra(service)
+        mandatoryFree || forbidden || isPeriodForcedFreeExtra(service)
           ? null
           : optionalPeriodMoney(row?.maxPeriodEur);
-      if (!mandatory && !forbidden && !isPeriodForcedFreeExtra(service)) {
+      if (!mandatoryFree && !forbidden && !isPeriodForcedFreeExtra(service)) {
         maxPeriodEur = capPartnerMaxPeriod(service.maxPeriodEur, maxPeriodEur).maxPeriodEur;
       }
       const ceiling = periodCeiling(service.maxPeriodEur, maxPeriodEur);
@@ -269,7 +274,7 @@ export async function PUT(req: Request) {
         enabled: mandatory ? true : forbidden ? true : Boolean(row?.enabled),
         forbidden,
         priceEur:
-          mandatory || forbidden || isPeriodForcedFreeExtra(service)
+          mandatoryFree || forbidden || isPeriodForcedFreeExtra(service)
             ? 0
             : clampPartnerDailyPrice(service.minPriceEur, service.maxPriceEur, Number(row?.priceEur)),
         minPeriodEur,

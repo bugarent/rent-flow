@@ -6,6 +6,7 @@ import type { ExtraServicePricing } from "@/lib/extras/pricing";
 import {
   capPartnerMaxPeriod,
   clampPartnerDailyPrice,
+  isMandatoryExtra,
   isMandatoryFreeExtra,
   isPeriodForcedFreeExtra,
   optionalPeriodMoney,
@@ -119,6 +120,10 @@ function uiCopy(locale: string) {
       adminDailyCap: "ადმინის ზღვარი €{min}–€{max}",
       adminDailyMaxOnly: "ადმინის მაქს. €{n}",
       adminNoCap: "ზღვარი არ არის",
+      mandatoryFree: "უფასო · სავალდებულო შეთავაზება",
+      mandatoryPriced: "სავალდებულო შეთავაზება",
+      mandatoryPricedHint:
+        "ადმინის მიერ სავალდებულოა — სერვისი ყოველთვის ჩართულია. 0 = მომხმარებლისთვის უფასო, ან დააწესეთ ფასი ლიმიტამდე.",
     };
   }
   if (locale === "ru") {
@@ -164,6 +169,10 @@ function uiCopy(locale: string) {
       adminDailyCap: "лимит админа €{min}–€{max}",
       adminDailyMaxOnly: "макс. админа €{n}",
       adminNoCap: "лимита нет",
+      mandatoryFree: "Бесплатно · обязательное предложение",
+      mandatoryPriced: "Обязательное предложение",
+      mandatoryPricedHint:
+        "Обязательно по решению админа — услуга всегда включена. 0 = бесплатно для клиента, или задайте цену до лимита.",
     };
   }
   return {
@@ -208,6 +217,10 @@ function uiCopy(locale: string) {
     adminDailyCap: "admin limit €{min}–€{max}",
     adminDailyMaxOnly: "admin max €{n}",
     adminNoCap: "no limit",
+    mandatoryFree: "Free · mandatory offer",
+    mandatoryPriced: "Mandatory offer",
+    mandatoryPricedHint:
+      "Mandatory by admin — this service is always on. 0 = free for the customer, or set a price up to the limit.",
   };
 }
 
@@ -240,12 +253,12 @@ export function PartnerEquipmentServicePanel({
       .filter((s) => s.isActive !== false)
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((service) => {
-        const mandatory = isMandatoryFreeExtra(service);
+        const mandatory = isMandatoryExtra(service);
         return {
           service,
           mode: mandatory ? ("on" as const) : ("off" as const),
           priceEur: mandatory
-            ? "0"
+            ? String(clampPartnerDailyPrice(service.minPriceEur, service.maxPriceEur, 0))
             : String(
                 clampPartnerDailyPrice(
                   service.minPriceEur,
@@ -307,7 +320,8 @@ export function PartnerEquipmentServicePanel({
                 maxPeriodEur?: number | null;
                 carIds?: string[];
               }) => {
-                const mandatory = isMandatoryFreeExtra(item.service);
+                const mandatory = isMandatoryExtra(item.service);
+                const mandatoryFree = isMandatoryFreeExtra(item.service);
                 const mode = modeFromFlags(
                   Boolean(item.enabled),
                   Boolean(item.forbidden),
@@ -326,11 +340,11 @@ export function PartnerEquipmentServicePanel({
                       : minPeriod;
                 const dailyMax = item.maxPriceEur ?? item.service.maxPriceEur ?? null;
                 const priceEur = String(
-                  periodFree
+                  periodFree || mandatoryFree
                     ? 0
                     : clampPartnerDailyPrice(item.service.minPriceEur, dailyMax, item.priceEur ?? 0),
                 );
-                const dailyZero = Number(priceEur) <= 0 || periodFree || mandatory;
+                const dailyZero = Number(priceEur) <= 0 || periodFree || mandatoryFree;
                 return {
                   service: item.service,
                   mode,
@@ -601,18 +615,19 @@ export function PartnerEquipmentServicePanel({
   /* —— Create / Edit detail view —— */
   if (creating || editingRow) {
     const title = creating ? t.add.replace("+ ", "") : knownText(locale, editingRow!.service.name);
-    const mandatory = editingRow ? isMandatoryFreeExtra(editingRow.service) : false;
+    const mandatory = editingRow ? isMandatoryExtra(editingRow.service) : false;
+    const mandatoryFree = editingRow ? isMandatoryFreeExtra(editingRow.service) : false;
     const periodFree = editingRow ? isPeriodForcedFreeExtra(editingRow.service) : false;
     const maxCap = editingRow?.adminMaxDaily ?? null;
     const adminPeriodMax = periodFree
       ? 0
       : optionalPeriodMoney(editingRow?.service.maxPeriodEur);
     // Daily lock (admin max daily ≤ 0) must NOT clear or disable min/max period windows.
-    const dailyLocked = mandatory || periodFree || (maxCap != null && maxCap <= 0);
+    const dailyLocked = mandatoryFree || periodFree || (maxCap != null && maxCap <= 0);
     const priceValue = creating ? draftPrice : editingRow!.priceEur;
     const dailyIsZero = dailyLocked || Number(priceValue) <= 0;
     // When daily is 0, min/max are inactive (table shows —).
-    const periodLocked = mandatory || periodFree || dailyIsZero;
+    const periodLocked = mandatoryFree || periodFree || dailyIsZero;
     const minValue = periodLocked ? "" : creating ? draftMin : editingRow!.minPeriodEur;
     const maxValue = periodLocked ? "" : creating ? draftMax : editingRow!.maxPeriodEur;
     const modeValue = creating ? draftMode : editingRow!.mode;
@@ -636,7 +651,15 @@ export function PartnerEquipmentServicePanel({
               {priceCapNotice}
             </p>
           ) : null}
-          {periodFree && !creating ? (
+          {mandatoryFree && !creating ? (
+            <p className="mb-3 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">
+              {t.mandatoryFree}
+            </p>
+          ) : mandatory && !creating ? (
+            <p className="mb-3 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900">
+              {t.mandatoryPricedHint}
+            </p>
+          ) : periodFree && !creating ? (
             <p className="mb-3 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">
               {t.periodFreeHint}
             </p>
@@ -1010,6 +1033,7 @@ export function PartnerEquipmentServicePanel({
                   <tbody>
                     {rows.map((row, idx) => {
                       const mandatory = isMandatoryFreeExtra(row.service);
+                      const mandatoryAny = isMandatoryExtra(row.service);
                       const periodFree = isPeriodForcedFreeExtra(row.service);
                       const dailyNum = Number(row.priceEur);
                       const dailyIsZero =
@@ -1071,7 +1095,18 @@ export function PartnerEquipmentServicePanel({
                                 {knownText(locale, row.service.description)}
                               </p>
                             ) : null}
-                            {row.mode === "forbidden" ? (
+                            {mandatoryAny ? (
+                              <span
+                                className={cn(
+                                  "mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold",
+                                  mandatory || dailyIsZero
+                                    ? "bg-emerald-50 text-emerald-700"
+                                    : "bg-sky-50 text-sky-700",
+                                )}
+                              >
+                                {mandatory || dailyIsZero ? t.mandatoryFree : t.mandatoryPriced}
+                              </span>
+                            ) : row.mode === "forbidden" ? (
                               <span className="mt-1 inline-block rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
                                 {t.forbidden}
                               </span>
@@ -1137,6 +1172,7 @@ export function PartnerEquipmentServicePanel({
                 <>
                   {rows.map((row) => {
                     const mandatory = isMandatoryFreeExtra(row.service);
+                    const mandatoryAny = isMandatoryExtra(row.service);
                     const periodFree = isPeriodForcedFreeExtra(row.service);
                     const dailyNum = Number(row.priceEur);
                     const dailyIsZero =
@@ -1193,7 +1229,18 @@ export function PartnerEquipmentServicePanel({
                                 {knownText(locale, row.service.description)}
                               </p>
                             ) : null}
-                            {row.mode === "forbidden" ? (
+                            {mandatoryAny ? (
+                              <span
+                                className={cn(
+                                  "mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold",
+                                  mandatory || dailyIsZero
+                                    ? "bg-emerald-50 text-emerald-700"
+                                    : "bg-sky-50 text-sky-700",
+                                )}
+                              >
+                                {mandatory || dailyIsZero ? t.mandatoryFree : t.mandatoryPriced}
+                              </span>
+                            ) : row.mode === "forbidden" ? (
                               <span className="mt-1 inline-block rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
                                 {t.forbidden}
                               </span>

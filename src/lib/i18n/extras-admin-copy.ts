@@ -739,6 +739,19 @@ const OVERLAY: Record<string, Copy> = {
   },
 };
 
-export function extrasAdminCopy(locale: string): Copy {
-  return OVERLAY[locale] ?? EN;
+const MANDATORY_PRICED_HINT: Record<string, string> = {
+  en: "Mandatory · partner sets the price (0 = free, up to the max)",
+  ka: "სავალდებულო · ფასს პარტნიორი აწესებს (0 = უფასო, მაქსიმუმამდე)",
+  ru: "Обязательно · цену задаёт партнёр (0 = бесплатно, до максимума)",
+  tr: "Zorunlu · fiyatı partner belirler (0 = ücretsiz, maksimuma kadar)",
+  de: "Pflicht · Preis legt der Partner fest (0 = gratis, bis zum Maximum)",
+  es: "Obligatorio · el socio fija el precio (0 = gratis, hasta el máximo)",
+  fr: "Obligatoire · le partenaire fixe le prix (0 = gratuit, jusqu’au max)",
+};
+
+export function extrasAdminCopy(locale: string): Copy & { mandatoryPricedHint: string } {
+  return {
+    ...(OVERLAY[locale] ?? EN),
+    mandatoryPricedHint: MANDATORY_PRICED_HINT[locale] ?? MANDATORY_PRICED_HINT.en,
+  };
 }

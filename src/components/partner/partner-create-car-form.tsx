@@ -7,7 +7,7 @@ import { Check, EyeOff, FileText, Trash2, UploadCloud } from "lucide-react";
 import { CREATE_AUTO_BACKDROP_URL, MIN_PUBLIC_PHOTOS } from "@/lib/brand";
 import { PARTNER_BASE } from "@/lib/routes";
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
-import { isMandatoryFreeExtra } from "@/lib/extras/pricing";
+import { isMandatoryExtra, isMandatoryFreeExtra } from "@/lib/extras/pricing";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import {
   buildExtraSelections,
@@ -648,7 +648,7 @@ export function PartnerCreateCarForm({
             );
             const filtered = extras.filter(
               (service: ExtraServicePricing) =>
-                isMandatoryFreeExtra(service) || carExtraIds.has(service.id),
+                isMandatoryExtra(service) || carExtraIds.has(service.id),
             );
             setExtrasCatalog(filtered);
             setExtraSelections(
@@ -670,7 +670,7 @@ export function PartnerCreateCarForm({
                 enabled:
                   Boolean(row.forbidden) ||
                   carExtraIds.has(row.extraServiceId) ||
-                  Boolean(filtered.find((s) => s.id === row.extraServiceId && isMandatoryFreeExtra(s))),
+                  Boolean(filtered.find((s) => s.id === row.extraServiceId && isMandatoryExtra(s))),
               })),
             );
           }
@@ -821,7 +821,7 @@ export function PartnerCreateCarForm({
           );
           const hasPrefs = prefItems.length > 0;
           const filtered = extras.filter((service: ExtraServicePricing) => {
-            if (isMandatoryFreeExtra(service)) return true;
+            if (isMandatoryExtra(service)) return true;
             if (!hasPrefs) return false;
             const pref = prefById.get(service.id);
             return Boolean(pref?.enabled || pref?.forbidden);
@@ -1051,7 +1051,7 @@ export function PartnerCreateCarForm({
             const hasPrefs = prefItems.length > 0;
             const carExtraIds = new Set(carExtras.map((e: { extraServiceId: string }) => e.extraServiceId));
             const filtered = extras.filter((service: ExtraServicePricing) => {
-              if (isMandatoryFreeExtra(service)) return true;
+              if (isMandatoryExtra(service)) return true;
               if (carExtraIds.has(service.id)) return true;
               if (!hasPrefs) return false;
               const pref = prefById.get(service.id);
@@ -1080,7 +1080,7 @@ export function PartnerCreateCarForm({
                 return {
                   ...row,
                   enabled:
-                    (service ? isMandatoryFreeExtra(service) : false) ||
+                    (service ? isMandatoryExtra(service) : false) ||
                     Boolean(row.forbidden) ||
                     carExtraIds.has(row.extraServiceId),
                   priceEur:
@@ -1596,14 +1596,14 @@ export function PartnerCreateCarForm({
       const extras = extraSelections
         .filter((row) => {
           const service = extrasCatalog.find((s) => s.id === row.extraServiceId);
-          if (service && isMandatoryFreeExtra(service)) return true;
+          if (service && isMandatoryExtra(service)) return true;
           if (row.forbidden) return true;
           return Boolean(row.enabled);
         })
         .map((row) => {
           const service = extrasCatalog.find((s) => s.id === row.extraServiceId);
           const mandatoryFree = service ? isMandatoryFreeExtra(service) : false;
-          const forbidden = !mandatoryFree && Boolean(row.forbidden);
+          const forbidden = !(service && isMandatoryExtra(service)) && Boolean(row.forbidden);
           return {
             extraServiceId: row.extraServiceId,
             enabled: true,
@@ -2422,13 +2422,13 @@ export function PartnerCreateCarForm({
             <div className="grid grid-cols-2 gap-1.5">
               {extrasCatalog.map((service) => {
                 const row = extraSelections.find((s) => s.extraServiceId === service.id);
-                const mandatory = isMandatoryFreeExtra(service);
+                const mandatory = isMandatoryExtra(service);
                 const forbidden = !mandatory && Boolean(row?.forbidden);
                 const enabled = mandatory || (!forbidden && Boolean(row?.enabled));
                 const off = !mandatory && !forbidden && !Boolean(row?.enabled);
                 const priceNum = Number(row?.priceEur);
                 const isFree =
-                  mandatory ||
+                  isMandatoryFreeExtra(service) ||
                   forbidden ||
                   !Number.isFinite(priceNum) ||
                   priceNum <= 0;

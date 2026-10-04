@@ -136,10 +136,10 @@ export function CheckoutInsurancePanel({
             const selected = locked || selectedIds.has(pack.id);
             const uncapped = pack.priceEur * dayCount;
             const lineTotal =
-              locked || pack.free
+              pack.free
                 ? 0
                 : roundMoney(extraPeriodCharge(pack.priceEur, dayCount, 1, pack.maxPeriodEur, pack.minPeriodEur));
-            const free = locked || Boolean(pack.free) || lineTotal <= 0;
+            const free = Boolean(pack.free) || lineTotal <= 0;
             const capped = !free && lineTotal + 0.009 < uncapped;
             return (
               <InsuranceToggleRow

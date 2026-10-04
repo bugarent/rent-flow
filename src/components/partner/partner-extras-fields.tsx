@@ -1,7 +1,11 @@
 "use client";
 
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
-import { isMandatoryFreeExtra } from "@/lib/extras/pricing";
+import {
+  clampPartnerDailyPrice,
+  isMandatoryFreeExtra,
+  isMandatoryPricedExtra,
+} from "@/lib/extras/pricing";
 import { formatAmountNumber } from "@/lib/utils";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { knownText } from "@/lib/i18n/known-record-text";
@@ -26,6 +30,16 @@ export function buildExtraSelections(
         enabled: true,
         forbidden: false,
         priceEur: "0",
+      };
+    }
+    if (isMandatoryPricedExtra(service)) {
+      return {
+        extraServiceId: service.id,
+        enabled: true,
+        forbidden: false,
+        priceEur: String(
+          clampPartnerDailyPrice(service.minPriceEur, service.maxPriceEur, current?.priceEur ?? 0),
+        ),
       };
     }
     if (current?.forbidden) {

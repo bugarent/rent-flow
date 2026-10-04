@@ -27,15 +27,18 @@ export function normalizeCheckoutSlot(value: unknown): ExtraCheckoutSlot {
   return "none";
 }
 
-/** Infer slot from slug / TPL flag when admin has not set one yet. */
+/**
+ * Infer slot from slug / name when admin has not set one yet.
+ * `isTpl` doubles as the admin "mandatory" flag, so it must not move ordinary extras into the TPL pack.
+ */
 export function inferCheckoutSlot(input: {
   slug?: string;
   isTpl?: boolean;
   name?: string;
 }): ExtraCheckoutSlot {
-  if (input.isTpl) return "tpl";
+  if (String(input.slug || "").toLowerCase().trim() === "tpl") return "tpl";
   const hay = `${input.slug || ""} ${input.name || ""}`.toLowerCase();
-  if (/^tpl$|third[-_\s]?party|მესამე მხარ|треть(я|ей) сторон/.test(hay)) return "tpl";
+  if (/(^|\s)tpl(\s|$)|third[-_\s]?party|მესამე მხარ|треть(я|ей) сторон/.test(hay)) return "tpl";
   if (/basic[-_\s]?cover|საბაზისო დაფარვ|базов(ое|ая) покрыт/.test(hay)) return "basic";
   if (/full[-_\s]?protect|სრული დაფარვ|полная защит|полная страхов/.test(hay)) return "full";
   if (

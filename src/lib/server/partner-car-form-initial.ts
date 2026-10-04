@@ -1,5 +1,5 @@
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
-import { isMandatoryFreeExtra, type ExtraServicePricing } from "@/lib/extras/pricing";
+import { isMandatoryExtra, type ExtraServicePricing } from "@/lib/extras/pricing";
 import { LOCAL_PARTNER_ID, loadLocalPartner } from "@/lib/auth/local-partner-store";
 import { prisma } from "@/lib/prisma";
 import { listExtraServices } from "@/lib/server/extras-store";
@@ -54,7 +54,7 @@ export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
     return {
       initialDeliveryCatalog: delivery,
       initialExtrasCatalog: extras.filter((service) => {
-        if (isMandatoryFreeExtra(service)) return true;
+        if (isMandatoryExtra(service)) return true;
         if (!hasPrefs) return false;
         return enabledIds.has(service.id);
       }),
@@ -64,7 +64,7 @@ export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
       const extras = await listExtraServices({ activeOnly: true });
       return {
         initialDeliveryCatalog: [],
-        initialExtrasCatalog: extras.filter((s) => isMandatoryFreeExtra(s)),
+        initialExtrasCatalog: extras.filter((s) => isMandatoryExtra(s)),
       };
     } catch {
       return { initialDeliveryCatalog: [], initialExtrasCatalog: [] };

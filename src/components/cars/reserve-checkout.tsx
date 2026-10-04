@@ -491,8 +491,8 @@ export function ReserveCheckout({
         const qty = extra.locked
           ? Math.max(1, extraQty[extra.id] || 0)
           : extraQty[extra.id] || 0;
-        // Daily × days, clamped by min/max. Locked mandatory stays €0; daily €0 can still have a floor.
-        if (extra.free || extra.locked) return sum;
+        // Daily × days, clamped by min/max. Mandatory is charged only when the partner set a price.
+        if (extra.free) return sum;
         return sum + extraPeriodCharge(extra.priceEur, dayCount, qty, extra.maxPeriodEur, extra.minPeriodEur);
       }, 0),
     );
@@ -1269,11 +1269,11 @@ export function ReserveCheckout({
                         const dayCount = Math.max(1, days || 1);
                         const units = Math.max(qty, 1);
                         const line = roundMoney(
-                          extra.free || locked
+                          extra.free
                             ? 0
                             : extraPeriodCharge(extra.priceEur, dayCount, units, extra.maxPeriodEur, extra.minPeriodEur),
                         );
-                        const isFree = Boolean(extra.free || locked || line <= 0);
+                        const isFree = Boolean(extra.free || line <= 0);
                         return (
                           <li
                             key={extra.id}
@@ -2112,10 +2112,10 @@ function PriceSummaryCard({
     const dayCount = Math.max(1, totals.days || 1);
     const uncapped = extra.priceEur * qty * dayCount;
     const line =
-      extra.locked || extra.free
+      extra.free
         ? 0
         : roundMoney(extraPeriodCharge(extra.priceEur, dayCount, qty, extra.maxPeriodEur, extra.minPeriodEur));
-    const free = Boolean(extra.locked || extra.free || line <= 0);
+    const free = Boolean(extra.free || line <= 0);
     const capped = !free && extra.maxPeriodEur != null && line + 0.009 < uncapped;
     return (
       <LineItem

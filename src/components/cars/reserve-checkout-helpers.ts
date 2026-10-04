@@ -2,6 +2,7 @@ import { cityStreetLabel, findSearchPlace } from "@/lib/catalog/search-places";
 import {
   isExtraChargeFree,
   isFreeCancellation48Extra,
+  isMandatoryExtra,
   isMandatoryFreeExtra,
   isPeriodForcedFreeExtra,
   localizeExtraName,
@@ -29,7 +30,7 @@ export type ReservePaidExtra = {
   checkoutSlot?: InsuranceCheckoutSlot | "none";
   /** Partner €0 offer — optional; customer can turn on/off */
   free?: boolean;
-  /** Admin mandatory free / TPL — always on, not toggled off */
+  /** Admin mandatory / TPL — always on, not toggled off (charged only when priced) */
   locked?: boolean;
   /** Partner forbidden territory/service notice — not purchasable */
   forbidden?: boolean;
@@ -200,9 +201,12 @@ function mapCarExtraRow(row: NonNullable<ReserveCarPayload["extras"]>[number]): 
     };
   }
   const freeCancel48 = isFreeCancellation48Extra({ slug, name, id });
+  const mandatory = priced
+    ? isMandatoryExtra({ ...priced, slug, name, id })
+    : Boolean(svc?.isTpl) && !freeCancel48;
   const mandatoryFree = priced
     ? isMandatoryFreeExtra({ ...priced, slug, name, id })
-    : Boolean(svc?.isTpl) && !freeCancel48;
+    : mandatory;
   const periodFree = priced
     ? isPeriodForcedFreeExtra(priced)
     : svc?.maxPeriodEur != null && Number(svc.maxPeriodEur) === 0;
@@ -236,7 +240,7 @@ function mapCarExtraRow(row: NonNullable<ReserveCarPayload["extras"]>[number]): 
     minPeriodEur,
     checkoutSlot,
     free,
-    locked: mandatoryFree,
+    locked: mandatory,
     slug,
     sortOrder,
   };

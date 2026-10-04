@@ -6,7 +6,7 @@ import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { extrasAdminCopy } from "@/lib/i18n/extras-admin-copy";
 import { knownText } from "@/lib/i18n/known-record-text";
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
-import { isMandatoryFreeExtra } from "@/lib/extras/pricing";
+import { isMandatoryExtra, isMandatoryPricedExtra } from "@/lib/extras/pricing";
 import {
   checkoutSlotLabel,
   type ExtraCheckoutSlot,
@@ -55,6 +55,11 @@ function moveItem(list: ExtraServicePricing[], fromId: string, toId: string) {
 }
 
 const SLOT_OPTIONS: ExtraCheckoutSlot[] = ["none", "tpl", "basic", "full", "driver"];
+
+/** System TPL pack (seed slug `tpl`) stays mandatory and free. */
+function isCorePackTpl(item: ExtraServicePricing) {
+  return item.slug === "tpl";
+}
 
 export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePricing[] }) {
   const { locale } = useAdminLocale();
@@ -368,16 +373,14 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
   };
 
   const toggleMandatory = async (item: ExtraServicePricing) => {
-    // Real TPL insurance pack stays mandatory.
-    if (item.checkoutSlot === "tpl" && item.isTpl) return;
-    const makeMandatory = !isMandatoryFreeExtra(item);
+    if (isCorePackTpl(item)) return;
+    const makeMandatory = !isMandatoryExtra(item);
     setTogglingId(item.id);
     setError("");
     try {
       const payload = makeMandatory
         ? {
             isTpl: true,
-            defaultPriceEur: 0,
             isActive: true,
             checkoutSlot: item.checkoutSlot || "none",
           }
@@ -431,7 +434,8 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
                   </tr>
                 ) : (
                   extras.map((item) => {
-                    const mandatory = isMandatoryFreeExtra(item);
+                    const mandatory = isMandatoryExtra(item);
+                    const corePack = isCorePackTpl(item);
                     const isDragging = draggingId === item.id;
                     const isOver = overId === item.id && draggingId !== item.id;
                     return (
@@ -461,11 +465,13 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
                           {item.description ? (
                             <p className="text-xs text-slate-500">{text(item.description)}</p>
                           ) : null}
-                          {item.isTpl ? (
+                          {corePack ? (
                             <p className="mt-1 text-xs font-semibold text-sky-700">{copy.tplHint}</p>
                           ) : mandatory ? (
                             <p className="mt-1 text-xs font-semibold text-emerald-700">
-                              {copy.mandatoryHint}
+                              {isMandatoryPricedExtra(item)
+                                ? copy.mandatoryPricedHint
+                                : copy.mandatoryHint}
                             </p>
                           ) : null}
                         </td>
@@ -475,7 +481,7 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
                         <td className="p-3">
                           <ExtraPriceWindows
                             item={item}
-                            disabled={mandatory}
+                            disabled={corePack}
                             saving={savingRowId === item.id}
                             copy={{
                               minDay: copy.rowMin,
@@ -498,7 +504,7 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
                             >
                               {copy.edit}
                             </button>
-                            {!item.isTpl ? (
+                            {!mandatory ? (
                               <button
                                 type="button"
                                 className="text-sm font-semibold text-red-600"
@@ -509,7 +515,7 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
                             ) : null}
                             <button
                               type="button"
-                              disabled={item.isTpl || togglingId === item.id}
+                              disabled={corePack || togglingId === item.id}
                               onClick={() => toggleMandatory(item)}
                               className={cn(
                                 "rounded-full border px-2.5 py-1 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50",
@@ -542,7 +548,8 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
             </p>
           ) : (
             extras.map((item) => {
-              const mandatory = isMandatoryFreeExtra(item);
+              const mandatory = isMandatoryExtra(item);
+              const corePack = isCorePackTpl(item);
               return (
                 <MobileDataCard key={item.id}>
                   <MobileDataRow label={copy.service}>
@@ -551,11 +558,11 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
                       {item.description ? (
                         <p className="text-xs font-medium text-slate-500">{text(item.description)}</p>
                       ) : null}
-                      {item.isTpl ? (
+                      {corePack ? (
                         <p className="mt-1 text-xs font-semibold text-sky-700">{copy.tplHint}</p>
                       ) : mandatory ? (
                         <p className="mt-1 text-xs font-semibold text-emerald-700">
-                          {copy.mandatoryHint}
+                          {isMandatoryPricedExtra(item) ? copy.mandatoryPricedHint : copy.mandatoryHint}
                         </p>
                       ) : null}
                     </div>
@@ -569,7 +576,7 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
                     <div className="w-full max-w-none text-start">
                       <ExtraPriceWindows
                         item={item}
-                        disabled={mandatory}
+                        disabled={corePack}
                         saving={savingRowId === item.id}
                         copy={{
                           minDay: copy.rowMin,
@@ -594,7 +601,7 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
                     >
                       {copy.edit}
                     </button>
-                    {!item.isTpl ? (
+                    {!mandatory ? (
                       <button
                         type="button"
                         className="min-h-11 px-3 text-sm font-semibold text-red-600"
@@ -605,7 +612,7 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
                     ) : null}
                     <button
                       type="button"
-                      disabled={item.isTpl || togglingId === item.id}
+                      disabled={corePack || togglingId === item.id}
                       onClick={() => toggleMandatory(item)}
                       className={cn(
                         "min-h-11 rounded-full border px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50",

@@ -8,7 +8,9 @@ import {
 import {
   clampPartnerDailyPrice,
   effectivePeriodBounds,
+  isMandatoryExtra,
   isMandatoryFreeExtra,
+  isMandatoryPricedExtra,
   isPeriodForcedFreeExtra,
   localizeExtraName,
 } from "@/lib/extras/pricing";
@@ -173,15 +175,16 @@ export async function applyPartnerExtraOfferModes(
     const next: HydratedListingExtra[] = [];
     for (const row of extras) {
       const svc = row.extraService;
-      if (svc && (svc.isTpl || isMandatoryFreeExtra(svc))) {
+      const pref = byId.get(row.extraServiceId);
+      const mandatoryPriced = Boolean(svc && isMandatoryPricedExtra(svc));
+      if (svc && !mandatoryPriced && (svc.isTpl || isMandatoryExtra(svc))) {
         next.push({
           extraServiceId: row.extraServiceId,
-          priceEur: Number(row.priceEur) || 0,
+          priceEur: 0,
           extraService: row.extraService,
         });
         continue;
       }
-      const pref = byId.get(row.extraServiceId);
       if (!pref) {
         next.push(row);
         continue;
@@ -191,11 +194,12 @@ export async function applyPartnerExtraOfferModes(
         next.push(row);
         continue;
       }
-      if (pref.forbidden) {
+      // Mandatory extras cannot be hidden or forbidden by the partner; only the price applies.
+      if (pref.forbidden && !mandatoryPriced) {
         next.push({ ...row, priceEur: 0, forbidden: true });
         continue;
       }
-      if (!pref.enabled) {
+      if (!pref.enabled && !mandatoryPriced) {
         continue; // off — hide from customer
       }
       const bounds = effectivePeriodBounds(
@@ -284,13 +288,14 @@ export async function mergePartnerOfferedExtras(
 
     const merged = [...extras];
     for (const pref of prefs) {
-      if (!pref.enabled && !pref.forbidden) continue;
       if (!partnerExtraPrefAppliesToCar(pref, carId)) continue;
       if (present.has(pref.extraServiceId)) continue;
       const service = byId.get(pref.extraServiceId);
       if (!service) continue;
-      if (service.isTpl || isMandatoryFreeExtra(service)) continue;
-      const forbidden = Boolean(pref.forbidden);
+      const mandatoryPriced = isMandatoryPricedExtra(service);
+      if (!mandatoryPriced && (service.isTpl || isMandatoryExtra(service))) continue;
+      if (!mandatoryPriced && !pref.enabled && !pref.forbidden) continue;
+      const forbidden = !mandatoryPriced && Boolean(pref.forbidden);
       const bounds = effectivePeriodBounds(service.maxPeriodEur, pref.maxPeriodEur, pref.minPeriodEur);
       merged.push({
         extraServiceId: service.id,

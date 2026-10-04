@@ -79,8 +79,7 @@ export function isFreeCancellation48Extra(extra: {
   );
 }
 
-/** True when the extra is a locked €0 inclusion (TPL / admin mandatory only). */
-export function isMandatoryFreeExtra(service: {
+type MandatoryCandidate = {
   isTpl?: boolean;
   mode?: ExtraPricingMode;
   minPriceEur?: number | null;
@@ -88,10 +87,25 @@ export function isMandatoryFreeExtra(service: {
   slug?: string | null;
   name?: string | null;
   id?: string | null;
-}): boolean {
+};
+
+/** Admin mandatory (stored as `isTpl`): always offered by the partner and locked on at checkout. */
+export function isMandatoryExtra(service: MandatoryCandidate): boolean {
   // Free cancel-48 must stay toggleable so it can yield to paid cancellation protection.
   if (isFreeCancellation48Extra(service)) return false;
   return Boolean(service.isTpl);
+}
+
+/** Admin daily max > 0 on a mandatory extra → partner sets the price (0…max). */
+export function isMandatoryPricedExtra(service: MandatoryCandidate): boolean {
+  if (!isMandatoryExtra(service)) return false;
+  const max = Number(service.maxPriceEur);
+  return service.maxPriceEur != null && Number.isFinite(max) && max > 0;
+}
+
+/** True when the extra is a locked €0 inclusion (mandatory with no admin price ceiling > 0). */
+export function isMandatoryFreeExtra(service: MandatoryCandidate): boolean {
+  return isMandatoryExtra(service) && !isMandatoryPricedExtra(service);
 }
 
 /**
@@ -173,6 +187,12 @@ export function normalizePartnerExtraPrice(
   service: ExtraServicePricing,
   input: PartnerExtraInput,
 ): { extraServiceId: string; priceEur: number; forbidden?: boolean } | null {
+  if (isMandatoryPricedExtra(service)) {
+    return {
+      extraServiceId: service.id,
+      priceEur: clampPartnerDailyPrice(service.minPriceEur, service.maxPriceEur, toNumber(input.priceEur, 0)),
+    };
+  }
   if (service.mode === "free" || service.isTpl) {
     return { extraServiceId: service.id, priceEur: 0 };
   }

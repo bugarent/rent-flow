@@ -54,10 +54,7 @@ async function resolveCarExtras(rawExtras: unknown) {
       enabled: service.mode !== "toggle",
       priceEur: service.defaultPriceEur,
     };
-    if (service.mode === "free" || service.isTpl) {
-      rows.push({ extraServiceId: service.id, priceEur: 0 });
-      continue;
-    }
+    // Mandatory extras are always attached: free ones at €0, priced ones clamped to the admin range.
     const normalized = normalizePartnerExtraPrice(service, input);
     if (normalized) rows.push(normalized);
   }
