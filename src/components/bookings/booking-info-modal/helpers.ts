@@ -144,8 +144,16 @@ export function languageLabel(code: string, locale: string) {
     ka: { en: "ინგლისური", ka: "ქართული", ru: "რუსული", fr: "ფრანგული", de: "გერმანული", pl: "პოლონური", ar: "არაბული" },
     ru: { en: "Английский", ka: "Грузинский", ru: "Русский", fr: "Французский", de: "Немецкий", pl: "Польский", ar: "Арабский" },
   };
-  const dict = map[locale] || map.en;
-  return dict[code.toLowerCase()] || code.toUpperCase();
+  const key = code.toLowerCase();
+  const known = (map[locale] || map.en)[key];
+  if (known) return known;
+  try {
+    const name = new Intl.DisplayNames([locale, "en"], { type: "language" }).of(key);
+    if (name && name.toLowerCase() !== key) return name.charAt(0).toLocaleUpperCase(locale) + name.slice(1);
+  } catch {
+    /* unsupported locale/code */
+  }
+  return code.toUpperCase();
 }
 
 export function normalizeSocial(raw: string[]): PartnerSocialPlatform[] {

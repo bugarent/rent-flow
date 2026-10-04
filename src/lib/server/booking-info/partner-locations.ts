@@ -73,12 +73,13 @@ export async function resolvePartnerPayload(input: {
       const stripped = ids[0].replace(/^file-partner-/, "");
       if (stripped && !ids.includes(stripped)) ids.push(stripped);
     }
-    if (!ids.includes(LOCAL_PARTNER_ID)) ids.push(LOCAL_PARTNER_ID);
-
     let settings = null;
     for (const id of ids) {
       settings = await readCompanySettingsFile(id);
       if (settings) break;
+    }
+    if (!settings && !input.companySettings && !ids.includes(LOCAL_PARTNER_ID)) {
+      settings = await readCompanySettingsFile(LOCAL_PARTNER_ID);
     }
     if (settings || input.companySettings) {
       const company = parseCompanySettings(settings || input.companySettings, {
