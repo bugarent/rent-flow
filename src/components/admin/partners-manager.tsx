@@ -105,10 +105,10 @@ function tabBadge(list: PartnerRow[]) {
 function fleetDisplay(p: { fleetSize: number; carCount: number }) {
   const declared = Number(p.fleetSize) || 0;
   const listed = Number(p.carCount) || 0;
-  if (listed > 0 && listed !== declared) {
-    return { primary: declared, hint: `${listed} listed` };
+  if (listed > 0 && declared > 0 && listed !== declared) {
+    return { primary: listed, declared: declared as number | null };
   }
-  return { primary: declared || listed, hint: null as string | null };
+  return { primary: listed || declared, declared: null as number | null };
 }
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
@@ -209,6 +209,7 @@ export function PartnersManager({
         noCars: "მანქანის განცხადება ჯერ არ არის",
         fleetDeclared: "ფლოტის ზომა (განაცხადი)",
         fleetListed: "ჩამონათვალში",
+        fleetInApplication: "განაცხადში",
         empty: "ამ სიაში პარტნიორი არ არის.",
         taxId: "კომპანიის საგადასახადო / საიდენტიფიკაციო ნომერი",
         personalId: "პირადი ნომერი",
@@ -239,6 +240,7 @@ export function PartnersManager({
         noCars: "Объявлений пока нет",
         fleetDeclared: "Размер флота (заявка)",
         fleetListed: "В каталоге",
+        fleetInApplication: "в заявке",
         empty: "В этом списке нет партнёров.",
         taxId: "Налоговый / идентификационный номер компании",
         personalId: "Личный номер",
@@ -268,6 +270,7 @@ export function PartnersManager({
       noCars: "No car listings yet",
       fleetDeclared: "Fleet size (application)",
       fleetListed: "Listed",
+      fleetInApplication: "in application",
       empty: "No partners in this list.",
       taxId: "Company tax / identification number",
       personalId: "Personal identification number",
@@ -599,8 +602,10 @@ export function PartnersManager({
                           </td>
                           <td className={cn("whitespace-nowrap px-2 py-0.5 align-middle", attention > 0 && "font-semibold text-orange-950")}>
                             <span className="font-bold">{p.fleet.primary}</span>
-                            {p.fleet.hint ? (
-                              <span className="ml-1 text-[10px] font-medium text-slate-500">{p.fleet.hint}</span>
+                            {p.fleet.declared != null ? (
+                              <span className="ml-1 text-[10px] font-medium text-slate-500">
+                                ({t.fleetInApplication}: {p.fleet.declared})
+                              </span>
                             ) : null}
                           </td>
                           <td className="whitespace-nowrap px-2 py-0.5 align-middle">
@@ -838,8 +843,10 @@ export function PartnersManager({
                   <MobileDataRow label={t.fleetCol}>
                     <div className={cn("text-end", attention > 0 && "font-semibold text-orange-950")}>
                       <span className="font-bold">{p.fleet.primary}</span>
-                      {p.fleet.hint ? (
-                        <p className="text-[11px] font-medium text-slate-500">{p.fleet.hint}</p>
+                      {p.fleet.declared != null ? (
+                        <p className="text-[11px] font-medium text-slate-500">
+                          {t.fleetInApplication}: {p.fleet.declared}
+                        </p>
                       ) : null}
                     </div>
                   </MobileDataRow>
