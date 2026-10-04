@@ -51,10 +51,10 @@ export async function assertPartnerOwnsBooking(
       include: { car: { select: { partnerId: true, id: true } } },
     });
     if (booking) {
-      const ownsDb = booking.car.partnerId === partnerId;
-      const fileCar = ownsDb ? null : await getFileCar(booking.carId);
-      const ownsFile = Boolean(fileCar && isFileCarOwner(fileCar, user));
-      if (ownsDb || ownsFile) return { kind: "db", booking: { id: booking.id, carId: booking.carId } };
+      const owns =
+        booking.car.partnerId === partnerId ||
+        (await partnerOwnsCar(booking.carId, partnerId, user));
+      if (owns) return { kind: "db", booking: { id: booking.id, carId: booking.carId } };
       return null;
     }
   } catch (error) {
@@ -63,7 +63,27 @@ export async function assertPartnerOwnsBooking(
 
   const fileBooking = await getFileBooking(bookingId);
   if (!fileBooking) return null;
-  const fileCar = await getFileCar(fileBooking.carId);
-  if (!fileCar || !isFileCarOwner(fileCar, user)) return null;
+  if (!(await partnerOwnsCar(fileBooking.carId, partnerId, user))) return null;
   return { kind: "file", booking: fileBooking };
+}
+
+/** Same ownership rules as the partner bookings list (file car ids, user, email, or DB car). */
+async function partnerOwnsCar(
+  carId: string,
+  partnerId: string,
+  user: { id: string; email?: string | null },
+): Promise<boolean> {
+  const fileCar = await getFileCar(carId);
+  if (fileCar) {
+    if (isFileCarOwner(fileCar, user)) return true;
+    const ids = new Set([partnerId, `file-partner-${partnerId}`, user.id, `file-partner-${user.id}`]);
+    if (ids.has(fileCar.partnerId) || ids.has(fileCar.partnerUserId)) return true;
+  }
+  try {
+    const car = await prisma.car.findUnique({ where: { id: carId }, select: { partnerId: true } });
+    if (car?.partnerId === partnerId) return true;
+  } catch (error) {
+    if (!isDbOfflineError(error)) throw error;
+  }
+  return false;
 }
