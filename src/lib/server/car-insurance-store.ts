@@ -8,6 +8,11 @@ export type CarInsuranceDoc = {
   insuranceUrl: string;
   /** Inclusive last valid day as YYYY-MM-DD (local calendar). */
   insuranceExpiresAt?: string;
+  /**
+   * Expiry day an admin already approved. Auto-remoderation skips this exact day
+   * so confirming a listing does not immediately send it back to the queue.
+   */
+  insuranceExpiryAcknowledgedAt?: string;
 };
 
 type StoreFile = Record<string, CarInsuranceDoc>;
@@ -107,16 +112,46 @@ export async function readCarInsuranceDocs(carIds: string[]): Promise<Map<string
   return map;
 }
 
-/** All car ids whose insurance expiry day has arrived. */
+/** True when this expiry day should pull an approved listing back into moderation. */
+export function insuranceExpiryNeedsRemoderation(
+  row: { insuranceExpiresAt?: string | null; insuranceExpiryAcknowledgedAt?: string | null },
+  now = new Date(),
+): boolean {
+  const day = normalizeInsuranceExpiresAt(row.insuranceExpiresAt);
+  if (!day || !isInsuranceExpired(day, now)) return false;
+  const acknowledged = normalizeInsuranceExpiresAt(row.insuranceExpiryAcknowledgedAt);
+  return acknowledged !== day;
+}
+
+/** All car ids whose insurance expiry day has arrived and was not already admin-approved. */
 export async function listExpiredInsuranceCarIds(now = new Date()): Promise<string[]> {
   const store = await readStore();
-  const today = todayYyyyMmDd(now);
   const ids: string[] = [];
   for (const [id, row] of Object.entries(store)) {
-    const day = normalizeInsuranceExpiresAt(row.insuranceExpiresAt);
-    if (day && day <= today) ids.push(id);
+    if (insuranceExpiryNeedsRemoderation(row, now)) ids.push(id);
   }
   return ids;
+}
+
+/**
+ * Remember that an admin approved the listing against the current expiry.
+ * A still-valid date clears any previous acknowledgement so a future expiry can re-queue it.
+ */
+export async function acknowledgeReviewedInsuranceExpiry(carId: string, now = new Date()): Promise<void> {
+  const store = await readStore();
+  const row = store[carId];
+  if (!row) return;
+  const day = normalizeInsuranceExpiresAt(row.insuranceExpiresAt);
+  if (day && isInsuranceExpired(day, now)) {
+    if (row.insuranceExpiryAcknowledgedAt === day) return;
+    row.insuranceExpiryAcknowledgedAt = day;
+  } else if (row.insuranceExpiryAcknowledgedAt) {
+    delete row.insuranceExpiryAcknowledgedAt;
+  } else {
+    return;
+  }
+  store[carId] = row;
+  await writeStore(store);
 }
 
 export async function writeCarInsuranceDoc(
@@ -127,14 +162,24 @@ export async function writeCarInsuranceDoc(
   const prev = store[carId] || { insuranceUrl: "" };
   const next: CarInsuranceDoc = { insuranceUrl: prev.insuranceUrl || "" };
   if (prev.insuranceExpiresAt) next.insuranceExpiresAt = prev.insuranceExpiresAt;
+  if (prev.insuranceExpiryAcknowledgedAt) {
+    next.insuranceExpiryAcknowledgedAt = prev.insuranceExpiryAcknowledgedAt;
+  }
 
   if (Object.prototype.hasOwnProperty.call(patch, "insuranceUrl")) {
     next.insuranceUrl = patch.insuranceUrl?.trim() || "";
   }
   if (Object.prototype.hasOwnProperty.call(patch, "insuranceExpiresAt")) {
     const day = normalizeInsuranceExpiresAt(patch.insuranceExpiresAt);
-    if (day) next.insuranceExpiresAt = day;
-    else delete next.insuranceExpiresAt;
+    if (day) {
+      next.insuranceExpiresAt = day;
+      if (next.insuranceExpiryAcknowledgedAt && next.insuranceExpiryAcknowledgedAt !== day) {
+        delete next.insuranceExpiryAcknowledgedAt;
+      }
+    } else {
+      delete next.insuranceExpiresAt;
+      delete next.insuranceExpiryAcknowledgedAt;
+    }
   }
 
   if (!next.insuranceUrl && !next.insuranceExpiresAt) {

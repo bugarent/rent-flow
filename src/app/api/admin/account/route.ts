@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getAdminSession } from "@/lib/auth/sessions";
 import { prisma } from "@/lib/prisma";
 import { hashSecret, normalizeLogin, verifySecret } from "@/lib/crypto";
-import { loadLocalAdmin, revealAdminPassword, saveLocalAdmin } from "@/lib/auth/local-admin-store";
+import { loadLocalAdminAsync, revealAdminPassword, saveLocalAdminAsync } from "@/lib/auth/local-admin-store";
 
 const schema = z
   .object({
@@ -27,7 +27,7 @@ export async function PATCH(req: Request) {
 
   try {
     const body = schema.parse(await req.json());
-    const local = loadLocalAdmin();
+    const local = await loadLocalAdminAsync();
     let passwordHash: string | null = null;
     let currentEmail = local?.email ?? session.user.email ?? "";
 
@@ -56,7 +56,7 @@ export async function PATCH(req: Request) {
       ? body.newPassword
       : revealAdminPassword(passwordHash, local?.passwordPlain);
 
-    saveLocalAdmin({
+    await saveLocalAdminAsync({
       email: nextEmail,
       passwordHash: nextHash,
       ...(passwordPlain ? { passwordPlain } : {}),

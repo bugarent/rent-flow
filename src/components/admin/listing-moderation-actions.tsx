@@ -85,7 +85,7 @@ export function ListingModerationActions({
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/cars/${carId}/moderate`, {
+      const res = await fetch(`/api/cars/${encodeURIComponent(carId)}/moderate`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -97,8 +97,8 @@ export function ListingModerationActions({
       if (!res.ok) throw new Error(data.error || "Failed");
       setRejectOpen(false);
       setRejectNote("");
-      router.refresh();
-      onDone?.();
+      if (onDone) onDone();
+      else router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
     } finally {
@@ -111,11 +111,11 @@ export function ListingModerationActions({
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/cars/${carId}`, { method: "DELETE" });
+      const res = await fetch(`/api/cars/${encodeURIComponent(carId)}`, { method: "DELETE" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed");
-      router.refresh();
-      onDone?.();
+      if (onDone) onDone();
+      else router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
     } finally {

@@ -193,12 +193,12 @@ async function deliverBookingNotice(input: {
       const adminText = reservationTelegramText(telegram, true);
       const adminIds = new Set((await adminChatIds()).map((id) => id.trim()).filter(Boolean));
       const partnerIds = [...new Set(input.partnerChatIds.map((id) => id.trim()).filter((id) => id && !adminIds.has(id)))];
-
-      await sendBookingNoticeToBot(adminText);
+      const sentBotChat = await sendBookingNoticeToBot(adminText);
       for (const chatId of partnerIds) {
         await sendTelegramMessage(chatId, partnerText);
       }
       for (const chatId of adminIds) {
+        if (sentBotChat && chatId === sentBotChat) continue;
         await sendTelegramMessage(chatId, adminText);
       }
     } catch (error) {

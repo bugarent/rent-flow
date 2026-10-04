@@ -8,6 +8,11 @@ import {
   clearCarRejectionNotice,
   writeCarRejectionNotice,
 } from "@/lib/server/car-rejection-store";
+import { acknowledgeReviewedInsuranceExpiry } from "@/lib/server/car-insurance-store";
+
+function isMissingRecord(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && (error as { code?: string }).code === "P2025");
+}
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await requireAdminApi();
@@ -34,16 +39,24 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         : rejectionNote || "Rejected by admin — listing is not visible on public search until re-approved";
 
     try {
-      if (status === "APPROVED") {
-        const car = await prisma.car.findUnique({
+      let prismaCar: { id: string; registrationNumber: string | null } | null = null;
+      try {
+        prismaCar = await prisma.car.findUnique({
           where: { id },
-          select: { registrationNumber: true },
+          select: { id: true, registrationNumber: true },
         });
-        if (car?.registrationNumber) {
+      } catch (error) {
+        if (!isDbOfflineError(error)) throw error;
+      }
+
+      if (status === "APPROVED") {
+        const registrationNumber =
+          prismaCar?.registrationNumber || (await getFileCar(id))?.registrationNumber;
+        if (registrationNumber) {
           const { assertRegistrationAvailable, plateTakenResponse } = await import(
             "@/lib/server/assert-registration-available"
           );
-          const check = await assertRegistrationAvailable(car.registrationNumber, {
+          const check = await assertRegistrationAvailable(registrationNumber, {
             excludeId: id,
           });
           if (!check.ok) {
@@ -52,22 +65,54 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         }
       }
 
-      const updatedCar = await prisma.car.update({
-        where: { id },
-        data: {
+      let prismaUpdated = false;
+      if (prismaCar) {
+        await prisma.car.update({
+          where: { id: prismaCar.id },
+          data: {
+            status,
+            hiddenReason,
+          },
+        });
+        prismaUpdated = true;
+      } else {
+        try {
+          await prisma.car.update({
+            where: { id },
+            data: {
+              status,
+              hiddenReason,
+            },
+          });
+          prismaUpdated = true;
+        } catch (error) {
+          if (!isDbOfflineError(error) && !isMissingRecord(error)) throw error;
+        }
+      }
+
+      let fileUpdated: Awaited<ReturnType<typeof updateFileCar>> = null;
+      try {
+        fileUpdated = await updateFileCar(id, {
           status,
           hiddenReason,
-        },
-      });
+        });
+      } catch (error) {
+        if (!prismaUpdated) throw error;
+        console.warn("[cars moderate] file status", id, error);
+      }
+      if (!prismaUpdated && !fileUpdated) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
 
       if (status === "APPROVED") {
+        await acknowledgeReviewedInsuranceExpiry(id);
         await clearPublishedCarSnapshot(id);
         await clearCarRejectionNotice(id);
       } else {
         await writeCarRejectionNotice(id, hiddenReason || "");
       }
 
-      return NextResponse.json({ id: updatedCar.id, status: updatedCar.status });
+      return NextResponse.json({ id, status });
     } catch (error) {
       if (!isDbOfflineError(error)) throw error;
       const fileCar = await getFileCar(id);
@@ -88,6 +133,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         hiddenReason,
       });
       if (status === "APPROVED") {
+        await acknowledgeReviewedInsuranceExpiry(id);
         await clearPublishedCarSnapshot(id);
         await clearCarRejectionNotice(id);
       } else {

@@ -123,13 +123,18 @@ export function bookingBotMessage(
 }
 
 /** Sends the booking notice to the single bot saved in the admin homepage panel. */
-export async function sendBookingNoticeToBot(text: string) {
+export async function sendBookingNoticeToBot(text: string): Promise<string | null> {
   const body = text.trim();
-  if (!body) return;
+  if (!body) return null;
   const bot = await getActiveTelegramLiveBot();
-  if (!bot?.botToken.trim() || !bot.chatId.trim()) return;
-  const sent = await sendTelegramMessageWithToken(bot.botToken, bot.chatId, body);
-  if (!sent.ok) console.warn("[booking-bot] telegram", sent.error);
+  const chatId = bot?.chatId.trim() || "";
+  if (!bot?.botToken.trim() || !chatId) return null;
+  const sent = await sendTelegramMessageWithToken(bot.botToken, chatId, body);
+  if (!sent.ok) {
+    console.warn("[booking-bot] telegram", sent.error);
+    return null;
+  }
+  return chatId;
 }
 
 /** Sends a new-booking summary to the single bot saved in the admin homepage panel. */

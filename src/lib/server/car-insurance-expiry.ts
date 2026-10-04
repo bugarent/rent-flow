@@ -7,8 +7,9 @@ import {
   writeCarFieldChanges,
   readCarFieldChanges,
 } from "@/lib/server/car-published-store";
+import { INSURANCE_EXPIRY_REASON } from "@/lib/cars/insurance-expiry-reason";
 
-const EXPIRY_REASON = "Insurance expired — awaiting re-moderation";
+const EXPIRY_REASON = INSURANCE_EXPIRY_REASON;
 
 async function markFileCarExpired(carId: string): Promise<boolean> {
   const car = await getFileCar(carId);

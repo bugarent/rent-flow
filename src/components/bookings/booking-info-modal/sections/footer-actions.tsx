@@ -143,6 +143,22 @@ export function FooterActions({
                 >
                   €{extrasPaymentBreakdown.payNow.toFixed(2)}
                 </p>
+                {extrasPaymentBreakdown.payNow > 0 ? (
+                  <p
+                    className={cn(
+                      "mt-0.5 text-[10px] font-semibold tabular-nums",
+                      customerPrice ? "text-[#1a4f93]" : "text-emerald-800/70",
+                    )}
+                  >
+                    {extrasPaymentBreakdown.depositPercent}% €
+                    {extrasPaymentBreakdown.payNowBase.toFixed(2)}
+                    {extrasPaymentBreakdown.payNow - extrasPaymentBreakdown.payNowBase > 0.009
+                      ? ` + ${CARD_PICKUP_SURCHARGE_PERCENT}% €${(
+                          extrasPaymentBreakdown.payNow - extrasPaymentBreakdown.payNowBase
+                        ).toFixed(2)}`
+                      : ""}
+                  </p>
+                ) : null}
               </div>
               <div className="min-w-0">
                 <p className={labelTone}>{t.dueWillAtPickup}</p>
@@ -192,11 +208,25 @@ export function FooterActions({
                   onClick={() =>
                     void onSubmitGuestChanges(extrasPaymentBreakdown.payNow > 0)
                   }
-                  className="w-full rounded-xl bg-emerald-600 px-3 py-[calc(0.625rem+0.5cm)] text-sm font-bold text-white disabled:opacity-50"
+                  className="flex w-full flex-col items-center justify-center rounded-xl bg-emerald-600 px-3 py-4 text-sm font-bold leading-tight text-white disabled:opacity-50"
                 >
-                  {extrasPaymentBreakdown.payNow > 0
-                    ? `${t.savePayment} €${extrasPaymentBreakdown.payNow.toFixed(2)}`
-                    : t.savePayment}
+                  <span>{t.savePayment}</span>
+                  {extrasPaymentBreakdown.payNow > 0 ? (
+                    <>
+                      <span className="mt-1 text-lg font-black tabular-nums">
+                        €{extrasPaymentBreakdown.payNow.toFixed(2)}
+                      </span>
+                      <span className="mt-0.5 text-[11px] font-semibold text-white/90">
+                        {extrasPaymentBreakdown.depositPercent}% €
+                        {extrasPaymentBreakdown.payNowBase.toFixed(2)}
+                        {extrasPaymentBreakdown.payNow - extrasPaymentBreakdown.payNowBase > 0.009
+                          ? ` + ${CARD_PICKUP_SURCHARGE_PERCENT}% €${(
+                              extrasPaymentBreakdown.payNow - extrasPaymentBreakdown.payNowBase
+                            ).toFixed(2)}`
+                          : ""}
+                      </span>
+                    </>
+                  ) : null}
                 </button>
                 {showTripRefund ? (
                   <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-950">

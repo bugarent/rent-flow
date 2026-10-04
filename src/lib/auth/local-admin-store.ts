@@ -1,5 +1,5 @@
 import { dataFile } from "@/lib/persistent-paths";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "@/lib/server/durable-fs";
+import { existsSync, mkdir, mkdirSync, readDurableText, readFileSync, writeFile, writeFileSync } from "@/lib/server/durable-fs";
 import { dirname } from "node:path";
 import { hashSecret, verifySecret } from "@/lib/crypto";
 
@@ -47,6 +47,45 @@ function writeStore(record: LocalAdminRecord) {
   }
 }
 
+function recordFromPatch(
+  current: LocalAdminRecord | null,
+  patch: Partial<Pick<LocalAdminRecord, "email" | "passwordHash" | "passwordPlain">>,
+): LocalAdminRecord {
+  const bootstrap = bootstrapAdminPassword();
+  return {
+    id: current?.id ?? LOCAL_ADMIN_ID,
+    email: patch.email ?? current?.email ?? TEST_ADMIN_EMAIL,
+    passwordHash:
+      patch.passwordHash ?? current?.passwordHash ?? (bootstrap ? hashSecret(bootstrap) : ""),
+    passwordPlain:
+      patch.passwordPlain !== undefined ? patch.passwordPlain : current?.passwordPlain,
+    role: "ADMIN",
+    status: "ACTIVE",
+  };
+}
+
+/** Reads the admin login mirror from Postgres when the local file is gone. */
+export async function loadLocalAdminAsync(): Promise<LocalAdminRecord | null> {
+  const raw = await readDurableText(STORE_PATH);
+  if (!raw) return readStore();
+  try {
+    return JSON.parse(raw) as LocalAdminRecord;
+  } catch {
+    return readStore();
+  }
+}
+
+/** Waits until the plaintext password is stored, so the settings page can show it. */
+export async function saveLocalAdminAsync(
+  patch: Partial<Pick<LocalAdminRecord, "email" | "passwordHash" | "passwordPlain">>,
+): Promise<LocalAdminRecord> {
+  const current = (await loadLocalAdminAsync()) ?? readStore();
+  const record = recordFromPatch(current, patch);
+  await mkdir(dirname(STORE_PATH), { recursive: true });
+  await writeFile(STORE_PATH, JSON.stringify(record, null, 2), "utf8");
+  return record;
+}
+
 export function loadLocalAdmin(): LocalAdminRecord | null {
   return readStore();
 }
@@ -67,18 +106,7 @@ export function revealAdminPassword(
 export function saveLocalAdmin(
   patch: Partial<Pick<LocalAdminRecord, "email" | "passwordHash" | "passwordPlain">>,
 ): LocalAdminRecord {
-  const current = readStore();
-  const bootstrap = bootstrapAdminPassword();
-  const record: LocalAdminRecord = {
-    id: current?.id ?? LOCAL_ADMIN_ID,
-    email: patch.email ?? current?.email ?? TEST_ADMIN_EMAIL,
-    passwordHash:
-      patch.passwordHash ?? current?.passwordHash ?? (bootstrap ? hashSecret(bootstrap) : ""),
-    passwordPlain:
-      patch.passwordPlain !== undefined ? patch.passwordPlain : current?.passwordPlain,
-    role: "ADMIN",
-    status: "ACTIVE",
-  };
+  const record = recordFromPatch(readStore(), patch);
   writeStore(record);
   return record;
 }

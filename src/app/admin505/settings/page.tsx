@@ -1,14 +1,14 @@
 import { AdminSettingsForm } from "@/components/admin/settings-form";
 import { AdminAccountForm } from "@/components/admin/account-form";
 import { requireAdmin } from "@/lib/auth/guards";
-import { loadLocalAdmin, revealAdminPassword, saveLocalAdmin } from "@/lib/auth/local-admin-store";
+import { loadLocalAdminAsync, revealAdminPassword, saveLocalAdminAsync } from "@/lib/auth/local-admin-store";
 import { AdminPageHeading, AdminPlatformTitle } from "@/components/admin/admin-page-heading";
 import { getPlatformSettings } from "@/lib/server/platform-settings-store";
 
 export default async function AdminSettingsPage() {
   const session = await requireAdmin();
 
-  const local = loadLocalAdmin();
+  const local = await loadLocalAdminAsync();
   let email = session.user.email ?? local?.email ?? "";
   let passwordHash = local?.passwordHash ?? "";
   const settings = await getPlatformSettings();
@@ -27,11 +27,15 @@ export default async function AdminSettingsPage() {
 
   const currentPassword = revealAdminPassword(passwordHash, local?.passwordPlain);
   if (currentPassword && local?.passwordPlain !== currentPassword) {
-    saveLocalAdmin({
-      ...(email ? { email } : {}),
-      ...(passwordHash ? { passwordHash } : {}),
-      passwordPlain: currentPassword,
-    });
+    try {
+      await saveLocalAdminAsync({
+        ...(email ? { email } : {}),
+        ...(passwordHash ? { passwordHash } : {}),
+        passwordPlain: currentPassword,
+      });
+    } catch {
+      /* Show the recovered password even if the mirror write fails. */
+    }
   }
 
   return (

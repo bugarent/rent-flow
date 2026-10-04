@@ -1,9 +1,15 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useBpLabels } from "@/components/admin/business-partners/labels";
+import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import {
+  insuranceExpiryReasonLabel,
+  isInsuranceDateExpired,
+  isInsuranceExpiryReason,
+} from "@/lib/cars/insurance-expiry-reason";
 import { ListingModerationActions } from "@/components/admin/listing-moderation-actions";
 import { ModerationProfilesPanel } from "@/components/admin/moderation-profiles-panel";
 import { PartnersManager } from "@/components/admin/partners-manager";
@@ -71,6 +77,7 @@ export type ModerationPartnerRow = {
   carCount: number;
   email: string;
   phone: string;
+  country?: string;
   hasUser: boolean;
   unreadReapplyCount: number;
   unreadForAdmin: number;
@@ -84,6 +91,9 @@ type Labels = {
   partnersTab: string;
   partnersTitle: string;
   partnersBody: string;
+  directoryTab: string;
+  directoryTitle: string;
+  directoryBody: string;
   primaryTab: string;
   primaryTitle: string;
   primaryBody: string;
@@ -122,7 +132,7 @@ type Props = {
   labels: Labels;
 };
 
-type TabId = "partners" | "primary" | "listings" | "reviews" | "profiles";
+type TabId = "partners" | "directory" | "primary" | "listings" | "reviews" | "profiles";
 
 const PRIMARY_STATUSES = new Set(["PENDING", "INVITED", "PENDING_FINAL", "NEEDS_CORRECTION"]);
 
@@ -157,6 +167,7 @@ export function ModerationHub({
   labels,
 }: Props) {
   const L = useBpLabels();
+  const { locale } = useAdminLocale();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -168,6 +179,7 @@ export function ModerationHub({
     if (raw === "profiles") return "profiles";
     if (raw === "listings") return "listings";
     if (raw === "primary" || partnerTab === "primary") return "primary";
+    if (raw === "directory" || partnerTab === "directory") return "directory";
     return "partners";
   }, [searchParams]);
 
@@ -176,7 +188,8 @@ export function ModerationHub({
       const params = new URLSearchParams(searchParams.toString());
       if (next === "partners") params.delete("tab");
       else params.set("tab", next);
-      if (next !== "partners" || params.get("partnerTab")?.trim().toLowerCase() === "primary") {
+      const partnerTab = params.get("partnerTab")?.trim().toLowerCase();
+      if (next !== "partners" || partnerTab === "primary" || partnerTab === "directory") {
         params.delete("partnerTab");
       }
       const qs = params.toString();
@@ -185,21 +198,30 @@ export function ModerationHub({
     [pathname, router, searchParams],
   );
 
+  const [removedCarIds, setRemovedCarIds] = useState<string[]>([]);
+  const visibleCars = cars.filter((car) => !removedCarIds.includes(car.id));
+
   const primaryPartners = partners.filter((p) => PRIMARY_STATUSES.has(p.status));
   const directoryPartners = partners.filter((p) => !PRIMARY_STATUSES.has(p.status));
 
+  const catalogPartners = partners.filter(
+    (p) => p.status === "APPROVED" || p.status === "SUSPENDED",
+  );
+
   const tabCounts = {
     partners: directoryPartners.length,
+    directory: catalogPartners.length,
     primary: primaryPartners.length,
-    listings: cars.length,
+    listings: visibleCars.length,
     profiles: profiles.length,
     reviews: reviews.length,
   } as const;
 
   const tabPending = {
     partners: directoryPartners.reduce((sum, p) => sum + partnerAttention(p), 0),
+    directory: catalogPartners.reduce((sum, p) => sum + partnerAttention(p), 0),
     primary: primaryPartners.reduce((sum, p) => sum + partnerAttention(p), 0),
-    listings: cars.length,
+    listings: visibleCars.length,
     profiles: profiles.length,
     reviews: reviewsBadgeCount ?? reviews.filter((r) => r.status === "PENDING").length,
   } as const;
@@ -210,13 +232,14 @@ export function ModerationHub({
       <p className="mb-5 text-sm text-slate-600">{labels.body}</p>
 
       <div
-        className="mb-6 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm sm:grid-cols-3 lg:grid-cols-5 lg:max-w-5xl"
+        className="mb-6 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm sm:grid-cols-3 lg:grid-cols-6"
         role="tablist"
         aria-label={labels.title}
       >
         {(
           [
             ["partners", labels.partnersTab],
+            ["directory", labels.directoryTab],
             ["primary", labels.primaryTab],
             ["listings", labels.listingsTab],
             ["profiles", labels.profilesTab],
@@ -284,6 +307,14 @@ export function ModerationHub({
         </section>
       ) : null}
 
+      {tab === "directory" ? (
+        <section role="tabpanel" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <h2 className="text-lg font-extrabold text-[#0b1f4b]">{labels.directoryTitle}</h2>
+          <p className="mt-1 mb-4 text-sm text-slate-500">{labels.directoryBody}</p>
+          <PartnersManager initialPartners={partners} mode="catalog" />
+        </section>
+      ) : null}
+
       {tab === "primary" ? (
         <section role="tabpanel" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <h2 className="text-lg font-extrabold text-[#0b1f4b]">{labels.primaryTitle}</h2>
@@ -310,7 +341,7 @@ export function ModerationHub({
           )}
 
           <div className="mt-5 space-y-3">
-            {cars.map((car) => (
+            {visibleCars.map((car) => (
               <article
                 key={car.id}
                 className="flex flex-col gap-3 rounded-xl border-2 border-amber-400 bg-amber-50/80 p-3 shadow-sm sm:flex-row sm:items-center"
@@ -323,7 +354,7 @@ export function ModerationHub({
                     <div className="flex h-full items-center justify-center text-[10px] text-slate-400">—</div>
                   )}
                 </div>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 overflow-hidden">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-[10px] font-extrabold uppercase tracking-wide text-amber-800">
                       {car.status}
@@ -333,15 +364,23 @@ export function ModerationHub({
                         {L.newListing}
                       </span>
                     ) : car.status === "PENDING_REMODERATION" ? (
-                      <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-extrabold text-amber-950">
-                        {L.correction}
-                      </span>
+                      <>
+                        <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-extrabold text-amber-950">
+                          {L.correction}
+                        </span>
+                        {isInsuranceExpiryReason(car.hiddenReason) ||
+                        isInsuranceDateExpired(car.insuranceExpiresAt) ? (
+                          <span className="text-[11px] font-extrabold text-red-700">
+                            {insuranceExpiryReasonLabel(locale)}
+                          </span>
+                        ) : null}
+                      </>
                     ) : null}
                   </div>
                   <p className="truncate text-base font-extrabold text-[#0b1f4b]">
                     {car.make} {car.model}
                   </p>
-                  <p className="text-sm font-semibold text-slate-700">
+                  <p className="truncate text-sm font-semibold text-slate-700">
                     {car.year} · {car.country} · {car.bodyType}
                   </p>
                   {car.insuranceExpiresAt ? (
@@ -351,12 +390,15 @@ export function ModerationHub({
                   ) : null}
                   <p className="truncate text-xs text-slate-500">{car.partnerName}</p>
                 </div>
-                <div className="shrink-0 sm:ms-auto">
-                  <ListingModerationActions carId={car.id} />
+                <div className="relative z-10 shrink-0 sm:ms-auto">
+                  <ListingModerationActions
+                    carId={car.id}
+                    onDone={() => setRemovedCarIds((prev) => (prev.includes(car.id) ? prev : [...prev, car.id]))}
+                  />
                 </div>
               </article>
             ))}
-            {cars.length === 0 ? (
+            {visibleCars.length === 0 ? (
               <p className="text-slate-500">
                 {listingsDbOffline ? labels.dbOfflineHint : labels.noListings}
               </p>

@@ -7,6 +7,7 @@ import { LOCAL_PARTNER_ID, loadLocalPartner } from "@/lib/auth/local-partner-sto
 import { normalizeLogin } from "@/lib/crypto";
 import { listFileCarsForPartner } from "@/lib/server/partner-cars-store";
 import { listFileBookingsForCars } from "@/lib/server/customer-bookings-store";
+import { loadCarsByIds } from "@/lib/server/booking-car-label";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 
 export default async function PartnerBookingsPage() {
@@ -85,12 +86,25 @@ export default async function PartnerBookingsPage() {
       email: session.user.email,
       partnerId: partnerId || (isLocal ? LOCAL_PARTNER_ID : undefined),
     });
-    if (fileCars.length) {
-      const byId = new Map(fileCars.map((c) => [c.id, c]));
+    let prismaCarIds: string[] = [];
+    if (partnerId) {
+      try {
+        const cars = await prisma.car.findMany({
+          where: { partnerId },
+          select: { id: true },
+        });
+        prismaCarIds = cars.map((car) => car.id);
+      } catch {
+        /* file cars still apply */
+      }
+    }
+    const carIds = [...new Set([...fileCars.map((car) => car.id), ...prismaCarIds])];
+    if (carIds.length) {
+      const named = await loadCarsByIds(carIds);
       const fileFrom = new Date();
       fileFrom.setMonth(fileFrom.getMonth() - 18);
       const fileBookings = await listFileBookingsForCars(
-        fileCars.map((c) => c.id),
+        carIds,
         fileFrom,
         new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         { includeCancelled: true },
@@ -98,7 +112,7 @@ export default async function PartnerBookingsPage() {
       const seen = new Set(rows.map((r) => r.id));
       for (const b of fileBookings) {
         if (seen.has(b.id)) continue;
-        const car = byId.get(b.carId);
+        const car = named.get(b.carId);
         const facing = displayBookingCharges({
           totalPriceEur: toNumber(b.totalPriceEur),
           depositPaidEur: toNumber(b.depositPaidEur),
@@ -112,8 +126,8 @@ export default async function PartnerBookingsPage() {
           guestLastName: b.guestLastName || "",
           guestName: fullName(b.guestFirstName, b.guestLastName),
           guestEmail: b.guestEmail || "",
-          carLabel: car ? `${car.make} ${car.model}`.trim() : b.carId.slice(0, 8),
-          carImageUrl: car?.photos?.[0] || null,
+          carLabel: car?.label || "—",
+          carImageUrl: car?.imageUrl || null,
           createdAt: b.createdAt,
           pickupAt: b.pickupAt,
           dropoffAt: b.dropoffAt,

@@ -688,13 +688,73 @@ export async function listPartnerScopedDeliveryLocations(
   return [...result.values()].sort((a, b) => a.sortOrder - b.sortOrder || a.iata.localeCompare(b.iata));
 }
 
-/** Search widget options: admin-enabled delivery locations, else catalog hubs on a fresh install. */
+/** Location codes where an approved car can actually be picked up. */
+async function codesOfferingCarPickup(locations: DeliveryLocationView[]): Promise<Set<string>> {
+  const codes = new Set<string>();
+  const add = (raw: string | null | undefined) => {
+    const code = normalizeLocationCode(raw || "");
+    if (code) codes.add(code.toUpperCase());
+  };
+  const byId = new Map(locations.map((loc) => [loc.id, loc]));
+
+  try {
+    const rows = await prisma.carDeliveryPrice.findMany({
+      where: {
+        car: {
+          status: "APPROVED",
+          partner: { status: { in: ["APPROVED", "PENDING_REMODERATION"] } },
+        },
+      },
+      select: {
+        deliveryLocationId: true,
+        deliveryLocation: { select: { airport: { select: { iata: true } } } },
+      },
+    });
+    for (const row of rows) {
+      add(row.deliveryLocation?.airport?.iata);
+      const loc = byId.get(row.deliveryLocationId);
+      add(loc?.iata);
+      add(loc?.airportId);
+      add(row.deliveryLocationId);
+    }
+  } catch {
+    /* file listings can still mark a place as bookable */
+  }
+
+  try {
+    const { isPublicFileCarStatus, listFileCars } = await import("@/lib/server/partner-cars-store");
+    const cars = await listFileCars();
+    for (const car of cars) {
+      if (!isPublicFileCarStatus(car.status)) continue;
+      for (const price of car.deliveryPrices || []) {
+        const loc = byId.get(price.deliveryLocationId);
+        add(loc?.iata);
+        add(loc?.airportId);
+        add(price.deliveryLocationId);
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  return codes;
+}
+
+function locationOffersPickup(loc: DeliveryLocationView, pickupCodes: Set<string>) {
+  return [loc.iata, loc.airportId, loc.id].some((raw) => {
+    const code = normalizeLocationCode(raw || "");
+    return Boolean(code && pickupCodes.has(code.toUpperCase()));
+  });
+}
+
+/** Search widget options: admin-enabled places that have a car, else catalog hubs on a fresh install. */
 export async function getSearchDeliveryAirports(): Promise<SearchAirportOption[]> {
   const hit = searchAirportsCache.get();
   if (hit) return hit;
 
   const all = await listDeliveryLocations();
   const locations = all.filter((loc) => loc.isActive);
+  const pickupCodes = locations.length ? await codesOfferingCarPickup(all) : new Set<string>();
 
   const toOption = (loc: {
     iata: string;
@@ -724,7 +784,7 @@ export async function getSearchDeliveryAirports(): Promise<SearchAirportOption[]
 
   let result: SearchAirportOption[];
   if (all.length > 0) {
-    result = locations.map(toOption);
+    result = locations.filter((loc) => locationOffersPickup(loc, pickupCodes)).map(toOption);
   } else {
     const hubs = CATALOG_AIRPORTS.filter((a) => a.isHub);
     const ordered = [...hubs.filter((a) => a.iata === "KUT"), ...hubs.filter((a) => a.iata !== "KUT")];

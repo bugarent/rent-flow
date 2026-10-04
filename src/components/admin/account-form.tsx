@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
 export function AdminAccountForm({
   email,
@@ -16,6 +17,7 @@ export function AdminAccountForm({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,14 +69,26 @@ export function AdminAccountForm({
       </label>
       <label className="block text-sm font-semibold">
         Current password
-        <input
-          type="text"
-          className="mt-1 w-full rounded-xl border p-3"
-          value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
-          required
-          autoComplete="current-password"
-        />
+        <div className="relative mt-1">
+          <input
+            type={showCurrentPassword ? "text" : "password"}
+            className="w-full rounded-xl border p-3 pe-12"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            required
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <button
+            type="button"
+            className="absolute inset-y-0 end-0 flex items-center px-3 text-slate-500 hover:text-slate-800"
+            aria-label={showCurrentPassword ? "Hide password" : "Show password"}
+            aria-pressed={showCurrentPassword}
+            onClick={() => setShowCurrentPassword((open) => !open)}
+          >
+            {showCurrentPassword ? <EyeOff className="h-5 w-5" aria-hidden /> : <Eye className="h-5 w-5" aria-hidden />}
+          </button>
+        </div>
       </label>
       <label className="block text-sm font-semibold">
         New password

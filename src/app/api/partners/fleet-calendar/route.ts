@@ -243,6 +243,23 @@ export async function GET(req: Request) {
       }
     }
 
+    try {
+      const { isInsuranceExpired, readCarInsuranceDocs } = await import(
+        "@/lib/server/car-insurance-store"
+      );
+      const { INSURANCE_EXPIRY_REASON } = await import("@/lib/cars/insurance-expiry-reason");
+      const docs = await readCarInsuranceDocs(cars.map((car) => car.id));
+      for (const car of cars) {
+        if (car.status !== "PENDING" && car.status !== "PENDING_REMODERATION") continue;
+        const expires = docs.get(car.id)?.insuranceExpiresAt;
+        if (expires && isInsuranceExpired(expires)) {
+          car.hiddenReason = INSURANCE_EXPIRY_REASON;
+        }
+      }
+    } catch (error) {
+      console.warn("[fleet-calendar] insurance reason", error);
+    }
+
     const carIds = cars.map((c) => c.id);
 
     let mapped: Array<Record<string, unknown>> = [];
@@ -402,7 +419,6 @@ export async function GET(req: Request) {
     let fileBookingBars: Array<Record<string, unknown>> = [];
     try {
       const { listFileBookingsForCars } = await import("@/lib/server/customer-bookings-store");
-      const { getFileCar } = await import("@/lib/server/partner-cars-store");
       const fileBookings = await listFileBookingsForCars(carIds, from, to, {
         includeCancelled: false,
       });
@@ -410,7 +426,7 @@ export async function GET(req: Request) {
       for (const b of fileBookings) {
         if (b.status === "UNFULFILLED" || b.status === "CANCELLED") continue;
         if (mappedIds.has(b.id)) continue;
-        const fileCar = await getFileCar(b.carId);
+        const known = byId.get(b.carId);
         const guestName = `${b.guestFirstName} ${b.guestLastName}`.trim();
         const pickupHour = formatHour(b.pickupAt);
         const dropoffHour = formatHour(b.dropoffAt);
@@ -444,8 +460,8 @@ export async function GET(req: Request) {
           dropoffLabel,
           barLabel: `${pickupHour} ${pickupLabel}`,
           endLabel: `${dropoffLabel} ${dropoffHour}`,
-          carLabel: fileCar ? `${fileCar.make} ${fileCar.model}`.trim() : "",
-          registrationNumber: fileCar?.registrationNumber || "",
+          carLabel: known ? `${known.make} ${known.model}`.trim() : "",
+          registrationNumber: known?.registrationNumber || "",
           totalPriceEur: b.totalPriceEur,
           depositPercent: b.depositPercent,
           depositPaidEur: b.depositPaidEur,

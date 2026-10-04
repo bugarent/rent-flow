@@ -11,7 +11,7 @@ import {
   normalizeLocationCode,
   searchPlacesForCountry,
 } from "@/lib/catalog/search-places";
-import { WORLD_COUNTRIES, worldCountryName } from "@/lib/catalog/world-countries";
+import { worldCountryName } from "@/lib/catalog/world-countries";
 import { LOCALES, LOCALE_LABELS } from "@/lib/i18n/config";
 import { PARTNER_SOCIAL_PLATFORMS, type PartnerSocialPlatform } from "@/lib/partner";
 import {
@@ -30,6 +30,7 @@ type CatalogLocation = {
   airportId?: string;
   label: string;
   countryIso2: string;
+  isActive?: boolean;
 };
 
 type LocationOption = {
@@ -107,21 +108,14 @@ function selectedLocationsForCountry(
 
 function locationsForCountry(iso2: string, catalog: CatalogLocation[]): LocationOption[] {
   const want = iso2.toUpperCase();
-  const places = searchPlacesForCountry(want);
-  return places.map((place) => {
-    const existing = catalog.find(
-      (loc) =>
-        loc.countryIso2.toUpperCase() === want &&
-        (locationCodesEqual(loc.iata || "", place.code) ||
-          locationCodesEqual(loc.airportId || "", place.code)),
-    );
-    return {
-      id: existing?.id || place.code,
-      label: place.label,
+  return catalog
+    .filter((loc) => loc.isActive !== false && loc.countryIso2.toUpperCase() === want)
+    .map((loc) => ({
+      id: loc.id,
+      label: loc.label,
       countryIso2: want,
-      iata: place.code,
-    };
-  });
+      iata: loc.iata || loc.airportId || loc.id,
+    }));
 }
 
 function isLocationSelected(
@@ -597,13 +591,16 @@ export function AdminPartnerReviewPanel({
         if (!res.ok || cancelled) return;
         const rows = Array.isArray(data.locations) ? data.locations : [];
         setCatalogLocations(
-          rows.map((row: Partial<CatalogLocation>) => ({
-            id: String(row.id || ""),
-            iata: String(row.iata || row.airportId || ""),
-            airportId: String(row.airportId || ""),
-            label: String(row.label || row.iata || row.id || ""),
-            countryIso2: String(row.countryIso2 || "").toUpperCase(),
-          })),
+          rows
+            .filter((row: { isActive?: boolean }) => row.isActive !== false)
+            .map((row: Partial<CatalogLocation>) => ({
+              id: String(row.id || ""),
+              iata: String(row.iata || row.airportId || ""),
+              airportId: String(row.airportId || ""),
+              label: String(row.label || row.iata || row.id || ""),
+              countryIso2: String(row.countryIso2 || "").toUpperCase(),
+              isActive: true,
+            })),
         );
       } catch {
         /* catalog optional for labels */
@@ -660,14 +657,19 @@ export function AdminPartnerReviewPanel({
   }, [changedFields]);
 
   const countryOptions = useMemo(
-    () =>
-      WORLD_COUNTRIES.filter((c) => searchPlacesForCountry(c.iso2).length > 0)
-        .map((c) => ({
-          iso2: c.iso2.toUpperCase(),
-          name: c.name || worldCountryName(c.iso2),
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })),
-    [],
+    () => {
+      const map = new Map<string, string>();
+      for (const loc of catalogLocations) {
+        if (loc.isActive === false) continue;
+        const iso2 = loc.countryIso2.toUpperCase();
+        if (iso2.length !== 2 || map.has(iso2)) continue;
+        map.set(iso2, worldCountryName(iso2));
+      }
+      return [...map.entries()]
+        .map(([iso2, name]) => ({ iso2, name }))
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    },
+    [catalogLocations],
   );
 
   const toggleClientLanguage = (code: string) => {

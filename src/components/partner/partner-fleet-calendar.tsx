@@ -19,6 +19,10 @@ import {
 import { formatBookingRef } from "@/lib/ids";
 import { clampPickupSelection, earliestPickupIsoDate, isPickupSlotAllowed } from "@/lib/bookings/lead-time";
 import { uiLocaleTag } from "@/lib/i18n/ui-text";
+import {
+  insuranceExpiryReasonLabel,
+  isInsuranceExpiryReason,
+} from "@/lib/cars/insurance-expiry-reason";
 
 function digitsOnlyBookingQuery(raw: string): string {
   return String(raw || "")
@@ -930,6 +934,12 @@ export function PartnerFleetCalendar() {
                     ))}
                   </div>
 
+                  {isInsuranceExpiryReason(car.hiddenReason) ? (
+                    <div className="pointer-events-none absolute inset-x-1 top-1/2 z-[1] flex h-7 -translate-y-1/2 items-center overflow-hidden rounded-md bg-amber-400 px-2 text-[11px] font-extrabold text-amber-950 shadow-sm ring-1 ring-amber-700/25">
+                      <span className="truncate">{insuranceExpiryReasonLabel(locale)}</span>
+                    </div>
+                  ) : null}
+
                   {rowBookings.map((b) => {
                     const start = new Date(b.pickupAt).getTime();
                     const end = new Date(b.dropoffAt).getTime();
@@ -994,7 +1004,7 @@ export function PartnerFleetCalendar() {
                           }
                         }}
                         className={cn(
-                          "absolute top-1.5 z-[1] overflow-hidden rounded-md border px-1 py-0.5 text-left text-[9px] font-semibold leading-tight shadow-sm select-none",
+                          "absolute top-1.5 z-[2] overflow-hidden rounded-md border px-1 py-0.5 text-left text-[9px] font-semibold leading-tight shadow-sm select-none",
                           statusBarClass(b),
                           (selectedId === b.id || viewingInfo?.id === b.id) &&
                             "ring-2 ring-[#1e1b4b]",
@@ -1407,12 +1417,14 @@ export function PartnerFleetCalendar() {
                     : "Admin comment"}
               </p>
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm font-medium leading-relaxed text-amber-950">
-                {(noticeCar.rejectionNote || noticeCar.hiddenReason || "").trim() ||
-                  (locale === "ka"
-                    ? "განცხადება ჯერ არ არის დამტკიცებული. მწვანე გახდება მხოლოდ ადმინის დამტკიცების შემდეგ."
-                    : locale === "ru"
-                      ? "Объявление ещё не одобрено. Зелёным станет только после одобрения админом."
-                      : "This listing is not approved yet. It turns green only after admin approval.")}
+                {isInsuranceExpiryReason(noticeCar.hiddenReason)
+                  ? insuranceExpiryReasonLabel(locale)
+                  : (noticeCar.rejectionNote || noticeCar.hiddenReason || "").trim() ||
+                    (locale === "ka"
+                      ? "განცხადება ჯერ არ არის დამტკიცებული. მწვანე გახდება მხოლოდ ადმინის დამტკიცების შემდეგ."
+                      : locale === "ru"
+                        ? "Объявление ещё не одобрено. Зелёным станет только после одобрения админом."
+                        : "This listing is not approved yet. It turns green only after admin approval.")}
               </div>
               <p className="text-xs text-slate-500">
                 {locale === "ka"

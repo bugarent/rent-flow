@@ -1,5 +1,6 @@
 import { prisma, reopenDbCircuit } from "@/lib/prisma";
-import { partnerDisplayName, partnerStatusLabel, formatPartnerCode } from "@/lib/partner";
+import { partnerDisplayName, partnerStatusLabel, formatPartnerCode, parseIso2List } from "@/lib/partner";
+import { worldCountryName } from "@/lib/catalog/world-countries";
 import { dbOfflineMessage, isDbOfflineError, shortPrismaError } from "@/lib/server/db-errors";
 import { listFilePartnerApplications } from "@/lib/server/partner-applications-store";
 
@@ -16,6 +17,7 @@ export type AdminPartnerRow = {
   carCount: number;
   email: string;
   phone: string;
+  country: string;
   hasUser: boolean;
   unreadReapplyCount: number;
   unreadForAdmin: number;
@@ -36,6 +38,13 @@ export const PENDING_PARTNER_STATUSES = new Set([
 ]);
 
 export const ACTIVE_PARTNER_STATUSES = new Set(["APPROVED", "SUSPENDED"]);
+
+function countryNames(iso2s: unknown): string {
+  const names = parseIso2List(iso2s)
+    .map((iso2) => worldCountryName(iso2))
+    .filter(Boolean);
+  return [...new Set(names)].join(", ") || "—";
+}
 
 function needsAdminAction(status: string) {
   return (
@@ -90,6 +99,7 @@ export async function loadAdminPartnerRows(): Promise<{
         carCount: p._count.cars,
         email: p.email,
         phone: p.phone,
+        country: countryNames(p.operatingCountryIso2s),
         hasUser: Boolean(p.userId),
         unreadReapplyCount: unreadReapply,
         unreadForAdmin,
@@ -123,6 +133,7 @@ export async function loadAdminPartnerRows(): Promise<{
         carCount: 0,
         email: p.email,
         phone: p.phone,
+        country: countryNames(p.operatingCountryIso2s),
         hasUser: false,
         unreadReapplyCount: unreadReapply,
         unreadForAdmin,
@@ -194,6 +205,7 @@ export async function loadAdminPartnerRows(): Promise<{
         carCount: 0,
         email,
         phone: settings?.primaryPhone || "",
+        country: countryNames(settings?.deliveryCountryIso2s),
         hasUser: false,
         unreadReapplyCount: row.moderation.unreadCount || 1,
         unreadForAdmin: Math.max(1, row.moderation.unreadCount || 1),

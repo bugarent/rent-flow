@@ -90,10 +90,9 @@ export function computeSiteServiceFee(input: {
 /**
  * Live settlement when a booking trip is edited.
  * - Full trip total = rental + extras + delivery (never deposit + stale balance).
- * - Pay-now (site service %) only for newly added extras — never for day/location/rental edits.
- * - Delivery changes always move in full on-site.
- * - Extra rental days: full amount on-site (no immediate site fee).
- * - Fewer rental days: on-site drops by partner share; unused site-fee share is credited.
+ * - Added days and services charge the site service percent on the green pay button.
+ * - Delivery changes stay on-site in full.
+ * - Fewer rental days: on-site drops by the partner share; unused site-fee share is credited.
  */
 export function computeProjectedTripSettlement(input: {
   originalRentalEur: number;
@@ -185,16 +184,21 @@ export function computeProjectedTripSettlement(input: {
     depositCredit = roundMoney(
       Math.max(0, Math.min(depositBasePaid, depositBasePaid - projectedExistingFee.payNowBase)),
     );
+  } else if (tripDelta > 0.02) {
+    // Partner share stays on site. The site percent of this increase is pay-now.
+    onSiteTripDelta = roundMoney(tripDelta * remainingRatio);
   } else {
     onSiteTripDelta = tripDelta;
   }
 
-  const fee =
-    newExtras > 0
-      ? computeSiteServiceFee({ commissionableEur: newExtras, depositPercent })
-      : { payNow: 0, payNowBase: 0, cardSurcharge: 0, depositPercent };
   const onSiteNewExtras = roundMoney(newExtras * remainingRatio);
   const onSiteCommissionableDelta = roundMoney(onSiteTripDelta + onSiteNewExtras);
+  // Site percent of added days and of services (new or grown with the extra days).
+  const addedCommissionable = roundMoney(Math.max(0, tripDelta) + newExtras);
+  const fee =
+    addedCommissionable > 0.009
+      ? computeSiteServiceFee({ commissionableEur: addedCommissionable, depositPercent })
+      : { payNow: 0, payNowBase: 0, cardSurcharge: 0, depositPercent };
 
   const nextDepositBaseCents = Math.max(
     0,
@@ -216,7 +220,7 @@ export function computeProjectedTripSettlement(input: {
     dueWill: centsToMoney(dueWillCents),
     payNow: fee.payNow,
     payNowBase: fee.payNowBase,
-    commissionableIncrease: newExtras,
+    commissionableIncrease: addedCommissionable,
     onSiteCommissionableDelta,
     refundableSiteFeeEur: depositCredit,
     nextDepositPaidEur: centsToMoney(nextDepositPaidCents),

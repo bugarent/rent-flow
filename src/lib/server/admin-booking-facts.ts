@@ -14,6 +14,7 @@ import {
 import { listHomepageCategories } from "@/lib/server/homepage-categories-store";
 import { listAllFileBookings } from "@/lib/server/customer-bookings-store";
 import { listFileCars } from "@/lib/server/partner-cars-store";
+import { carDisplayName, loadCarsByIds } from "@/lib/server/booking-car-label";
 import { LOCAL_PARTNER_ID, loadLocalPartner } from "@/lib/auth/local-partner-store";
 import { readCompanySettingsFile } from "@/lib/server/partner-company-settings-store";
 import {
@@ -173,6 +174,8 @@ export async function loadAdminBookingFacts(): Promise<AdminBookingFact[]> {
   try {
     const [fileBookings, fileCars] = await Promise.all([listAllFileBookings(), listFileCars()]);
     const carById = new Map(fileCars.map((car) => [car.id, car]));
+    const missingIds = fileBookings.map((booking) => booking.carId).filter((id) => !carById.has(id));
+    const prismaCars = await loadCarsByIds(missingIds);
     const local = loadLocalPartner();
     const settingsCache = new Map<string, Awaited<ReturnType<typeof readCompanySettingsFile>>>();
     let deliveryIsoById = new Map<string, string>();
@@ -196,7 +199,8 @@ export async function loadAdminBookingFacts(): Promise<AdminBookingFact[]> {
     for (const booking of fileBookings) {
       if (seen.has(booking.id)) continue;
       const car = carById.get(booking.carId);
-      let partnerName = car?.partnerName || car?.partnerEmail || car?.partnerId || "—";
+      const prismaCar = car ? undefined : prismaCars.get(booking.carId);
+      let partnerName = car?.partnerName || car?.partnerEmail || car?.partnerId || prismaCar?.partnerLabel || "—";
       let partnerCode = "";
       const partnerIds = [
         car?.partnerId,
@@ -262,10 +266,10 @@ export async function loadAdminBookingFacts(): Promise<AdminBookingFact[]> {
         depositPaidEur: toNumber(booking.depositPaidEur),
         balanceDueEur: toNumber(booking.balanceDueEur),
         guestName: fullName(booking.guestFirstName, booking.guestLastName) || booking.guestEmail || "—",
-        carMake: car?.make || "",
-        carModel: car?.model || "",
-        carTitle: car?.title || "",
-        carLabel: car ? `${car.make} ${car.model}`.trim() : booking.carId.slice(0, 8),
+        carMake: car?.make || prismaCar?.make || "",
+        carModel: car?.model || prismaCar?.model || "",
+        carTitle: car?.title || prismaCar?.title || "",
+        carLabel: carDisplayName(car) || prismaCar?.label || "—",
         categorySlug: car ? assignedCategorySlug(car, categories) : null,
         pickupIata: iata,
         pickupTitle: airportTitle(iata, booking.pickupAddress || ""),

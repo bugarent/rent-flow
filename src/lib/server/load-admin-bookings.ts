@@ -4,7 +4,7 @@ import { formatBookingRef } from "@/lib/ids";
 import { fullName, toNumber } from "@/lib/utils";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import { listAllFileBookings } from "@/lib/server/customer-bookings-store";
-import { listFileCars } from "@/lib/server/partner-cars-store";
+import { loadCarsByIds } from "@/lib/server/booking-car-label";
 import {
   businessPartnerCodeForBooking,
   loadBusinessPartnerCodeIndex,
@@ -80,8 +80,8 @@ export async function loadAdminBookingRows(): Promise<AdminBookingListRow[]> {
   }
 
   try {
-    const [fileBookings, fileCars] = await Promise.all([listAllFileBookings(), listFileCars()]);
-    const byId = new Map(fileCars.map((c) => [c.id, c]));
+    const fileBookings = await listAllFileBookings();
+    const byId = await loadCarsByIds(fileBookings.map((b) => b.carId));
     const seen = new Set(rows.map((r) => r.id));
     for (const b of fileBookings) {
       if (seen.has(b.id)) continue;
@@ -94,9 +94,9 @@ export async function loadAdminBookingRows(): Promise<AdminBookingListRow[]> {
         guestLastName: b.guestLastName || "",
         guestName: fullName(b.guestFirstName, b.guestLastName),
         guestEmail: b.guestEmail || "",
-        carLabel: car ? `${car.make} ${car.model}`.trim() : b.carId.slice(0, 8),
-        carImageUrl: car?.photos?.[0] || null,
-        partnerLabel: car?.partnerId || "",
+        carLabel: car?.label || "—",
+        carImageUrl: car?.imageUrl || null,
+        partnerLabel: car?.partnerLabel || "",
         createdAt: b.createdAt,
         pickupAt: b.pickupAt,
         dropoffAt: b.dropoffAt,

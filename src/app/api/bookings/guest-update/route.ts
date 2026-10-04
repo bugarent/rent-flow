@@ -123,21 +123,53 @@ export async function POST(req: Request) {
           })();
       const { hydrateBookingExtraLabels } = await import("@/lib/server/booking-info/extras");
       const nextExtras = await hydrateBookingExtraLabels(draftedExtras);
+      const { quoteGuestBookingCorrection } = await import("@/lib/server/guest-correction-quote");
+      const quote = await quoteGuestBookingCorrection({
+        carId: file.carId,
+        promoCode: file.promoCode,
+        depositPercent: file.depositPercent,
+        totalPriceEur: file.totalPriceEur,
+        depositPaidEur: file.depositPaidEur,
+        balanceDueEur: file.balanceDueEur,
+        oldPickupAt: file.pickupAt,
+        oldDropoffAt: file.dropoffAt,
+        newPickupAt: pickupAt,
+        newDropoffAt: dropoffAt,
+        oldPickupIata: file.pickupAirportIata,
+        oldDropoffIata: file.dropoffAirportIata,
+        newPickupIata: pickupIata || file.pickupAirportIata,
+        newDropoffIata: dropoffIata || file.dropoffAirportIata,
+        oldExtras: file.extras || [],
+        newExtras: nextExtras,
+      });
+      const offeredPayNow = body.paymentMode === "sandbox" ? extrasPayNow : 0;
+      if (quote.payNow > 0.02 && offeredPayNow + 0.05 < quote.payNow) {
+        return NextResponse.json(
+          { error: "Payment required for added days or services", payNowEur: quote.payNow },
+          { status: 402 },
+        );
+      }
       const extrasDelta = securedExtras.reduce((s, e) => s + (Number(e.priceEur) || 0), 0);
       const totalPriceEur =
-        body.projectedTotalEur != null
-          ? roundMoney(body.projectedTotalEur)
-          : roundMoney((file.totalPriceEur || 0) + extrasDelta);
+        quote.payNow > 0.02
+          ? quote.projectedTotal
+          : body.projectedTotalEur != null
+            ? roundMoney(body.projectedTotalEur)
+            : roundMoney((file.totalPriceEur || 0) + extrasDelta);
       const depositPaidEur =
-        body.depositPaidEur != null
-          ? roundMoney(body.depositPaidEur)
-          : paidNow
-            ? roundMoney((file.depositPaidEur || 0) + extrasPayNow)
-            : file.depositPaidEur;
+        quote.payNow > 0.02
+          ? quote.nextDepositPaidEur
+          : body.depositPaidEur != null
+            ? roundMoney(body.depositPaidEur)
+            : paidNow
+              ? roundMoney((file.depositPaidEur || 0) + extrasPayNow)
+              : file.depositPaidEur;
       const nextBalance =
-        body.balanceDueEur != null
-          ? roundMoney(body.balanceDueEur)
-          : roundMoney(Math.max(0, totalPriceEur - depositPaidEur));
+        quote.payNow > 0.02
+          ? quote.nextBalanceDueEur
+          : body.balanceDueEur != null
+            ? roundMoney(body.balanceDueEur)
+            : roundMoney(Math.max(0, totalPriceEur - depositPaidEur));
 
       // Apply dates, locations, extras, and totals immediately (not only pendingChanges).
       const updated = await updateFileBooking(file.id, {
@@ -217,6 +249,11 @@ export async function POST(req: Request) {
           id: body.bookingId,
           guestEmail: { equals: email, mode: "insensitive" },
         },
+        include: {
+          extras: { select: { extraServiceId: true, priceEur: true } },
+          pickupAirport: { select: { iata: true } },
+          dropoffAirport: { select: { iata: true } },
+        },
       });
       if (!booking) {
         return NextResponse.json({ error: "Booking not found" }, { status: 404 });
@@ -249,23 +286,58 @@ export async function POST(req: Request) {
         ? await mergeMandatoryCatalogExtras(booking.carId, newExtrasRaw, rentalDays)
         : newExtrasRaw;
 
+      const { quoteGuestBookingCorrection } = await import("@/lib/server/guest-correction-quote");
+      const quote = await quoteGuestBookingCorrection({
+        carId: booking.carId,
+        promoCode: booking.promoCode,
+        depositPercent: booking.depositPercent,
+        totalPriceEur: Number(booking.totalPriceEur),
+        depositPaidEur: Number(booking.depositPaidEur),
+        balanceDueEur: Number(booking.balanceDueEur),
+        oldPickupAt: booking.pickupAt.toISOString(),
+        oldDropoffAt: booking.dropoffAt.toISOString(),
+        newPickupAt: pickupAt.toISOString(),
+        newDropoffAt: dropoffAt.toISOString(),
+        oldPickupIata: booking.pickupAirport.iata,
+        oldDropoffIata: booking.dropoffAirport.iata,
+        newPickupIata: pickupIata || booking.pickupAirport.iata,
+        newDropoffIata: dropoffIata || booking.dropoffAirport.iata,
+        oldExtras: booking.extras.map((line) => ({
+          id: line.extraServiceId,
+          priceEur: Number(line.priceEur),
+        })),
+        newExtras,
+      });
+      const offeredPayNow = body.paymentMode === "sandbox" ? extrasPayNow : 0;
+      if (quote.payNow > 0.02 && offeredPayNow + 0.05 < quote.payNow) {
+        return NextResponse.json(
+          { error: "Payment required for added days or services", payNowEur: quote.payNow },
+          { status: 402 },
+        );
+      }
+
       let totalPriceEur = Number(booking.totalPriceEur);
       let depositPaidEur = Number(booking.depositPaidEur);
-      if (body.projectedTotalEur != null) {
+      if (quote.payNow > 0.02) {
+        totalPriceEur = quote.projectedTotal;
+        depositPaidEur = quote.nextDepositPaidEur;
+      } else if (body.projectedTotalEur != null) {
         totalPriceEur = roundMoney(body.projectedTotalEur);
       } else if (paidNow || newExtras.length) {
         const extrasDelta = newExtras.reduce((s, e) => s + (Number(e.priceEur) || 0), 0);
         totalPriceEur = roundMoney(totalPriceEur + extrasDelta);
       }
-      if (body.depositPaidEur != null) {
+      if (quote.payNow <= 0.02 && body.depositPaidEur != null) {
         depositPaidEur = roundMoney(body.depositPaidEur);
-      } else if (paidNow) {
+      } else if (quote.payNow <= 0.02 && paidNow) {
         depositPaidEur = roundMoney(depositPaidEur + extrasPayNow);
       }
       const balanceDueEur =
-        body.balanceDueEur != null
-          ? roundMoney(body.balanceDueEur)
-          : roundMoney(Math.max(0, totalPriceEur - depositPaidEur));
+        quote.payNow > 0.02
+          ? quote.nextBalanceDueEur
+          : body.balanceDueEur != null
+            ? roundMoney(body.balanceDueEur)
+            : roundMoney(Math.max(0, totalPriceEur - depositPaidEur));
 
       if (replaceExtras || newExtras.length) {
         const catalogIds = new Set(

@@ -35,11 +35,7 @@ import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import { CREATE_AUTO_BACKDROP_URL } from "@/lib/brand";
 import { PartnerTelegramVerifyBanner } from "@/components/partner/partner-telegram-verify-banner";
 import { PhoneMessengerIcons } from "@/components/partner/phone-messenger-icons";
-import {
-  locationCodesEqual,
-  normalizeLocationCode,
-  searchPlacesForCountry,
-} from "@/lib/catalog/search-places";
+import { locationCodesEqual, normalizeLocationCode } from "@/lib/catalog/search-places";
 import type { PartnerSocialPlatform } from "@/lib/partner";
 
 async function uploadPartnerFile(file: File): Promise<string> {
@@ -316,21 +312,17 @@ export function PartnerPersonalInfoForm({
   };
 
   const countryOptions = useMemo(() => {
-    const withPlaces = WORLD_COUNTRIES.filter((c) => searchPlacesForCountry(c.iso2).length > 0).map(
-      (c) => ({
-        iso2: c.iso2.toUpperCase(),
-        name: c.name || worldCountryName(c.iso2),
-      }),
-    );
-    // Keep any already-saved countries even if catalog has no places yet
-    for (const iso of settings.deliveryCountryIso2s || []) {
-      const iso2 = iso.toUpperCase();
-      if (!withPlaces.some((c) => c.iso2 === iso2)) {
-        withPlaces.push({ iso2, name: worldCountryName(iso2) });
-      }
+    const map = new Map<string, string>();
+    for (const loc of activeDeliveryLocations) {
+      if (!loc.isActive) continue;
+      const iso2 = (loc.countryIso2 || "").toUpperCase();
+      if (iso2.length !== 2) continue;
+      if (!map.has(iso2)) map.set(iso2, worldCountryName(iso2));
     }
-    return withPlaces.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-  }, [settings.deliveryCountryIso2s]);
+    return [...map.entries()]
+      .map(([iso2, name]) => ({ iso2, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  }, [activeDeliveryLocations]);
 
   const committedCountries = settings.deliveryCountryIso2s ?? [];
   const visibleCommitted = committedCountries.filter((iso) => !pendingCountryRemoves.includes(iso));
@@ -702,22 +694,15 @@ export function PartnerPersonalInfoForm({
 
   const locationsForCountry = (iso2: string): CountryLocationOption[] => {
     const want = iso2.toUpperCase();
-    const places = searchPlacesForCountry(want);
-    return places.map((place) => {
-      const existing = activeDeliveryLocations.find(
-        (loc) =>
-          locationCodesEqual(loc.iata || "", place.code) ||
-          locationCodesEqual(loc.airportId || "", place.code) ||
-          loc.id === place.code,
-      );
-      return {
-        id: existing?.id || place.code,
-        label: place.label,
+    return activeDeliveryLocations
+      .filter((loc) => loc.isActive && (loc.countryIso2 || "").toUpperCase() === want)
+      .map((loc) => ({
+        id: loc.id,
+        label: loc.label,
         countryIso2: want,
-        iata: place.code,
+        iata: loc.iata || loc.airportId,
         isActive: true,
-      };
-    });
+      }));
   };
 
   const selectedLocationIds = settings.deliveryLocationIds ?? [];

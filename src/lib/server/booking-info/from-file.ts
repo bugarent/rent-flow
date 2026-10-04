@@ -128,6 +128,20 @@ export async function fromFile(
         (1000 * 60 * 60 * 24),
     ),
   );
+  let carMake = fileCar?.make || "";
+  let carModel = fileCar?.model || "";
+  let carYear = fileCar?.year || 0;
+  let carImage = fileCar?.photos?.[0] || null;
+  if (!carMake && !carModel && file.carId) {
+    const { loadCarsByIds } = await import("@/lib/server/booking-car-label");
+    const resolved = (await loadCarsByIds([file.carId])).get(file.carId);
+    if (resolved) {
+      carMake = resolved.make;
+      carModel = resolved.model;
+      carYear = carYear || resolved.year;
+      carImage = carImage || resolved.imageUrl;
+    }
+  }
   const discountPercent = await resolvedDiscountPercentForBooking({
     carId: file.carId,
     pickupAt: file.pickupAt,
@@ -173,10 +187,10 @@ export async function fromFile(
     extras,
     carId: file.carId,
     car: {
-      make: fileCar?.make || "Vehicle",
-      model: fileCar?.model || "",
-      year: fileCar?.year || 0,
-      imageUrl: fileCar?.photos?.[0] || null,
+      make: carMake || "Vehicle",
+      model: carModel,
+      year: carYear,
+      imageUrl: carImage,
       fuelType: fileCar?.fuelType || "",
       transmission: fileCar?.transmission || "",
       seats: fileCar?.seats ?? null,

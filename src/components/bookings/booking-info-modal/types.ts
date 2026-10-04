@@ -233,6 +233,7 @@ export type ExtrasPaymentBreakdown = {
   projectedComponents: number;
   addedServicesTotal: number;
   payNow: number;
+  payNowBase: number;
   dueWas: number;
   dueWill: number;
   projectedTotal: number;

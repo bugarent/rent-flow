@@ -26,6 +26,11 @@ import {
 import { isSyntheticDeliveryId } from "@/lib/delivery/pricing";
 import { parseCarDetails } from "@/lib/cars/car-details";
 import { diffCarAgainstPublished, fieldChangesMapFromRecord } from "@/lib/cars/car-published-diff";
+import {
+  insuranceExpiryReasonLabel,
+  isInsuranceDateExpired,
+  isInsuranceExpiryReason,
+} from "@/lib/cars/insurance-expiry-reason";
 import type { PublishedCarSnapshot } from "@/lib/server/car-published-store";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { knownText } from "@/lib/i18n/known-record-text";
@@ -199,9 +204,9 @@ function SectionCard({
 const HEADER_BORDER = "#8fbf9a";
 const HEADER_TEXT = "#143322";
 const HEADER_BAND = "rgba(168, 210, 178, 0.94)";
-const HEADER_BAND_REMOD = "rgba(250, 204, 21, 0.94)";
-const HEADER_BORDER_REMOD = "#ca8a04";
-const HEADER_TEXT_REMOD = "#713f12";
+const HEADER_BAND_ALERT = "rgba(254, 202, 202, 0.97)";
+const HEADER_BORDER_ALERT = "#b91c1c";
+const HEADER_TEXT_ALERT = "#7f1d1d";
 const ACCENT_GREEN = "#28a745";
 
 const CONTENT_MAX = "calc(100% - 7cm)";
@@ -373,6 +378,7 @@ export function PartnerCreateCarForm({
   const [booting, setBooting] = useState(isEdit);
   const [serverCaps, setServerCaps] = useState<DeliveryAdjustment[] | null>(null);
   const [listingStatus, setListingStatus] = useState("");
+  const [moderationReason, setModerationReason] = useState("");
   const [fieldChanges, setFieldChanges] = useState<Map<string, { previous: string }>>(new Map());
   const [adminNote, setAdminNote] = useState("");
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -383,6 +389,7 @@ export function PartnerCreateCarForm({
   const changePrev = (key: string) => fieldChanges.get(key)?.previous;
   const isNewListing = isAdminReview && listingStatus === "PENDING";
   const isRemoderation = isAdminReview && listingStatus === "PENDING_REMODERATION";
+  const awaitingAdminModeration = isNewListing || isRemoderation;
 
   const [make, setMake] = useState("");
   const [model, setModel] = useState("");
@@ -437,6 +444,11 @@ export function PartnerCreateCarForm({
   const [passportBack, setPassportBack] = useState("");
   const [insuranceUrl, setInsuranceUrl] = useState("");
   const [insuranceExpiresAt, setInsuranceExpiresAt] = useState("");
+  const insuranceExpiredReview =
+    awaitingAdminModeration &&
+    (isInsuranceExpiryReason(moderationReason) ||
+      isChanged("insuranceExpiresAt") ||
+      isInsuranceDateExpired(insuranceExpiresAt));
   const [uploading, setUploading] = useState(false);
   const [docPreview, setDocPreview] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -518,6 +530,7 @@ export function PartnerCreateCarForm({
 
           const details = parseCarDetails(car.description);
           setListingStatus(String(car.status || ""));
+          setModerationReason(String((car as { hiddenReason?: string | null }).hiddenReason || ""));
           const snapshot = (car.publishedSnapshot || null) as PublishedCarSnapshot | null;
           const photoUrls = Array.isArray(car.photos)
             ? car.photos
@@ -885,6 +898,7 @@ export function PartnerCreateCarForm({
 
           const details = parseCarDetails(car.description);
           setListingStatus(String(car.status || ""));
+          setModerationReason(String((car as { hiddenReason?: string | null }).hiddenReason || ""));
           const snapshot = (car.publishedSnapshot || null) as PublishedCarSnapshot | null;
           const photoUrls = Array.isArray(car.photos)
             ? car.photos
@@ -1797,9 +1811,9 @@ export function PartnerCreateCarForm({
       <header
         className={cn("sticky z-40 border-b backdrop-blur-md", isAdminReview ? "top-0" : "top-12")}
         style={{
-          backgroundColor: isRemoderation || isNewListing ? HEADER_BAND_REMOD : HEADER_BAND,
-          borderColor: isRemoderation || isNewListing ? HEADER_BORDER_REMOD : HEADER_BORDER,
-          color: isRemoderation || isNewListing ? HEADER_TEXT_REMOD : HEADER_TEXT,
+          backgroundColor: awaitingAdminModeration ? HEADER_BAND_ALERT : HEADER_BAND,
+          borderColor: awaitingAdminModeration ? HEADER_BORDER_ALERT : HEADER_BORDER,
+          color: awaitingAdminModeration ? HEADER_TEXT_ALERT : HEADER_TEXT,
         }}
       >
         {isAdminReview && adminReview ? (
@@ -1848,7 +1862,12 @@ export function PartnerCreateCarForm({
               )}
               style={
                 activeSection === id
-                  ? { backgroundColor: "rgba(40,167,69,0.14)", color: HEADER_TEXT }
+                  ? {
+                      backgroundColor: awaitingAdminModeration
+                        ? "rgba(185, 28, 28, 0.12)"
+                        : "rgba(40,167,69,0.14)",
+                      color: awaitingAdminModeration ? HEADER_TEXT_ALERT : HEADER_TEXT,
+                    }
                   : undefined
               }
             >
@@ -1865,43 +1884,42 @@ export function PartnerCreateCarForm({
         )}
         style={{ maxWidth: CONTENT_MAX }}
       >
-        <div className="space-y-2.5 rounded-xl border border-white/50 bg-white/95 px-3 py-3 shadow-[0_12px_40px_rgba(11,31,75,0.18)] backdrop-blur-sm sm:px-4 lg:px-5 lg:py-4">
+        <div
+          className={cn(
+            "space-y-2.5 rounded-xl border px-3 py-3 shadow-[0_12px_40px_rgba(11,31,75,0.18)] backdrop-blur-sm sm:px-4 lg:px-5 lg:py-4",
+            awaitingAdminModeration
+              ? "border-red-500 bg-red-50"
+              : "border-white/50 bg-white/95",
+          )}
+        >
         {error ? <div className="rounded-lg bg-red-50 p-3 text-sm font-medium text-red-700">{error}</div> : null}
-        {isNewListing ? (
-          <div
-            className={cn(
-              "rounded-lg border px-4 py-3 text-sm font-semibold",
-              fieldChanges.size > 0
-                ? "border-red-300 bg-red-50 text-red-950"
-                : "border-sky-300 bg-sky-50 text-sky-950",
-            )}
-          >
-            {fieldChanges.size > 0
-              ? locale === "ka"
-                ? `ახალი განცხადება — პარტნიორმა განაახლა ${fieldChanges.size} ველი. გაწითლებული ადგილები მონიშნავს ცვლილებებს.`
-                : locale === "ru"
-                  ? `Новое объявление — партнёр обновил ${fieldChanges.size} пол(ей). Красным отмечены изменения.`
-                  : `New listing — the partner updated ${fieldChanges.size} field(s). Red highlights show what changed.`
-              : locale === "ka"
-                ? "ეს არის ახალი განცხადება — პარტნიორი პირველად აგზავნის მოდერაციაზე."
-                : locale === "ru"
-                  ? "Это новое объявление — партнёр отправляет его на модерацию впервые."
-                  : "This is a new listing — the partner is submitting it for moderation for the first time."}
-          </div>
-        ) : null}
-        {isRemoderation ? (
-          <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm font-semibold text-red-950">
-            {locale === "ka"
-              ? fieldChanges.size > 0
-                ? `კორექტირება ძველ განცხადებაში — ${fieldChanges.size} ველი შეცვლილია. გაწითლებული ადგილები მონიშნავს ცვლილებებს.`
-                : "კორექტირება ძველ განცხადებაში — პარტნიორმა შეცვალა უკვე დამტკიცებული განცხადება. გაწითლებული ველები გამოჩნდება, როცა ცვლილებების შედარება ხელმისაწვდომია."
-              : locale === "ru"
+        {awaitingAdminModeration ? (
+          <div className="rounded-lg border border-red-600 bg-red-100 px-4 py-3 text-sm font-extrabold text-red-950">
+            {insuranceExpiredReview
+              ? insuranceExpiryReasonLabel(locale)
+              : isNewListing
                 ? fieldChanges.size > 0
-                  ? `Корректировка существующего объявления — изменено полей: ${fieldChanges.size}. Красным отмечены изменения.`
-                  : "Корректировка существующего объявления — партнёр изменил уже одобренное объявление."
+                  ? locale === "ka"
+                    ? `ახალი განცხადება — პარტნიორმა განაახლა ${fieldChanges.size} ველი. გაწითლებული ადგილები მონიშნავს ცვლილებებს.`
+                    : locale === "ru"
+                      ? `Новое объявление — партнёр обновил ${fieldChanges.size} пол(ей). Красным отмечены изменения.`
+                      : `New listing — the partner updated ${fieldChanges.size} field(s). Red highlights show what changed.`
+                  : locale === "ka"
+                    ? "ეს არის ახალი განცხადება — პარტნიორი პირველად აგზავნის მოდერაციაზე."
+                    : locale === "ru"
+                      ? "Это новое объявление — партнёр отправляет его на модерацию впервые."
+                      : "This is a new listing — the partner is submitting it for moderation for the first time."
                 : fieldChanges.size > 0
-                  ? `Correction to an existing listing — ${fieldChanges.size} field(s) changed. Red highlights show what the partner updated.`
-                  : "Correction to an existing listing — the partner edited an already approved listing."}
+                  ? locale === "ka"
+                    ? `კორექტირება ძველ განცხადებაში — ${fieldChanges.size} ველი შეცვლილია. გაწითლებული ადგილები მონიშნავს ცვლილებებს.`
+                    : locale === "ru"
+                      ? `Корректировка существующего объявления — изменено полей: ${fieldChanges.size}. Красным отмечены изменения.`
+                      : `Correction to an existing listing — ${fieldChanges.size} field(s) changed. Red highlights show what the partner updated.`
+                  : locale === "ka"
+                    ? "განცხადება გაგზავნილია მოდერაციაზე."
+                    : locale === "ru"
+                      ? "Объявление отправлено на модерацию."
+                      : "This listing was sent for moderation."}
           </div>
         ) : null}
 
@@ -2688,7 +2706,12 @@ export function PartnerCreateCarForm({
             fieldInvalid("passport-back") ||
             fieldInvalid("insurance-file")
           }
-          changed={isChanged("passport") || isChanged("insurance")}
+          changed={
+            isChanged("passport") ||
+            isChanged("insurance") ||
+            isChanged("insuranceExpiresAt") ||
+            insuranceExpiredReview
+          }
         >
           <p className="mb-1.5 text-xs text-slate-500">{cc.certPrivate}</p>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -2896,9 +2919,19 @@ export function PartnerCreateCarForm({
               />
             </div>
             <div className="mt-3">
-              <label className="mb-1 block text-[11px] font-semibold text-slate-800">
+              <label
+                className={cn(
+                  "mb-1 block text-[11px] font-semibold",
+                  insuranceExpiredReview || isChanged("insuranceExpiresAt")
+                    ? "text-red-700"
+                    : "text-slate-800",
+                )}
+              >
                 {cc.insuranceExpiresAtLabel}
                 <span className="text-[#e11d48]"> *</span>
+                {insuranceExpiredReview ? (
+                  <span className="ms-1 font-extrabold">· {insuranceExpiryReasonLabel(locale)}</span>
+                ) : null}
               </label>
               <input
                 type="date"
@@ -2907,7 +2940,7 @@ export function PartnerCreateCarForm({
                 onChange={(e) => setInsuranceExpiresAt(e.target.value)}
                 className={cn(
                   "w-full max-w-xs rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-200",
-                  fieldInvalid("insurance-expires")
+                  fieldInvalid("insurance-expires") || insuranceExpiredReview || isChanged("insuranceExpiresAt")
                     ? "border-red-500 bg-red-50 ring-2 ring-red-200"
                     : "border-slate-300",
                 )}
@@ -2925,9 +2958,9 @@ export function PartnerCreateCarForm({
           isAdminReview && "pointer-events-auto",
         )}
         style={{
-          backgroundColor: isRemoderation || isNewListing ? HEADER_BAND_REMOD : HEADER_BAND,
-          borderColor: isRemoderation || isNewListing ? HEADER_BORDER_REMOD : HEADER_BORDER,
-          color: isRemoderation || isNewListing ? HEADER_TEXT_REMOD : HEADER_TEXT,
+          backgroundColor: awaitingAdminModeration ? HEADER_BAND_ALERT : HEADER_BAND,
+          borderColor: awaitingAdminModeration ? HEADER_BORDER_ALERT : HEADER_BORDER,
+          color: awaitingAdminModeration ? HEADER_TEXT_ALERT : HEADER_TEXT,
         }}
       >
         <div className="mx-auto w-full" style={{ maxWidth: CONTENT_MAX }}>

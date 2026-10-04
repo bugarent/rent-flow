@@ -450,7 +450,6 @@ export function BookingInfoModal({
           legFeeForLocation(byIata.get(originalIataDropoff), days, 0),
     );
     const projectedDelivery = deliveryTotal;
-    const rentalDelta = roundMoney(projectedRental - originalRental);
     const deliveryDelta = roundMoney(projectedDelivery - originalDelivery);
 
     const settlement = bpPromo
@@ -483,6 +482,9 @@ export function BookingInfoModal({
       0,
       roundMoney(settlement.onSiteCommissionableDelta + Math.max(0, deliveryDelta)),
     );
+    const payNow = settlement.payNow;
+    const payNowBase = settlement.payNowBase;
+    const dueWill = settlement.dueWill;
 
     const displayOriginalRental = bpPromo
       ? applyBusinessPartnerCustomerDiscount(originalRental)
@@ -510,19 +512,22 @@ export function BookingInfoModal({
       originalComponents: settlement.originalComponents,
       projectedComponents: settlement.projectedComponents,
       addedServicesTotal: onSiteAdded,
-      payNow: settlement.payNow,
+      payNow,
+      payNowBase,
       dueWas: settlement.dueWas,
-      dueWill: settlement.dueWill,
+      dueWill,
       /** Trip total shown in UI (rental + extras + delivery). */
       projectedTotal: settlement.projectedComponents,
       /** Value persisted as booking.totalPriceEur (components + deposit card surcharge). */
       persistTotalEur: settlement.projectedTotal,
-      liveBalanceDue: settlement.nextBalanceDueEur,
+      liveBalanceDue: dueWill,
       nextDepositPaidEur: settlement.nextDepositPaidEur,
-      nextBalanceDueEur: settlement.nextBalanceDueEur,
+      nextBalanceDueEur: dueWill,
       depositPercent: settlement.depositPercent,
-      siteFeeEur: settlement.siteFeeEur,
-      cardSurchargeEur: settlement.cardSurchargeEur,
+      siteFeeEur: roundMoney(Math.max(0, settlement.siteFeeEur - payNowBase)),
+      cardSurchargeEur: roundMoney(
+        Math.max(0, settlement.cardSurchargeEur - roundMoney(payNow - payNowBase)),
+      ),
       refundableSiteFeeEur: settlement.refundableSiteFeeEur,
       totalDelta,
     };
@@ -711,6 +716,11 @@ export function BookingInfoModal({
   };
 
   const persistGuestChanges = async (payNow: boolean) => {
+    if (!payNow && extrasPaymentBreakdown.payNow > 0.009) {
+      setPaymentOpen(true);
+      setError("");
+      return;
+    }
     setBusy(true);
     setError("");
     try {

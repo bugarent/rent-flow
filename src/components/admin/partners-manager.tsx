@@ -8,7 +8,6 @@ import type { PartnerApplicationMessage } from "@/lib/partner-application-messag
 import { worldCountryName } from "@/lib/catalog/world-countries";
 import { cn } from "@/lib/utils";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
-import { DirectoryDashboard } from "@/components/admin/directory-dashboard";
 import { PartnerRowActions } from "@/components/admin/partner-row-actions";
 import { ADMIN_BASE } from "@/lib/routes";
 import {
@@ -30,6 +29,7 @@ type PartnerRow = {
   carCount: number;
   email: string;
   phone: string;
+  country?: string;
   hasUser?: boolean;
   unreadReapplyCount?: number;
   unreadForAdmin?: number;
@@ -163,7 +163,7 @@ function ApplicationSnapshotView({ snapshot }: { snapshot: PartnerApplicationMes
   );
 }
 
-type PartnersManagerMode = "directory" | "queue" | "primary";
+type PartnersManagerMode = "directory" | "queue" | "primary" | "catalog";
 
 export function PartnersManager({
   initialPartners,
@@ -177,7 +177,7 @@ export function PartnersManager({
   const searchParams = useSearchParams();
   const { locale } = useAdminLocale();
   const [filter, setFilter] = useState<Filter>(
-    mode === "queue" ? "PENDING" : mode === "primary" ? "PRIMARY" : "DIRECTORY",
+    mode === "queue" ? "PENDING" : mode === "primary" ? "PRIMARY" : mode === "catalog" ? "DIRECTORY" : "COMPANY",
   );
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -195,6 +195,7 @@ export function PartnersManager({
         pending: "დასამტკიცებელი პარტნიორები",
         idCol: "საიდენტიფიკაციო ნომერი",
         nameCol: "სახელი",
+        countryCol: "ქვეყანა",
         typeCol: "ტიპი",
         fleetCol: "ფლოტის ზომა",
         statusCol: "სტატუსი",
@@ -224,6 +225,7 @@ export function PartnersManager({
         pending: "Партнёры на одобрение",
         idCol: "Идентификационный номер",
         nameCol: "Имя",
+        countryCol: "Страна",
         typeCol: "Тип",
         fleetCol: "Размер флота",
         statusCol: "Статус",
@@ -252,6 +254,7 @@ export function PartnersManager({
       pending: "Partners pending approval",
       idCol: "Identification number",
       nameCol: "Name",
+      countryCol: "Country",
       typeCol: "Type",
       fleetCol: "Fleet size",
       statusCol: "Status",
@@ -278,7 +281,9 @@ export function PartnersManager({
         ? ["PENDING"]
         : mode === "primary"
           ? ["PRIMARY"]
-          : ["COMPANY", "PRIVATE", "REJECTED", "DIRECTORY"];
+          : mode === "catalog"
+        ? ["DIRECTORY"]
+        : ["COMPANY", "PRIVATE", "REJECTED"];
     return Object.fromEntries(
       defs.map((key) => [key, tabBadge(partnersInFilter(initialPartners, key))]),
     ) as Record<Filter, { count: number; pending: number }>;
@@ -305,6 +310,7 @@ export function PartnersManager({
   const reviewHref = (id: string) => {
     const base = `${ADMIN_BASE}/moderation/partners/${encodeURIComponent(id)}`;
     if (mode === "primary") return `${base}?returnTab=primary`;
+    if (mode === "catalog" || filter === "DIRECTORY") return `${base}?returnTab=directory`;
     if (mode === "directory" && (filter === "COMPANY" || filter === "PRIVATE")) {
       return `${base}?returnTab=${filter.toLowerCase()}`;
     }
@@ -332,13 +338,12 @@ export function PartnersManager({
       partnerTab === "COMPANY" ||
       partnerTab === "PRIVATE" ||
       partnerTab === "REJECTED" ||
-      partnerTab === "DIRECTORY" ||
       partnerTab === "PENDING"
     ) {
       setFilter(partnerTab as Filter);
       return;
     }
-    if (legacyTab === "directory") setFilter("DIRECTORY");
+    if (legacyTab === "directory") return;
   }, [mode, searchParams]);
 
   const selectFilter = (value: Filter) => {
@@ -417,7 +422,6 @@ export function PartnersManager({
             { value: "COMPANY", label: t.company },
             { value: "PRIVATE", label: t.private },
             { value: "REJECTED", label: t.rejected },
-            { value: "DIRECTORY", label: t.directory },
           ];
 
   return (
@@ -481,31 +485,20 @@ export function PartnersManager({
         </div>
       ) : null}
 
-      {filter === "DIRECTORY" ? (
-        <DirectoryDashboard
-          seedPartners={initialPartners.map((p) => ({
-            id: p.id,
-            displayName: p.displayName,
-            kind: p.kind,
-            status: p.status,
-            sequentialNumber: p.sequentialNumber,
-            partnerCode: p.partnerCode ?? null,
-            email: p.email,
-            phone: p.phone,
-            carCount: p.carCount,
-            fleetSize: p.fleetSize,
-          }))}
-        />
-      ) : (
-      <>
+      {(() => {
+        const showCountry = filter === "DIRECTORY";
+        const hideId = filter === "DIRECTORY";
+        const colCount = 6;
+        return (
       <ResponsiveDataList
         desktop={
           <div className="overflow-x-auto rounded-xl border bg-white">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-100">
                 <tr>
-                  <th className="whitespace-nowrap px-2 py-1">{t.idCol}</th>
+                  {hideId ? null : <th className="whitespace-nowrap px-2 py-1">{t.idCol}</th>}
                   <th className="whitespace-nowrap px-2 py-1">{t.nameCol}</th>
+                  {showCountry ? <th className="whitespace-nowrap px-2 py-1">{t.countryCol}</th> : null}
                   <th className="whitespace-nowrap px-2 py-1">{t.typeCol}</th>
                   <th className="whitespace-nowrap px-2 py-1">{t.fleetCol}</th>
                   <th className="whitespace-nowrap px-2 py-1">{t.statusCol}</th>
@@ -515,7 +508,7 @@ export function PartnersManager({
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-6 text-center text-slate-500">
+                    <td colSpan={colCount} className="p-6 text-center text-slate-500">
                       {t.empty}
                     </td>
                   </tr>
@@ -536,6 +529,7 @@ export function PartnersManager({
                                 : "border-l-transparent bg-white",
                           )}
                         >
+                          {hideId ? null : (
                           <td
                             className={cn(
                               "whitespace-nowrap px-2 py-0.5 align-middle font-mono font-bold leading-none",
@@ -567,6 +561,7 @@ export function PartnersManager({
                               </button>
                             ) : null}
                           </td>
+                          )}
                           <td className="max-w-[16rem] px-2 py-0.5 align-middle leading-none">
                             <button
                               type="button"
@@ -586,7 +581,17 @@ export function PartnersManager({
                             >
                               {p.email}
                             </span>
+                            {hideId && p.partnerCodeLabel ? (
+                              <span className="ml-2 text-[10px] font-semibold text-slate-500">
+                                {p.partnerCodeLabel}
+                              </span>
+                            ) : null}
                           </td>
+                          {showCountry ? (
+                            <td className="whitespace-nowrap px-2 py-0.5 align-middle text-slate-700">
+                              {p.country || "—"}
+                            </td>
+                          ) : null}
                           <td className={cn("whitespace-nowrap px-2 py-0.5 align-middle", attention > 0 && "font-semibold text-orange-950")}>
                             {p.kind === "COMPANY" ? t.companyType : t.privateType}
                           </td>
@@ -764,7 +769,10 @@ export function PartnersManager({
                         : "border-l-transparent",
                   )}
                 >
-                  <MobileDataRow label={t.idCol}>
+                  <MobileDataRow label={showCountry ? t.countryCol : t.idCol}>
+                    {showCountry ? (
+                      <div className="text-end font-semibold text-slate-800">{p.country || "—"}</div>
+                    ) : (
                     <div className={cn("text-end font-mono font-bold", attention > 0 && "text-orange-950")}>
                       <div>{p.idNumber}</div>
                       {p.partnerCodeLabel ? (
@@ -791,6 +799,7 @@ export function PartnersManager({
                         </button>
                       ) : null}
                     </div>
+                    )}
                   </MobileDataRow>
                   <MobileDataRow label={t.nameCol}>
                     <div className="text-end">
@@ -965,9 +974,8 @@ export function PartnersManager({
           )
         }
       />
-
-      </>
-      )}
+        );
+      })()}
     </div>
   );
 }
