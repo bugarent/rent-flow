@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Trash2, Upload } from "lucide-react";
 import { MIN_PUBLIC_PHOTOS } from "@/lib/brand";
 import { cn } from "@/lib/utils";
@@ -63,7 +63,9 @@ export function PartnerCarPhotoGallery({
   const dragOverRef = useRef<number | null>(null);
   const suppressClick = useRef(false);
   const photosRef = useRef(photos);
-  photosRef.current = photos;
+  useLayoutEffect(() => {
+    photosRef.current = photos;
+  });
 
   const clearLongPress = () => {
     if (longPressTimer.current != null) {

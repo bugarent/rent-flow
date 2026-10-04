@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useId, useMemo, useRef, useState, useEffect } from "react";
 import { ADMIN_BASE } from "@/lib/routes";
 
 export type FinanceCountryOption = { iso2: string; label: string };
@@ -124,6 +124,7 @@ function CountryCombobox({
   const [query, setQuery] = useState("");
   const [iso2, setIso2] = useState(defaultIso2);
   const rootRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const selected = options.find((c) => c.iso2 === iso2) ?? null;
@@ -165,6 +166,7 @@ function CountryCombobox({
           type="text"
           role="combobox"
           aria-expanded={open}
+          aria-controls={listId}
           aria-autocomplete="list"
           autoComplete="off"
           placeholder="All countries — type to search"
@@ -181,6 +183,7 @@ function CountryCombobox({
         />
         {open ? (
           <ul
+            id={listId}
             role="listbox"
             className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
           >

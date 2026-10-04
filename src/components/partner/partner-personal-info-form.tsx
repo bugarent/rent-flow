@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Eye, EyeOff, Plus, Trash2, Upload } from "lucide-react";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
-import { PartnerCurrencySelect } from "@/components/partner/partner-currency-select";
 import { cn } from "@/lib/utils";
 import {
   DEPOSIT_METHOD_OPTIONS,
@@ -165,7 +164,7 @@ export type AdminProfileReviewConfig = {
 
 export function PartnerPersonalInfoForm({
   initial,
-  catalogCountries = [],
+  catalogCountries: _catalogCountries = [],
   partnerStatus: partnerStatusInitial = "PENDING",
   pendingRemoderation: pendingRemoderationInitial = false,
   partnerCode = null,

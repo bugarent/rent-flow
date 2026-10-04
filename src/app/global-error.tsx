@@ -64,6 +64,8 @@ export default function GlobalError({
             >
               Try again
             </button>
+            {/* A full reload is required: the root layout itself failed, so client routing may be broken. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a
               href="/"
               style={{

@@ -1,4 +1,4 @@
-import { SITE_DOMAIN, SITE_NAME } from "@/lib/brand";
+import { SITE_DOMAIN } from "@/lib/brand";
 import type { Locale } from "@/lib/i18n/config";
 
 export const SITE_URL =

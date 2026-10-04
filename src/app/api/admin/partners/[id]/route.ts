@@ -1267,8 +1267,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       "@/lib/server/partner-applications-store"
     );
 
-    let email = String(body.email || existing.email || "").trim();
-    let phone = String(body.phone || existing.phone || "").trim();
+    const email = String(body.email || existing.email || "").trim();
+    const phone = String(body.phone || existing.phone || "").trim();
     const extraEmail = String(body.extraEmail || body.blockEmail || "").trim();
     const plate = String(body.plate || body.registrationNumber || body.carNumber || "").trim();
     const notes = String(body.notes || body.blockNotes || "").trim();

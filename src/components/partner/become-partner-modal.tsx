@@ -27,7 +27,7 @@ export function BecomePartnerModal({
   open,
   onClose,
   initialEmail = "",
-  initialCompany = "",
+  initialCompany: _initialCompany = "",
   initialCountry = "",
 }: Props) {
   const { dictionary } = useSurfaceDictionary();

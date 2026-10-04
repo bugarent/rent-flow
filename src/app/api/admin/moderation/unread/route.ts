@@ -18,12 +18,10 @@ function needsPartnerAction(status: string) {
 
 async function countPartners(): Promise<number> {
   let total = 0;
-  let usedDb = false;
   try {
     const partners = await prisma.partner.findMany({
       select: { status: true, unreadReapplyCount: true },
     });
-    usedDb = true;
     total = partners.reduce((sum, p) => {
       const reapply = p.unreadReapplyCount || 0;
       if (needsPartnerAction(p.status)) return sum + Math.max(1, reapply);

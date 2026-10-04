@@ -29,14 +29,14 @@ export const AUTH_SIGNOUT_PAGES: Record<AuthPortal, string> = {
   partner: PARTNER_LOGIN,
 };
 
-export function useSecureAuthCookies() {
+export function shouldUseSecureAuthCookies() {
   const url = process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? "";
   return url.startsWith("https://");
 }
 
 export function sessionCookieName(portal: AuthPortal) {
   const prefix = AUTH_COOKIE_PREFIX[portal];
-  return useSecureAuthCookies() ? `__Secure-${prefix}.session-token` : `${prefix}.session-token`;
+  return shouldUseSecureAuthCookies() ? `__Secure-${prefix}.session-token` : `${prefix}.session-token`;
 }
 
 export async function getPortalToken(req: NextRequest, portal: AuthPortal): Promise<JWT | null> {

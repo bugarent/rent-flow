@@ -7,7 +7,7 @@ import {
   AUTH_SIGNIN_PAGES,
   type AuthPortal,
   sessionCookieName,
-  useSecureAuthCookies,
+  shouldUseSecureAuthCookies,
 } from "@/lib/auth/portals";
 
 function cookieOptions() {
@@ -15,13 +15,13 @@ function cookieOptions() {
     httpOnly: true,
     sameSite: "lax" as const,
     path: "/",
-    secure: useSecureAuthCookies(),
+    secure: shouldUseSecureAuthCookies(),
   };
 }
 
 function portalCookies(portal: AuthPortal): NextAuthOptions["cookies"] {
   const prefix = AUTH_COOKIE_PREFIX[portal];
-  const secure = useSecureAuthCookies();
+  const secure = shouldUseSecureAuthCookies();
   const opts = cookieOptions();
   return {
     sessionToken: {

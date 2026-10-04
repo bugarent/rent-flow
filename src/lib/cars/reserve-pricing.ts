@@ -164,7 +164,6 @@ export function computeProjectedTripSettlement(input: {
       ? storedDue
       : dueFromComponents;
 
-  const deliveryDelta = roundMoney(projectedDelivery - originalDelivery);
   const existingExtrasProjected = roundMoney(Math.max(0, projectedExtras - newExtras));
   const tripDelta = roundMoney(
     projectedRental + existingExtrasProjected - (originalRental + originalExtras),

@@ -106,7 +106,7 @@ export default async function PartnerBookingsPage() {
       const fileBookings = await listFileBookingsForCars(
         carIds,
         fileFrom,
-        new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        new Date(new Date().getTime() + 365 * 24 * 60 * 60 * 1000),
         { includeCancelled: true },
       );
       const seen = new Set(rows.map((r) => r.id));

@@ -113,7 +113,6 @@ export function PartnerExtraCarPicker({
 
       <div className="max-h-[calc(14rem+10cm)] space-y-2.5 overflow-y-auto overscroll-contain pr-0.5">
         {groups.map(([group, groupCars]) => {
-          const allOn = groupCars.every((c) => selected.has(c.id));
           return (
             <section key={group}>
               <div className="mb-1 flex flex-wrap items-center justify-between gap-2">

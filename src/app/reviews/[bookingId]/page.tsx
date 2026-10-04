@@ -3,6 +3,34 @@
 import { use, useState } from "react";
 import { usePreferences } from "@/components/providers/preferences-context";
 
+function StarRow({
+  value,
+  onChange,
+  label,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  label: string;
+}) {
+  return (
+    <div>
+      <label className="mb-2 block text-sm font-semibold text-slate-700">{label}</label>
+      <div className="flex gap-2">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            type="button"
+            key={star}
+            onClick={() => onChange(star)}
+            className={`min-h-10 min-w-10 text-2xl ${star <= value ? "text-yellow-400" : "text-slate-300"}`}
+          >
+            ★
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function ReviewPage({ params }: { params: Promise<{ bookingId: string }> }) {
   const { bookingId } = use(params);
   const { dictionary } = usePreferences();
@@ -13,24 +41,6 @@ export default function ReviewPage({ params }: { params: Promise<{ bookingId: st
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [googleMapsUrl, setGoogleMapsUrl] = useState<string | null>(null);
-
-  const StarRow = ({ value, onChange, label }: { value: number; onChange: (n: number) => void; label: string }) => (
-    <div>
-      <label className="mb-2 block text-sm font-semibold text-slate-700">{label}</label>
-      <div className="flex gap-2">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <button
-            type="button"
-            key={star}
-            onClick={() => onChange(star)}
-            className={`text-2xl ${star <= value ? "text-yellow-400" : "text-slate-300"}`}
-          >
-            ★
-          </button>
-        ))}
-      </div>
-    </div>
-  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

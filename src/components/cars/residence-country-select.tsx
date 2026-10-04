@@ -265,7 +265,7 @@ export function ResidenceCountrySelect({
         type="button"
         aria-expanded={open}
         aria-haspopup="listbox"
-        aria-invalid={invalid || undefined}
+        data-invalid={invalid || undefined}
         className={cn(
           "flex w-full items-center gap-2.5 rounded-md border px-3 py-2.5 text-left text-sm outline-none transition",
           invalid

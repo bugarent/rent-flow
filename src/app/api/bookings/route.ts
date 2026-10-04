@@ -13,7 +13,6 @@ import {
 } from "@/lib/cars/reserve-pricing";
 import { parseCarDetails } from "@/lib/cars/car-details";
 import { extraPeriodCharge } from "@/lib/extras/pricing";
-import { persistedBookingCharge } from "@/lib/bookings/booking-money";
 import { parsePartnerMessengers } from "@/lib/partner";
 import { isValidEmail } from "@/lib/crypto";
 import { toNumber } from "@/lib/utils";
@@ -447,7 +446,7 @@ export async function POST(req: Request) {
           fullProtection: Boolean(fullProtection),
           cancellationProtection: Boolean(cancellationProtection),
         });
-        let extrasTotal = extraLines.reduce((sum, line) => sum + line.priceEur, 0);
+        const extrasTotal = extraLines.reduce((sum, line) => sum + line.priceEur, 0);
         let deliveryFeeEur = 0;
         let leadChecked = false;
         try {

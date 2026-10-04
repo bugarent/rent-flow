@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { GripVertical } from "lucide-react";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { extrasAdminCopy } from "@/lib/i18n/extras-admin-copy";
@@ -81,7 +81,9 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
   const pointerIdRef = useRef<number | null>(null);
   const orderBeforeDrag = useRef<ExtraServicePricing[] | null>(null);
   const extrasRef = useRef(extras);
-  extrasRef.current = extras;
+  useLayoutEffect(() => {
+    extrasRef.current = extras;
+  });
 
   const clearHold = () => {
     if (holdTimer.current) {

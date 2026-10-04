@@ -318,7 +318,7 @@ export default async function CarsPage({
   if (startDate && pickupIata) {
     const pickupAt = new Date(startDate);
     if (!Number.isNaN(pickupAt.getTime())) {
-      const minutesUntilPickup = Math.max(0, Math.floor((pickupAt.getTime() - Date.now()) / 60000));
+      const minutesUntilPickup = Math.max(0, Math.floor((pickupAt.getTime() - new Date().getTime()) / 60000));
       const dropoffCode = (dropoff || pickupIata).trim();
       const placeMatches = (
         rows: NonNullable<(typeof cars)[number]["deliveryPrices"]>,

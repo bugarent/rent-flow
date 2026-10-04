@@ -51,7 +51,7 @@ export default async function AdminBookingsPage({
   const sp = await searchParams;
   const tab = parseTab(sp.tab);
   const to = sp.to ?? isoDate(new Date());
-  const from = sp.from ?? isoDate(new Date(Date.now() - 1000 * 60 * 60 * 24 * 30));
+  const from = sp.from ?? isoDate(new Date(new Date().getTime() - 1000 * 60 * 60 * 24 * 30));
 
   const dateQs = new URLSearchParams({ from, to }).toString();
   const bookingsHref = `${ADMIN_BASE}/bookings`;

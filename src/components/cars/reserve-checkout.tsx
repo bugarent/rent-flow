@@ -49,7 +49,6 @@ import {
 import { settleBookingMoney } from "@/lib/bookings/booking-money";
 import { settleBusinessPartnerBookingMoney } from "@/lib/business-partner/referral-pricing";
 import { useBusinessPartnerReferralDiscount } from "@/components/business/use-business-partner-referral-discount";
-import { isCityLocationCode } from "@/lib/catalog/search-places";
 import { formatInternationalPhone } from "@/lib/catalog/dial-codes";
 import { extraPeriodCharge } from "@/lib/extras/pricing";
 import type { PartnerSocialPlatform } from "@/lib/partner";
@@ -153,12 +152,12 @@ export function ReserveCheckout({
   const record = (value: string) => knownText(locale, value);
   const t = getCheckoutCopy(locale);
 
-  const [startDate, setStartDate] = useState(initialStart);
-  const [endDate, setEndDate] = useState(initialEnd);
-  const [pickup, setPickup] = useState(initialPickup || "TBS");
-  const [dropoff, setDropoff] = useState(initialDropoff || initialPickup || "TBS");
-  const [pickupAddress, setPickupAddress] = useState(initialPickupAddress);
-  const [dropoffAddress, setDropoffAddress] = useState(initialDropoffAddress);
+  const [startDate] = useState(initialStart);
+  const [endDate] = useState(initialEnd);
+  const [pickup] = useState(initialPickup || "TBS");
+  const [dropoff] = useState(initialDropoff || initialPickup || "TBS");
+  const [pickupAddress] = useState(initialPickupAddress);
+  const [dropoffAddress] = useState(initialDropoffAddress);
   const [flightNumber, setFlightNumber] = useState("");
   const [noFlightNumber, setNoFlightNumber] = useState(false);
   const [supplierNote, setSupplierNote] = useState("");
@@ -227,7 +226,7 @@ export function ReserveCheckout({
   const [promoCode, setPromoCode] = useState("");
   const [noPromoCode, setNoPromoCode] = useState(false);
   /** True when promo was auto-filled from partner link / QR (7-minute TTL). */
-  const [promoFromReferral, setPromoFromReferral] = useState(false);
+  const [, setPromoFromReferral] = useState(false);
   const [depositPercent, setDepositPercent] = useState(DEFAULT_DEPOSIT_PERCENT);
   const bpReferral = useBusinessPartnerReferralDiscount(promoCode, {
     disabled: noPromoCode,

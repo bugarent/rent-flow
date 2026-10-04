@@ -105,7 +105,7 @@ export function ManageBookingModal({
   const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
   const [foundChat, setFoundChat] = useState<FoundCustomChat | null>(null);
   const [reply, setReply] = useState("");
-  const [detailOpen, setDetailOpen] = useState(false);
+  const [, setDetailOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
 
   const bookingNumber = bookingDigits ? `${BOOKING_REF_PREFIX}${bookingDigits}` : "";

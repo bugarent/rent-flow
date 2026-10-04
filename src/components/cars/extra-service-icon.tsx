@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import {
   Baby,
   Bluetooth,
@@ -45,7 +46,7 @@ export function ExtraServiceIcon({
   className?: string;
 }) {
   const hay = `${slug || ""} ${name || ""} ${description || ""}`.toLowerCase();
-  const Icon = variant === "forbidden" ? Mountain : pickIcon(hay);
+  const icon = variant === "forbidden" ? Mountain : pickIcon(hay);
   const box = compact ? "h-7 w-7 rounded-md" : "h-10 w-10 rounded-lg";
   const glyph = compact ? "h-3.5 w-3.5" : "h-5 w-5";
 
@@ -60,7 +61,7 @@ export function ExtraServiceIcon({
         aria-hidden
       >
         <span className="flex h-full w-full items-center justify-center rounded-[inherit] bg-red-600 text-white">
-          <Icon className={glyph} strokeWidth={2.25} />
+          {createElement(icon, { className: glyph, strokeWidth: 2.25 })}
         </span>
       </span>
     );
@@ -75,7 +76,7 @@ export function ExtraServiceIcon({
       )}
       aria-hidden
     >
-      <Icon className={glyph} strokeWidth={1.75} />
+      {createElement(icon, { className: glyph, strokeWidth: 1.75 })}
     </span>
   );
 }

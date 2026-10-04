@@ -416,7 +416,7 @@ export async function GET(req: Request) {
     });
 
     // Site bookings saved to file store (when DB was offline) — show as green booking bars.
-    let fileBookingBars: Array<Record<string, unknown>> = [];
+    const fileBookingBars: Array<Record<string, unknown>> = [];
     try {
       const { listFileBookingsForCars } = await import("@/lib/server/customer-bookings-store");
       const fileBookings = await listFileBookingsForCars(carIds, from, to, {

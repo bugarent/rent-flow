@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useBpLabels } from "@/components/admin/business-partners/labels";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
@@ -13,7 +12,6 @@ import {
 import { ListingModerationActions } from "@/components/admin/listing-moderation-actions";
 import { ModerationProfilesPanel } from "@/components/admin/moderation-profiles-panel";
 import { PartnersManager } from "@/components/admin/partners-manager";
-import { ADMIN_BASE } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import {
   ResponsiveDataList,

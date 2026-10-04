@@ -33,7 +33,7 @@ export function LiveChatPanel({ onClose }: { onClose: () => void }) {
   const [queuePosition, setQueuePosition] = useState(0);
   const [idlePrompt, setIdlePrompt] = useState(false);
 
-  const lastActivityRef = useRef(Date.now());
+  const lastActivityRef = useRef(0);
   const idlePromptRef = useRef(false);
 
   const bumpActivity = () => {
@@ -50,6 +50,7 @@ export function LiveChatPanel({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     if (starting) return;
+    if (!lastActivityRef.current) lastActivityRef.current = Date.now();
     const id = window.setInterval(() => {
       if (idlePromptRef.current) return;
       if (Date.now() - lastActivityRef.current >= IDLE_MS) {

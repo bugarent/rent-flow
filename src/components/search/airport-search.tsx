@@ -1,6 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, Fragment } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  Fragment,
+} from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { CalendarDays, ChevronDown, Clock3, Globe, MapPin, PlaneTakeoff, BadgeCheck, ShieldCheck, Zap } from "lucide-react";
@@ -423,9 +433,12 @@ export function LocationPicker({
   const valueRef = useRef(value);
   const restoreRef = useRef(restoreOnClear);
   const onChangeRef = useRef(onChange);
-  valueRef.current = value;
-  restoreRef.current = restoreOnClear;
-  onChangeRef.current = onChange;
+  const listId = useId();
+  useLayoutEffect(() => {
+    valueRef.current = value;
+    restoreRef.current = restoreOnClear;
+    onChangeRef.current = onChange;
+  });
   const selected = options.find((o) => o.value === value);
 
   const filtered = useMemo(
@@ -556,7 +569,7 @@ export function LocationPicker({
             className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white text-left shadow-2xl"
             style={panelStyle}
           >
-            <ul role="listbox" className="min-h-0 flex-1 overflow-y-auto py-0.5">
+            <ul id={listId} role="listbox" className="min-h-0 flex-1 overflow-y-auto py-0.5">
               {filtered.length === 0 ? (
                 <li className="px-2.5 py-2 text-xs text-slate-500">{resolvedEmpty}</li>
               ) : useCountryGroups ? (
@@ -595,6 +608,7 @@ export function LocationPicker({
         type="text"
         role="combobox"
         aria-expanded={open}
+        aria-controls={listId}
         aria-autocomplete="list"
         aria-haspopup="listbox"
         value={displayValue}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useBpLabels } from "@/components/admin/business-partners/labels";
 import { businessPartnerCategoryMatches } from "@/lib/catalog/business-partners";
 import { uiLocaleTag } from "@/lib/i18n/ui-text";
@@ -128,6 +128,7 @@ function CountryCombobox({
   const L = useBpLabels();
   const [iso2, setIso2] = useState(defaultIso2);
   const rootRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
 
   const selected = options.find((c) => c.iso2 === iso2) ?? null;
   const displayValue = open ? query : selected ? `${selected.label} (${selected.iso2})` : "";
@@ -162,6 +163,7 @@ function CountryCombobox({
           type="text"
           role="combobox"
           aria-expanded={open}
+          aria-controls={listId}
           aria-autocomplete="list"
           autoComplete="off"
           placeholder={L.allCountriesSearch}
@@ -178,6 +180,7 @@ function CountryCombobox({
         />
         {open ? (
           <ul
+            id={listId}
             role="listbox"
             className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
           >

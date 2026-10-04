@@ -33,7 +33,7 @@ export function normalizeBusinessPartnerPayoutTiers(
   raw: Partial<BusinessPartnerPayoutTiers> | null | undefined,
 ): BusinessPartnerPayoutTiers {
   const d = DEFAULT_BUSINESS_PARTNER_PAYOUT_TIERS;
-  let lowMax = clampInt(raw?.lowMaxBookings, 1, 10_000, d.lowMaxBookings);
+  const lowMax = clampInt(raw?.lowMaxBookings, 1, 10_000, d.lowMaxBookings);
   let midMax = clampInt(raw?.midMaxBookings, 1, 10_000, d.midMaxBookings);
   if (midMax <= lowMax) midMax = lowMax + 1;
   return {

@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import {
   AUTH_COOKIE_PREFIX,
   type AuthPortal,
-  useSecureAuthCookies,
+  shouldUseSecureAuthCookies,
 } from "@/lib/auth/portals";
 
 function clearPortalCookies(res: NextResponse, portal: AuthPortal) {
-  const secure = useSecureAuthCookies();
+  const secure = shouldUseSecureAuthCookies();
   const prefix = AUTH_COOKIE_PREFIX[portal];
   const base = {
     httpOnly: true,

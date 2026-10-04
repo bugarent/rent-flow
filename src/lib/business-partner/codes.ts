@@ -93,17 +93,6 @@ export function buildReferralEmbedScript(origin: string, code: string): string {
   ].join("");
 }
 
-function readRawCookie(name: string): string {
-  if (typeof document === "undefined") return "";
-  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-  if (!match?.[1]) return "";
-  try {
-    return decodeURIComponent(match[1]);
-  } catch {
-    return match[1];
-  }
-}
-
 function writeClientCookie(name: string, value: string, maxAgeSec: number) {
   if (typeof document === "undefined") return;
   const secure =

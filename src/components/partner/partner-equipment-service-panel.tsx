@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Pencil, Plus, X } from "lucide-react";
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
 import {
@@ -365,7 +365,9 @@ export function PartnerEquipmentServicePanel({
 
   const editingRow = editingId ? rows.find((r) => r.service.id === editingId) : null;
   const rowsRef = useRef(rows);
-  rowsRef.current = rows;
+  useLayoutEffect(() => {
+    rowsRef.current = rows;
+  });
 
   const buildPrefsPayload = (override?: { id: string; patch: Partial<RowState> }) => {
     return rowsRef.current.map((row) => {

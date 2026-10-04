@@ -338,7 +338,9 @@ export function PartnerFleetCalendar() {
   const dayCount = daysInMonth(month);
   const rangeFrom = month;
   const rangeTo = addDays(month, dayCount);
-  const days = useMemo(() => eachDay(rangeFrom, dayCount), [rangeFrom.getTime(), dayCount]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rangeFromMs = rangeFrom.getTime();
+  const rangeToMs = rangeTo.getTime();
+  const days = useMemo(() => eachDay(new Date(rangeFromMs), dayCount), [rangeFromMs, dayCount]);
   const months = useMemo(() => monthNames(locale), [locale]);
   const yearOptions = useMemo(() => {
     const y = new Date().getFullYear();
@@ -367,8 +369,8 @@ export function PartnerFleetCalendar() {
     setError("");
     try {
       const params = new URLSearchParams({
-        from: rangeFrom.toISOString(),
-        to: rangeTo.toISOString(),
+        from: new Date(rangeFromMs).toISOString(),
+        to: new Date(rangeToMs).toISOString(),
         locale,
       });
       const qDigits = digitsOnlyBookingQuery(debouncedQ);
@@ -387,7 +389,7 @@ export function PartnerFleetCalendar() {
     } finally {
       setLoading(false);
     }
-  }, [rangeFrom.getTime(), rangeTo.getTime(), locale, debouncedQ]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rangeFromMs, rangeToMs, locale, debouncedQ]);
 
   useEffect(() => {
     void load(false);

@@ -6,7 +6,7 @@ import {
   AUTH_BASE_PATHS,
   AUTH_COOKIE_PREFIX,
   AUTH_SIGNOUT_PAGES,
-  useSecureAuthCookies,
+  shouldUseSecureAuthCookies,
 } from "@/lib/auth/portals";
 
 /** Partner cabinet auto sign-out after this much idle time. */
@@ -27,7 +27,7 @@ function expireCookie(name: string, secure: boolean) {
 }
 
 function clearPartnerCookiesClient() {
-  const secure = useSecureAuthCookies();
+  const secure = shouldUseSecureAuthCookies();
   const prefix = AUTH_COOKIE_PREFIX.partner;
   for (const name of [
     secure ? `__Secure-${prefix}.session-token` : `${prefix}.session-token`,
