@@ -109,13 +109,16 @@ function RowActions({
   row,
   busy,
   onRun,
+  onDelete,
   compact,
 }: {
   row: PartnerIntegrationRecord;
   busy: IntegrationBusy;
   onRun: (action: "test" | "sync") => void;
+  onDelete: () => void;
   compact?: boolean;
 }) {
+  const deleting = busy?.id === row.id && busy.action === "delete";
   const rowBusy = busy?.id === row.id;
   const btn = compact
     ? "inline-flex items-center justify-center gap-1.5 rounded border bg-white px-2 py-1 text-xs font-bold hover:bg-slate-50 disabled:opacity-60"
@@ -133,6 +136,15 @@ function RowActions({
       <Link href={`${ADMIN_BASE}/integrations/${row.id}`} className={btn}>
         Details
       </Link>
+      <button
+        type="button"
+        disabled={rowBusy}
+        onClick={onDelete}
+        className={cn(btn, "border-red-200 bg-red-50 text-red-700 hover:bg-red-100", !compact && "basis-full")}
+      >
+        {deleting ? <Spinner /> : null}
+        {deleting ? "Deleting…" : "Delete"}
+      </button>
     </>
   );
 }
@@ -156,6 +168,7 @@ export function IntegrationsManager({
     create,
     run,
     toggleOverride,
+    remove,
   } = useIntegrationActions(initialIntegrations);
   const [partnerId, setPartnerId] = useState(partnerOptions[0]?.id || "local-partner");
   const [name, setName] = useState("Channel connection");
@@ -303,7 +316,13 @@ export function IntegrationsManager({
                       </td>
                       <td className="max-w-[16rem] p-3">
                         <div className="flex flex-wrap gap-1">
-                          <RowActions row={row} busy={busy} onRun={(a) => void run(row, a)} compact />
+                          <RowActions
+                            row={row}
+                            busy={busy}
+                            onRun={(a) => void run(row, a)}
+                            onDelete={() => void remove(row)}
+                            compact
+                          />
                         </div>
                         <NoticeText notice={rowNotices[row.id]} className="mt-1.5" />
                       </td>
@@ -363,7 +382,12 @@ export function IntegrationsManager({
                   />
                 </MobileDataRow>
                 <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                  <RowActions row={row} busy={busy} onRun={(a) => void run(row, a)} />
+                  <RowActions
+                    row={row}
+                    busy={busy}
+                    onRun={(a) => void run(row, a)}
+                    onDelete={() => void remove(row)}
+                  />
                 </div>
                 <NoticeText notice={rowNotices[row.id]} className="mt-2" />
               </MobileDataCard>

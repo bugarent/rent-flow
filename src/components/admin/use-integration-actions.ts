@@ -5,7 +5,10 @@ import type { PartnerIntegrationRecord } from "@/lib/integrations/types";
 import { requestJson } from "@/lib/http/request-json";
 
 export type IntegrationNotice = { ok: boolean; text: string };
-export type IntegrationBusy = { id: string; action: "test" | "sync" | "override" } | null;
+export type IntegrationBusy = {
+  id: string;
+  action: "test" | "sync" | "override" | "delete";
+} | null;
 
 export function useIntegrationActions(initialIntegrations: PartnerIntegrationRecord[]) {
   const [rows, setRows] = useState(initialIntegrations);
@@ -115,8 +118,24 @@ export function useIntegrationActions(initialIntegrations: PartnerIntegrationRec
     setBusy(null);
   };
 
+  const remove = async (row: PartnerIntegrationRecord) => {
+    if (!window.confirm(`Delete "${row.name}"? Its API key will stop working.`)) return;
+    setBusy({ id: row.id, action: "delete" });
+    const res = await requestJson(`/api/admin/integrations/${encodeURIComponent(row.id)}`, {
+      method: "DELETE",
+    });
+    if (res.ok) {
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
+      setNotice({ ok: true, text: `"${row.name}" deleted` });
+    } else {
+      setRowNotice(row.id, { ok: false, text: res.error || "Delete failed" });
+    }
+    setBusy(null);
+  };
+
   return {
     rows,
+    remove,
     busy,
     refreshing,
     creating,
