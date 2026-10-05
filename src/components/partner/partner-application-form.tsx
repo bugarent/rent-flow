@@ -37,6 +37,7 @@ function copyFor(locale: string) {
       website: "ვებსაიტი",
       credentials: "შესვლის მონაცემები",
       login: "ლოგინი (ელ. ფოსტა)",
+      emailMismatch: "ელ. ფოსტა და ლოგინი უნდა იყოს ერთი და იგივე მისამართი. სანამ არ დაემთხვევა, მოთხოვნა არ გაიგზავნება.",
       password: "პაროლი",
       confirm: "გაიმეორეთ პაროლი",
       submit: "განაცხადის გაგზავნა",
@@ -72,6 +73,7 @@ function copyFor(locale: string) {
       website: "Сайт",
       credentials: "Данные входа",
       login: "Логин (эл. почта)",
+      emailMismatch: "Эл. почта и логин должны быть одним и тем же адресом. Пока они не совпадут, заявка не отправится.",
       password: "Пароль",
       confirm: "Повторите пароль",
       submit: "Отправить заявку",
@@ -106,6 +108,7 @@ function copyFor(locale: string) {
     website: "Website",
     credentials: "Login credentials",
     login: "Login (email)",
+    emailMismatch: "Email and login must be the same address. The request will not be sent until they match.",
     password: "Password",
     confirm: "Confirm password",
     submit: "Submit application",
@@ -196,11 +199,15 @@ export function PartnerApplicationForm({
   const countryMissingPlace = (iso2: string) =>
     !placesForCountry(iso2).some((place) => locationCodes.includes(place.code));
 
+  const emailsDiffer =
+    email.trim().length > 0 &&
+    loginEmail.trim().length > 0 &&
+    email.trim().toLowerCase() !== loginEmail.trim().toLowerCase();
   const invalid = {
     title: !title.trim(),
     firstName: !firstName.trim(),
     lastName: !lastName.trim(),
-    email: !emailOk(email),
+    email: !emailOk(email) || emailsDiffer,
     officeCountry: !officeCountry.trim(),
     centralOffice: !centralOffice.trim(),
     address: !address.trim(),
@@ -209,7 +216,7 @@ export function PartnerApplicationForm({
     primaryPhone: !phoneOk(primaryPhone) || primaryMessengers.length === 0,
     managerPhone: !phoneOk(managerPhone) || managerMessengers.length === 0,
     website: !websiteOk(website),
-    login: !emailOk(loginEmail),
+    login: !emailOk(loginEmail) || emailsDiffer,
     password: password.length < 6,
     confirm: confirmPassword.length < 6 || confirmPassword !== password,
   };
@@ -237,6 +244,7 @@ export function PartnerApplicationForm({
     event.preventDefault();
     setError("");
     setShowErrors(true);
+    if (emailsDiffer) setError(t.emailMismatch);
     if (Object.values(invalid).some(Boolean)) {
       requestAnimationFrame(() => {
         formRef.current
@@ -245,7 +253,7 @@ export function PartnerApplicationForm({
       });
       return;
     }
-    const login = loginEmail.trim();
+    const login = email.trim();
     const phoneSplit = splitStoredPhone(primaryPhone);
     const managerSplit = splitStoredPhone(managerPhone);
     const idSeed = title.trim().replace(/\s+/g, "");
@@ -328,7 +336,14 @@ export function PartnerApplicationForm({
                     <TextField label={t.firstName} value={firstName} onChange={setFirstName} invalid={mark("firstName")} />
                     <TextField label={t.lastName} value={lastName} onChange={setLastName} invalid={mark("lastName")} />
                   </div>
-                  <TextField label={t.email} value={email} onChange={setEmail} invalid={mark("email")} type="email" />
+                  <TextField
+                    label={t.email}
+                    value={email}
+                    onChange={setEmail}
+                    invalid={mark("email")}
+                    type="email"
+                    hint={showErrors && emailsDiffer ? t.emailMismatch : ""}
+                  />
                   <div className="grid gap-3 sm:grid-cols-2">
                     <TextField
                       label={t.country}
@@ -520,7 +535,14 @@ export function PartnerApplicationForm({
                     )}
                   >
                     <p className="text-sm font-semibold text-[#3a4553]">{t.credentials}</p>
-                    <TextField label={t.login} value={loginEmail} onChange={setLoginEmail} invalid={mark("login")} type="email" />
+                    <TextField
+                      label={t.login}
+                      value={loginEmail}
+                      onChange={setLoginEmail}
+                      invalid={mark("login")}
+                      type="email"
+                      hint={showErrors && emailsDiffer ? t.emailMismatch : ""}
+                    />
                     <TextField
                       label={t.password}
                       value={password}
@@ -568,6 +590,7 @@ function TextField({
   invalid,
   type = "text",
   autoComplete,
+  hint = "",
 }: {
   label: string;
   value: string;
@@ -575,6 +598,7 @@ function TextField({
   invalid: boolean;
   type?: string;
   autoComplete?: string;
+  hint?: string;
 }) {
   return (
     <label
@@ -590,6 +614,7 @@ function TextField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
+      {hint ? <span className="mt-1 block text-sm font-semibold text-red-700">{hint}</span> : null}
     </label>
   );
 }
