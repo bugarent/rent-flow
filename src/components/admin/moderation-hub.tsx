@@ -86,9 +86,6 @@ export type ModerationPartnerRow = {
 type Labels = {
   title: string;
   body: string;
-  partnersTab: string;
-  partnersTitle: string;
-  partnersBody: string;
   primaryTab: string;
   primaryTitle: string;
   primaryBody: string;
@@ -111,7 +108,6 @@ type Labels = {
 
 type Props = {
   partners: ModerationPartnerRow[];
-  partnersBadgeCount?: number;
   partnersError: string;
   partnersDbOffline: boolean;
   cars: ModerationCarView[];
@@ -127,7 +123,7 @@ type Props = {
   labels: Labels;
 };
 
-type TabId = "partners" | "primary" | "listings" | "reviews" | "profiles";
+type TabId = "primary" | "listings" | "reviews" | "profiles";
 
 const PRIMARY_STATUSES = new Set(["PENDING", "INVITED", "PENDING_FINAL", "NEEDS_CORRECTION"]);
 
@@ -173,19 +169,16 @@ export function ModerationHub({
     if (raw === "reviews") return "reviews";
     if (raw === "profiles") return "profiles";
     if (raw === "listings") return "listings";
-    if (raw === "primary" || partnerTab === "primary") return "primary";
-    return "partners";
+    if (raw === "primary" || partnerTab === "primary" || !raw) return "primary";
+    return "primary";
   }, [searchParams]);
 
   const setTab = useCallback(
     (next: TabId) => {
       const params = new URLSearchParams(searchParams.toString());
-      if (next === "partners") params.delete("tab");
+      if (next === "primary") params.delete("tab");
       else params.set("tab", next);
-      const partnerTab = params.get("partnerTab")?.trim().toLowerCase();
-      if (next !== "partners" || partnerTab === "primary" || partnerTab === "directory") {
-        params.delete("partnerTab");
-      }
+      params.delete("partnerTab");
       const qs = params.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
@@ -196,10 +189,8 @@ export function ModerationHub({
   const visibleCars = cars.filter((car) => !removedCarIds.includes(car.id));
 
   const primaryPartners = partners.filter((p) => PRIMARY_STATUSES.has(p.status));
-  const directoryPartners = partners.filter((p) => !PRIMARY_STATUSES.has(p.status));
 
   const tabCounts = {
-    partners: directoryPartners.length,
     primary: primaryPartners.length,
     listings: visibleCars.length,
     profiles: profiles.length,
@@ -207,7 +198,6 @@ export function ModerationHub({
   } as const;
 
   const tabPending = {
-    partners: directoryPartners.reduce((sum, p) => sum + partnerAttention(p), 0),
     primary: primaryPartners.reduce((sum, p) => sum + partnerAttention(p), 0),
     listings: visibleCars.length,
     profiles: profiles.length,
@@ -220,13 +210,12 @@ export function ModerationHub({
       <p className="mb-5 text-sm text-slate-600">{labels.body}</p>
 
       <div
-        className="mb-6 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm sm:grid-cols-3 lg:grid-cols-5"
+        className="mb-6 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm lg:grid-cols-4"
         role="tablist"
         aria-label={labels.title}
       >
         {(
           [
-            ["partners", labels.partnersTab],
             ["primary", labels.primaryTab],
             ["listings", labels.listingsTab],
             ["profiles", labels.profilesTab],
@@ -273,31 +262,23 @@ export function ModerationHub({
         })}
       </div>
 
-      {tab === "partners" ? (
+      {tab === "primary" ? (
         <section role="tabpanel" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <h2 className="text-lg font-extrabold text-[#0b1f4b]">{labels.partnersTitle}</h2>
-          <p className="mt-1 mb-4 text-sm text-slate-500">{labels.partnersBody}</p>
-
+          <h2 className="text-lg font-extrabold text-[#0b1f4b]">{labels.primaryTitle}</h2>
+          <p className="mt-1 mb-4 text-sm text-slate-500">{labels.primaryBody}</p>
           {(partnersDbOffline || partnersError) && (
             <div
               role="status"
               className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
             >
               <p className="font-semibold">
-                {partnersDbOffline ? "Partner list could not be loaded from the online database" : "Could not load partners"}
+                {partnersDbOffline
+                  ? "Partner list could not be loaded from the online database"
+                  : "Could not load partners"}
               </p>
               <p className="mt-1 leading-relaxed">{partnersError}</p>
             </div>
           )}
-
-          <PartnersManager initialPartners={partners} mode="directory" />
-        </section>
-      ) : null}
-
-      {tab === "primary" ? (
-        <section role="tabpanel" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <h2 className="text-lg font-extrabold text-[#0b1f4b]">{labels.primaryTitle}</h2>
-          <p className="mt-1 mb-4 text-sm text-slate-500">{labels.primaryBody}</p>
           <PartnersManager initialPartners={partners} mode="primary" />
         </section>
       ) : null}

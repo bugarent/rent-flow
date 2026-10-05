@@ -3,7 +3,6 @@ import { ListingStatus, ReviewStatus } from "@prisma/client";
 import { getAdminSession } from "@/lib/auth/sessions";
 import { prisma } from "@/lib/prisma";
 import { isDbOfflineError } from "@/lib/server/db-errors";
-import { getFilePartnerUnreadTotal } from "@/lib/server/partner-applications-store";
 import { listFilePendingCars } from "@/lib/server/partner-cars-store";
 import { parseProfileModeration } from "@/lib/partners/profile-moderation";
 
@@ -16,28 +15,48 @@ function needsPartnerAction(status: string) {
   );
 }
 
-async function countPartners(): Promise<number> {
-  let total = 0;
+const PRIMARY_PARTNER_STATUSES = new Set([
+  "PENDING",
+  "INVITED",
+  "PENDING_FINAL",
+  "NEEDS_CORRECTION",
+]);
+
+function partnerAttentionAmount(status: string, unread: number) {
+  const reapply = unread || 0;
+  if (needsPartnerAction(status)) return Math.max(1, reapply);
+  return reapply;
+}
+
+/** Directory list (Partners window) vs first-review queue (stays on Moderation). */
+async function countPartners(): Promise<{ directory: number; primary: number }> {
+  let directory = 0;
+  let primary = 0;
+  const add = (status: string, unread: number) => {
+    const amount = partnerAttentionAmount(status, unread);
+    if (!amount) return;
+    if (PRIMARY_PARTNER_STATUSES.has(status)) primary += amount;
+    else directory += amount;
+  };
   try {
     const partners = await prisma.partner.findMany({
       select: { status: true, unreadReapplyCount: true },
     });
-    total = partners.reduce((sum, p) => {
-      const reapply = p.unreadReapplyCount || 0;
-      if (needsPartnerAction(p.status)) return sum + Math.max(1, reapply);
-      return sum + reapply;
-    }, 0);
+    for (const partner of partners) add(partner.status, partner.unreadReapplyCount || 0);
   } catch (error) {
     if (!isDbOfflineError(error)) {
       console.warn("[admin/moderation/unread] partners", error);
     }
   }
   try {
-    total += await getFilePartnerUnreadTotal();
+    const { listFilePartnerApplications } = await import("@/lib/server/partner-applications-store");
+    for (const partner of await listFilePartnerApplications()) {
+      add(partner.status, partner.unreadForAdmin || 0);
+    }
   } catch {
     /* ignore */
   }
-  return total;
+  return { directory, primary };
 }
 
 async function countListings(): Promise<number> {
@@ -115,17 +134,26 @@ export async function GET() {
     return NextResponse.json({ error: "Admin access required" }, { status: 403 });
   }
 
-  const [partners, listings, profiles, reviews] = await Promise.all([
+  const [partnerCounts, listings, profiles, reviews] = await Promise.all([
     countPartners(),
     countListings(),
     countProfiles(),
     countReviews(),
   ]);
 
-  const unreadTotal = partners + listings + profiles + reviews;
+  const partners = partnerCounts.directory + partnerCounts.primary;
+  const unreadTotal = partnerCounts.primary + listings + profiles + reviews;
 
   return NextResponse.json(
-    { partners, listings, profiles, reviews, unreadTotal },
+    {
+      partners,
+      partnersDirectory: partnerCounts.directory,
+      partnersPrimary: partnerCounts.primary,
+      listings,
+      profiles,
+      reviews,
+      unreadTotal,
+    },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

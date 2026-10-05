@@ -90,9 +90,11 @@ export function PartnerRowActions({
   const blocked = status === "SUSPENDED";
 
   const openDetails = () => {
-    router.push(
-      `${ADMIN_BASE}/moderation/partners/${partnerId}?returnTab=${encodeURIComponent(returnTab)}`,
-    );
+    const onModeration = returnTab === "primary" || returnTab === "profiles";
+    const base = onModeration
+      ? `${ADMIN_BASE}/moderation/partners/${partnerId}`
+      : `${ADMIN_BASE}/partners/${partnerId}`;
+    router.push(`${base}?returnTab=${encodeURIComponent(returnTab)}`);
   };
 
   const deletePartner = async () => {

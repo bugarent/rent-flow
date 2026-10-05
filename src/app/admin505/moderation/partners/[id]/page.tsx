@@ -16,7 +16,7 @@ export default async function AdminPartnerModerationReviewPage({
   const sp = await searchParams;
   const returnTab = sp.returnTab?.trim().toLowerCase();
 
-  let backHref = `${ADMIN_BASE}/moderation`;
+  let backHref = `${ADMIN_BASE}/partners`;
   let backLabel = "← პარტნიორები";
   if (returnTab === "profiles") {
     backHref = `${ADMIN_BASE}/moderation?tab=profiles`;
@@ -24,10 +24,8 @@ export default async function AdminPartnerModerationReviewPage({
   } else if (returnTab === "primary") {
     backHref = `${ADMIN_BASE}/moderation?tab=primary`;
     backLabel = "← პირველადი მოდერაცია";
-  } else if (returnTab === "company") {
-    backHref = `${ADMIN_BASE}/moderation?partnerTab=company`;
-  } else if (returnTab === "private") {
-    backHref = `${ADMIN_BASE}/moderation?partnerTab=private`;
+  } else if (returnTab === "company" || returnTab === "private" || returnTab === "rejected") {
+    backHref = `${ADMIN_BASE}/partners?partnerTab=${encodeURIComponent(returnTab)}`;
   }
 
   if (returnTab === "profiles") {

@@ -31,6 +31,7 @@ export function AdminOperationsNav() {
   const [bookingUnread, setBookingUnread] = useState(0);
   const [refundUnread, setRefundUnread] = useState(0);
   const [moderationUnread, setModerationUnread] = useState(0);
+  const [partnersUnread, setPartnersUnread] = useState(0);
   const [businessPartnerUnread, setBusinessPartnerUnread] = useState(0);
   const [badgesReady, setBadgesReady] = useState(false);
   const prevUnreadRef = useRef<number | null>(null);
@@ -65,6 +66,7 @@ export function AdminOperationsNav() {
         if (cancelled) return;
         const nextChat = chatRes.ok ? Number(chatData.unreadTotal) || 0 : 0;
         const nextModeration = moderationRes.ok ? Number(moderationData.unreadTotal) || 0 : 0;
+        const nextPartners = moderationRes.ok ? Number(moderationData.partnersDirectory) || 0 : 0;
         const nextBookings = bookingRes.ok ? Number(bookingData.unreadTotal) || 0 : 0;
         const nextRefunds = refundRes.ok
           ? Number(refundData.unreadTotal) ||
@@ -76,7 +78,7 @@ export function AdminOperationsNav() {
           : 0;
         const nextBp = bpRes.ok ? Number(bpData.unreadTotal) || 0 : 0;
         const prev = prevUnreadRef.current;
-        const combined = nextChat + nextModeration + nextBookings + nextRefunds + nextBp;
+        const combined = nextChat + nextModeration + nextPartners + nextBookings + nextRefunds + nextBp;
         if (soundReadyRef.current && prev != null && combined > prev) {
           playChatSound(getAdminChatSoundId());
         }
@@ -86,6 +88,7 @@ export function AdminOperationsNav() {
         setBookingUnread(nextBookings);
         setRefundUnread(nextRefunds);
         setModerationUnread(nextModeration);
+        setPartnersUnread(nextPartners);
         setBusinessPartnerUnread(nextBp);
       } catch {
         /* ignore */
@@ -110,6 +113,7 @@ export function AdminOperationsNav() {
       badge: bookingUnread + unread + refundUnread,
     },
     { href: `${ADMIN_BASE}/moderation`, label: t.moderation, exact: false, badge: moderationUnread },
+    { href: `${ADMIN_BASE}/partners`, label: t.partners, exact: false, badge: partnersUnread },
     {
       href: `${ADMIN_BASE}/business-partners`,
       label: t.businessPartners,
@@ -124,7 +128,7 @@ export function AdminOperationsNav() {
 
   const totalBadge =
     (badgesReady
-      ? bookingUnread + unread + refundUnread + moderationUnread + businessPartnerUnread
+      ? bookingUnread + unread + refundUnread + moderationUnread + partnersUnread + businessPartnerUnread
       : 0) || 0;
 
   const renderLink = (l: (typeof links)[number], opts?: { stacked?: boolean }) => {

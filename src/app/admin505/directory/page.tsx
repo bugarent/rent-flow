@@ -4,5 +4,5 @@ import { ADMIN_BASE } from "@/lib/routes";
 
 export default async function AdminDirectoryPage() {
   await requireAdmin();
-  redirect(`${ADMIN_BASE}/partners?tab=directory`);
+  redirect(`${ADMIN_BASE}/partners`);
 }

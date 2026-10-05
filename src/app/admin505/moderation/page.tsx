@@ -1,4 +1,6 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
+import { ADMIN_BASE } from "@/lib/routes";
 import { ListingStatus } from "@prisma/client";
 import { prisma, reopenDbCircuit } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guards";
@@ -374,8 +376,19 @@ async function loadProfiles(): Promise<{
   return { profiles, dbOffline, queryError };
 }
 
-export default async function AdminModerationPage() {
+export default async function AdminModerationPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; partnerTab?: string }>;
+}) {
   await requireAdmin();
+  const sp = await searchParams;
+  const tab = String(sp.tab || "").trim().toLowerCase();
+  const partnerTab = String(sp.partnerTab || "").trim().toLowerCase();
+  if (tab === "partners" || (!tab && partnerTab && partnerTab !== "primary")) {
+    const qs = partnerTab ? `?partnerTab=${encodeURIComponent(partnerTab)}` : "";
+    redirect(`${ADMIN_BASE}/partners${qs}`);
+  }
   reopenDbCircuit();
   const locale = await readAdminLocale();
   const t = getAdminDictionary(locale);
@@ -386,27 +399,11 @@ export default async function AdminModerationPage() {
     loadAdminPartnerRows(),
   ]);
   const directoryPartners = filterDirectoryPartners(partnerRows.partners);
-  const partnersAttentionCount = directoryPartners.reduce((sum, p) => {
-    const unread = Number(p.unreadForAdmin) || 0;
-    if (unread > 0) return sum + unread;
-    if (
-      p.status === "PENDING" ||
-      p.status === "PENDING_FINAL" ||
-      p.status === "NEEDS_CORRECTION" ||
-      p.status === "PENDING_REMODERATION"
-    ) {
-      return sum + 1;
-    }
-    return sum;
-  }, 0);
   const pendingReviewsCount = reviewData.reviews.filter((r) => r.status === "PENDING").length;
 
   const tabLabels =
     locale === "ka"
       ? {
-          partnersTab: "პარტნიორები",
-          partnersTitle: t.pages.partners.title,
-          partnersBody: t.pages.partners.body,
           primaryTab: "პირველადი მოდერაცია",
           primaryTitle: "პირველადი მოდერაცია",
           primaryBody: "ახალი პარტნიორის განაცხადები, რომლებიც პირველ გადამოწმებას ელოდება.",
@@ -420,13 +417,10 @@ export default async function AdminModerationPage() {
           openPartner: "განხილვის გახსნა",
           rejectProfile: "უარყოფა",
           moderationBody:
-            "აირჩიეთ ქვეფანჯარა: პარტნიორები, პირველადი მოდერაცია, განცხადებები, პროფილები ან შეფასებები.",
+            "აირჩიეთ ქვეფანჯარა: პირველადი მოდერაცია, განცხადებები, პროფილები ან შეფასებები.",
         }
       : locale === "ru"
         ? {
-            partnersTab: "Партнёры",
-            partnersTitle: t.pages.partners.title,
-            partnersBody: t.pages.partners.body,
             primaryTab: "Первичная модерация",
             primaryTitle: "Первичная модерация",
             primaryBody: "Новые заявки партнёров, которые ждут первой проверки.",
@@ -440,12 +434,9 @@ export default async function AdminModerationPage() {
             openPartner: "Открыть проверку",
             rejectProfile: "Отклонить",
             moderationBody:
-              "Выберите раздел: партнёры, первичная модерация, объявления, профили или отзывы.",
+              "Выберите раздел: первичная модерация, объявления, профили или отзывы.",
           }
         : {
-            partnersTab: "Partners",
-            partnersTitle: t.pages.partners.title,
-            partnersBody: t.pages.partners.body,
             primaryTab: "Primary moderation",
             primaryTitle: "Primary moderation",
             primaryBody: "New partner applications waiting for a first review.",
@@ -459,7 +450,7 @@ export default async function AdminModerationPage() {
             openPartner: "Open review",
             rejectProfile: "Reject",
             moderationBody:
-              "Choose a section: partners, primary moderation, car listings, profiles, or reviews.",
+              "Choose a section: primary moderation, car listings, profiles, or reviews.",
           };
 
   return (
@@ -470,7 +461,6 @@ export default async function AdminModerationPage() {
     >
       <ModerationHub
         partners={directoryPartners}
-        partnersBadgeCount={partnersAttentionCount}
         partnersError={partnerRows.queryError}
         partnersDbOffline={partnerRows.dbOffline}
         cars={listings.cars}
@@ -486,9 +476,6 @@ export default async function AdminModerationPage() {
         labels={{
           title: t.pages.moderation.title,
           body: tabLabels.moderationBody,
-          partnersTab: tabLabels.partnersTab,
-          partnersTitle: tabLabels.partnersTitle,
-          partnersBody: tabLabels.partnersBody,
           primaryTab: tabLabels.primaryTab,
           primaryTitle: tabLabels.primaryTitle,
           primaryBody: tabLabels.primaryBody,

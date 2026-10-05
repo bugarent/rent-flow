@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, Fragment, type ReactNode } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { fleetAgeLabel, partnerStatusLabel, PARTNER_SOCIAL_PLATFORMS } from "@/lib/partner";
 import type { PartnerApplicationMessage } from "@/lib/partner-application-messages";
@@ -169,6 +169,7 @@ export function PartnersManager({
   mode?: PartnersManagerMode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const { locale } = useAdminLocale();
   const [filter, setFilter] = useState<Filter>(
@@ -300,10 +301,16 @@ export function PartnersManager({
   }, [filter, initialPartners]);
 
   const reviewHref = (id: string) => {
-    const base = `${ADMIN_BASE}/moderation/partners/${encodeURIComponent(id)}`;
+    const onPartnersPage = mode === "directory" || mode === "catalog" || filter === "DIRECTORY";
+    const base = onPartnersPage
+      ? `${ADMIN_BASE}/partners/${encodeURIComponent(id)}`
+      : `${ADMIN_BASE}/moderation/partners/${encodeURIComponent(id)}`;
     if (mode === "primary") return `${base}?returnTab=primary`;
     if (mode === "catalog" || filter === "DIRECTORY") return `${base}?returnTab=directory`;
-    if (mode === "directory" && (filter === "COMPANY" || filter === "PRIVATE")) {
+    if (
+      mode === "directory" &&
+      (filter === "COMPANY" || filter === "PRIVATE" || filter === "REJECTED")
+    ) {
       return `${base}?returnTab=${filter.toLowerCase()}`;
     }
     return base;
@@ -344,12 +351,11 @@ export function PartnersManager({
     setExpandedMessages([]);
     if (mode !== "directory") return;
     const params = new URLSearchParams(searchParams.toString());
-    // Stay on Moderation → Partners (default tab has no `tab` query).
     params.delete("tab");
     if (value === "PRIMARY") params.delete("partnerTab");
     else params.set("partnerTab", value.toLowerCase());
     const qs = params.toString();
-    router.replace(qs ? `${ADMIN_BASE}/moderation?${qs}` : `${ADMIN_BASE}/moderation`);
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
   };
   const toggleExpand = async (id: string) => {
     if (expandedId === id) {
