@@ -13,6 +13,10 @@ import { BookingCustomersPanel } from "@/components/admin/booking-customers-pane
 import type { BookingCustomerRow } from "@/lib/admin/booking-customer-row";
 import { ADMIN_BASE } from "@/lib/routes";
 import {
+  parseDirectoryPartnerTabs,
+  type DirectoryPartnerTab,
+} from "@/lib/admin/partner-directory-tabs";
+import {
   ResponsiveDataList,
   MobileDataCard,
   MobileDataRow,
@@ -99,6 +103,21 @@ function partnersInFilter(list: PartnerRow[], filter: Filter) {
   return list.filter((p) => p.status === "REJECTED");
 }
 
+function partnersInDirectoryTabs(list: PartnerRow[], tabs: DirectoryPartnerTab[]) {
+  const want = new Set(tabs.filter((tab) => tab !== "CUSTOMERS"));
+  const seen = new Set<string>();
+  const out: PartnerRow[] = [];
+  for (const tab of ["COMPANY", "PRIVATE", "REJECTED"] as const) {
+    if (!want.has(tab)) continue;
+    for (const partner of partnersInFilter(list, tab)) {
+      if (seen.has(partner.id)) continue;
+      seen.add(partner.id);
+      out.push(partner);
+    }
+  }
+  return out;
+}
+
 /** Total rows in tab + how many need admin attention. */
 function tabBadge(list: PartnerRow[]) {
   const pending = list.reduce((sum, p) => sum + partnerAttention(p), 0);
@@ -182,18 +201,17 @@ export function PartnersManager({
     if (mode === "queue") return "PENDING";
     if (mode === "primary") return "PRIMARY";
     if (mode === "catalog") return "DIRECTORY";
-    const partnerTab = searchParams.get("partnerTab")?.trim().toUpperCase();
-    if (
-      partnerTab === "COMPANY" ||
-      partnerTab === "PRIVATE" ||
-      partnerTab === "REJECTED" ||
-      partnerTab === "CUSTOMERS" ||
-      partnerTab === "PENDING"
-    ) {
-      return partnerTab;
-    }
     return "COMPANY";
   });
+  const partnerTabQuery = mode === "directory" ? searchParams.get("partnerTab") : null;
+  const [tabQuery, setTabQuery] = useState(partnerTabQuery);
+  const [tabs, setTabs] = useState<DirectoryPartnerTab[]>(() =>
+    parseDirectoryPartnerTabs(mode === "directory" ? searchParams.get("partnerTab") : "company"),
+  );
+  if (mode === "directory" && tabQuery !== partnerTabQuery) {
+    setTabQuery(partnerTabQuery);
+    setTabs(parseDirectoryPartnerTabs(partnerTabQuery));
+  }
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -305,7 +323,7 @@ export function PartnersManager({
   }, [initialPartners, mode]);
 
   const rows = useMemo(() => {
-    const filtered = partnersInFilter(initialPartners, filter)
+    const filtered = (mode === "directory" ? partnersInDirectoryTabs(initialPartners, tabs) : partnersInFilter(initialPartners, filter))
       .slice()
       .sort((a, b) => {
         const ua = partnerAttention(a);
@@ -320,7 +338,7 @@ export function PartnersManager({
       statusLabel: p.statusLabel ?? partnerStatusLabel(p.status),
       fleet: fleetDisplay(p),
     }));
-  }, [filter, initialPartners]);
+  }, [filter, initialPartners, mode, tabs]);
 
   const reviewHref = (id: string) => {
     const onPartnersPage = mode === "directory" || mode === "catalog" || filter === "DIRECTORY";
@@ -329,11 +347,10 @@ export function PartnersManager({
       : `${ADMIN_BASE}/moderation/partners/${encodeURIComponent(id)}`;
     if (mode === "primary") return `${base}?returnTab=primary`;
     if (mode === "catalog" || filter === "DIRECTORY") return `${base}?returnTab=directory`;
-    if (
-      mode === "directory" &&
-      (filter === "COMPANY" || filter === "PRIVATE" || filter === "REJECTED")
-    ) {
-      return `${base}?returnTab=${filter.toLowerCase()}`;
+    if (mode === "directory") {
+      const selected = tabs.filter((tab) => tab !== "CUSTOMERS");
+      const query = (selected.length ? selected : tabs).map((tab) => tab.toLowerCase()).join(",");
+      return `${base}?returnTab=${encodeURIComponent(query)}`;
     }
     return base;
   };
@@ -351,22 +368,13 @@ export function PartnersManager({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- open once from deep link
   }, [searchParams]);
 
-  useEffect(() => {
-    if (mode !== "directory") return;
-    const partnerTab = searchParams.get("partnerTab")?.trim().toUpperCase();
-    const legacyTab = searchParams.get("tab")?.trim().toLowerCase();
-    if (
-      partnerTab === "COMPANY" ||
-      partnerTab === "PRIVATE" ||
-      partnerTab === "REJECTED" ||
-      partnerTab === "CUSTOMERS" ||
-      partnerTab === "PENDING"
-    ) {
-      setFilter(partnerTab as Filter);
-      return;
-    }
-    if (legacyTab === "directory") return;
-  }, [mode, searchParams]);
+  const writeDirectoryTabs = (next: DirectoryPartnerTab[]) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("tab");
+    params.set("partnerTab", next.map((tab) => tab.toLowerCase()).join(","));
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+  };
 
   const selectFilter = (value: Filter) => {
     setFilter(value);
@@ -380,6 +388,16 @@ export function PartnersManager({
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname);
   };
+
+  const toggleDirectoryTab = (value: DirectoryPartnerTab) => {
+    const next = tabs.includes(value) ? tabs.filter((tab) => tab !== value) : [...tabs, value];
+    if (!next.length) return;
+    setTabs(next);
+    setExpandedId(null);
+    setExpandedMessages([]);
+    writeDirectoryTabs(next);
+  };
+
   const toggleExpand = async (id: string) => {
     if (expandedId === id) {
       setExpandedId(null);
@@ -412,11 +430,14 @@ export function PartnersManager({
       const nextStatus = String(data.status || "");
       const kind = (data.partner?.kind || data.kind) as string | undefined;
       if (mode === "directory") {
-        if (nextStatus === "APPROVED") {
-          setFilter(kind === "PRIVATE" ? "PRIVATE" : "COMPANY");
-        } else if (nextStatus === "REJECTED") {
-          setFilter("REJECTED");
-        }
+        const nextTabs: DirectoryPartnerTab[] =
+          nextStatus === "APPROVED"
+            ? [kind === "PRIVATE" ? "PRIVATE" : "COMPANY"]
+            : nextStatus === "REJECTED"
+              ? ["REJECTED"]
+              : tabs;
+        setTabs(nextTabs);
+        writeDirectoryTabs(nextTabs);
       } else if (mode === "queue" && PENDING_STATUSES.has(nextStatus)) {
         setFilter("PENDING");
       }
@@ -433,6 +454,21 @@ export function PartnersManager({
       setLoadingId(null);
     }
   };
+
+  const rowReturnTab =
+    mode === "directory"
+      ? (tabs.some((tab) => tab !== "CUSTOMERS") ? tabs.filter((tab) => tab !== "CUSTOMERS") : tabs)
+          .map((tab) => tab.toLowerCase())
+          .join(",")
+      : filter === "COMPANY"
+        ? "company"
+        : filter === "PRIVATE"
+          ? "private"
+          : filter === "REJECTED"
+            ? "rejected"
+            : "directory";
+  const showCustomers = mode === "directory" && tabs.includes("CUSTOMERS");
+  const showPartners = !(showCustomers && tabs.length === 1);
 
   const filters: Array<{ value: Filter; label: string }> =
     mode === "queue"
@@ -461,19 +497,25 @@ export function PartnersManager({
           const badge = filterBadges[item.value] ?? { count: 0, pending: 0 };
           const hasPending = item.value === "CUSTOMERS" ? false : badge.pending > 0;
           const count = item.value === "CUSTOMERS" ? customers.length : badge.count;
+          const selected =
+            mode === "directory"
+              ? tabs.includes(item.value as DirectoryPartnerTab)
+              : filter === item.value;
           return (
             <button
               key={item.value}
               type="button"
+              aria-pressed={selected}
               onClick={() => {
-                selectFilter(item.value);
+                if (mode === "directory") toggleDirectoryTab(item.value as DirectoryPartnerTab);
+                else selectFilter(item.value);
               }}
               className={cn(
                 "relative min-h-10 rounded-full px-4 py-2 text-sm font-semibold transition",
-                filter === item.value && !hasPending && "bg-[#0b1f4b] text-white",
-                filter === item.value && hasPending && "bg-amber-400 text-amber-950 ring-2 ring-amber-500",
-                filter !== item.value && !hasPending && "border bg-white text-slate-600",
-                filter !== item.value &&
+                selected && !hasPending && "bg-[#0b1f4b] text-white",
+                selected && hasPending && "bg-amber-400 text-amber-950 ring-2 ring-amber-500",
+                !selected && !hasPending && "border bg-white text-slate-600",
+                !selected &&
                   hasPending &&
                   "border border-amber-400 bg-amber-100 font-extrabold text-amber-950",
               )}
@@ -483,10 +525,10 @@ export function PartnersManager({
                 className={cn(
                   "ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-extrabold",
                   hasPending
-                    ? filter === item.value
+                    ? selected
                       ? "bg-amber-950 text-white"
                       : "bg-amber-500 text-white"
-                    : filter === item.value
+                    : selected
                       ? "bg-white/25 text-white"
                       : "bg-slate-200 text-slate-700",
                 )}
@@ -509,9 +551,7 @@ export function PartnersManager({
         </div>
       ) : null}
 
-      {filter === "CUSTOMERS" ? (
-        <BookingCustomersPanel customers={customers} />
-      ) : (() => {
+      {showPartners ? (() => {
         const showCountry = filter === "DIRECTORY" || mode === "directory";
         const hideId = filter === "DIRECTORY";
         const colCount = 5 + (hideId ? 0 : 1) + (showCountry ? 1 : 0);
@@ -703,15 +743,7 @@ export function PartnersManager({
                                 email={p.email}
                                 phone={p.phone}
                                 status={p.status}
-                                returnTab={
-                                  filter === "COMPANY"
-                                    ? "company"
-                                    : filter === "PRIVATE"
-                                      ? "private"
-                                      : filter === "REJECTED"
-                                        ? "rejected"
-                                        : "directory"
-                                }
+                                returnTab={rowReturnTab}
                               />
                             </div>
                           </td>
@@ -939,15 +971,7 @@ export function PartnersManager({
                         email={p.email}
                         phone={p.phone}
                         status={p.status}
-                        returnTab={
-                          filter === "COMPANY"
-                            ? "company"
-                            : filter === "PRIVATE"
-                              ? "private"
-                              : filter === "REJECTED"
-                                ? "rejected"
-                                : "directory"
-                        }
+                        returnTab={rowReturnTab}
                       />
                     </div>
                   </div>
@@ -1000,7 +1024,12 @@ export function PartnersManager({
         }
       />
         );
-      })()}
+      })() : null}
+      {showCustomers ? (
+        <div className={showPartners ? "mt-6" : undefined}>
+          <BookingCustomersPanel customers={customers} />
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { AdminPartnerReviewPanel } from "@/components/admin/admin-partner-review-panel";
 import { AdminProfileRemoderationPanel } from "@/components/admin/admin-profile-remodeation-panel";
 import { ADMIN_BASE } from "@/lib/routes";
+import { directoryPartnerTabQuery } from "@/lib/admin/partner-directory-tabs";
 
 export default async function AdminPartnerModerationReviewPage({
   params,
@@ -24,8 +25,11 @@ export default async function AdminPartnerModerationReviewPage({
   } else if (returnTab === "primary") {
     backHref = `${ADMIN_BASE}/moderation?tab=primary`;
     backLabel = "← პირველადი მოდერაცია";
-  } else if (returnTab === "company" || returnTab === "private" || returnTab === "rejected") {
-    backHref = `${ADMIN_BASE}/partners?partnerTab=${encodeURIComponent(returnTab)}`;
+  } else {
+    const partnerTabs = directoryPartnerTabQuery(returnTab);
+    if (partnerTabs) {
+      backHref = `${ADMIN_BASE}/partners?partnerTab=${encodeURIComponent(partnerTabs)}`;
+    }
   }
 
   if (returnTab === "profiles") {

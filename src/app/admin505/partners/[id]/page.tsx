@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/auth/guards";
 import { AdminPartnerReviewPanel } from "@/components/admin/admin-partner-review-panel";
 import { ADMIN_BASE } from "@/lib/routes";
+import { directoryPartnerTabQuery } from "@/lib/admin/partner-directory-tabs";
 
 export default async function AdminPartnerDetailPage({
   params,
@@ -15,10 +16,10 @@ export default async function AdminPartnerDetailPage({
   const sp = await searchParams;
   const returnTab = sp.returnTab?.trim().toLowerCase();
 
-  let backHref = `${ADMIN_BASE}/partners`;
-  if (returnTab === "private" || returnTab === "rejected" || returnTab === "company") {
-    backHref = `${ADMIN_BASE}/partners?partnerTab=${encodeURIComponent(returnTab)}`;
-  }
+  const partnerTabs = directoryPartnerTabQuery(returnTab);
+  const backHref = partnerTabs
+    ? `${ADMIN_BASE}/partners?partnerTab=${encodeURIComponent(partnerTabs)}`
+    : `${ADMIN_BASE}/partners`;
 
   return (
     <AdminPartnerReviewPanel
