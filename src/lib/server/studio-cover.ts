@@ -66,14 +66,16 @@ export async function renderStudioCover(input: {
     "No people, no text, no watermark, no extra objects.",
   ].join(" ");
 
+  const ext = input.mime.includes("png") ? "png" : input.mime.includes("webp") ? "webp" : "jpg";
+  const source = new Uint8Array(input.bytes.byteLength);
+  source.set(input.bytes);
   const form = new FormData();
   form.append("model", IMAGE_MODEL);
   form.append("prompt", prompt);
   form.append("size", "1536x1024");
   form.append("quality", "medium");
-  const source = new Uint8Array(input.bytes.byteLength);
-  source.set(input.bytes);
-  form.append("image", new Blob([source], { type: input.mime || "image/jpeg" }), "source.jpg");
+  form.append("output_format", "png");
+  form.append("image", new File([source], `source.${ext}`, { type: input.mime || "image/jpeg" }));
 
   const res = await fetch("https://api.openai.com/v1/images/edits", {
     method: "POST",

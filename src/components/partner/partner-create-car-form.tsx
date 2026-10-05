@@ -1368,32 +1368,32 @@ export function PartnerCreateCarForm({
     setError("");
     try {
       const urls: string[] = [];
-      for (const file of files) {
-        urls.push((await uploadFile(file)).url);
-      }
-      const coverSource = files[0];
-      if (fillsCover && coverSource && identityReady && coverSource.type !== "image/gif") {
-        const source = coverSource;
-        const originalCover = urls[0] || "";
-        window.setTimeout(() => {
-          void uploadFile(source, coverIdentity)
-            .then((styled) => {
-              if (!styled.styled || !styled.url) return;
-              setPhotos((prev) => {
-                if (String(prev[0] || "") !== originalCover) return prev;
-                const next = [...prev];
-                next[0] = styled.url;
-                return next;
-              });
-            })
-            .catch(() => {
-              /* the uploaded photo already stays as the cover */
-            });
-        }, 0);
+      const styleCover =
+        fillsCover &&
+        Boolean(files[0]) &&
+        identityReady &&
+        files[0]!.type !== "image/gif";
+      let coverUrl: string | undefined;
+      if (styleCover && startIndex === 0) {
+        const cover = await uploadFile(files[0]!, coverIdentity);
+        urls.push(cover.url);
+        if (!cover.styled) setError(cc.coverStyleFailed);
+        for (let index = 1; index < files.length; index += 1) {
+          urls.push((await uploadFile(files[index]!)).url);
+        }
+      } else {
+        for (const file of files) {
+          urls.push((await uploadFile(file)).url);
+        }
+        if (styleCover) {
+          const cover = await uploadFile(files[0]!, coverIdentity);
+          coverUrl = cover.url;
+          if (!cover.styled) setError(cc.coverStyleFailed);
+        }
       }
       return {
         urls,
-        coverUrl: coverEmpty && startIndex > 0 ? urls[0] : undefined,
+        coverUrl: coverUrl || (coverEmpty && startIndex > 0 ? urls[0] : undefined),
       };
     } catch (err) {
       showError(err instanceof Error ? err.message : common.uploadFailed, "photo");
