@@ -1808,16 +1808,7 @@ export function ReserveCheckout({
                       />
                     </label>
                   </div>
-                  {totals.siteDiscountActive ? (
-                    <p className="text-xs font-semibold text-emerald-700">
-                      −{totals.bpDiscountPercent}%{" "}
-                      {locale === "ka"
-                        ? "საიტის ფასდაკლება — მანქანასა და სერვისებზე. მიწოდება/დაბრუნება სრულ ფასად რჩება; ადგილზე გადახდა უცვლელია."
-                        : locale === "ru"
-                          ? "Скидка сайта — на автомобиль и услуги. Доставка/возврат по полной цене; оплата на месте не меняется."
-                          : "Site discount — on car & services. Delivery/return stay full price; pay-on-site unchanged."}
-                    </p>
-                  ) : noPromoCode ? null : totals.bpDiscountActive ? (
+                  {totals.siteDiscountActive ? null : noPromoCode ? null : totals.bpDiscountActive ? (
                     <p className="text-xs font-semibold text-emerald-700">
                       −{totals.bpDiscountPercent}%{" "}
                       {locale === "ka"
