@@ -214,6 +214,13 @@ export type Dictionary = {
     fillAll: string;
     messengersRequired: string;
     countriesRequired: string;
+    pickupPlaces: string;
+    pickupPlacesHint: string;
+    pickupAirports: string;
+    pickupCities: string;
+    pickupPlacesRequired: string;
+    pickupPlacesEmpty: string;
+    pickupSearch: string;
     phoneRequired: string;
     partnerLogin: string;
     pageBody: string;
@@ -571,6 +578,13 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       fillAll: "Please complete every required field before submitting.",
       messengersRequired: "Select at least one active messenger.",
       countriesRequired: "Select at least one operating country.",
+      pickupPlaces: "Pickup points",
+      pickupPlacesHint: "Choose the airports and main pickup places in the selected countries. An administrator keeps the ones to approve, and they join search after confirmation.",
+      pickupAirports: "Airports",
+      pickupCities: "Main pickup places",
+      pickupPlacesRequired: "Select at least one pickup point.",
+      pickupPlacesEmpty: "Select a country to see its airports and pickup places.",
+      pickupSearch: "Search airports and places",
       phoneRequired: "Enter a phone number with country code.",
       partnerLogin: "Partner login",
       pageBody:
@@ -932,6 +946,13 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       fillAll: "გაგზავნამდე შეავსეთ ყველა სავალდებულო ველი.",
       messengersRequired: "აირჩიეთ სულ მცირე ერთი აქტიური მესენჯერი.",
       countriesRequired: "აირჩიეთ სულ მცირე ერთი ქვეყანა.",
+      pickupPlaces: "აყვანის პუნქტები",
+      pickupPlacesHint: "აირჩიეთ არჩეული ქვეყნების აეროპორტები და ძირითადი აყვანის ადგილები. ადმინისტრატორი დატოვებს საჭირო ლოკაციებს და დადასტურების შემდეგ ისინი ძიებაში გამოჩნდება.",
+      pickupAirports: "აეროპორტები",
+      pickupCities: "ძირითადი აყვანის ადგილები",
+      pickupPlacesRequired: "აირჩიეთ სულ მცირე ერთი აყვანის პუნქტი.",
+      pickupPlacesEmpty: "ჯერ აირჩიეთ ქვეყანა — გამოჩნდება მისი აეროპორტები და აყვანის ადგილები.",
+      pickupSearch: "მოძებნეთ აეროპორტი ან ქალაქი",
       phoneRequired: "შეიყვანეთ ტელეფონის ნომერი ქვეყნის კოდით.",
       partnerLogin: "პარტნიორის შესვლა",
       pageBody:
@@ -1295,6 +1316,13 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       fillAll: "Заполните все обязательные поля перед отправкой.",
       messengersRequired: "Выберите хотя бы один активный мессенджер.",
       countriesRequired: "Выберите хотя бы одну страну.",
+      pickupPlaces: "Пункты выдачи",
+      pickupPlacesHint: "Выберите аэропорты и основные пункты выдачи в выбранных странах. Администратор оставит нужные, и после подтверждения они появятся в поиске.",
+      pickupAirports: "Аэропорты",
+      pickupCities: "Основные пункты выдачи",
+      pickupPlacesRequired: "Выберите хотя бы один пункт выдачи.",
+      pickupPlacesEmpty: "Сначала выберите страну — появятся её аэропорты и пункты выдачи.",
+      pickupSearch: "Поиск аэропорта или города",
       phoneRequired: "Укажите телефон с кодом страны.",
       partnerLogin: "Вход для партнёров",
       pageBody:
@@ -1657,6 +1685,13 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       fillAll: "Veuillez remplir tous les champs obligatoires avant d'envoyer.",
       messengersRequired: "Sélectionnez au moins une messagerie active.",
       countriesRequired: "Sélectionnez au moins un pays.",
+      pickupPlaces: "Points de prise en charge",
+      pickupPlacesHint: "Choisissez les aéroports et les principaux lieux de prise en charge des pays sélectionnés. L’administrateur conserve ceux qu’il approuve ; ils rejoignent la recherche après confirmation.",
+      pickupAirports: "Aéroports",
+      pickupCities: "Lieux principaux",
+      pickupPlacesRequired: "Sélectionnez au moins un point de prise en charge.",
+      pickupPlacesEmpty: "Sélectionnez d’abord un pays pour voir ses aéroports et lieux.",
+      pickupSearch: "Rechercher un aéroport ou une ville",
       phoneRequired: "Saisissez un téléphone avec l'indicatif pays.",
       partnerLogin: "Connexion partenaire",
       pageBody:
@@ -2019,6 +2054,13 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       fillAll: "Bitte füllen Sie alle Pflichtfelder aus, bevor Sie senden.",
       messengersRequired: "Wählen Sie mindestens einen aktiven Messenger.",
       countriesRequired: "Wählen Sie mindestens ein Land.",
+      pickupPlaces: "Abholpunkte",
+      pickupPlacesHint: "Wählen Sie die Flughäfen und wichtigsten Abholorte der gewählten Länder. Der Administrator behält die nötigen Orte; nach der Bestätigung erscheinen sie in der Suche.",
+      pickupAirports: "Flughäfen",
+      pickupCities: "Wichtigste Abholorte",
+      pickupPlacesRequired: "Wählen Sie mindestens einen Abholpunkt.",
+      pickupPlacesEmpty: "Wählen Sie zuerst ein Land, dann erscheinen Flughäfen und Abholorte.",
+      pickupSearch: "Flughafen oder Stadt suchen",
       phoneRequired: "Geben Sie eine Telefonnummer mit Ländervorwahl ein.",
       partnerLogin: "Partner-Login",
       pageBody:
@@ -2381,6 +2423,13 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       fillAll: "Uzupełnij wszystkie wymagane pola przed wysłaniem.",
       messengersRequired: "Wybierz co najmniej jeden aktywny komunikator.",
       countriesRequired: "Wybierz co najmniej jeden kraj.",
+      pickupPlaces: "Punkty odbioru",
+      pickupPlacesHint: "Wybierz lotniska i główne miejsca odbioru w wybranych krajach. Administrator zostawi potrzebne, a po zatwierdzeniu pojawią się w wyszukiwarce.",
+      pickupAirports: "Lotniska",
+      pickupCities: "Główne miejsca odbioru",
+      pickupPlacesRequired: "Wybierz co najmniej jeden punkt odbioru.",
+      pickupPlacesEmpty: "Najpierw wybierz kraj — pojawią się jego lotniska i miejsca odbioru.",
+      pickupSearch: "Szukaj lotniska lub miasta",
       phoneRequired: "Podaj telefon z numerem kierunkowym.",
       partnerLogin: "Logowanie partnera",
       pageBody:
@@ -2740,6 +2789,13 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       fillAll: "يرجى إكمال كل الحقول المطلوبة قبل الإرسال.",
       messengersRequired: "اختر تطبيقاً نشطاً واحداً على الأقل.",
       countriesRequired: "اختر دولة واحدة على الأقل.",
+      pickupPlaces: "نقاط الاستلام",
+      pickupPlacesHint: "اختر المطارات وأماكن الاستلام الرئيسية في الدول المحددة. يُبقي المسؤول ما يراه مناسبًا، وتُضاف إلى البحث بعد التأكيد.",
+      pickupAirports: "المطارات",
+      pickupCities: "أماكن الاستلام الرئيسية",
+      pickupPlacesRequired: "اختر نقطة استلام واحدة على الأقل.",
+      pickupPlacesEmpty: "اختر دولة أولًا لتظهر مطاراتها وأماكن الاستلام.",
+      pickupSearch: "ابحث عن مطار أو مدينة",
       phoneRequired: "أدخل رقم هاتف مع رمز الدولة.",
       partnerLogin: "دخول الشريك",
       pageBody:

@@ -75,7 +75,12 @@ async function readFileStore(): Promise<StoredDeliveryLocation[]> {
 async function writeFileStore(rows: StoredDeliveryLocation[]) {
   await mkdir(DATA_DIR, { recursive: true });
   await writeFile(DATA_FILE, JSON.stringify(rows, null, 2), "utf8");
+  searchAirportsCache.clear();
   revalidatePublishedContent();
+}
+
+export function clearSearchAirportsCache() {
+  searchAirportsCache.clear();
 }
 
 /** Countries that currently have approved partners (via partner airport locations). */
@@ -625,7 +630,84 @@ export async function activatePartnerApprovedDeliveryLocations(rawIds: string[])
       console.warn("[delivery-locations] activatePartnerApprovedDeliveryLocations", id, error);
     }
   }
+  searchAirportsCache.clear();
   return ids;
+}
+
+/** Place codes listed by approved partners, expanded to location ids and IATA codes. */
+async function approvedPartnerPlaceCodes(exceptPartnerId?: string): Promise<Set<string>> {
+  const set = new Set<string>();
+  const add = (raw: string) => {
+    const code = normalizeLocationCode(raw || "");
+    if (code) set.add(code.toUpperCase());
+  };
+
+  try {
+    const partners = await prisma.partner.findMany({
+      where: { status: { in: ["APPROVED", "PENDING_REMODERATION"] } },
+      select: { id: true, companySettings: true },
+    });
+    const { parseCompanySettings } = await import("@/lib/partners/company-settings");
+    for (const partner of partners) {
+      if (exceptPartnerId && partner.id === exceptPartnerId) continue;
+      for (const id of parseCompanySettings(partner.companySettings).deliveryLocationIds || []) add(id);
+    }
+  } catch {
+    /* file partners below */
+  }
+
+  try {
+    const { listFilePartnerApplications } = await import("@/lib/server/partner-applications-store");
+    const { readCompanySettingsFile } = await import("@/lib/server/partner-company-settings-store");
+    const files = await listFilePartnerApplications();
+    for (const partner of files) {
+      if (partner.status !== "APPROVED") continue;
+      if (exceptPartnerId && partner.id === exceptPartnerId) continue;
+      const settings = await readCompanySettingsFile(partner.id);
+      for (const id of settings?.deliveryLocationIds || []) add(id);
+    }
+  } catch {
+    /* ignore */
+  }
+
+  const all = await listDeliveryLocations({ activeOnly: false });
+  const extra: string[] = [];
+  for (const loc of all) {
+    const keys = [loc.id, loc.iata, loc.airportId]
+      .map((value) => normalizeLocationCode(value || "").toUpperCase())
+      .filter(Boolean);
+    if (!keys.some((key) => set.has(key))) continue;
+    extra.push(...keys);
+  }
+  for (const key of extra) set.add(key);
+  return set;
+}
+
+/**
+ * Turn off pickup places that belonged only to this partner.
+ * Places still used by another approved partner, or by a live car, stay in search.
+ */
+export async function retireUnusedPartnerPlaces(partnerId: string, listed: string[]) {
+  const kept = await approvedPartnerPlaceCodes(partnerId);
+  const all = await listDeliveryLocations({ activeOnly: false });
+  const carCodes = await codesOfferingCarPickup(all);
+  for (const raw of listed) {
+    const code = normalizeLocationCode(raw || "").toUpperCase();
+    if (!code || kept.has(code) || carCodes.has(code)) continue;
+    const loc = all.find((row) =>
+      [row.id, row.iata, row.airportId].some(
+        (value) => normalizeLocationCode(value || "").toUpperCase() === code,
+      ),
+    );
+    if (!loc?.isActive) continue;
+    if (locationOffersPickup(loc, kept) || locationOffersPickup(loc, carCodes)) continue;
+    try {
+      await updateDeliveryLocation(loc.id, { isActive: false });
+    } catch (error) {
+      console.warn("[delivery-locations] retireUnusedPartnerPlaces", loc.id, error);
+    }
+  }
+  searchAirportsCache.clear();
 }
 
 /**
@@ -755,6 +837,7 @@ export async function getSearchDeliveryAirports(): Promise<SearchAirportOption[]
   const all = await listDeliveryLocations();
   const locations = all.filter((loc) => loc.isActive);
   const pickupCodes = locations.length ? await codesOfferingCarPickup(all) : new Set<string>();
+  const partnerCodes = locations.length ? await approvedPartnerPlaceCodes() : new Set<string>();
 
   const toOption = (loc: {
     iata: string;
@@ -784,7 +867,9 @@ export async function getSearchDeliveryAirports(): Promise<SearchAirportOption[]
 
   let result: SearchAirportOption[];
   if (all.length > 0) {
-    result = locations.filter((loc) => locationOffersPickup(loc, pickupCodes)).map(toOption);
+    result = locations
+      .filter((loc) => locationOffersPickup(loc, pickupCodes) || locationOffersPickup(loc, partnerCodes))
+      .map(toOption);
   } else {
     const hubs = CATALOG_AIRPORTS.filter((a) => a.isHub);
     const ordered = [...hubs.filter((a) => a.iata === "KUT"), ...hubs.filter((a) => a.iata !== "KUT")];

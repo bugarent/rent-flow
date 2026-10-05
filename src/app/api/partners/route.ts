@@ -3,9 +3,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { FLEET_AGE_RANGES, PARTNER_SOCIAL_PLATFORMS } from "@/lib/partner";
-import { setPartnerAirports } from "@/lib/server/partner-airports";
-import { airportsForCountries } from "@/lib/catalog/operating-regions";
 import { formatInternationalPhone } from "@/lib/catalog/dial-codes";
+import {
+  applicationCompanySettings,
+  normalizeRequestedLocationCodes,
+  saveApplicationPlaces,
+} from "@/lib/server/partner-search-coverage";
 import { assertAllowedOperatingCountries } from "@/lib/server/partner-operating-countries";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import { createOrReapplyFilePartner } from "@/lib/server/partner-applications-store";
@@ -40,6 +43,7 @@ const applicationSchema = z
     fleetSize: z.number().int().min(1).max(10000),
     fleetAgeRange: z.enum(fleetAgeValues),
     countryIso2s: z.array(z.string().length(2)).min(1),
+    locationCodes: z.array(z.string().trim().min(2).max(80)).min(1).max(400),
     password: z.string().min(6).max(128),
     confirmPassword: z.string().min(6).max(128),
   })
@@ -66,6 +70,24 @@ async function saveViaFile(input: {
 }) {
   try {
     const { partner, reapplied } = await createOrReapplyFilePartner(input);
+    try {
+      const { applicationCompanySettings, saveApplicationPlaces } = await import(
+        "@/lib/server/partner-search-coverage"
+      );
+      await saveApplicationPlaces(
+        partner.id,
+        applicationCompanySettings({
+          companyName: input.contactName,
+          email: input.snapshot.email,
+          phone: input.snapshot.phone,
+          messengers: input.snapshot.messengers,
+          countryIso2s: input.snapshot.countryIso2s,
+          locationCodes: input.snapshot.locationCodes,
+        }),
+      );
+    } catch {
+      /* the application itself is already stored */
+    }
     try {
       const { setPartnerCredentials } = await import("@/lib/server/partner-credentials-store");
       await setPartnerCredentials(partner.id, input.snapshot.email, input.password);
@@ -115,6 +137,13 @@ export async function POST(req: Request) {
     const body = applicationSchema.parse(await req.json());
     const email = body.email.toLowerCase().trim();
     const countryIso2s = [...new Set(body.countryIso2s.map((c) => c.toUpperCase()))];
+    const locationCodes = normalizeRequestedLocationCodes(countryIso2s, body.locationCodes);
+    if (!locationCodes.length) {
+      return NextResponse.json(
+        { error: "Select at least one airport or pickup place in the chosen countries." },
+        { status: 400 },
+      );
+    }
     const messengers = [...new Set(body.messengers)];
     const phone = formatInternationalPhone(body.phoneCountryIso2, body.phone);
     const secondaryPhone = body.secondaryPhone
@@ -160,7 +189,16 @@ export async function POST(req: Request) {
       fleetSize: body.fleetSize,
       fleetAgeRange: body.fleetAgeRange,
       countryIso2s,
+      locationCodes,
     };
+    const placeSettings = applicationCompanySettings({
+      companyName: contactName,
+      email,
+      phone,
+      messengers,
+      countryIso2s,
+      locationCodes,
+    });
     const filePayload = {
       snapshot,
       contactName,
@@ -226,6 +264,7 @@ export async function POST(req: Request) {
                 countryIso2s: Array.isArray(reopenCandidate.operatingCountryIso2s)
                   ? (reopenCandidate.operatingCountryIso2s as string[])
                   : [],
+                locationCodes: [],
               },
               true,
             ),
@@ -253,18 +292,13 @@ export async function POST(req: Request) {
             representativeFirstName: body.firstName.trim(),
             representativeLastName: body.lastName.trim(),
             operatingCountryIso2s: countryIso2s,
+            companySettings: placeSettings,
             applicationMessages: messages,
             unreadReapplyCount,
           },
         });
 
-        try {
-          const airportIatas = airportsForCountries(countryIso2s).map((a) => a.iata);
-          if (airportIatas.length) await setPartnerAirports(updated.id, airportIatas);
-        } catch (locError) {
-          console.warn("[partners] could not attach airports yet:", locError);
-        }
-
+        await saveApplicationPlaces(updated.id, placeSettings);
         await rememberPartnerPassword(updated.id, email, body.password);
 
         return NextResponse.json(
@@ -302,19 +336,14 @@ export async function POST(req: Request) {
           representativeFirstName: body.firstName.trim(),
           representativeLastName: body.lastName.trim(),
           operatingCountryIso2s: countryIso2s,
+          companySettings: placeSettings,
           applicationMessages: [initialMessage],
           unreadReapplyCount: 0,
           sequentialNumber,
         },
       });
 
-      try {
-        const airportIatas = airportsForCountries(countryIso2s).map((a) => a.iata);
-        if (airportIatas.length) await setPartnerAirports(partner.id, airportIatas);
-      } catch (locError) {
-        console.warn("[partners] could not attach airports yet:", locError);
-      }
-
+      await saveApplicationPlaces(partner.id, placeSettings);
       await rememberPartnerPassword(partner.id, email, body.password);
 
       return NextResponse.json(

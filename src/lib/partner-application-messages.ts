@@ -21,6 +21,8 @@ export type PartnerApplicationMessageSnapshot = {
   fleetSize: number;
   fleetAgeRange: string;
   countryIso2s: string[];
+  /** Airport IATA codes and city pickup codes the applicant asked for. */
+  locationCodes: string[];
 };
 
 export type PartnerApplicationMessage = {
@@ -60,6 +62,9 @@ export function parsePartnerApplicationMessages(raw: unknown): PartnerApplicatio
           fleetAgeRange: String(snapshot.fleetAgeRange || "AGE_0_5"),
           countryIso2s: Array.isArray(snapshot.countryIso2s)
             ? snapshot.countryIso2s.map(String)
+            : [],
+          locationCodes: Array.isArray(snapshot.locationCodes)
+            ? snapshot.locationCodes.map(String)
             : [],
         },
       };

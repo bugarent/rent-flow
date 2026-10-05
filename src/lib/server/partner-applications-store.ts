@@ -196,6 +196,7 @@ export async function createOrReapplyFilePartner(input: {
             fleetSize: existing.fleetSize,
             fleetAgeRange: existing.fleetAgeRange,
             countryIso2s: existing.operatingCountryIso2s,
+            locationCodes: [],
           },
           true,
         ),

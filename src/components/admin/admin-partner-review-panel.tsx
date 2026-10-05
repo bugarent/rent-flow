@@ -11,7 +11,7 @@ import {
   normalizeLocationCode,
   searchPlacesForCountry,
 } from "@/lib/catalog/search-places";
-import { worldCountryName } from "@/lib/catalog/world-countries";
+import { WORLD_COUNTRIES, worldCountryName } from "@/lib/catalog/world-countries";
 import { LOCALES, LOCALE_LABELS } from "@/lib/i18n/config";
 import { PARTNER_SOCIAL_PLATFORMS, type PartnerSocialPlatform } from "@/lib/partner";
 import {
@@ -108,14 +108,28 @@ function selectedLocationsForCountry(
 
 function locationsForCountry(iso2: string, catalog: CatalogLocation[]): LocationOption[] {
   const want = iso2.toUpperCase();
-  return catalog
-    .filter((loc) => loc.isActive !== false && loc.countryIso2.toUpperCase() === want)
-    .map((loc) => ({
-      id: loc.id,
-      label: loc.label,
+  const byCode = new Map<string, LocationOption>();
+  for (const place of searchPlacesForCountry(want)) {
+    const code = normalizeLocationCode(place.code);
+    byCode.set(code, {
+      id: code,
+      label: place.label,
       countryIso2: want,
-      iata: loc.iata || loc.airportId || loc.id,
-    }));
+      iata: code,
+    });
+  }
+  for (const loc of catalog) {
+    if (loc.countryIso2.toUpperCase() !== want) continue;
+    const code = normalizeLocationCode(loc.iata || loc.airportId || loc.id);
+    const prev = byCode.get(code);
+    byCode.set(code, {
+      id: loc.id || prev?.id || code,
+      label: loc.label || prev?.label || code,
+      countryIso2: want,
+      iata: code,
+    });
+  }
+  return [...byCode.values()];
 }
 
 function isLocationSelected(
@@ -578,6 +592,8 @@ export function AdminPartnerReviewPanel({
   };
 
   useEffect(() => {
+    // The panel loads this partner from the server when the id changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [partnerId]);
@@ -657,19 +673,11 @@ export function AdminPartnerReviewPanel({
   }, [changedFields]);
 
   const countryOptions = useMemo(
-    () => {
-      const map = new Map<string, string>();
-      for (const loc of catalogLocations) {
-        if (loc.isActive === false) continue;
-        const iso2 = loc.countryIso2.toUpperCase();
-        if (iso2.length !== 2 || map.has(iso2)) continue;
-        map.set(iso2, worldCountryName(iso2));
-      }
-      return [...map.entries()]
-        .map(([iso2, name]) => ({ iso2, name }))
-        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-    },
-    [catalogLocations],
+    () =>
+      WORLD_COUNTRIES.map((country) => ({ iso2: country.iso2, name: country.name })).sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+      ),
+    [],
   );
 
   const toggleClientLanguage = (code: string) => {

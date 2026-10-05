@@ -9,6 +9,8 @@ import { PARTNER_LOGIN } from "@/lib/routes";
 import { PhoneCountryField } from "@/components/partner/phone-country-field";
 import { SocialPlatformPicker } from "@/components/partner/social-platform-picker";
 import { OperatingCountriesHover } from "@/components/partner/operating-countries-hover";
+import { OperatingPickupPlaces } from "@/components/partner/operating-pickup-places";
+import { findSearchPlace } from "@/lib/catalog/search-places";
 import { useSurfaceDictionary } from "@/components/providers/use-surface-dictionary";
 
 type Props = {
@@ -44,6 +46,7 @@ export function BecomePartnerModal({
     fleetSize: "1",
     fleetAgeRange: "AGE_0_5",
     countryIso2s: [] as string[],
+    locationCodes: [] as string[],
     password: "",
     confirmPassword: "",
   });
@@ -62,6 +65,7 @@ export function BecomePartnerModal({
         ...prev,
         email: initialEmail || prev.email,
         countryIso2s: initialCountry ? [initialCountry] : prev.countryIso2s,
+        locationCodes: prev.locationCodes,
       }));
     }
   }
@@ -81,6 +85,7 @@ export function BecomePartnerModal({
   const messengersInvalid = submitted && form.messengers.length === 0;
   const fleetInvalid = submitted && !(Number(form.fleetSize) >= 1);
   const countriesInvalid = submitted && form.countryIso2s.length === 0;
+  const placesInvalid = submitted && form.locationCodes.length === 0;
 
   const fleetAgeLabel = (value: string) => {
     if (value === "AGE_0_5") return t.fleetAge0_5;
@@ -125,6 +130,7 @@ export function BecomePartnerModal({
       fleetSize < 1 ||
       !form.fleetAgeRange ||
       !form.countryIso2s.length ||
+      !form.locationCodes.length ||
       password.length < 6
     ) {
       setError(
@@ -132,6 +138,8 @@ export function BecomePartnerModal({
           ? t.messengersRequired
           : !form.countryIso2s.length
             ? t.countriesRequired
+            : !form.locationCodes.length
+              ? t.pickupPlacesRequired
             : !phone
               ? t.phoneRequired
               : password.length < 6
@@ -162,6 +170,7 @@ export function BecomePartnerModal({
           fleetSize,
           fleetAgeRange: form.fleetAgeRange,
           countryIso2s: form.countryIso2s,
+          locationCodes: form.locationCodes,
           password,
           confirmPassword,
         }),
@@ -417,10 +426,27 @@ export function BecomePartnerModal({
 
             <div className="md:col-span-2">
               <OperatingCountriesHover
-                catalog="europe-asia"
+                catalog="world"
                 invalid={countriesInvalid}
                 countryIso2s={form.countryIso2s}
-                onChange={(countryIso2s) => setForm((prev) => ({ ...prev, countryIso2s }))}
+                onChange={(countryIso2s) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    countryIso2s,
+                    locationCodes: prev.locationCodes.filter((code) => {
+                      const place = findSearchPlace(code);
+                      return Boolean(place && countryIso2s.includes(place.countryIso2));
+                    }),
+                  }))
+                }
+              />
+            </div>
+            <div className="md:col-span-2">
+              <OperatingPickupPlaces
+                invalid={placesInvalid}
+                countryIso2s={form.countryIso2s}
+                locationCodes={form.locationCodes}
+                onChange={(locationCodes) => setForm((prev) => ({ ...prev, locationCodes }))}
               />
             </div>
 

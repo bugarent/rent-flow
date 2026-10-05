@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { europeAndAsiaCountries, worldCountryName } from "@/lib/catalog/world-countries";
+import {
+  WORLD_COUNTRIES,
+  europeAndAsiaCountries,
+  europeAsiaHoverRegion,
+  worldCountryName,
+} from "@/lib/catalog/world-countries";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { cn } from "@/lib/utils";
 import { useSurfaceDictionary } from "@/components/providers/use-surface-dictionary";
@@ -23,37 +28,50 @@ export function OperatingCountriesHover({
 }: {
   countryIso2s: string[];
   onChange: (iso2s: string[]) => void;
-  /** active = countries already on the homepage. europe-asia = every European and Asian country. */
-  catalog?: "active" | "europe-asia";
+  /** active = countries already on the homepage. europe-asia = Europe and Asia. world = every country. */
+  catalog?: "active" | "europe-asia" | "world";
   invalid?: boolean;
 }) {
   const { dictionary } = useSurfaceDictionary();
   const t = dictionary.partner;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [options, setOptions] = useState<CountryOption[]>(europeAndAsiaCountries());
+  const [activeOptions, setActiveOptions] = useState<CountryOption[] | null>(null);
   const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (catalog === "europe-asia") {
-      setOptions(europeAndAsiaCountries());
-      return;
-    }
+    if (catalog !== "active") return;
     let cancelled = false;
     fetch("/api/partners/operating-countries")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled || !Array.isArray(data?.countries) || !data.countries.length) return;
-        setOptions(data.countries as CountryOption[]);
+        setActiveOptions(data.countries as CountryOption[]);
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, [catalog]);
+
+  const options = useMemo(
+    () =>
+      catalog === "world"
+        ? WORLD_COUNTRIES.map((country) => ({
+            iso2: country.iso2,
+            name: country.name,
+            hoverRegion: europeAsiaHoverRegion(country) ?? ("Europe" as const),
+          }))
+        : catalog === "europe-asia"
+          ? europeAndAsiaCountries()
+          : activeOptions?.length
+            ? activeOptions
+            : europeAndAsiaCountries(),
+    [catalog, activeOptions],
+  );
 
   const placePanel = () => {
     const rect = rootRef.current?.getBoundingClientRect();
@@ -164,7 +182,7 @@ export function OperatingCountriesHover({
                   if (e.key === "Escape") setOpen(false);
                 }}
                 placeholder={t.operatingSearch}
-                className="w-full rounded-lg border px-3 py-2 text-sm font-normal outline-none focus:border-sky-400"
+                className="w-full rounded-lg border px-3 py-2.5 text-base font-normal outline-none focus:border-sky-400"
                 aria-label={t.operatingSearch}
               />
               <p className="mt-2 text-xs text-slate-500">{t.operatingHint}</p>

@@ -253,6 +253,7 @@ async function filePartnerDetailWithCars(
 ) {
   const credentials = await getPartnerCredentials(file.id);
   const detail = filePartnerDetail(file);
+  const companySettings = await readCompanySettingsFile(file.id);
   const cars = await mergeFileCarsIntoPartnerRows([], {
     partnerId: file.id,
     email: file.email,
@@ -265,6 +266,7 @@ async function filePartnerDetailWithCars(
     loginEmail: credentials?.email || file.email || "",
     portalPassword: credentials?.password || "",
     hasUser: false,
+    companySettings,
   };
 }
 
@@ -486,12 +488,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         secondaryMessengers: previous.secondaryMessengers,
       });
       try {
-        const { activatePartnerApprovedDeliveryLocations } = await import(
-          "@/lib/server/delivery-locations"
-        );
-        nextSettings.deliveryLocationIds = await activatePartnerApprovedDeliveryLocations(
-          nextSettings.deliveryLocationIds || [],
-        );
+        const filePartner = await getFilePartnerById(id);
+        const publishNow = !filePartner || filePartner.status === "APPROVED";
+        if (publishNow) {
+          const { activatePartnerApprovedDeliveryLocations } = await import(
+            "@/lib/server/delivery-locations"
+          );
+          nextSettings.deliveryLocationIds = await activatePartnerApprovedDeliveryLocations(
+            nextSettings.deliveryLocationIds || [],
+          );
+        }
       } catch {
         /* keep codes */
       }
@@ -606,9 +612,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       secondaryMessengers: previous.secondaryMessengers,
     });
     const { activatePartnerApprovedDeliveryLocations } = await import("@/lib/server/delivery-locations");
-    const resolvedLocationIds = await activatePartnerApprovedDeliveryLocations(
-      settings.deliveryLocationIds || [],
-    );
+    const publishNow =
+      partnerExisting.status === "APPROVED" || partnerExisting.status === "PENDING_REMODERATION";
+    const resolvedLocationIds = publishNow
+      ? await activatePartnerApprovedDeliveryLocations(settings.deliveryLocationIds || [])
+      : settings.deliveryLocationIds || [];
     const nextSettings = {
       ...settings,
       deliveryCountryIso2s: settings.deliveryCountryIso2s.length
@@ -700,6 +708,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (file) {
       if (action === "REJECTED") {
         const note = String(body.rejectionNote || body.note || "Rejected").trim();
+        const { retirePartnerSearchPlaces } = await import("@/lib/server/partner-search-coverage");
+        await retirePartnerSearchPlaces(id);
         const updated = await updateFilePartnerStatus(id, "REJECTED", note);
         return NextResponse.json({
           id,
@@ -716,6 +726,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         }
         const updated = await updateFilePartnerStatus(id, "APPROVED", null);
         await markFilePartnerRead(id);
+        const { publishPartnerSearchPlaces } = await import("@/lib/server/partner-search-coverage");
+        await publishPartnerSearchPlaces(id);
         const seq =
           updated?.sequentialNumber ??
           (await (await import("@/lib/server/ensure-file-partner-code")).ensureFilePartnerSequentialNumber({
@@ -737,6 +749,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           if (activated.ok) {
             const updated = await updateFilePartnerStatus(id, "APPROVED", null);
             await markFilePartnerRead(id);
+            const { publishPartnerSearchPlaces } = await import("@/lib/server/partner-search-coverage");
+            await publishPartnerSearchPlaces(id);
             return NextResponse.json({
               id,
               status: "APPROVED",
@@ -782,6 +796,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             partnerId: id,
           });
           await updateFilePartnerStatus(id, "REJECTED", ban.reason);
+          const { retirePartnerSearchPlaces } = await import("@/lib/server/partner-search-coverage");
+          await retirePartnerSearchPlaces(id);
           return NextResponse.json({
             ok: true,
             status: "SUSPENDED",
@@ -791,6 +807,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         }
         await removePartnerBan({ partnerId: id, email: file.email, phone: file.phone });
         await updateFilePartnerStatus(id, "APPROVED", null);
+        const { publishPartnerSearchPlaces } = await import("@/lib/server/partner-search-coverage");
+        await publishPartnerSearchPlaces(id);
         return NextResponse.json({ ok: true, status: "APPROVED" });
       }
       return NextResponse.json(
@@ -856,6 +874,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       } catch {
         /* DB offline — partner profile still approved in file store */
       }
+
+      const { publishPartnerSearchPlaces } = await import("@/lib/server/partner-search-coverage");
+      await publishPartnerSearchPlaces(id);
 
       return NextResponse.json({
         id,
@@ -1037,6 +1058,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (existing.status === "PENDING" && !existing.userId) {
       const activated = await activatePartnerFromStoredPassword(existing.id);
       if (activated.ok) {
+        const { publishPartnerSearchPlaces } = await import("@/lib/server/partner-search-coverage");
+        await publishPartnerSearchPlaces(activated.partnerId);
         return NextResponse.json({
           id: activated.partnerId,
           status: "APPROVED",
@@ -1151,6 +1174,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       });
     }
 
+    const { publishPartnerSearchPlaces } = await import("@/lib/server/partner-search-coverage");
+    await publishPartnerSearchPlaces(partner.id);
+
     return NextResponse.json({
       id: partner.id,
       status: partner.status,
@@ -1233,6 +1259,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         rejectionNote: body.rejectionNote ?? existing.rejectionNote,
       },
     });
+    const { retirePartnerSearchPlaces } = await import("@/lib/server/partner-search-coverage");
+    await retirePartnerSearchPlaces(id);
     if (existing.userId) {
       await prisma.user.update({
         where: { id: existing.userId },
@@ -1247,6 +1275,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       where: { id },
       data: { status: "SUSPENDED" },
     });
+    const { retirePartnerSearchPlaces } = await import("@/lib/server/partner-search-coverage");
+    await retirePartnerSearchPlaces(id);
     if (existing.userId) {
       await prisma.user.update({
         where: { id: existing.userId },
@@ -1291,6 +1321,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             data: { status: "SUSPENDED" },
           });
         }
+        const { retirePartnerSearchPlaces } = await import("@/lib/server/partner-search-coverage");
+        await retirePartnerSearchPlaces(id);
       } catch (error) {
         if (!isDbOfflineError(error)) throw error;
         const file = await getFilePartnerById(id);
@@ -1313,6 +1345,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           data: { status: "ACTIVE" },
         });
       }
+      const { publishPartnerSearchPlaces } = await import("@/lib/server/partner-search-coverage");
+      await publishPartnerSearchPlaces(id);
     } catch (error) {
       if (!isDbOfflineError(error)) throw error;
       const file = await getFilePartnerById(id);
@@ -1345,6 +1379,8 @@ export async function DELETE(
       select: { id: true, userId: true, email: true, phone: true },
     });
     if (existing) {
+      const { retirePartnerSearchPlaces } = await import("@/lib/server/partner-search-coverage");
+      await retirePartnerSearchPlaces(existing.id);
       try {
         await prisma.partner.delete({ where: { id: existing.id } });
         if (existing.userId) {
@@ -1384,6 +1420,8 @@ export async function DELETE(
     );
     const file = await getFilePartnerById(id);
     if (file) {
+      const { retirePartnerSearchPlaces } = await import("@/lib/server/partner-search-coverage");
+      await retirePartnerSearchPlaces(id);
       await updateFilePartnerStatus(id, "REJECTED");
       return NextResponse.json({ ok: true, source: "file" });
     }
