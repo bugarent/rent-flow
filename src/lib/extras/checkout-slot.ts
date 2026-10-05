@@ -69,13 +69,28 @@ export function extractCheckoutSlotFromDescription(description: unknown): ExtraC
   return "none";
 }
 
+/** Period cap lives in the description JSON because ExtraService has no column for it. */
+export function extractStoredMaxPeriod(description: unknown): { present: boolean; value: number | null } {
+  if (!description || typeof description !== "object" || !("maxPeriodEur" in description)) {
+    return { present: false, value: null };
+  }
+  const raw = (description as { maxPeriodEur?: unknown }).maxPeriodEur;
+  if (raw == null || raw === "") return { present: true, value: null };
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n) || n < 0) return { present: true, value: null };
+  return { present: true, value: n };
+}
+
 export function descriptionWithCheckoutSlot(
   description: string,
   checkoutSlot: ExtraCheckoutSlot,
-): { en: string; checkoutSlot?: ExtraCheckoutSlot } {
+  maxPeriodEur?: number | null,
+): { en: string; checkoutSlot?: ExtraCheckoutSlot; maxPeriodEur?: number | null } {
   const en = description.trim();
-  if (checkoutSlot === "none") return { en };
-  return { en, checkoutSlot };
+  const payload: { en: string; checkoutSlot?: ExtraCheckoutSlot; maxPeriodEur?: number | null } = { en };
+  if (checkoutSlot !== "none") payload.checkoutSlot = checkoutSlot;
+  if (maxPeriodEur !== undefined) payload.maxPeriodEur = maxPeriodEur;
+  return payload;
 }
 
 export function checkoutSlotLabel(slot: ExtraCheckoutSlot): string {

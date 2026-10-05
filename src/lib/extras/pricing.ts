@@ -1,6 +1,7 @@
 import { toNumber } from "@/lib/utils";
 import {
   extractCheckoutSlotFromDescription,
+  extractStoredMaxPeriod,
   resolveCheckoutSlot,
   type ExtraCheckoutSlot,
 } from "@/lib/extras/checkout-slot";
@@ -146,12 +147,16 @@ export function toExtraServicePricing(row: {
   const minPriceEur = min != null && Number.isFinite(min) ? min : null;
   const maxPriceEur = max != null && Number.isFinite(max) ? max : null;
   const periodRaw =
-    row.maxPeriodEur == null || row.maxPeriodEur === ""
+    row.maxPeriodEur === undefined || row.maxPeriodEur == null || row.maxPeriodEur === ""
       ? null
       : toNumber(row.maxPeriodEur, NaN);
   // Keep 0: admin period 0 means optional free. Strip only negative / NaN.
-  const maxPeriodEur =
+  let maxPeriodEur =
     periodRaw != null && Number.isFinite(periodRaw) && periodRaw >= 0 ? periodRaw : null;
+  if (row.maxPeriodEur === undefined) {
+    const embedded = extractStoredMaxPeriod(row.description);
+    if (embedded.present) maxPeriodEur = embedded.value;
+  }
   const name = localizeExtraName(row.name);
   const description = localizeExtraName(row.description, "");
   const checkoutSlot = resolveCheckoutSlot({

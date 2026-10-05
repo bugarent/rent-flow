@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { GripVertical } from "lucide-react";
 import { useLongPressReorder } from "@/components/admin/extras/use-long-press-reorder";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
@@ -128,14 +128,17 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
     return Number.isFinite(n) ? n : null;
   };
 
-  useEffect(() => {
-    if (!editSource) return;
-    setForm((prev) => ({
-      ...prev,
-      name: knownText(locale, editSource.name),
-      description: knownText(locale, editSource.description),
-    }));
-  }, [locale, editSource]);
+  const [formLocale, setFormLocale] = useState(locale);
+  if (formLocale !== locale) {
+    setFormLocale(locale);
+    if (editSource) {
+      setForm((prev) => ({
+        ...prev,
+        name: knownText(locale, editSource.name),
+        description: knownText(locale, editSource.description),
+      }));
+    }
+  }
 
   const startEdit = (item: ExtraServicePricing) => {
     const source = { name: item.name, description: item.description || "" };
@@ -184,9 +187,14 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
     }
     setSaving(true);
     try {
+      const keptSource = (source: string, edited: string) =>
+        editSource != null && edited.trim() === knownText(locale, source).trim();
       const payload = {
-        name: editSource && locale !== "en" ? editSource.name : form.name.trim(),
-        description: editSource && locale !== "en" ? editSource.description : form.description.trim(),
+        name: editSource && keptSource(editSource.name, form.name) ? editSource.name : form.name.trim(),
+        description:
+          editSource && keptSource(editSource.description, form.description)
+            ? editSource.description
+            : form.description.trim(),
         minPriceEur,
         maxPriceEur,
         maxPeriodEur,

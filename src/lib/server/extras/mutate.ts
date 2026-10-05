@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import {
   descriptionWithCheckoutSlot,
   extractCheckoutSlotFromDescription,
+  extractStoredMaxPeriod,
   normalizeCheckoutSlot,
   resolveCheckoutSlot,
 } from "@/lib/extras/checkout-slot";
@@ -22,7 +23,7 @@ import {
   toPricing,
   writeFileStore,
 } from "./file-store";
-import { listExtraServices } from "./list";
+import { clearExtrasCatalogCache, listExtraServices } from "./list";
 import type { ExtraCreateInput, ExtraUpdateInput, StoredExtraService } from "./types";
 
 export async function createExtraService(input: ExtraCreateInput): Promise<ExtraServicePricing> {
@@ -46,7 +47,7 @@ export async function createExtraService(input: ExtraCreateInput): Promise<Extra
     name,
   });
   const baseSlug = slugifyExtraName(name);
-  const descriptionJson = descriptionWithCheckoutSlot(description, checkoutSlot);
+  const descriptionJson = descriptionWithCheckoutSlot(description, checkoutSlot, maxPeriodEur);
 
   try {
     let slug = baseSlug;
@@ -74,6 +75,7 @@ export async function createExtraService(input: ExtraCreateInput): Promise<Extra
     stored.maxPeriodEur = maxPeriodEur;
     const fileRows = await readFileStore();
     await writeFileStore([...fileRows.filter((r) => r.slug !== stored.slug), stored]);
+    clearExtrasCatalogCache();
     return toExtraServicePricing({ ...row, checkoutSlot, maxPeriodEur });
   } catch (error) {
     // DB offline or not migrated — persist globally via file store so partners still see it
@@ -98,6 +100,7 @@ export async function createExtraService(input: ExtraCreateInput): Promise<Extra
       updatedAt: now,
     };
     await writeFileStore([...fileRows, stored]);
+    clearExtrasCatalogCache();
     return toPricing(stored);
   }
 }
@@ -136,6 +139,7 @@ export async function updateExtraService(
     if (next.maxPriceEur != null && next.maxPriceEur <= 0) next.defaultPriceEur = 0;
     fileRows[idx] = next;
     await writeFileStore(fileRows);
+    clearExtrasCatalogCache();
     if (next.maxPeriodEur != null && next.maxPeriodEur > 0) {
       const { clampAllPartnerPeriodCaps } = await import("@/lib/server/partner-extras-prefs-store");
       await clampAllPartnerPeriodCaps(id, next.maxPeriodEur);
@@ -173,8 +177,22 @@ export async function updateExtraService(
 
     const data: Record<string, unknown> = {};
     if (input.name != null) data.name = { en: input.name.trim() };
-    if (input.description != null || input.checkoutSlot != null || input.isTpl != null) {
-      data.description = descriptionWithCheckoutSlot(nextDescription, nextSlot);
+    const embeddedPeriod = extractStoredMaxPeriod(current.description);
+    const nextPeriod =
+      input.maxPeriodEur !== undefined
+        ? input.maxPeriodEur != null && Number.isFinite(input.maxPeriodEur) && input.maxPeriodEur >= 0
+          ? input.maxPeriodEur
+          : null
+        : embeddedPeriod.present
+          ? embeddedPeriod.value
+          : undefined;
+    if (
+      input.description !== undefined ||
+      input.checkoutSlot !== undefined ||
+      input.isTpl != null ||
+      input.maxPeriodEur !== undefined
+    ) {
+      data.description = descriptionWithCheckoutSlot(nextDescription, nextSlot, nextPeriod);
     }
     if (input.isActive != null) data.isActive = input.isActive;
     if (input.isTpl != null) data.isTpl = input.isTpl;
@@ -216,6 +234,7 @@ export async function updateExtraService(
           : null
         : previous?.maxPeriodEur ?? null;
     await writeFileStore([...fileRows.filter((r) => r.id !== id && r.slug !== stored.slug), stored]);
+    clearExtrasCatalogCache();
     if (stored.maxPeriodEur != null && stored.maxPeriodEur > 0) {
       const { clampAllPartnerPeriodCaps } = await import("@/lib/server/partner-extras-prefs-store");
       await clampAllPartnerPeriodCaps(id, stored.maxPeriodEur);
@@ -347,7 +366,11 @@ export async function ensureExtrasExistInDb(catalog: ExtraServicePricing[]): Pro
           id: service.id,
           slug: service.slug,
           name: { en: service.name },
-          description: descriptionWithCheckoutSlot(service.description || "", service.checkoutSlot),
+          description: descriptionWithCheckoutSlot(
+            service.description || "",
+            service.checkoutSlot,
+            service.maxPeriodEur,
+          ),
           isTpl: service.isTpl,
           isActive: service.isActive,
           sortOrder: service.sortOrder,
@@ -357,7 +380,11 @@ export async function ensureExtrasExistInDb(catalog: ExtraServicePricing[]): Pro
         },
         update: {
           name: { en: service.name },
-          description: descriptionWithCheckoutSlot(service.description || "", service.checkoutSlot),
+          description: descriptionWithCheckoutSlot(
+            service.description || "",
+            service.checkoutSlot,
+            service.maxPeriodEur,
+          ),
           isActive: service.isActive,
           sortOrder: service.sortOrder,
           defaultPriceEur: service.defaultPriceEur,
