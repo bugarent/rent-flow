@@ -5,9 +5,9 @@ import dynamic from "next/dynamic";
 import { useSurfaceDictionary } from "@/components/providers/use-surface-dictionary";
 import { RouteLoadingSpinner } from "@/components/layout/route-loading-spinner";
 
-const BecomePartnerModal = dynamic(
+const PartnerApplicationForm = dynamic(
   () =>
-    import("@/components/partner/become-partner-modal").then((m) => m.BecomePartnerModal),
+    import("@/components/partner/partner-application-form").then((m) => m.PartnerApplicationForm),
   { ssr: false, loading: () => <RouteLoadingSpinner /> },
 );
 
@@ -35,7 +35,7 @@ export function BecomePartnerCta({
         {label ?? dictionary.partner.applyCta}
       </button>
       {mounted ? (
-        <BecomePartnerModal open={open} onClose={() => setOpen(false)} />
+        <PartnerApplicationForm open={open} onClose={() => setOpen(false)} />
       ) : null}
     </>
   );

@@ -29,21 +29,60 @@ export function normalizeRequestedLocationCodes(countryIso2s: string[], rawCodes
 
 export function applicationCompanySettings(input: {
   companyName: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   phone: string;
+  secondaryPhone?: string;
   messengers: string[];
+  secondaryMessengers?: string[];
   countryIso2s: string[];
   locationCodes: string[];
+  officeCountry?: string;
+  centralOffice?: string;
+  address?: string;
+  clientLanguages?: string[];
+  logoUrl?: string;
+  website?: string;
 }): PartnerCompanySettings {
+  const primaryMessengers = input.messengers.filter(
+    (item): item is PartnerCompanySettings["primaryMessengers"][number] =>
+      item === "WHATSAPP" || item === "VIBER" || item === "TELEGRAM",
+  );
+  const secondaryMessengers = (input.secondaryMessengers || []).filter(
+    (item): item is PartnerCompanySettings["secondaryMessengers"][number] =>
+      item === "WHATSAPP" || item === "VIBER" || item === "TELEGRAM",
+  );
   const base = defaultCompanySettings({
     companyName: input.companyName,
     email: input.email,
     phone: input.phone,
-    messengers: input.messengers,
-    primaryMessengers: input.messengers,
+    secondaryPhone: input.secondaryPhone || null,
+    messengers: primaryMessengers,
+    primaryMessengers,
+    secondaryMessengers,
     deliveryCountryIso2s: input.countryIso2s,
   });
-  return { ...base, deliveryLocationIds: input.locationCodes };
+  return {
+    ...base,
+    title: input.companyName,
+    firstName: input.firstName || "",
+    lastName: input.lastName || "",
+    legalName: input.companyName,
+    country: input.officeCountry || "",
+    centralOffice: input.centralOffice || "",
+    address: input.address || "",
+    clientLanguages: input.clientLanguages?.length ? input.clientLanguages : base.clientLanguages,
+    logoUrl: input.logoUrl || "",
+    primaryPhone: input.phone,
+    secondaryPhone: input.secondaryPhone || "",
+    primaryMessengers,
+    secondaryMessengers,
+    email: input.email,
+    website: input.website || "",
+    deliveryCountryIso2s: input.countryIso2s,
+    deliveryLocationIds: input.locationCodes,
+  };
 }
 
 export async function saveApplicationPlaces(partnerId: string, settings: PartnerCompanySettings) {

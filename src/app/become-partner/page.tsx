@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
-import { BecomePartnerModal } from "@/components/partner/become-partner-modal";
+import { PartnerApplicationForm } from "@/components/partner/partner-application-form";
 import { PARTNER_LOGIN } from "@/lib/routes";
 import { usePreferences } from "@/components/providers/preferences-context";
 
@@ -16,10 +16,6 @@ function BecomePartnerInner() {
   const email = searchParams.get("email")?.trim() || "";
   const company = searchParams.get("company")?.trim() || "";
   const country = searchParams.get("country")?.trim().toUpperCase() || "";
-
-  useEffect(() => {
-    setOpen(true);
-  }, [email, company, country]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16">
@@ -37,7 +33,7 @@ function BecomePartnerInner() {
           {t.partnerLogin}
         </Link>
       </div>
-      <BecomePartnerModal
+      <PartnerApplicationForm
         open={open}
         onClose={() => setOpen(false)}
         initialEmail={email}

@@ -9,6 +9,7 @@ import {
   normalizeRequestedLocationCodes,
   saveApplicationPlaces,
 } from "@/lib/server/partner-search-coverage";
+import type { PartnerCompanySettings } from "@/lib/partners/company-settings";
 import { assertAllowedOperatingCountries } from "@/lib/server/partner-operating-countries";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import { createOrReapplyFilePartner } from "@/lib/server/partner-applications-store";
@@ -35,6 +36,7 @@ const applicationSchema = z
     kind: z.enum(["COMPANY", "PRIVATE"]),
     identificationNumber: z.string().trim().min(5).max(40),
     email: z.string().email(),
+    contactEmail: z.string().email().optional(),
     phone: z.string().trim().min(8).max(40),
     phoneCountryIso2: z.string().length(2),
     secondaryPhone: z.string().trim().min(8).max(40).optional(),
@@ -44,6 +46,14 @@ const applicationSchema = z
     fleetAgeRange: z.enum(fleetAgeValues),
     countryIso2s: z.array(z.string().length(2)).min(1),
     locationCodes: z.array(z.string().trim().min(2).max(80)).min(1).max(400),
+    title: z.string().trim().max(120).optional(),
+    officeCountry: z.string().trim().max(80).optional(),
+    centralOffice: z.string().trim().max(80).optional(),
+    address: z.string().trim().max(240).optional(),
+    clientLanguages: z.array(z.string().trim().min(2).max(8)).max(20).optional(),
+    logoUrl: z.string().trim().max(300).optional(),
+    website: z.string().trim().max(200).optional(),
+    secondaryMessengers: z.array(z.enum(socialValues)).optional(),
     password: z.string().min(6).max(128),
     confirmPassword: z.string().min(6).max(128),
   })
@@ -67,24 +77,13 @@ async function saveViaFile(input: {
   secondaryPhone: string | null;
   secondaryPhoneCountryIso2: string | null;
   password: string;
+  settings: PartnerCompanySettings;
 }) {
   try {
     const { partner, reapplied } = await createOrReapplyFilePartner(input);
     try {
-      const { applicationCompanySettings, saveApplicationPlaces } = await import(
-        "@/lib/server/partner-search-coverage"
-      );
-      await saveApplicationPlaces(
-        partner.id,
-        applicationCompanySettings({
-          companyName: input.contactName,
-          email: input.snapshot.email,
-          phone: input.snapshot.phone,
-          messengers: input.snapshot.messengers,
-          countryIso2s: input.snapshot.countryIso2s,
-          locationCodes: input.snapshot.locationCodes,
-        }),
-      );
+      const { saveApplicationPlaces } = await import("@/lib/server/partner-search-coverage");
+      await saveApplicationPlaces(partner.id, input.settings);
     } catch {
       /* the application itself is already stored */
     }
@@ -191,13 +190,24 @@ export async function POST(req: Request) {
       countryIso2s,
       locationCodes,
     };
+    const brandName = body.title?.trim() || contactName;
     const placeSettings = applicationCompanySettings({
-      companyName: contactName,
-      email,
+      companyName: brandName,
+      firstName: body.firstName.trim(),
+      lastName: body.lastName.trim(),
+      email: body.contactEmail?.trim() || email,
       phone,
+      secondaryPhone: secondaryPhone || "",
       messengers,
+      secondaryMessengers: body.secondaryMessengers || [],
       countryIso2s,
       locationCodes,
+      officeCountry: body.officeCountry || "",
+      centralOffice: body.centralOffice || "",
+      address: body.address || "",
+      clientLanguages: body.clientLanguages || [],
+      logoUrl: body.logoUrl || "",
+      website: body.website || "",
     });
     const filePayload = {
       snapshot,
@@ -205,6 +215,7 @@ export async function POST(req: Request) {
       secondaryPhone: secondaryPhone || null,
       secondaryPhoneCountryIso2: body.secondaryPhoneCountryIso2?.toUpperCase() || null,
       password: body.password,
+      settings: placeSettings,
     };
 
     try {
@@ -278,7 +289,7 @@ export async function POST(req: Request) {
           data: {
             kind: body.kind,
             contactName,
-            companyName: body.kind === "COMPANY" ? contactName : `${contactName} (Private)`,
+            companyName: brandName,
             personalId: body.identificationNumber.trim(),
             email,
             phone,
@@ -321,7 +332,7 @@ export async function POST(req: Request) {
         data: {
           kind: body.kind,
           contactName,
-          companyName: body.kind === "COMPANY" ? contactName : `${contactName} (Private)`,
+          companyName: brandName,
           personalId: body.identificationNumber,
           email,
           phone,
@@ -369,7 +380,7 @@ export async function POST(req: Request) {
             data: {
               kind: body.kind,
               contactName,
-              companyName: body.kind === "COMPANY" ? contactName : `${contactName} (Private)`,
+              companyName: brandName,
               personalId: body.identificationNumber,
               email,
               phone,

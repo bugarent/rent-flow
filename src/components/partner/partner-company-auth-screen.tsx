@@ -15,8 +15,8 @@ import { partnerLoginCopy } from "@/lib/i18n/partner-login-copy";
 import { PARTNER_BASE, safePortalCallback } from "@/lib/routes";
 import { SITE_NAME } from "@/lib/brand";
 
-const BecomePartnerModal = dynamic(
-  () => import("@/components/partner/become-partner-modal").then((m) => m.BecomePartnerModal),
+const PartnerApplicationForm = dynamic(
+  () => import("@/components/partner/partner-application-form").then((m) => m.PartnerApplicationForm),
   { ssr: false },
 );
 
@@ -191,7 +191,7 @@ export function PartnerCompanyAuthScreen(_props?: { initialMode?: Mode }) {
         </div>
       </main>
 
-      {applyOpen ? <BecomePartnerModal open onClose={closeApply} /> : null}
+      {applyOpen ? <PartnerApplicationForm open onClose={closeApply} /> : null}
 
       <footer className="px-4 pb-8 pt-2 text-center">
         <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-slate-600">
