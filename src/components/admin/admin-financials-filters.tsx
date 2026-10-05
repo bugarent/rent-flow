@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useMemo, useRef, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { uiText } from "@/lib/i18n/ui-text";
 import { ADMIN_BASE } from "@/lib/routes";
@@ -45,13 +46,14 @@ function DmyDateField({
 }) {
   const [text, setText] = useState(() => isoToDmy(defaultIso));
   const [iso, setIso] = useState(defaultIso);
+  const [isoSeen, setIsoSeen] = useState(defaultIso);
   const pickerRef = useRef<HTMLInputElement>(null);
   const { locale } = useAdminLocale();
-
-  useEffect(() => {
-    setText(isoToDmy(defaultIso));
+  if (defaultIso !== isoSeen) {
+    setIsoSeen(defaultIso);
     setIso(defaultIso);
-  }, [defaultIso]);
+    setText(isoToDmy(defaultIso));
+  }
 
   function commitText(next: string) {
     setText(next);
@@ -130,7 +132,12 @@ function CountryCombobox({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [iso2, setIso2] = useState(defaultIso2);
+  const [iso2Seen, setIso2Seen] = useState(defaultIso2);
   const rootRef = useRef<HTMLDivElement>(null);
+  if (defaultIso2 !== iso2Seen) {
+    setIso2Seen(defaultIso2);
+    setIso2(defaultIso2);
+  }
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -150,10 +157,6 @@ function CountryCombobox({
         c.label.toLowerCase().startsWith(q) || c.iso2.toLowerCase().startsWith(q),
     );
   }, [options, query]);
-
-  useEffect(() => {
-    setIso2(defaultIso2);
-  }, [defaultIso2]);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -278,6 +281,7 @@ export function AdminFinancialsFilters({
   isPartnerCancelled: boolean;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+  const router = useRouter();
   const { locale } = useAdminLocale();
   const phrase = (en: string, ka: string, ru: string) => uiText(locale, en, ka, ru);
   const periodLabel = (id: FinancePeriod) => {
@@ -299,7 +303,7 @@ export function AdminFinancialsFilters({
       ? String(new FormData(formRef.current).get("country") || "").trim()
       : country;
     if (selected) params.set("country", selected.toUpperCase());
-    window.location.assign(`${ADMIN_BASE}/bookings?${params.toString()}`);
+    router.push(`${ADMIN_BASE}/bookings?${params.toString()}`);
   }
 
   return (

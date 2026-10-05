@@ -1,6 +1,5 @@
 import type { AdminLocale } from "@/lib/i18n/admin-config";
 import { DEFAULT_ADMIN_LOCALE } from "@/lib/i18n/admin-config";
-import { withAdminExtra } from "@/lib/i18n/admin-extra-dictionaries";
 
 export type AdminDictionary = {
   brand: string;
@@ -1295,6 +1294,5 @@ export function getAdminDictionary(locale: AdminLocale | string | null | undefin
   if (locale === "en" || locale === "ka" || locale === "ru") {
     return DICTS[locale] ?? DICTS.en;
   }
-  if (!locale) return DICTS[DEFAULT_ADMIN_LOCALE] ?? DICTS.en;
-  return withAdminExtra(DICTS.en, locale);
+  return DICTS[DEFAULT_ADMIN_LOCALE] ?? DICTS.en;
 }

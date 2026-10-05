@@ -2,6 +2,8 @@
 
 import { useState, type ReactNode } from "react";
 import { GripVertical } from "lucide-react";
+import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { uiText } from "@/lib/i18n/ui-text";
 
 type Item = { id: string };
 
@@ -16,6 +18,8 @@ export function SortableAdminGrid<T extends Item>({
   className?: string;
   renderItem: (item: T) => ReactNode;
 }) {
+  const { locale } = useAdminLocale();
+  const phrase = (en: string, ka: string, ru: string) => uiText(locale, en, ka, ru);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -43,9 +47,9 @@ export function SortableAdminGrid<T extends Item>({
   return (
     <div className="relative">
       {saving ? (
-        <p className="mb-2 text-xs font-medium text-sky-700">Saving order…</p>
+        <p className="mb-2 text-xs font-medium text-sky-700">{phrase("Saving order…", "რიგი ინახება…", "Порядок сохраняется…")}</p>
       ) : (
-        <p className="mb-2 text-xs text-slate-500">Drag cards by the handle to change homepage order.</p>
+        <p className="mb-2 text-xs text-slate-500">{phrase("Drag cards by the handle to change homepage order.", "რიგის შესაცვლელად გადაიტანეთ ბარათი სახელურით.", "Перетащите карточку за ручку, чтобы изменить порядок.")}</p>
       )}
       <div className={className}>
         {items.map((item) => {

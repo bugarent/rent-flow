@@ -34,6 +34,14 @@ function normKey(source: string) {
     .trim();
 }
 
+function looseKey(source: string) {
+  return normKey(source)
+    .replace(/\s+/g, " ")
+    .replace(/[.!?…]+$/g, "")
+    .trim()
+    .toLowerCase();
+}
+
 function indexPhrase(phrase: string, values: Row) {
   const norm = normKey(phrase);
   if (!norm) return;
@@ -41,6 +49,8 @@ function indexPhrase(phrase: string, values: Row) {
   BY_NORM.set(norm.toLowerCase(), values);
   BY_NORM.set(norm.replace(/\s+/g, " "), values);
   BY_NORM.set(norm.replace(/\s+/g, " ").toLowerCase(), values);
+  const loose = looseKey(phrase);
+  if (loose) BY_NORM.set(loose, values);
 }
 
 function add(source: string, values: Row) {
@@ -57,7 +67,8 @@ function lookup(source: string): Row | undefined {
     BY_NORM.get(norm) ||
     BY_NORM.get(norm.toLowerCase()) ||
     BY_NORM.get(norm.replace(/\s+/g, " ")) ||
-    BY_NORM.get(norm.replace(/\s+/g, " ").toLowerCase())
+    BY_NORM.get(norm.replace(/\s+/g, " ").toLowerCase()) ||
+    BY_NORM.get(looseKey(source))
   );
 }
 
@@ -325,6 +336,7 @@ const EXTRAS: Array<[string, Row]> = [
 for (const [source, values] of EXTRAS) add(source, values);
 
 alias("TPL — შესაძლო ზიანის პასუხისმგებლობა", "TPL — Third Party Liability");
+alias("ჯგუფის მგზავრების დაზღვევა", "Personal Accident Insurance");
 alias("ძირითადი დაფარვა (CDW)", "Basic coverage");
 alias("სრული დაფარვა (SuperCDW)", "Full coverage");
 alias("Child safety seat (1-5 years)", "Child safety seat 1-4 years");

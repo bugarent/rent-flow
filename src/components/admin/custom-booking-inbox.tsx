@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { uiText } from "@/lib/i18n/ui-text";
 import { BellOff, BellRing, ImagePlus, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -80,6 +82,8 @@ type ChatDetail = {
 };
 
 export function CustomBookingInbox() {
+  const { locale } = useAdminLocale();
+  const phrase = (en: string, ka: string, ru: string) => uiText(locale, en, ka, ru);
   const [chats, setChats] = useState<ChatListItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ChatDetail | null>(null);
@@ -92,17 +96,12 @@ export function CustomBookingInbox() {
   const [commissionPercent, setCommissionPercent] = useState("0");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [soundId, setSoundId] = useState<ChatSoundId>("chime");
-  const [mutedIds, setMutedIds] = useState<string[]>([]);
+  const [soundId, setSoundId] = useState<ChatSoundId>(() => getAdminChatSoundId());
+  const [mutedIds, setMutedIds] = useState<string[]>(() => getAdminMutedChatIds());
   const fileRef = useRef<HTMLInputElement>(null);
   const carFileRef = useRef<HTMLInputElement>(null);
   const knownGuestMsgRef = useRef<Map<string, string>>(new Map());
   const soundReadyRef = useRef(false);
-
-  useEffect(() => {
-    setSoundId(getAdminChatSoundId());
-    setMutedIds(getAdminMutedChatIds());
-  }, []);
 
   const loadList = useCallback(async () => {
     const res = await fetch("/api/admin/custom-booking/chats", { cache: "no-store" });
@@ -160,6 +159,8 @@ export function CustomBookingInbox() {
   );
 
   useEffect(() => {
+    // Polls the chat API; state updates only after the response.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadList().catch((err) => setError(err instanceof Error ? err.message : "Failed"));
     const timer = window.setInterval(() => {
       void loadList().catch(() => undefined);
@@ -353,7 +354,7 @@ export function CustomBookingInbox() {
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <Volume2 className="h-4 w-4 text-slate-500" />
-          <p className="text-sm font-extrabold text-[#0b1f4b]">Message notification sound</p>
+          <p className="text-sm font-extrabold text-[#0b1f4b]">{phrase("Message notification sound", "შეტყობინების ხმა", "Звук уведомления")}</p>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {CHAT_SOUND_PRESETS.map((preset) => (
@@ -378,7 +379,7 @@ export function CustomBookingInbox() {
         <div className="rounded-2xl border bg-white shadow-sm">
           <ul className="max-h-[70vh] divide-y overflow-y-auto">
             {filtered.length === 0 ? (
-              <li className="p-6 text-center text-sm text-slate-500">No items in this list.</li>
+              <li className="p-6 text-center text-sm text-slate-500">{phrase("No items in this list.", "ამ სიაში ჩანაწერი არ არის.", "В этом списке ничего нет.")}</li>
             ) : (
               filtered.map((chat) => {
                 const unread = Number(chat.unreadCount) > 0;
@@ -638,7 +639,7 @@ export function CustomBookingInbox() {
                       className="h-16 w-24 rounded object-cover"
                     />
                     <div>
-                      <p className="text-xs font-bold text-emerald-800">Guest selected car</p>
+                      <p className="text-xs font-bold text-emerald-800">{phrase("Guest selected car", "სტუმარმა მანქანა აირჩია", "Гость выбрал авто")}</p>
                       <p className="text-xs text-emerald-900">{detail.selectedCarNote || "—"}</p>
                     </div>
                   </div>

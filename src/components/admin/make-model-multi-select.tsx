@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { uiText } from "@/lib/i18n/ui-text";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { CAR_MAKES_MODELS, modelKey, type MappedCarModel } from "@/lib/catalog/car-models";
 
@@ -11,6 +13,7 @@ export function MakeModelMultiSelect({
   value: MappedCarModel[];
   onChange: (next: MappedCarModel[]) => void;
 }) {
+  const { locale } = useAdminLocale();
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [query, setQuery] = useState("");
@@ -123,7 +126,7 @@ export function MakeModelMultiSelect({
               );
             })}
             {filtered.length === 0 ? (
-              <p className="p-3 text-center text-sm text-slate-500">No makes or models match.</p>
+              <p className="p-3 text-center text-sm text-slate-500">{uiText(locale, "No makes or models match.", "მარკა ან მოდელი ვერ მოიძებნა.", "Марка или модель не найдены.")}</p>
             ) : null}
           </div>
           <div className="border-t p-2">

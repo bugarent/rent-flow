@@ -37,6 +37,7 @@ import { knownText } from "@/lib/i18n/known-record-text";
 import { usePartnerMoneyOptional } from "@/components/providers/partner-money-context";
 import { cn, formatMoney } from "@/lib/utils";
 import { compressImageForUpload } from "@/lib/files/compress-image";
+import { CAR_COLORS, carColorLabel } from "@/lib/catalog/car-colors";
 import { CAR_MAKES_MODELS } from "@/lib/catalog/car-models";
 import {
   isValidRegistrationNumber,
@@ -150,7 +151,6 @@ const MUSIC_OPTIONS = [
   "Video-DVD",
 ] as const;
 
-const COLORS = ["White", "Black", "Silver", "Gray", "Blue", "Red", "Green", "Brown", "Other"];
 const YEARS = Array.from({ length: 30 }, (_, i) => new Date().getFullYear() + 1 - i);
 
 type PartnerCarCategoryOption = { id: string; slug: string; name: string };
@@ -409,6 +409,7 @@ export function PartnerCreateCarForm({
   const [plate, setPlate] = useState("");
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [color, setColor] = useState("");
+  if (color === "Other") setColor("");
   const [categorySlug, setCategorySlug] = useState("");
   const [categoryOptions, setCategoryOptions] = useState<PartnerCarCategoryOption[]>([]);
   const [licenseCat, setLicenseCat] = useState("B");
@@ -2026,16 +2027,20 @@ export function PartnerCreateCarForm({
               previous={changePrev("color")}
             >
               <select
-                className={cn(inputClass, fieldInvalid("color") && "border-red-500 ring-2 ring-red-200")}
+                className={cn(
+                  inputClass,
+                  "text-base sm:text-xs",
+                  fieldInvalid("color") && "border-red-500 ring-2 ring-red-200",
+                )}
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
                 required
                 disabled={isAdminReview}
               >
                 <option value="">{common.select}</option>
-                {COLORS.map((c) => (
+                {CAR_COLORS.map((c) => (
                   <option key={c} value={c}>
-                    {c}
+                    {carColorLabel(locale, c)}
                   </option>
                 ))}
               </select>

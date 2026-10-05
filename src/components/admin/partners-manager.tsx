@@ -8,6 +8,7 @@ import type { PartnerApplicationMessage } from "@/lib/partner-application-messag
 import { worldCountryName } from "@/lib/catalog/world-countries";
 import { cn } from "@/lib/utils";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { uiText } from "@/lib/i18n/ui-text";
 import { PartnerRowActions } from "@/components/admin/partner-row-actions";
 import { BookingCustomersPanel } from "@/components/admin/booking-customers-panel";
 import type { BookingCustomerRow } from "@/lib/admin/booking-customer-row";
@@ -752,7 +753,7 @@ export function PartnersManager({
                                   Application history
                                 </p>
                                 {expandedMessages.length === 0 ? (
-                                  <p className="text-sm text-slate-500">No stored messages yet.</p>
+                                  <p className="text-sm text-slate-500">{uiText(locale, "No stored messages yet.", "შენახული შეტყობინება ჯერ არ არის.", "Сохранённых сообщений пока нет.")}</p>
                                 ) : (
                                   expandedMessages
                                     .slice()
@@ -973,7 +974,7 @@ export function PartnersManager({
                         Application history
                       </p>
                       {expandedMessages.length === 0 ? (
-                        <p className="text-sm text-slate-500">No stored messages yet.</p>
+                        <p className="text-sm text-slate-500">{uiText(locale, "No stored messages yet.", "შენახული შეტყობინება ჯერ არ არის.", "Сохранённых сообщений пока нет.")}</p>
                       ) : (
                         expandedMessages
                           .slice()

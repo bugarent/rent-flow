@@ -14,7 +14,7 @@ export function AdminOperationsShell({ children }: { children: React.ReactNode }
   return (
     <div
       lang={locale}
-      dir={locale === "ar" ? "rtl" : "ltr"}
+      dir="ltr"
       className="flex min-h-screen min-w-0 flex-col overflow-x-clip bg-slate-100"
     >
       <AdminOperationsNav />

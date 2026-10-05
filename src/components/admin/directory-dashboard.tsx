@@ -63,7 +63,7 @@ export function DirectoryDashboard({
   const phrase = (en: string, ka: string, ru: string) => uiText(locale, en, ka, ru);
   const [tab, setTab] = useState<Tab>("partners");
   const [country, setCountry] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [total, setTotal] = useState(0);
   const [countries, setCountries] = useState<DirectoryCountry[]>([]);
@@ -79,10 +79,16 @@ export function DirectoryDashboard({
     [seedPartners],
   );
 
+  const queryKey = `${tab}|${country}|${seedKey}`;
+  const loading = loadedKey !== queryKey;
+  const [errorKey, setErrorKey] = useState(queryKey);
+  if (errorKey !== queryKey) {
+    setErrorKey(queryKey);
+    setError("");
+  }
+
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError("");
     const params = new URLSearchParams({ tab });
     if (country) params.set("country", country);
     fetch(`/api/admin/directory?${params}`)
@@ -158,13 +164,14 @@ export function DirectoryDashboard({
         setError(phrase("Could not load directory", "დირექტორიის ჩატვირთვა ვერ მოხერხდა", "Не удалось загрузить каталог"));
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoadedKey(queryKey);
       });
     return () => {
       cancelled = true;
     };
+    // queryKey already covers tab, country, and seedPartners.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, country, seedKey]);
+  }, [queryKey]);
 
   const countryOptions = useMemo(() => {
     const seen = new Set(countries.map((c) => c.iso2));

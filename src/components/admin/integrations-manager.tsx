@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { uiText } from "@/lib/i18n/ui-text";
 import { ADMIN_BASE } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import type { PartnerIntegrationRecord } from "@/lib/integrations/types";
@@ -17,6 +19,11 @@ import {
 } from "@/components/admin/use-integration-actions";
 
 type PartnerOption = { id: string; label: string };
+
+function usePhrase() {
+  const { locale } = useAdminLocale();
+  return (en: string, ka: string, ru: string) => uiText(locale, en, ka, ru);
+}
 
 function Spinner() {
   return (
@@ -61,15 +68,19 @@ function StatusBadge({ status }: { status: PartnerIntegrationRecord["status"] })
 }
 
 function LastRun({ row }: { row: PartnerIntegrationRecord }) {
+  const phrase = usePhrase();
   return (
     <>
       <div>
-        Test:{" "}
+        {phrase("Test", "ტესტი", "Тест")}:{" "}
         {row.lastTestAt
-          ? `${row.lastTestOk ? "OK" : "FAIL"} · ${new Date(row.lastTestAt).toLocaleString()}`
+          ? `${row.lastTestOk ? phrase("OK", "კარგი", "ОК") : phrase("FAIL", "ჩავარდა", "Ошибка")} · ${new Date(row.lastTestAt).toLocaleString()}`
           : "—"}
       </div>
-      <div>Sync: {row.lastSyncAt ? new Date(row.lastSyncAt).toLocaleString() : "—"}</div>
+      <div>
+        {phrase("Sync", "სინქრონიზაცია", "Синхронизация")}:{" "}
+        {row.lastSyncAt ? new Date(row.lastSyncAt).toLocaleString() : "—"}
+      </div>
     </>
   );
 }
@@ -85,6 +96,7 @@ function OverrideButton({
   onToggle: () => void;
   className?: string;
 }) {
+  const phrase = usePhrase();
   const loading = busy?.id === row.id && busy.action === "override";
   return (
     <button
@@ -100,7 +112,7 @@ function OverrideButton({
       )}
     >
       {loading ? <Spinner /> : null}
-      {row.manualOverride ? "ON" : "Off"}
+      {row.manualOverride ? phrase("ON", "ჩართული", "Вкл") : phrase("Off", "გამორთული", "Выкл")}
     </button>
   );
 }
@@ -118,6 +130,7 @@ function RowActions({
   onDelete: () => void;
   compact?: boolean;
 }) {
+  const phrase = usePhrase();
   const deleting = busy?.id === row.id && busy.action === "delete";
   const rowBusy = busy?.id === row.id;
   const btn = compact
@@ -127,14 +140,14 @@ function RowActions({
     <>
       <button type="button" disabled={rowBusy} className={btn} onClick={() => onRun("test")}>
         {rowBusy && busy?.action === "test" ? <Spinner /> : null}
-        {rowBusy && busy?.action === "test" ? "Testing…" : "Test"}
+        {rowBusy && busy?.action === "test" ? phrase("Testing…", "მოწმდება…", "Проверка…") : phrase("Test", "ტესტი", "Тест")}
       </button>
       <button type="button" disabled={rowBusy} className={btn} onClick={() => onRun("sync")}>
         {rowBusy && busy?.action === "sync" ? <Spinner /> : null}
-        {rowBusy && busy?.action === "sync" ? "Syncing…" : "Sync"}
+        {rowBusy && busy?.action === "sync" ? phrase("Syncing…", "სინქრონდება…", "Синхронизация…") : phrase("Sync", "სინქრონიზაცია", "Синхронизация")}
       </button>
       <Link href={`${ADMIN_BASE}/integrations/${row.id}`} className={btn}>
-        Details
+        {phrase("Details", "დეტალები", "Детали")}
       </Link>
       <button
         type="button"
@@ -143,7 +156,7 @@ function RowActions({
         className={cn(btn, "border-red-200 bg-red-50 text-red-700 hover:bg-red-100", !compact && "basis-full")}
       >
         {deleting ? <Spinner /> : null}
-        {deleting ? "Deleting…" : "Delete"}
+        {deleting ? phrase("Deleting…", "იშლება…", "Удаление…") : phrase("Delete", "წაშლა", "Удалить")}
       </button>
     </>
   );
@@ -170,6 +183,7 @@ export function IntegrationsManager({
     toggleOverride,
     remove,
   } = useIntegrationActions(initialIntegrations);
+  const phrase = usePhrase();
   const [partnerId, setPartnerId] = useState(partnerOptions[0]?.id || "local-partner");
   const [name, setName] = useState("Channel connection");
   const [webhookUrl, setWebhookUrl] = useState("");
@@ -181,7 +195,7 @@ export function IntegrationsManager({
           href={`${ADMIN_BASE}/integrations/sandbox`}
           className="inline-flex min-h-10 items-center rounded-lg bg-amber-500 px-4 text-sm font-bold text-white hover:bg-amber-600"
         >
-          Open sandbox simulator
+          {phrase("Open sandbox simulator", "სავარჯიშო სიმულატორის გახსნა", "Открыть песочницу")}
         </Link>
         <button
           type="button"
@@ -190,7 +204,7 @@ export function IntegrationsManager({
           className="inline-flex min-h-10 items-center gap-2 rounded-lg border bg-white px-4 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60"
         >
           {refreshing ? <Spinner /> : null}
-          {refreshing ? "Refreshing…" : "Refresh"}
+          {refreshing ? phrase("Refreshing…", "ახლდება…", "Обновление…") : phrase("Refresh", "განახლება", "Обновить")}
         </button>
       </div>
 
@@ -209,16 +223,16 @@ export function IntegrationsManager({
       ) : null}
       {apiKeyOnce ? (
         <div className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
-          <p className="font-extrabold">API key (copy now — shown once)</p>
+          <p className="font-extrabold">{phrase("API key (copy now — shown once)", "API გასაღები (ახლა დააკოპირეთ — ერთხელ ჩანს)", "Ключ API (скопируйте сейчас — показывается один раз)")}</p>
           <code className="mt-2 block break-all rounded bg-white px-2 py-2 font-mono text-xs">{apiKeyOnce}</code>
         </div>
       ) : null}
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <h2 className="text-lg font-extrabold text-[#0b1f4b]">Create connection</h2>
+        <h2 className="text-lg font-extrabold text-[#0b1f4b]">{phrase("Create connection", "კავშირის შექმნა", "Создать подключение")}</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="text-sm">
-            <span className="mb-1 block font-semibold text-slate-600">Partner</span>
+            <span className="mb-1 block font-semibold text-slate-600">{phrase("Partner", "პარტნიორი", "Партнёр")}</span>
             <select
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-base sm:text-sm"
               value={partnerId}
@@ -232,7 +246,7 @@ export function IntegrationsManager({
             </select>
           </label>
           <label className="text-sm">
-            <span className="mb-1 block font-semibold text-slate-600">Name</span>
+            <span className="mb-1 block font-semibold text-slate-600">{phrase("Name", "სახელი", "Название")}</span>
             <input
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-base sm:text-sm"
               value={name}
@@ -240,7 +254,7 @@ export function IntegrationsManager({
             />
           </label>
           <label className="text-sm sm:col-span-2">
-            <span className="mb-1 block font-semibold text-slate-600">Partner webhook base URL (optional)</span>
+            <span className="mb-1 block font-semibold text-slate-600">{phrase("Partner webhook base URL (optional)", "პარტნიორის webhook ბმული (არასავალდებულო)", "Базовый URL webhook партнёра (необязательно)")}</span>
             <input
               type="url"
               inputMode="url"
@@ -258,7 +272,7 @@ export function IntegrationsManager({
           className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0b1f4b] px-4 text-sm font-bold text-white disabled:opacity-50"
         >
           {creating ? <Spinner /> : null}
-          {creating ? "Creating…" : "Generate API key & connection"}
+          {creating ? phrase("Creating…", "იქმნება…", "Создание…") : phrase("Generate API key & connection", "API გასაღებისა და კავშირის შექმნა", "Создать ключ API и подключение")}
         </button>
       </section>
 
@@ -268,13 +282,13 @@ export function IntegrationsManager({
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-100">
                 <tr>
-                  <th className="p-3">Name</th>
-                  <th className="p-3">Partner</th>
-                  <th className="p-3">Status</th>
+                  <th className="p-3">{phrase("Name", "სახელი", "Название")}</th>
+                  <th className="p-3">{phrase("Partner", "პარტნიორი", "Партнёр")}</th>
+                  <th className="p-3">{phrase("Status", "სტატუსი", "Статус")}</th>
                   <th className="p-3">Key</th>
-                  <th className="p-3">Last test / sync</th>
-                  <th className="p-3">Override</th>
-                  <th className="p-3">Actions</th>
+                  <th className="p-3">{phrase("Last test / sync", "ბოლო ტესტი / სინქრონიზაცია", "Последний тест / синхронизация")}</th>
+                  <th className="p-3">{phrase("Override", "ხელით ჩართვა", "Ручной режим")}</th>
+                  <th className="p-3">{phrase("Actions", "მოქმედებები", "Действия")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -356,7 +370,7 @@ export function IntegrationsManager({
                     ) : null}
                   </div>
                 </MobileDataRow>
-                <MobileDataRow label="Partner">
+                <MobileDataRow label={phrase("Partner", "პარტნიორი", "Партнёр")}>
                   <div className="text-end text-xs">
                     <div className="font-semibold">{row.partnerName || row.partnerId}</div>
                     <div className="font-medium text-slate-500">{row.syncMode}</div>
@@ -368,12 +382,12 @@ export function IntegrationsManager({
                 <MobileDataRow label="Key">
                   <span className="font-mono text-[11px]">{row.apiKeyPrefix}…</span>
                 </MobileDataRow>
-                <MobileDataRow label="Last test / sync">
+                <MobileDataRow label={phrase("Last test / sync", "ბოლო ტესტი / სინქრონიზაცია", "Последний тест / синхронизация")}>
                   <div className="text-end text-xs text-slate-600">
                     <LastRun row={row} />
                   </div>
                 </MobileDataRow>
-                <MobileDataRow label="Override">
+                <MobileDataRow label={phrase("Override", "ხელით ჩართვა", "Ручной режим")}>
                   <OverrideButton
                     row={row}
                     busy={busy}
