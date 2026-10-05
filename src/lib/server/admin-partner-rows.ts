@@ -4,6 +4,14 @@ import { worldCountryName } from "@/lib/catalog/world-countries";
 import { dbOfflineMessage, isDbOfflineError, shortPrismaError } from "@/lib/server/db-errors";
 import { listFilePartnerApplications } from "@/lib/server/partner-applications-store";
 import { listFileCarsForPartner } from "@/lib/server/partner-cars-store";
+import { TEST_PARTNER_EMAIL, LOCAL_PARTNER_ID } from "@/lib/auth/local-partner-store";
+
+function isSeedTestPartner(row: { id: string; email: string; displayName: string }) {
+  const email = row.email.trim().toLowerCase();
+  if (email === TEST_PARTNER_EMAIL) return true;
+  if (row.id === LOCAL_PARTNER_ID || row.id === "file-partner-local-partner") return true;
+  return row.displayName.trim() === "Test Fleet Partner" && email === TEST_PARTNER_EMAIL;
+}
 
 export type AdminPartnerRow = {
   id: string;
@@ -241,7 +249,11 @@ export async function loadAdminPartnerRows(): Promise<{
     console.warn("[admin/partners] file cars", carsError);
   }
 
-  return { partners: initialPartners, dbOffline, queryError };
+  return {
+    partners: initialPartners.filter((row) => !isSeedTestPartner(row)),
+    dbOffline,
+    queryError,
+  };
 }
 
 export function filterDirectoryPartners(partners: AdminPartnerRow[]) {

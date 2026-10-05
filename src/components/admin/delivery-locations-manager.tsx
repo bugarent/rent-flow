@@ -15,6 +15,7 @@ import {
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { uiText } from "@/lib/i18n/ui-text";
 import { CountryFlag } from "@/components/ui/country-flag";
+import { DeliveryCountryFilter } from "@/components/admin/delivery-country-filter";
 import {
   ResponsiveDataList,
   MobileDataCard,
@@ -112,16 +113,39 @@ export function DeliveryLocationsManager({
   const [message, setMessage] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
+  const [countryIso2, setCountryIso2] = useState("");
 
   const symbol = currencySymbol(currency);
 
+  const countries = useMemo(() => {
+    const map = new Map<string, { iso2: string; name: string; count: number }>();
+    for (const item of locations) {
+      const iso2 = item.countryIso2.trim().toUpperCase();
+      if (!iso2) continue;
+      const current = map.get(iso2);
+      if (current) current.count += 1;
+      else map.set(iso2, { iso2, name: item.country || iso2, count: 1 });
+    }
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  }, [locations]);
+
   const activeLocations = useMemo(
-    () => sortLocationsByCountry(locations.filter((l) => l.isActive)),
-    [locations],
+    () =>
+      sortLocationsByCountry(
+        locations.filter(
+          (item) => item.isActive && (!countryIso2 || item.countryIso2.trim().toUpperCase() === countryIso2),
+        ),
+      ),
+    [locations, countryIso2],
   );
   const inactiveLocations = useMemo(
-    () => sortLocationsByCountry(locations.filter((l) => !l.isActive)),
-    [locations],
+    () =>
+      sortLocationsByCountry(
+        locations.filter(
+          (item) => !item.isActive && (!countryIso2 || item.countryIso2.trim().toUpperCase() === countryIso2),
+        ),
+      ),
+    [locations, countryIso2],
   );
 
   const switchCurrency = (next: PricingCurrency) => {
@@ -443,6 +467,30 @@ export function DeliveryLocationsManager({
       {error ? <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</p> : null}
       {message ? <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p> : null}
 
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <button
+          type="button"
+          aria-pressed={!countryIso2}
+          onClick={() => setCountryIso2("")}
+          className={`min-h-11 shrink-0 rounded-xl border px-4 text-base font-bold ${
+            !countryIso2
+              ? "border-[#0b1f4b] bg-[#0b1f4b] text-white"
+              : "border-slate-300 bg-white text-[#0b1f4b] hover:bg-slate-50"
+          }`}
+        >
+          {phrase("All", "ყველა", "Все")}
+        </button>
+        <DeliveryCountryFilter
+          countries={countries}
+          valueIso2={countryIso2}
+          onChange={setCountryIso2}
+          label={phrase("Country", "ქვეყანა", "Страна")}
+          allLabel={phrase("All", "ყველა", "Все")}
+          searchLabel={phrase("Search country", "მოძებნეთ ქვეყანა", "Найти страну")}
+          emptyLabel={phrase("No matching country", "ქვეყანა ვერ მოიძებნა", "Страна не найдена")}
+        />
+      </div>
+
       <ResponsiveDataList
         desktop={
           <div className="overflow-x-auto rounded-2xl border bg-white">
@@ -468,7 +516,17 @@ export function DeliveryLocationsManager({
                 {activeLocations.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="p-8 text-center text-slate-500">
-                      No active delivery locations. Re-enable an inactive one if needed.
+                      {countryIso2
+                        ? phrase(
+                            "No locations for this country.",
+                            "ამ ქვეყანაში ლოკაცია არ არის.",
+                            "Для этой страны локаций нет.",
+                          )
+                        : phrase(
+                            "No active delivery locations.",
+                            "აქტიური ლოკაცია არ არის.",
+                            "Активных локаций нет.",
+                          )}
                     </td>
                   </tr>
                 ) : (
@@ -485,7 +543,17 @@ export function DeliveryLocationsManager({
             </div>
             {activeLocations.length === 0 ? (
               <p className="rounded-2xl border bg-white p-8 text-center text-sm text-slate-500">
-                No active delivery locations. Re-enable an inactive one if needed.
+                {countryIso2
+                  ? phrase(
+                      "No locations for this country.",
+                      "ამ ქვეყანაში ლოკაცია არ არის.",
+                      "Для этой страны локаций нет.",
+                    )
+                  : phrase(
+                      "No active delivery locations.",
+                      "აქტიური ლოკაცია არ არის.",
+                      "Активных локаций нет.",
+                    )}
               </p>
             ) : (
               activeLocations.map((item, index) => renderMobileCard(item, index))

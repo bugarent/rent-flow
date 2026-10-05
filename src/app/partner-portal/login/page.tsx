@@ -1,14 +1,7 @@
 import { Suspense } from "react";
-import { ensureTestPartner } from "@/lib/auth/ensure-test-partner";
 import { PartnerCompanyAuthScreen } from "@/components/partner/partner-company-auth-screen";
 
-export default async function PartnerPortalLoginPage() {
-  try {
-    await ensureTestPartner();
-  } catch (error) {
-    console.error("ensureTestPartner failed", error);
-  }
-
+export default function PartnerPortalLoginPage() {
   return (
     <Suspense
       fallback={

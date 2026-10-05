@@ -2,7 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { normalizeLogin } from "@/lib/crypto";
-import { LOCAL_PARTNER_ID, loadLocalPartner } from "@/lib/auth/local-partner-store";
+import { LOCAL_PARTNER_ID, TEST_PARTNER_EMAIL, loadLocalPartner } from "@/lib/auth/local-partner-store";
 import { nextPartnerSequentialNumber } from "@/lib/sequential-ids";
 import { ensureExtrasExistInDb, listExtraServices } from "@/lib/server/extras-store";
 import type { FileCarListing } from "@/lib/server/partner-cars-store";
@@ -42,7 +42,7 @@ async function resolvePartnerForFileCar(fileCar: FileCarListing) {
       (fileCar.partnerUserId === local.id ||
         (email && normalizeLogin(local.email) === email)));
 
-  if (!isLocal || !local) {
+  if (!isLocal || !local || normalizeLogin(local.email) === TEST_PARTNER_EMAIL || email === TEST_PARTNER_EMAIL) {
     throw new Error("Partner profile missing for this listing");
   }
 

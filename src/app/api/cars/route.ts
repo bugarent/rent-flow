@@ -21,7 +21,7 @@ import {
   normalizeRegistrationNumber,
 } from "@/lib/cars/registration-number";
 import { isDbOfflineError } from "@/lib/server/db-errors";
-import { LOCAL_PARTNER_ID, loadLocalPartner } from "@/lib/auth/local-partner-store";
+import { LOCAL_PARTNER_ID, TEST_PARTNER_EMAIL, loadLocalPartner } from "@/lib/auth/local-partner-store";
 import { normalizeLogin } from "@/lib/crypto";
 import { nextPartnerSequentialNumber } from "@/lib/sequential-ids";
 import { persistCarInsuranceDocument } from "@/lib/server/car-passport-docs";
@@ -69,7 +69,9 @@ async function resolvePartnerForListing(session: {
       (session.user.id === local.id ||
         (email && normalizeLogin(local.email) === email)));
 
-  if (!isLocalSession || !local) return null;
+  if (!isLocalSession || !local || normalizeLogin(local.email) === TEST_PARTNER_EMAIL || email === TEST_PARTNER_EMAIL) {
+    return null;
+  }
 
   let user = email
     ? await prisma.user.findUnique({ where: { email } })
