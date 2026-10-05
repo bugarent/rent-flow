@@ -18,10 +18,13 @@ type SendMailInput = {
     | "BOOKING_NEW"
     | "BOOKING_EDITED"
     | "BOOKING_CANCELLED"
-    | "CONTACT_MESSAGE";
+    | "CONTACT_MESSAGE"
+    | "CUSTOMER_NOTICE";
   userId?: string | null;
   payload?: Record<string, unknown>;
   replyTo?: string;
+  /** Mailbox shown as the sender. Falls back to SMTP_FROM. */
+  from?: string;
   attachments?: Array<{ filename: string; content: Buffer; contentType?: string }>;
 };
 
@@ -77,8 +80,9 @@ export async function sendPartnerMail(input: SendMailInput): Promise<{ logged: t
       secure: process.env.SMTP_SECURE === "true",
       auth: { user, pass },
     });
+    const fromAddress = input.from?.trim() || process.env.SMTP_FROM || `${SITE_NAME} <noreply@${SITE_NAME}>`;
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || `${SITE_NAME} <noreply@${SITE_NAME}>`,
+      from: fromAddress,
       to: input.to,
       subject: input.subject,
       text: input.text,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Ban, Eye, Trash2, X } from "lucide-react";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import {
@@ -42,6 +42,10 @@ export function BookingCustomersPanel({ customers }: { customers: BookingCustome
   const [blockRow, setBlockRow] = useState<BookingCustomerRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
+  const [fromEmail, setFromEmail] = useState("");
+  const [noticeText, setNoticeText] = useState("");
+  const [noticeCountry, setNoticeCountry] = useState("all");
+  const [sendingNotice, setSendingNotice] = useState(false);
   const nextSignature = customers
     .map((row) => `${row.id}:${row.bookingCount}:${row.status}:${row.banned ? 1 : 0}`)
     .join("|");
@@ -51,6 +55,24 @@ export function BookingCustomersPanel({ customers }: { customers: BookingCustome
   }
 
   const rows = customers.map((row) => ({ ...row, ...patch[row.id] }));
+  const countries = [...new Set(rows.map((row) => row.countryLabel).filter((label) => label && label !== "—"))].sort(
+    (a, b) => a.localeCompare(b),
+  );
+  if (noticeCountry !== "all" && !countries.includes(noticeCountry)) {
+    setNoticeCountry("all");
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const res = await fetch("/api/admin/customers/notify");
+      const data = await res.json().catch(() => ({}));
+      if (!cancelled && res.ok && typeof data.fromEmail === "string") setFromEmail(data.fromEmail);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const labels = {
     intro: t(
@@ -77,7 +99,15 @@ export function BookingCustomersPanel({ customers }: { customers: BookingCustome
     empty: t("No booking customers yet.", "ჯავშნის მომხმარებელი ჯერ არ არის.", "Клиентов с бронью пока нет."),
     close: t("Close", "დახურვა", "Закрыть"),
     cancel: t("Cancel", "გაუქმება", "Отмена"),
-    messenger: t("Messenger", "მესენჯერი", "Мессенджер"),
+    messenger: t("Messenger", "მესენჯერი", "Мессენджер"),
+    fromLabel: t("Sender email", "გამგზავნი მაილი", "Почта отправителя"),
+    fromPh: t("Email the notice is sent from", "მაილი, საიდანაც გაიგზავნება", "Почта, с которой уйдёт письмо"),
+    textLabel: t("Message", "ტექსტი", "Текст"),
+    textPh: t("Text that will be sent", "ტექსტი, რომელიც გაეგზავნება", "Текст, который будет отправлен"),
+    countryPick: t("Country", "ქვეყანა", "Страна"),
+    allCountries: t("All", "ყველა", "Все"),
+    sendNotice: t("Send", "გაგზავნა", "Отправить"),
+    sendingNotice: t("Sending…", "იგზავნება…", "Отправка…"),
     bookings: t("Bookings", "ჯავშნები", "Брони"),
     detailsTitle: t("Customer", "მომხმარებელი", "Клиент"),
     blockTitle: t("Block customer", "მომხმარებლის დაბლოკვა", "Блокировка клиента"),
@@ -102,6 +132,75 @@ export function BookingCustomersPanel({ customers }: { customers: BookingCustome
       "ანგარიში წაიშალა. ჯავშნები სიაში რჩება.",
       "Аккаунт удалён. Брони остаются в списке.",
     ),
+    sentNotice: t(
+      "Sent to {n} email(s).",
+      "გაიგზავნა {n} მაილზე.",
+      "Отправлено на {n} адрес(ов).",
+    ),
+    sentPartial: t(
+      "Sent to {sent} of {total}. {failed} failed.",
+      "გაიგზავნა {sent} / {total}. ვერ გაიგზავნა {failed}.",
+      "Отправлено {sent} из {total}. Не отправлено {failed}.",
+    ),
+    needFrom: t("Enter the sender email.", "ჩაწერეთ გამგზავნი მაილი.", "Укажите почту отправителя."),
+    needText: t("Enter the message.", "ჩაწერეთ ტექსტი.", "Введите текст."),
+    noneRecipients: t(
+      "No customer email for this choice.",
+      "ამ არჩევანში მომხმარებლის მაილი არ არის.",
+      "Для этого выбора нет почты клиента.",
+    ),
+    smtpOff: t(
+      "The mail server is not set up, so the message was not delivered.",
+      "ფოსტის სერვერი არ არის გამართული, ამიტომ შეტყობინება ვერ გაიგზავნა.",
+      "Почтовый сервер не настроен, поэтому сообщение не доставлено.",
+    ),
+  };
+
+  const sendCustomerNotice = async () => {
+    if (!fromEmail.trim()) {
+      setNotice({ tone: "err", text: labels.needFrom });
+      return;
+    }
+    if (!noticeText.trim()) {
+      setNotice({ tone: "err", text: labels.needText });
+      return;
+    }
+    setSendingNotice(true);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/admin/customers/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fromEmail: fromEmail.trim(),
+          text: noticeText.trim(),
+          country: noticeCountry,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (data.error === "from") throw new Error(labels.needFrom);
+        if (data.error === "text") throw new Error(labels.needText);
+        if (data.error === "none") throw new Error(labels.noneRecipients);
+        if (data.error === "smtp") throw new Error(labels.smtpOff);
+        throw new Error(labels.failed);
+      }
+      const sent = Number(data.sent) || 0;
+      const failed = Number(data.failed) || 0;
+      const total = Number(data.total) || sent;
+      setNoticeText("");
+      setNotice({
+        tone: failed > 0 ? "err" : "ok",
+        text:
+          failed > 0
+            ? labels.sentPartial.replace("{sent}", String(sent)).replace("{total}", String(total)).replace("{failed}", String(failed))
+            : labels.sentNotice.replace("{n}", String(sent)),
+      });
+    } catch (err) {
+      setNotice({ tone: "err", text: err instanceof Error ? err.message : labels.failed });
+    } finally {
+      setSendingNotice(false);
+    }
   };
 
   const apply = (id: string, next: Partial<BookingCustomerRow>) => {
@@ -227,6 +326,55 @@ export function BookingCustomersPanel({ customers }: { customers: BookingCustome
   return (
     <div>
       <p className="mb-3 text-sm text-slate-600">{labels.intro}</p>
+      <section className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-end">
+          <label className="block min-w-0 flex-1 text-xs font-bold text-slate-600">
+            {labels.fromLabel}
+            <input
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              value={fromEmail}
+              onChange={(e) => setFromEmail(e.target.value)}
+              placeholder={labels.fromPh}
+              className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-base font-normal text-slate-900"
+            />
+          </label>
+          <label className="block min-w-0 flex-[1.4] text-xs font-bold text-slate-600">
+            {labels.textLabel}
+            <textarea
+              value={noticeText}
+              onChange={(e) => setNoticeText(e.target.value)}
+              placeholder={labels.textPh}
+              rows={2}
+              className="mt-1 min-h-11 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-base font-normal text-slate-900"
+            />
+          </label>
+          <label className="block min-w-0 text-xs font-bold text-slate-600 lg:w-52">
+            {labels.countryPick}
+            <select
+              value={noticeCountry}
+              onChange={(e) => setNoticeCountry(e.target.value)}
+              className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-base font-normal text-slate-900"
+            >
+              <option value="all">{labels.allCountries}</option>
+              {countries.map((country) => (
+                <option key={country} value={country}>
+                  {country}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            disabled={sendingNotice}
+            onClick={() => void sendCustomerNotice()}
+            className="min-h-11 rounded-lg bg-[#0b1f4b] px-4 text-sm font-bold text-white hover:bg-[#16326e] disabled:opacity-50"
+          >
+            {sendingNotice ? labels.sendingNotice : labels.sendNotice}
+          </button>
+        </div>
+      </section>
       {notice ? (
         <p
           className={cn(
