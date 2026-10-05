@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { uiText } from "@/lib/i18n/ui-text";
 import { ADMIN_BASE } from "@/lib/routes";
 import type { AdminCarRow } from "@/lib/server/load-admin-cars";
 
@@ -42,40 +44,66 @@ const COL =
 export function AdminCarsPanel({
   cars,
   dbOffline,
-  labels,
 }: {
   cars: AdminCarRow[];
   dbOffline?: boolean;
-  labels: {
-    title: string;
-    body: string;
-    empty: string;
-    dbOfflineHint: string;
-    details: string;
-    delete: string;
-    deleteConfirm: string;
-    deleteFailed: string;
-    partner: string;
-    perDay: string;
-    searchPlatePlaceholder: string;
-    searchPartnerPlaceholder: string;
-    searchButton: string;
-    searchEmpty: string;
-    colPlate: string;
-    colPartnerNumber: string;
-  };
 }) {
+  const { locale, dictionary } = useAdminLocale();
+  const labels = {
+    title: dictionary.pages.cars.title,
+    body: dictionary.pages.cars.body,
+    empty: uiText(locale, "No cars yet.", "მანქანები ჯერ არ არის.", "Автомобилей пока нет."),
+    dbOfflineHint: uiText(
+      locale,
+      "Database offline — showing local listings.",
+      "ბაზა მიუწვდომელია — ნაჩვენებია ლოკალური განცხადებები.",
+      "База недоступна — показаны локальные объявления.",
+    ),
+    details: uiText(locale, "Details", "დეტალები", "Детали"),
+    delete: uiText(locale, "Delete", "წაშლა", "Удалить"),
+    deleteConfirm: uiText(
+      locale,
+      "Delete this listing?",
+      "ნამდვილად გსურთ ამ განცხადების წაშლა?",
+      "Удалить это объявление?",
+    ),
+    deleteFailed: uiText(
+      locale,
+      "Could not delete listing.",
+      "განცხადების წაშლა ვერ მოხერხდა.",
+      "Не удалось удалить объявление.",
+    ),
+    partner: uiText(locale, "Partner", "პარტნიორი", "Партнёр"),
+    perDay: uiText(locale, "day", "დღე", "день"),
+    searchPlatePlaceholder: uiText(locale, "License plate…", "სახელმწიფო ნომერი…", "Госномер…"),
+    searchPartnerPlaceholder: uiText(
+      locale,
+      "Partner number (PRT-…)…",
+      "პარტნიორის ნომერი (PRT-…)…",
+      "Номер партнёра (PRT-…)…",
+    ),
+    searchButton: uiText(locale, "Search", "ძებნა", "Поиск"),
+    searchEmpty: uiText(
+      locale,
+      "No cars match this search.",
+      "ამ ძებნით მანქანა არ მოიძებნა.",
+      "По этому запросу автомобилей нет.",
+    ),
+    colPlate: uiText(locale, "Plate", "სახ. ნომერი", "Госномер"),
+    colPartnerNumber: uiText(locale, "Partner number", "პარტნიორის ნომერი", "Номер партнёра"),
+  };
   const [rows, setRows] = useState(cars);
+  const [carsSource, setCarsSource] = useState(cars);
+  if (carsSource !== cars) {
+    setCarsSource(cars);
+    setRows(cars);
+  }
   const [plateDraft, setPlateDraft] = useState("");
   const [partnerDraft, setPartnerDraft] = useState("");
   const [plateQuery, setPlateQuery] = useState("");
   const [partnerQuery, setPartnerQuery] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState("");
-
-  useEffect(() => {
-    setRows(cars);
-  }, [cars]);
 
   const plateNorm = normalizeQuery(plateQuery);
   const partnerNorm = normalizeQuery(partnerQuery);

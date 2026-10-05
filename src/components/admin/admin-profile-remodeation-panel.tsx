@@ -15,13 +15,13 @@ import {
 } from "@/lib/partners/company-settings";
 import { isPartnerLocale, type PartnerLocale } from "@/lib/i18n/partner-config";
 import { DEFAULT_FX_RATES, type FxRates } from "@/lib/fx";
-import { uiText } from "@/lib/i18n/ui-text";
+import { adminBackLabel, uiText, type AdminBackTarget } from "@/lib/i18n/ui-text";
 import { ADMIN_BASE } from "@/lib/routes";
 
 type Props = {
   partnerId: string;
   backHref?: string;
-  backLabel?: string;
+  backTarget?: AdminBackTarget;
 };
 
 type DetailPayload = {
@@ -56,11 +56,11 @@ function flattenChanges(
 export function AdminProfileRemoderationPanel({
   partnerId,
   backHref = `${ADMIN_BASE}/moderation?tab=profiles`,
-  backLabel,
+  backTarget = "profiles",
 }: Props) {
   const { locale: adminLocale } = useAdminLocale();
   const partnerLocale: PartnerLocale = isPartnerLocale(adminLocale) ? adminLocale : "en";
-  const label = backLabel ?? uiText(adminLocale, "← Profiles", "← პროფილები", "← Профили");
+  const label = adminBackLabel(adminLocale, backTarget);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [settings, setSettings] = useState<PartnerCompanySettings | null>(null);

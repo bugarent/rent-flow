@@ -15,7 +15,6 @@ export default async function AdminListingModerationReviewPage({
     <AdminListingReviewPanel
       carId={id}
       backHref={`${ADMIN_BASE}/moderation?tab=listings`}
-      backLabel="← განცხადებები"
     />
   );
 }

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { uiText } from "@/lib/i18n/ui-text";
 import {
   ResponsiveDataList,
   MobileDataCard,
@@ -29,6 +31,8 @@ export function AnalyticsDashboard({
   preserveParams?: Record<string, string>;
 }) {
   const router = useRouter();
+  const { locale } = useAdminLocale();
+  const phrase = (en: string, ka: string, ru: string) => uiText(locale, en, ka, ru);
   const [from, setFrom] = useState(initialFrom);
   const [to, setTo] = useState(initialTo);
   const [stats, setStats] = useState(initial);
@@ -54,30 +58,32 @@ export function AnalyticsDashboard({
     <div className="space-y-8">
       <form onSubmit={search} className="flex flex-wrap items-end gap-3 rounded-2xl border bg-white p-4">
         <label className="text-sm font-semibold">
-          From
+          {phrase("From", "დან", "С")}
           <input type="date" className="mt-1 block rounded-xl border p-2" value={from} onChange={(e) => setFrom(e.target.value)} required />
         </label>
         <label className="text-sm font-semibold">
-          To
+          {phrase("To", "მდე", "По")}
           <input type="date" className="mt-1 block rounded-xl border p-2" value={to} onChange={(e) => setTo(e.target.value)} required />
         </label>
         <button disabled={loading} className="rounded-xl bg-sky-600 px-5 py-2.5 font-bold text-white">
-          {loading ? "Loading..." : "Search"}
+          {loading ? phrase("Loading...", "იტვირთება...", "Загрузка...") : phrase("Search", "ძებნა", "Поиск")}
         </button>
-        <p className="text-sm text-slate-500">{stats.totalActive} active bookings in range</p>
+        <p className="text-sm text-slate-500">
+          {stats.totalActive} {phrase("active bookings in range", "აქტიური ჯავშანი პერიოდში", "активных броней за период")}
+        </p>
       </form>
 
       <section>
-        <h2 className="mb-3 text-xl font-extrabold">Car rental statistics</h2>
+        <h2 className="mb-3 text-xl font-extrabold">{phrase("Car rental statistics", "ქირაობის სტატისტიკა", "Статистика аренды")}</h2>
         <ResponsiveDataList
           desktop={
             <div className="overflow-x-auto rounded-xl border bg-white">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-100">
                   <tr>
-                    <th className="p-3">Category</th>
-                    <th className="p-3">Example / details</th>
-                    <th className="p-3">Active bookings</th>
+                    <th className="p-3">{phrase("Category", "კატეგორია", "Категория")}</th>
+                    <th className="p-3">{phrase("Example / details", "მაგალითი / დეტალები", "Пример / детали")}</th>
+                    <th className="p-3">{phrase("Active bookings", "აქტიური ჯავშნები", "Активные брони")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -94,23 +100,23 @@ export function AnalyticsDashboard({
           }
           mobile={stats.categoryStats.map((row) => (
             <MobileDataCard key={row.id}>
-              <MobileDataRow label="Category">{row.name}</MobileDataRow>
-              <MobileDataRow label="Example / details">
+              <MobileDataRow label={phrase("Category", "კატეგორია", "Категория")}>{row.name}</MobileDataRow>
+              <MobileDataRow label={phrase("Example / details", "მაგალითი / დეტალები", "Пример / детали")}>
                 <span className="font-medium text-slate-500">{row.details}</span>
               </MobileDataRow>
-              <MobileDataRow label="Active bookings">{row.bookings}</MobileDataRow>
+              <MobileDataRow label={phrase("Active bookings", "აქტიური ჯავშნები", "Активные брони")}>{row.bookings}</MobileDataRow>
             </MobileDataCard>
           ))}
         />
-        <h3 className="mb-3 mt-6 font-bold">By model</h3>
+        <h3 className="mb-3 mt-6 font-bold">{phrase("By model", "მოდელის მიხედვით", "По модели")}</h3>
         <ResponsiveDataList
           desktop={
             <div className="overflow-x-auto rounded-xl border bg-white">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-100">
                   <tr>
-                    <th className="p-3">Model</th>
-                    <th className="p-3">Active bookings</th>
+                    <th className="p-3">{phrase("Model", "მოდელი", "Модель")}</th>
+                    <th className="p-3">{phrase("Active bookings", "აქტიური ჯავშნები", "Активные брони")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -140,8 +146,8 @@ export function AnalyticsDashboard({
             ) : (
               stats.modelStats.map((row) => (
                 <MobileDataCard key={row.model}>
-                  <MobileDataRow label="Model">{row.model}</MobileDataRow>
-                  <MobileDataRow label="Active bookings">{row.bookings}</MobileDataRow>
+                  <MobileDataRow label={phrase("Model", "მოდელი", "Модель")}>{row.model}</MobileDataRow>
+                  <MobileDataRow label={phrase("Active bookings", "აქტიური ჯავშნები", "Активные брони")}>{row.bookings}</MobileDataRow>
                 </MobileDataCard>
               ))
             )
@@ -150,23 +156,23 @@ export function AnalyticsDashboard({
       </section>
 
       <section>
-        <h2 className="mb-3 text-xl font-extrabold">Airport statistics</h2>
+        <h2 className="mb-3 text-xl font-extrabold">{phrase("Airport statistics", "აეროპორტის სტატისტიკა", "Статистика аэропортов")}</h2>
         <ResponsiveDataList
           desktop={
             <div className="overflow-x-auto rounded-xl border bg-white">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-100">
                   <tr>
-                    <th className="p-3">Airport</th>
+                    <th className="p-3">{phrase("Airport", "აეროპორტი", "Аэропорт")}</th>
                     <th className="p-3">IATA</th>
-                    <th className="p-3">Active bookings</th>
+                    <th className="p-3">{phrase("Active bookings", "აქტიური ჯავშნები", "Активные брони")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {stats.airportStats.length === 0 ? (
                     <tr>
                       <td className="p-3 text-slate-500" colSpan={3}>
-                        No airport bookings in this date range.
+                        {phrase("No airport bookings in this date range.", "ამ პერიოდში აეროპორტის ჯავშანი არ არის.", "За этот период броней в аэропортах нет.")}
                       </td>
                     </tr>
                   ) : (
@@ -185,14 +191,14 @@ export function AnalyticsDashboard({
           mobile={
             stats.airportStats.length === 0 ? (
               <p className="rounded-xl border bg-white p-3 text-sm text-slate-500">
-                No airport bookings in this date range.
+                {phrase("No airport bookings in this date range.", "ამ პერიოდში აეროპორტის ჯავშანი არ არის.", "За этот период броней в аэропортах нет.")}
               </p>
             ) : (
               stats.airportStats.map((row) => (
                 <MobileDataCard key={row.iata}>
-                  <MobileDataRow label="Airport">{row.title}</MobileDataRow>
+                  <MobileDataRow label={phrase("Airport", "აეროპორტი", "Аэропорт")}>{row.title}</MobileDataRow>
                   <MobileDataRow label="IATA">{row.iata}</MobileDataRow>
-                  <MobileDataRow label="Active bookings">{row.bookings}</MobileDataRow>
+                  <MobileDataRow label={phrase("Active bookings", "აქტიური ჯავშნები", "Активные брони")}>{row.bookings}</MobileDataRow>
                 </MobileDataCard>
               ))
             )

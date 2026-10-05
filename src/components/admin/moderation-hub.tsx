@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useBpLabels } from "@/components/admin/business-partners/labels";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { uiText } from "@/lib/i18n/ui-text";
 import {
   insuranceExpiryReasonLabel,
   isInsuranceDateExpired,
@@ -120,7 +121,6 @@ type Props = {
   listingsDbOffline: boolean;
   reviewsDbOffline: boolean;
   profilesDbOffline: boolean;
-  labels: Labels;
 };
 
 type TabId = "primary" | "listings" | "reviews" | "profiles";
@@ -155,10 +155,66 @@ export function ModerationHub({
   listingsDbOffline,
   reviewsDbOffline,
   profilesDbOffline,
-  labels,
 }: Props) {
   const L = useBpLabels();
-  const { locale } = useAdminLocale();
+  const { locale, dictionary } = useAdminLocale();
+  const labels = useMemo<Labels>(() => {
+    const phrase = (en: string, ka: string, ru: string) => uiText(locale, en, ka, ru);
+    return {
+      title: dictionary.pages.moderation.title,
+      body: phrase(
+        "Choose a section: primary moderation, car listings, profiles, or reviews.",
+        "აირჩიეთ ქვეფანჯარა: პირველადი მოდერაცია, განცხადებები, პროფილები ან შეფასებები.",
+        "Выберите раздел: первичная модерация, объявления, профили или отзывы.",
+      ),
+      primaryTab: phrase("Primary moderation", "პირველადი მოდერაცია", "Первичная модерация"),
+      primaryTitle: phrase("Primary moderation", "პირველადი მოდერაცია", "Первичная модерация"),
+      primaryBody: phrase(
+        "New partner applications waiting for a first review.",
+        "ახალი პარტნიორის განაცხადები, რომლებიც პირველ გადამოწმებას ელოდება.",
+        "Новые заявки партнёров, которые ждут первой проверки.",
+      ),
+      listingsTab: phrase("Listings", "განცხადებები", "Объявления"),
+      reviewsTab: dictionary.nav.reviews,
+      profilesTab: phrase("Profiles", "პროფილები", "Профили"),
+      listingsTitle: phrase("Listing moderation", "განცხადებების მოდერაცია", "Модерация объявлений"),
+      listingsBody: phrase(
+        "Approve or reject car listings waiting for review.",
+        "დაამტკიცეთ ან უარყავით მანქანების განცხადებები.",
+        "Одобрение или отклонение автомобилей.",
+      ),
+      reviewsTitle: dictionary.pages.reviews.title,
+      reviewsBody: dictionary.pages.reviews.body,
+      profilesTitle: phrase(
+        "Partner profile moderation",
+        "პარტნიორის პროფილის მოდერაცია",
+        "Модерация профилей партнёров",
+      ),
+      profilesBody: phrase(
+        "Personal-info changes awaiting review — open the partner review page.",
+        "პირადი ინფოს ცვლილებები — გახსენით განხილვის გვერდი უნიკალური კოდით.",
+        "Изменения личной информации — откройте страницу проверки.",
+      ),
+      noListings: phrase(
+        "No listings awaiting moderation.",
+        "მოდერაციის მოლოდინში განცხადება არ არის.",
+        "Нет объявлений на модерации.",
+      ),
+      noReviews: phrase("No reviews yet.", "შეფასებები ჯერ არ არის.", "Отзывов пока нет."),
+      noProfiles: phrase(
+        "No profile changes awaiting review.",
+        "პროფილის ცვლილებები ჯერ არ არის.",
+        "Изменений профиля пока нет.",
+      ),
+      openPartner: phrase("Open review", "განხილვის გახსნა", "Открыть проверку"),
+      rejectProfile: phrase("Reject", "უარყოფა", "Отклонить"),
+      dbOfflineHint: phrase(
+        "No data while the database is offline.",
+        "ბაზა მიუწვდომელია — მონაცემები არ ჩანს.",
+        "База недоступна — данных нет.",
+      ),
+    };
+  }, [locale, dictionary]);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();

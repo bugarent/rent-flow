@@ -20,6 +20,7 @@ import {
   parseCompanySettings,
   type PartnerCompanySettings,
 } from "@/lib/partners/company-settings";
+import { adminBackLabel, type AdminBackTarget } from "@/lib/i18n/ui-text";
 import { ADMIN_BASE } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { ListingModerationActions } from "@/components/admin/listing-moderation-actions";
@@ -380,12 +381,14 @@ export function AdminPartnerReviewPanel({
   partnerId,
   backHref,
   backLabel,
+  backTarget = "moderation",
   editable = false,
   onBack,
 }: {
   partnerId: string;
   backHref?: string;
   backLabel?: string;
+  backTarget?: AdminBackTarget;
   editable?: boolean;
   /** When set, back control closes this panel in-place instead of navigating. */
   onBack?: () => void;
@@ -561,7 +564,7 @@ export function AdminPartnerReviewPanel({
   }, [locale]);
 
   const resolvedBackHref = backHref ?? `${ADMIN_BASE}/moderation`;
-  const resolvedBackLabel = backLabel ?? labels.back;
+  const resolvedBackLabel = backLabel ?? adminBackLabel(locale, backTarget) ?? labels.back;
 
   const handleBack = () => {
     if (onBack) onBack();

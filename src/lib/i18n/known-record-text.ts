@@ -22,19 +22,74 @@ function row(
 }
 
 const TABLE = new Map<string, Row>();
+const BY_NORM = new Map<string, Row>();
+
+function normKey(source: string) {
+  return source
+    .replace(/\u00a0/g, " ")
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+function indexPhrase(phrase: string, values: Row) {
+  const norm = normKey(phrase);
+  if (!norm) return;
+  BY_NORM.set(norm, values);
+  BY_NORM.set(norm.toLowerCase(), values);
+  BY_NORM.set(norm.replace(/\s+/g, " "), values);
+  BY_NORM.set(norm.replace(/\s+/g, " ").toLowerCase(), values);
+}
 
 function add(source: string, values: Row) {
   TABLE.set(source, values);
+  indexPhrase(source, values);
+  for (const phrase of Object.values(values)) indexPhrase(phrase, values);
+}
+
+function lookup(source: string): Row | undefined {
+  const direct = TABLE.get(source);
+  if (direct) return direct;
+  const norm = normKey(source);
+  return (
+    BY_NORM.get(norm) ||
+    BY_NORM.get(norm.toLowerCase()) ||
+    BY_NORM.get(norm.replace(/\s+/g, " ")) ||
+    BY_NORM.get(norm.replace(/\s+/g, " ").toLowerCase())
+  );
+}
+
+function pick(row: Row, locale: string) {
+  const value = row[locale as Locale];
+  return value && value.trim() ? value : row.en;
 }
 
 /** Show a known stored phrase in the selected language. Unknown text stays as saved. */
 export function knownText(locale: string, source: string): string {
   const raw = String(source ?? "");
   if (!raw.trim()) return raw;
-  const hit = TABLE.get(raw);
-  if (!hit) return raw;
-  const value = hit[locale as Locale];
-  return value && value.trim() ? value : hit.en;
+  const hit = lookup(raw);
+  if (hit) return pick(hit, locale);
+  if (raw.includes("\n")) {
+    let changed = false;
+    const lines = raw.split("\n").map((line) => {
+      const row = lookup(line);
+      if (!row) return line;
+      changed = true;
+      return pick(row, locale);
+    });
+    if (changed) return lines.join("\n");
+  }
+  return raw;
+}
+
+function alias(variant: string, canonical: string) {
+  const row = TABLE.get(canonical);
+  if (!row) return;
+  TABLE.set(variant, row);
+  indexPhrase(variant, row);
 }
 
 add(
@@ -268,6 +323,20 @@ const EXTRAS: Array<[string, Row]> = [
 ];
 
 for (const [source, values] of EXTRAS) add(source, values);
+
+alias("TPL — შესაძლო ზიანის პასუხისმგებლობა", "TPL — Third Party Liability");
+alias("ძირითადი დაფარვა (CDW)", "Basic coverage");
+alias("სრული დაფარვა (SuperCDW)", "Full coverage");
+alias("Child safety seat (1-5 years)", "Child safety seat 1-4 years");
+alias(
+  "Group 0+ child safety seat. Children of (about) 0-1.5 years of age with body weight of 0-10 kg",
+  "Group 0+ child safety seat.\nChildren of (about) 0-1.5 years of age with body kg. weight of 0-10 kg.",
+);
+alias(
+  "Group 1 child safety seat. Child weight 9-18 kg. Age of the child (approx.) 1-5 years.",
+  "Group 1 child seat.\nChild weight 9-18 kg.\nAge of the child (approx.) 1-4 years.\nX",
+);
+alias("საგადახდო სერვისი", "Additional services list");
 
 add("Standard", row("Standard", "სტანდარტი", "Standard", "Estándar", "Standard", "Standard", "Standaard", "Standard", "Standart", "Стандарт", "قياسي", "标准", "스탠다드", "มาตรฐาน"));
 add("4x4 SUV", row("4x4 SUV", "4x4 ჯიპი", "4x4 SUV", "SUV 4x4", "SUV 4x4", "SUV 4x4", "4x4 SUV", "SUV 4x4", "4x4 SUV", "Внедорожник 4x4", "دفع رباعي SUV", "四驱 SUV", "4x4 SUV", "SUV ขับเคลื่อน 4 ล้อ"));

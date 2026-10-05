@@ -18,13 +18,13 @@ export default async function AdminPartnerModerationReviewPage({
   const returnTab = sp.returnTab?.trim().toLowerCase();
 
   let backHref = `${ADMIN_BASE}/partners`;
-  let backLabel = "← პარტნიორები";
+  let backTarget: "partners" | "profiles" | "primary" = "partners";
   if (returnTab === "profiles") {
     backHref = `${ADMIN_BASE}/moderation?tab=profiles`;
-    backLabel = "← პროფილები";
+    backTarget = "profiles";
   } else if (returnTab === "primary") {
     backHref = `${ADMIN_BASE}/moderation?tab=primary`;
-    backLabel = "← პირველადი მოდერაცია";
+    backTarget = "primary";
   } else {
     const partnerTabs = directoryPartnerTabQuery(returnTab);
     if (partnerTabs) {
@@ -37,7 +37,7 @@ export default async function AdminPartnerModerationReviewPage({
       <AdminProfileRemoderationPanel
         partnerId={id}
         backHref={backHref}
-        backLabel={backLabel}
+        backTarget={backTarget}
       />
     );
   }
@@ -46,7 +46,7 @@ export default async function AdminPartnerModerationReviewPage({
     <AdminPartnerReviewPanel
       partnerId={id}
       backHref={backHref}
-      backLabel={backLabel}
+      backTarget={backTarget}
       editable
     />
   );

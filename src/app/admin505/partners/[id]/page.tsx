@@ -25,7 +25,7 @@ export default async function AdminPartnerDetailPage({
     <AdminPartnerReviewPanel
       partnerId={id}
       backHref={backHref}
-      backLabel="← პარტნიორები"
+      backTarget="partners"
       editable
     />
   );

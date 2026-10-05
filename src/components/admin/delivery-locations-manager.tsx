@@ -12,6 +12,8 @@ import {
   formatAmountNumber,
   roundMoney,
 } from "@/lib/utils";
+import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { uiText } from "@/lib/i18n/ui-text";
 import { CountryFlag } from "@/components/ui/country-flag";
 import {
   ResponsiveDataList,
@@ -98,6 +100,8 @@ export function DeliveryLocationsManager({
   fxRates?: FxRates;
 }) {
   const rates = fxRates;
+  const { locale } = useAdminLocale();
+  const phrase = (en: string, ka: string, ru: string) => uiText(locale, en, ka, ru);
   const [currency, setCurrency] = useState<PricingCurrency>("EUR");
   const [locations, setLocations] = useState(() => sortLocationsByCountry(initialLocations));
   const [priceDrafts, setPriceDrafts] = useState(() =>
@@ -305,7 +309,7 @@ export function DeliveryLocationsManager({
               item.isActive ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
             }`}
           >
-            {item.isActive ? "Active" : "Inactive"}
+            {item.isActive ? phrase("Active", "აქტიური", "Активно") : phrase("Inactive", "არააქტიური", "Неактивно")}
           </button>
         </td>
         <td className="p-3">
@@ -318,7 +322,7 @@ export function DeliveryLocationsManager({
               } disabled:opacity-50`}
               onClick={() => void saveRow(item.id)}
             >
-              {busy ? "Saving…" : "Save"}
+              {busy ? phrase("Saving…", "ინახება…", "Сохранение…") : phrase("Save", "შენახვა", "Сохранить")}
             </button>
             <button
               type="button"
@@ -326,7 +330,7 @@ export function DeliveryLocationsManager({
               disabled={busy}
               onClick={() => void remove(item.id)}
             >
-              Delete
+              {phrase("Delete", "წაშლა", "Удалить")}
             </button>
           </div>
         </td>
@@ -346,7 +350,7 @@ export function DeliveryLocationsManager({
         <MobileDataRow label="#">
           <span className="font-mono text-sm font-bold text-slate-500">{index + 1}</span>
         </MobileDataRow>
-        <MobileDataRow label="Airport">
+        <MobileDataRow label={phrase("Airport", "აეროპორტი", "Аэропорт")}>
           <div className="flex items-center justify-end gap-2 text-end">
             <CountryFlag iso2={item.countryIso2} className="h-4 w-6 rounded-sm shadow-sm" />
             <div>
@@ -355,8 +359,8 @@ export function DeliveryLocationsManager({
             </div>
           </div>
         </MobileDataRow>
-        <MobileDataRow label="Country">{item.country}</MobileDataRow>
-        <MobileDataRow label={`Max delivery ${symbol}`}>
+        <MobileDataRow label={phrase("Country", "ქვეყანა", "Страна")}>{item.country}</MobileDataRow>
+        <MobileDataRow label={`${phrase("Max delivery", "მაქს. მიწოდება", "Макс. доставка")} ${symbol}`}>
           <div className="flex items-center justify-end gap-1.5">
             <span className="text-sm font-semibold text-slate-500">{symbol}</span>
             <input
@@ -378,7 +382,7 @@ export function DeliveryLocationsManager({
             />
           </div>
         </MobileDataRow>
-        <MobileDataRow label="Free after days">
+        <MobileDataRow label={phrase("Free after days", "უფასო დღის შემდეგ", "Бесплатно после дней")}>
           <input
             type="number"
             min={0}
@@ -398,7 +402,7 @@ export function DeliveryLocationsManager({
             }}
           />
         </MobileDataRow>
-        <MobileDataRow label="Status">
+        <MobileDataRow label={phrase("Status", "სტატუსი", "Статус")}>
           <button
             type="button"
             disabled={busy}
@@ -407,7 +411,7 @@ export function DeliveryLocationsManager({
               item.isActive ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
             }`}
           >
-            {item.isActive ? "Active" : "Inactive"}
+            {item.isActive ? phrase("Active", "აქტიური", "Активно") : phrase("Inactive", "არააქტიური", "Неактивно")}
           </button>
         </MobileDataRow>
         <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
@@ -419,7 +423,7 @@ export function DeliveryLocationsManager({
             } disabled:opacity-50`}
             onClick={() => void saveRow(item.id)}
           >
-            {busy ? "Saving…" : "Save"}
+            {busy ? phrase("Saving…", "ინახება…", "Сохранение…") : phrase("Save", "შენახვა", "Сохранить")}
           </button>
           <button
             type="button"
@@ -427,7 +431,7 @@ export function DeliveryLocationsManager({
             disabled={busy}
             onClick={() => void remove(item.id)}
           >
-            Delete
+            {phrase("Delete", "წაშლა", "Удалить")}
           </button>
         </div>
       </MobileDataCard>
@@ -447,17 +451,17 @@ export function DeliveryLocationsManager({
                 <tr>
                   <th className="w-12 p-3">#</th>
                   <th className="w-14 p-3" aria-label="Country flag" />
-                  <th className="p-3">Airport</th>
-                  <th className="p-3">Country</th>
+                  <th className="p-3">{phrase("Airport", "აეროპორტი", "Аэропорт")}</th>
+                  <th className="p-3">{phrase("Country", "ქვეყანა", "Страна")}</th>
                   <th className="p-3">
                     <span className="inline-flex items-center gap-2">
-                      Max delivery
+                      {phrase("Max delivery", "მაქს. მიწოდება", "Макс. доставка")}
                       <CurrencyToggle value={currency} onChange={switchCurrency} />
                     </span>
                   </th>
-                  <th className="p-3">Free after days</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3">Actions</th>
+                  <th className="p-3">{phrase("Free after days", "უფასო დღის შემდეგ", "Бесплатно после дней")}</th>
+                  <th className="p-3">{phrase("Status", "სტატუსი", "Статус")}</th>
+                  <th className="p-3">{phrase("Actions", "მოქმედებები", "Действия")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -497,7 +501,10 @@ export function DeliveryLocationsManager({
             className="text-sm font-bold text-slate-700 hover:text-[#0b1f4b]"
             onClick={() => setShowInactive((v) => !v)}
           >
-            {showInactive ? "Hide" : "Show"} inactive locations ({inactiveLocations.length})
+            {showInactive
+              ? phrase("Hide inactive locations", "არააქტიურის დამალვა", "Скрыть неактивные")
+              : phrase("Show inactive locations", "არააქტიურის ჩვენება", "Показать неактивные")}{" "}
+            ({inactiveLocations.length})
           </button>
           {showInactive ? (
             <ResponsiveDataList
@@ -509,12 +516,12 @@ export function DeliveryLocationsManager({
                       <tr>
                         <th className="w-12 p-3">#</th>
                         <th className="w-14 p-3" aria-label="Country flag" />
-                        <th className="p-3">Airport</th>
-                        <th className="p-3">Country</th>
-                        <th className="p-3">Max delivery {symbol}</th>
-                        <th className="p-3">Free after days</th>
-                        <th className="p-3">Status</th>
-                        <th className="p-3">Actions</th>
+                        <th className="p-3">{phrase("Airport", "აეროპორტი", "Аэропорт")}</th>
+                        <th className="p-3">{phrase("Country", "ქვეყანა", "Страна")}</th>
+                        <th className="p-3">{phrase("Max delivery", "მაქს. მიწოდება", "Макс. доставка")} {symbol}</th>
+                        <th className="p-3">{phrase("Free after days", "უფასო დღის შემდეგ", "Бесплатно после дней")}</th>
+                        <th className="p-3">{phrase("Status", "სტატუსი", "Статус")}</th>
+                        <th className="p-3">{phrase("Actions", "მოქმედებები", "Действия")}</th>
                       </tr>
                     </thead>
                     <tbody>{inactiveLocations.map((item, index) => renderRow(item, index))}</tbody>

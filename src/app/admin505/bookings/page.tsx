@@ -4,15 +4,13 @@ import { CustomBookingInbox } from "@/components/admin/custom-booking-inbox";
 import { AdminBookingsDashboard } from "@/components/admin/admin-bookings-dashboard";
 import { AnalyticsDashboard } from "@/components/admin/analytics-dashboard";
 import { AdminFinancialsPanel } from "@/components/admin/admin-financials-panel";
-import { AdminBookingsPillTabs } from "@/components/admin/admin-bookings-pill-tabs";
 import {
   AdminCustomersTable,
 } from "@/components/admin/admin-customers-table";
 import { AdminBookingRefundsPanel } from "@/components/admin/admin-booking-refunds-panel";
 import { loadAdminCustomerRows } from "@/lib/server/load-admin-customers";
 import { loadAdminBookingRows } from "@/lib/server/load-admin-bookings";
-import { readAdminLocale } from "@/lib/server/admin-preferences";
-import { getAdminDictionary } from "@/lib/i18n/admin-dictionaries";
+import { AdminBookingsSection } from "@/components/admin/admin-bookings-section";
 import { ADMIN_BASE } from "@/lib/routes";
 
 export const dynamic = "force-dynamic";
@@ -46,8 +44,6 @@ export default async function AdminBookingsPage({
   }>;
 }) {
   await requireAdmin();
-  const locale = await readAdminLocale();
-  const t = getAdminDictionary(locale);
   const sp = await searchParams;
   const tab = parseTab(sp.tab);
   const to = sp.to ?? isoDate(new Date());
@@ -84,59 +80,19 @@ export default async function AdminBookingsPage({
 
   const bookingRows = tab === "bookings" ? await loadAdminBookingRows() : [];
 
-  const title =
-    tab === "statistics"
-      ? t.pages.analytics.title
-      : tab === "financials"
-        ? t.pages.financials.title
-        : tab === "users"
-          ? t.pages.users.title
-          : tab === "chat"
-            ? t.pages.customBooking.title
-            : tab === "refunds"
-              ? locale === "ka"
-                ? "დასაბრუნებელი"
-                : locale === "ru"
-                  ? "Возвраты"
-                  : "Refunds"
-              : t.pages.bookings.title;
-  const body =
-    tab === "statistics"
-      ? t.pages.analytics.body
-      : tab === "financials"
-        ? t.pages.financials.body
-        : tab === "users"
-          ? t.pages.users.body
-          : tab === "chat"
-            ? t.pages.customBooking.body
-            : tab === "refunds"
-              ? locale === "ka"
-                ? "კლიენტის გაუქმებული სერვისებისა და შემცირებული დღეების საიტის საკომისიოს დაბრუნების ინვოისები."
-                : locale === "ru"
-                  ? "Счета на возврат сервисного сбора за отменённые услуги и сокращённые дни."
-                  : "Invoices to refund site service fees for cancelled extras or shortened trips."
-              : t.pages.bookings.body;
-
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
-      <h1 className="mb-2 text-3xl font-extrabold">{title}</h1>
-      <p className="mb-6 text-sm text-slate-600">{body}</p>
-
-      <AdminBookingsPillTabs
-        tabs={[
-          { href: bookingsHref, label: t.nav.bookings, active: tab === "bookings" },
-          {
-            href: refundsHref,
-            label: locale === "ka" ? "დასაბრუნებელი" : locale === "ru" ? "Возвраты" : "Refunds",
-            active: tab === "refunds",
-          },
-          { href: financialsHref, label: t.nav.financials, active: tab === "financials" },
-          { href: statsHref, label: t.nav.statistics, active: tab === "statistics" },
-          { href: usersHref, label: t.nav.users, active: tab === "users" },
-          { href: chatHref, label: t.nav.customBooking, active: tab === "chat" },
-        ]}
-      />
-
+      <AdminBookingsSection
+        tab={tab}
+        hrefs={{
+          bookings: bookingsHref,
+          refunds: refundsHref,
+          financials: financialsHref,
+          stats: statsHref,
+          users: usersHref,
+          chat: chatHref,
+        }}
+      >
       {tab === "statistics" ? (
         <AnalyticsDashboard
           initial={stats}
@@ -163,7 +119,7 @@ export default async function AdminBookingsPage({
           queryError={customers.queryError}
         />
       ) : tab === "chat" ? (
-        <Suspense fallback={<p className="text-sm text-slate-500">{t.common.loading}</p>}>
+        <Suspense fallback={<p className="text-sm text-slate-500">…</p>}>
           <CustomBookingInbox />
         </Suspense>
       ) : tab === "refunds" ? (
@@ -171,6 +127,7 @@ export default async function AdminBookingsPage({
       ) : (
         <AdminBookingsDashboard bookings={bookingRows} />
       )}
+      </AdminBookingsSection>
     </div>
   );
 }

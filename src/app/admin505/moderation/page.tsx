@@ -11,8 +11,7 @@ import {
   type ModerationProfileView,
   type ModerationReviewView,
 } from "@/components/admin/moderation-hub";
-import { readAdminLocale } from "@/lib/server/admin-preferences";
-import { getAdminDictionary } from "@/lib/i18n/admin-dictionaries";
+import { AdminLoading } from "@/components/admin/admin-page-heading";
 import { formatPartnerCode } from "@/lib/ids";
 import { parseProfileModeration } from "@/lib/partners/profile-moderation";
 import { resolveProfileModeration } from "@/lib/server/partner-profile-moderation-store";
@@ -390,8 +389,6 @@ export default async function AdminModerationPage({
     redirect(`${ADMIN_BASE}/partners${qs}`);
   }
   reopenDbCircuit();
-  const locale = await readAdminLocale();
-  const t = getAdminDictionary(locale);
   const [listings, reviewData, profileData, partnerRows] = await Promise.all([
     loadCars(),
     loadReviews(),
@@ -401,64 +398,8 @@ export default async function AdminModerationPage({
   const directoryPartners = filterDirectoryPartners(partnerRows.partners);
   const pendingReviewsCount = reviewData.reviews.filter((r) => r.status === "PENDING").length;
 
-  const tabLabels =
-    locale === "ka"
-      ? {
-          primaryTab: "პირველადი მოდერაცია",
-          primaryTitle: "პირველადი მოდერაცია",
-          primaryBody: "ახალი პარტნიორის განაცხადები, რომლებიც პირველ გადამოწმებას ელოდება.",
-          listingsTab: "განცხადებები",
-          listingsTitle: "განცხადებების მოდერაცია",
-          listingsBody: "დაამტკიცეთ ან უარყავით მანქანების განცხადებები.",
-          profilesTab: "პროფილები",
-          profilesTitle: "პარტნიორის პროფილის მოდერაცია",
-          profilesBody: "პირადი ინფოს ცვლილებები — გახსენით განხილვის გვერდი უნიკალური კოდით.",
-          noProfiles: "პროფილის ცვლილებები ჯერ არ არის.",
-          openPartner: "განხილვის გახსნა",
-          rejectProfile: "უარყოფა",
-          moderationBody:
-            "აირჩიეთ ქვეფანჯარა: პირველადი მოდერაცია, განცხადებები, პროფილები ან შეფასებები.",
-        }
-      : locale === "ru"
-        ? {
-            primaryTab: "Первичная модерация",
-            primaryTitle: "Первичная модерация",
-            primaryBody: "Новые заявки партнёров, которые ждут первой проверки.",
-            listingsTab: "Объявления",
-            listingsTitle: "Модерация объявлений",
-            listingsBody: "Одобрение или отклонение автомобилей.",
-            profilesTab: "Профили",
-            profilesTitle: "Модерация профилей партнёров",
-            profilesBody: "Изменения личной информации — откройте страницу проверки.",
-            noProfiles: "Изменений профиля пока нет.",
-            openPartner: "Открыть проверку",
-            rejectProfile: "Отклонить",
-            moderationBody:
-              "Выберите раздел: первичная модерация, объявления, профили или отзывы.",
-          }
-        : {
-            primaryTab: "Primary moderation",
-            primaryTitle: "Primary moderation",
-            primaryBody: "New partner applications waiting for a first review.",
-            listingsTab: "Listings",
-            listingsTitle: "Listing moderation",
-            listingsBody: "Approve or reject car listings waiting for review.",
-            profilesTab: "Profiles",
-            profilesTitle: "Partner profile moderation",
-            profilesBody: "Personal-info changes awaiting review — open the partner review page.",
-            noProfiles: "No profile changes awaiting review.",
-            openPartner: "Open review",
-            rejectProfile: "Reject",
-            moderationBody:
-              "Choose a section: primary moderation, car listings, profiles, or reviews.",
-          };
-
   return (
-    <Suspense
-      fallback={
-        <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-slate-500">{t.common.loading}</div>
-      }
-    >
+    <Suspense fallback={<AdminLoading className="mx-auto max-w-6xl px-4 py-10 text-sm text-slate-500" />}>
       <ModerationHub
         partners={directoryPartners}
         partnersError={partnerRows.queryError}
@@ -473,28 +414,6 @@ export default async function AdminModerationPage({
         listingsDbOffline={listings.dbOffline}
         reviewsDbOffline={reviewData.dbOffline}
         profilesDbOffline={profileData.dbOffline}
-        labels={{
-          title: t.pages.moderation.title,
-          body: tabLabels.moderationBody,
-          primaryTab: tabLabels.primaryTab,
-          primaryTitle: tabLabels.primaryTitle,
-          primaryBody: tabLabels.primaryBody,
-          listingsTab: tabLabels.listingsTab,
-          reviewsTab: t.nav.reviews,
-          profilesTab: tabLabels.profilesTab,
-          listingsTitle: tabLabels.listingsTitle,
-          listingsBody: tabLabels.listingsBody,
-          reviewsTitle: t.pages.reviews.title,
-          reviewsBody: t.pages.reviews.body,
-          profilesTitle: tabLabels.profilesTitle,
-          profilesBody: tabLabels.profilesBody,
-          noListings: "No listings awaiting moderation.",
-          noReviews: "No reviews yet.",
-          noProfiles: tabLabels.noProfiles,
-          openPartner: tabLabels.openPartner,
-          rejectProfile: tabLabels.rejectProfile,
-          dbOfflineHint: "No data while the database is offline.",
-        }}
       />
     </Suspense>
   );
