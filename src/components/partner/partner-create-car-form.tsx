@@ -340,10 +340,20 @@ function PercentInput({
   );
 }
 
-async function uploadFile(file: File): Promise<string> {
+async function uploadFile(
+  file: File,
+  cover?: { make: string; model: string; year: string; color: string },
+): Promise<string> {
   const optimized = await compressImageForUpload(file);
   const fd = new FormData();
   fd.append("file", optimized);
+  if (cover) {
+    fd.append("role", "cover");
+    fd.append("make", cover.make);
+    fd.append("model", cover.model);
+    fd.append("year", cover.year);
+    fd.append("color", cover.color);
+  }
   const res = await fetch("/api/partners/uploads", { method: "POST", body: fd });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Upload failed");
@@ -481,10 +491,14 @@ export function PartnerCreateCarForm({
     partnerAmountToEur(amount, pricingCurrency, fxRates);
   const fromEurLabel = (amountEur: number) => formatMoney(amountEur, pricingCurrency, fxRates);
 
-  useEffect(() => {
-    if (!moneyCtx) return;
+  const fxStamp = moneyCtx
+    ? `${moneyCtx.fxRates.eurUsd}|${moneyCtx.fxRates.eurGbp}|${moneyCtx.fxRates.eurGel}|${moneyCtx.fxRates.eurRub}`
+    : "";
+  const [fxStampSeen, setFxStampSeen] = useState("");
+  if (moneyCtx && fxStamp !== fxStampSeen) {
+    setFxStampSeen(fxStamp);
     setFxRates(moneyCtx.fxRates);
-  }, [moneyCtx]);
+  }
 
   const insuranceRef = useRef<HTMLInputElement>(null);
   const passportFrontRef = useRef<HTMLInputElement>(null);
@@ -1218,10 +1232,12 @@ export function PartnerCreateCarForm({
   }, []);
 
   const seasonMeta = useMemo(() => buildCreateAutoSeasonRows(seasonalPricing), [seasonalPricing]);
-
-  useEffect(() => {
+  const seasonStamp = seasonMeta.map((row) => `${row.index}:${row.from}:${row.to}`).join("|");
+  const [seasonStampSeen, setSeasonStampSeen] = useState<string | null>(null);
+  if (seasonStamp !== seasonStampSeen) {
+    setSeasonStampSeen(seasonStamp);
     setSeasonRates((prev) => seasonMeta.map((_, i) => prev[i] ?? emptyRates()));
-  }, [seasonMeta]);
+  }
 
   const dailyRate = useMemo(() => {
     const fromTariffs = tariffPrices
@@ -1338,19 +1354,57 @@ export function PartnerCreateCarForm({
     setMusic((prev) => (prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]));
   };
 
-  const onGalleryFiles = async (files: File[]): Promise<string[]> => {
-    if (!files.length) return [];
+  const onGalleryFiles = async (
+    files: File[],
+    startIndex: number,
+  ): Promise<{ urls: string[]; coverUrl?: string }> => {
+    if (!files.length) return { urls: [] };
+    const coverIdentity = { make: make.trim(), model: model.trim(), year: year.trim(), color: color.trim() };
+    const identityReady = Boolean(coverIdentity.make && coverIdentity.model && coverIdentity.year && coverIdentity.color);
+    const coverEmpty = !String(photos[0] || "").trim();
+    const stylizeCoverSlot = files.some((_, index) => startIndex + index === 0);
+    const needsCover = stylizeCoverSlot || coverEmpty;
+    if (needsCover && !identityReady) {
+      showError(cc.coverNeedIdentity, "main-info", ["make", "model", "year", "color"]);
+      return { urls: [] };
+    }
     setUploading(true);
     setError("");
     try {
-      const urls: string[] = [];
-      for (const file of files) {
-        urls.push(await uploadFile(file));
+      let coverUrl: string | undefined;
+      if (!stylizeCoverSlot && coverEmpty) {
+        try {
+          coverUrl = await uploadFile(files[0]!, coverIdentity);
+        } catch (err) {
+          const code = err instanceof Error ? err.message : "";
+          if (code === "cover_identity") {
+            showError(cc.coverNeedIdentity, "main-info", ["make", "model", "year", "color"]);
+            return { urls: [] };
+          }
+          showError(code === "cover_style" ? cc.coverStyleFailed : code || common.uploadFailed, "photo");
+        }
       }
-      return urls;
+      const urls: string[] = [];
+      for (let index = 0; index < files.length; index += 1) {
+        const file = files[index]!;
+        const isCover = startIndex + index === 0;
+        urls.push(await uploadFile(file, isCover ? coverIdentity : undefined));
+      }
+      return { urls, coverUrl };
     } catch (err) {
-      showError(err instanceof Error ? err.message : common.uploadFailed, "photo");
-      return [];
+      const code = err instanceof Error ? err.message : "";
+      const message =
+        code === "cover_identity"
+          ? cc.coverNeedIdentity
+          : code === "cover_style"
+            ? cc.coverStyleFailed
+            : code || common.uploadFailed;
+      showError(
+        message,
+        code === "cover_identity" ? "main-info" : "photo",
+        code === "cover_identity" ? ["make", "model", "year", "color"] : undefined,
+      );
+      return { urls: [] };
     } finally {
       setUploading(false);
     }
@@ -2058,11 +2112,12 @@ export function PartnerCreateCarForm({
               <Field
                 label={cc.year}
                 required
+                invalid={fieldInvalid("year")}
                 changed={isChanged("year")}
                 previous={changePrev("year")}
               >
                 <select
-                  className={inputClass}
+                  className={cn(inputClass, fieldInvalid("year") && "border-red-500 ring-2 ring-red-200")}
                   value={year}
                   onChange={(e) => setYear(e.target.value)}
                   disabled={isAdminReview}

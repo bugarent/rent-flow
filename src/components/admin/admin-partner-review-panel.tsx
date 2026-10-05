@@ -13,14 +13,14 @@ import {
 } from "@/lib/catalog/search-places";
 import { WORLD_COUNTRIES, worldCountryName } from "@/lib/catalog/world-countries";
 import { LOCALES, LOCALE_LABELS } from "@/lib/i18n/config";
-import { PARTNER_SOCIAL_PLATFORMS, type PartnerSocialPlatform } from "@/lib/partner";
+import { localizedPartnerStatus, PARTNER_SOCIAL_PLATFORMS, type PartnerSocialPlatform } from "@/lib/partner";
 import {
   defaultCompanySettings,
   joinPersonName,
   parseCompanySettings,
   type PartnerCompanySettings,
 } from "@/lib/partners/company-settings";
-import { adminBackLabel, type AdminBackTarget } from "@/lib/i18n/ui-text";
+import { adminBackLabel, uiText, type AdminBackTarget } from "@/lib/i18n/ui-text";
 import { ADMIN_BASE } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { ListingModerationActions } from "@/components/admin/listing-moderation-actions";
@@ -231,6 +231,15 @@ const inputClass =
   "w-full rounded-md border border-[#c5ced8] bg-white px-3 py-2.5 text-sm font-semibold text-[#1f2937] outline-none focus:border-slate-500";
 const inputChangedClass = "border-red-500 bg-red-50 text-red-950";
 
+function ChangedMark() {
+  const { locale } = useAdminLocale();
+  return (
+    <span className="text-[11px] font-extrabold uppercase tracking-wide">
+      {uiText(locale, "Changed", "შეცვლილია", "Изменено")}
+    </span>
+  );
+}
+
 function NestedWindow({
   title,
   changed,
@@ -273,7 +282,9 @@ function NestedWindow({
         tabIndex={onSelect ? 0 : undefined}
       >
         <span>{title}</span>
-        {changed ? <span className="text-[11px] font-extrabold uppercase tracking-wide">შეცვლილია</span> : null}
+        {changed ? (
+          <ChangedMark />
+        ) : null}
       </header>
       {children ? <div className="bg-[#fbfcfd] px-5 py-5 sm:px-7 sm:py-6">{children}</div> : null}
     </section>
@@ -944,7 +955,7 @@ export function AdminPartnerReviewPanel({
               statusTheme.badge,
             )}
           >
-            {isRejected ? labels.rejectedBadge : detail.statusLabel || detail.status}
+            {localizedPartnerStatus(locale, detail.status)}
           </span>
         </div>
         <nav
@@ -1057,7 +1068,9 @@ export function AdminPartnerReviewPanel({
                     </div>
                   ) : null}
                   {ch("logoUrl") ? (
-                    <p className="mt-1 text-[10px] font-semibold text-red-700">შეიცვალა</p>
+                    <p className="mt-1 text-[10px] font-semibold text-red-700">
+                      {uiText(locale, "Changed", "შეიცვალა", "Изменено")}
+                    </p>
                   ) : null}
                 </div>
 

@@ -116,3 +116,33 @@ export function partnerStatusLabel(status: string) {
       return status;
   }
 }
+
+const PARTNER_STATUS_KA: Record<string, string> = {
+  PENDING: "განაცხადი მოლოდინშია",
+  INVITED: "მოწვევა გაგზავნილია",
+  PENDING_FINAL: "საბოლოო განხილვა",
+  NEEDS_CORRECTION: "საჭიროებს კორექტირებას",
+  PENDING_REMODERATION: "საჭიროებს რემოდერაციას",
+  APPROVED: "დამტკიცებული",
+  REJECTED: "უარყოფილი",
+  SUSPENDED: "შეჩერებული",
+};
+
+const PARTNER_STATUS_RU: Record<string, string> = {
+  PENDING: "Заявка на рассмотрении",
+  INVITED: "Приглашение отправлено",
+  PENDING_FINAL: "Финальная проверка",
+  NEEDS_CORRECTION: "Нужна правка",
+  PENDING_REMODERATION: "Нужна повторная модерация",
+  APPROVED: "Одобрен",
+  REJECTED: "Отклонён",
+  SUSPENDED: "Приостановлен",
+};
+
+/** Status chip text in the admin language. Unknown codes stay as stored. */
+export function localizedPartnerStatus(locale: string, status: string) {
+  const code = String(status || "").trim();
+  if (locale === "ka") return PARTNER_STATUS_KA[code] || partnerStatusLabel(code);
+  if (locale === "ru") return PARTNER_STATUS_RU[code] || partnerStatusLabel(code);
+  return partnerStatusLabel(code);
+}

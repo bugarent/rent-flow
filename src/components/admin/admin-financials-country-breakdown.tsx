@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { AdminMoneyText } from "@/components/admin/admin-money-text";
+import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { uiText } from "@/lib/i18n/ui-text";
 import {
   ResponsiveDataList,
   MobileDataCard,
@@ -22,16 +24,37 @@ export function AdminFinancialsCountryBreakdown({
   linkBase,
   from,
   to,
-  title = "Breakdown by partner country",
-  subtitle = "Sorted by highest gross volume. Same totals as above, split by partner country.",
+  cancelled = false,
 }: {
   rows: CountryFinanceRow[];
   linkBase: string;
   from: string;
   to: string;
-  title?: string;
-  subtitle?: string;
+  cancelled?: boolean;
 }) {
+  const { locale } = useAdminLocale();
+  const phrase = (en: string, ka: string, ru: string) => uiText(locale, en, ka, ru);
+  const title = cancelled
+    ? phrase("Partner cancelled by country", "პარტნიორის გაუქმება ქვეყნების მიხედვით", "Отмены партнёра по странам")
+    : phrase("Breakdown by partner country", "პარტნიორის ქვეყნების მიხედვით", "По странам партнёров");
+  const subtitle = cancelled
+    ? phrase(
+        "Sorted by highest cancelled volume. Partner-cancelled bookings only.",
+        "დალაგებულია გაუქმებული მოცულობის მიხედვით. მხოლოდ პარტნიორის გაუქმებული ჯავშნები.",
+        "По убыванию отменённого объёма. Только брони, отменённые партнёром.",
+      )
+    : phrase(
+        "Sorted by highest gross volume. Same totals as above, split by partner country.",
+        "დალაგებულია საერთო მოცულობის მიხედვით. იგივე ჯამები, დაყოფილი პარტნიორის ქვეყნით.",
+        "По убыванию общего объёма. Те же итоги, разбитые по стране партнёра.",
+      );
+  const colCountry = phrase("Country", "ქვეყანა", "Страна");
+  const colBookings = cancelled
+    ? phrase("Cancelled bookings", "გაუქმებული ჯავშნები", "Отменённые брони")
+    : phrase("Active bookings", "აქტიური ჯავშნები", "Активные брони");
+  const colPaid = phrase("Paid online", "ონლაინ გადახდილი", "Оплачено онлайн");
+  const colDue = phrase("Due at pick-up", "გადასახდელი მიღებისას", "К оплате при получении");
+  const colGross = phrase("Gross volume", "საერთო მოცულობა", "Общий объём");
   const [open, setOpen] = useState(true);
 
   if (rows.length === 0) return null;
@@ -62,11 +85,11 @@ export function AdminFinancialsCountryBreakdown({
             <table className="w-full border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b bg-slate-100">
-                  <th className="p-4">Country</th>
-                  <th className="p-4">Active bookings</th>
-                  <th className="p-4">Paid online</th>
-                  <th className="p-4">Due at pick-up</th>
-                  <th className="p-4">Gross volume</th>
+                  <th className="p-4">{colCountry}</th>
+                  <th className="p-4">{colBookings}</th>
+                  <th className="p-4">{colPaid}</th>
+                  <th className="p-4">{colDue}</th>
+                  <th className="p-4">{colGross}</th>
                 </tr>
               </thead>
               <tbody>
@@ -97,7 +120,7 @@ export function AdminFinancialsCountryBreakdown({
           }
           mobile={rows.map((row) => (
             <MobileDataCard key={row.iso2}>
-              <MobileDataRow label="Country">
+              <MobileDataRow label={colCountry}>
                 <a
                   className="text-sky-700 hover:underline"
                   href={`${linkBase}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&country=${encodeURIComponent(row.iso2)}`}
@@ -105,18 +128,18 @@ export function AdminFinancialsCountryBreakdown({
                   {row.label} ({row.iso2})
                 </a>
               </MobileDataRow>
-              <MobileDataRow label="Active bookings">{row.bookings}</MobileDataRow>
-              <MobileDataRow label="Paid online">
+              <MobileDataRow label={colBookings}>{row.bookings}</MobileDataRow>
+              <MobileDataRow label={colPaid}>
                 <span className="font-semibold text-sky-700">
                   <AdminMoneyText amountEur={row.deposit} />
                 </span>
               </MobileDataRow>
-              <MobileDataRow label="Due at pick-up">
+              <MobileDataRow label={colDue}>
                 <span className="font-semibold text-amber-700">
                   <AdminMoneyText amountEur={row.balance} />
                 </span>
               </MobileDataRow>
-              <MobileDataRow label="Gross volume">
+              <MobileDataRow label={colGross}>
                 <span className="font-semibold text-green-600">
                   <AdminMoneyText amountEur={row.revenue} />
                 </span>

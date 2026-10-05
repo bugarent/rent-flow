@@ -1,6 +1,8 @@
 "use client";
 
 import { europeAndAsiaCountries } from "@/lib/catalog/world-countries";
+import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { uiText } from "@/lib/i18n/ui-text";
 
 const ALL = europeAndAsiaCountries();
 const EUROPE = ALL.filter((c) => c.hoverRegion === "Europe");
@@ -13,6 +15,8 @@ export function OperatingCountriesSettings({
   selected: string[];
   onChange: (iso2s: string[]) => void;
 }) {
+  const { locale } = useAdminLocale();
+  const phrase = (en: string, ka: string, ru: string) => uiText(locale, en, ka, ru);
   const selectedSet = new Set(selected);
   const allSelected = selected.length === 0 || selected.length === ALL.length;
 
@@ -26,10 +30,13 @@ export function OperatingCountriesSettings({
     <div className="rounded-xl border p-4">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="text-sm font-semibold">Partner operating countries</p>
+          <p className="text-sm font-semibold">{phrase("Partner operating countries", "პარტნიორის ოპერირების ქვეყნები", "Страны работы партнёра")}</p>
           <p className="mt-1 text-xs text-slate-500">
-            These Europe and Asia countries appear in the Become a Partner hover list. Leave all selected to offer the
-            full catalog.
+            {phrase(
+              "These Europe and Asia countries appear in the partner list. Leave all selected to offer the full catalog.",
+              "ეს ევროპისა და აზიის ქვეყნები ჩანს პარტნიორის სიაში. სრული კატალოგისთვის ყველა დატოვეთ მონიშნული.",
+              "Эти страны Европы и Азии видны в списке партнёра. Оставьте все выбранными для полного каталога.",
+            )}
           </p>
         </div>
         <button
@@ -37,15 +44,17 @@ export function OperatingCountriesSettings({
           className="rounded-lg border px-3 py-1 text-xs font-semibold"
           onClick={() => onChange([])}
         >
-          Offer all
+          {phrase("Offer all", "ყველას შეთავაზება", "Предлагать все")}
         </button>
       </div>
       <p className="mb-3 text-xs font-semibold text-sky-800">
-        {allSelected ? "All Europe & Asia countries are offered to partners." : `${selected.length} countries selected.`}
+        {allSelected
+          ? phrase("All Europe and Asia countries are offered to partners.", "პარტნიორებს სთავაზობენ ევროპისა და აზიის ყველა ქვეყანას.", "Партнёрам предлагаются все страны Европы и Азии.")
+          : phrase(`${selected.length} countries selected.`, `არჩეულია ${selected.length} ქვეყანა.`, `Выбрано стран: ${selected.length}.`)}
       </p>
       <div className="grid max-h-72 gap-4 overflow-y-auto sm:grid-cols-2">
         <section>
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Europe</p>
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">{phrase("Europe", "ევროპა", "Европа")}</p>
           <ul className="space-y-1">
             {EUROPE.map((c) => (
               <li key={c.iso2}>
@@ -63,7 +72,7 @@ export function OperatingCountriesSettings({
           </ul>
         </section>
         <section>
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Asia</p>
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">{phrase("Asia", "აზია", "Азия")}</p>
           <ul className="space-y-1">
             {ASIA.map((c) => (
               <li key={c.iso2}>

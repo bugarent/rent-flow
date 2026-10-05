@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, Fragment, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { fleetAgeLabel, partnerStatusLabel, PARTNER_SOCIAL_PLATFORMS } from "@/lib/partner";
+import { fleetAgeLabel, localizedPartnerStatus, partnerStatusLabel, PARTNER_SOCIAL_PLATFORMS } from "@/lib/partner";
 import type { PartnerApplicationMessage } from "@/lib/partner-application-messages";
 import { worldCountryName } from "@/lib/catalog/world-countries";
 import { cn } from "@/lib/utils";
@@ -682,11 +682,7 @@ export function PartnersManager({
                                       : "bg-slate-100",
                               )}
                             >
-                              {p.status === "REJECTED"
-                                ? locale === "ka"
-                                  ? "უარყოფილი"
-                                  : p.statusLabel
-                                : p.statusLabel}
+                              {localizedPartnerStatus(locale, p.status)}
                               {attention > 0 ? (
                                 <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-extrabold text-white">
                                   {attention > 99 ? "99+" : attention}
@@ -911,11 +907,7 @@ export function PartnersManager({
                               : "bg-slate-100",
                       )}
                     >
-                      {p.status === "REJECTED"
-                        ? locale === "ka"
-                          ? "უარყოფილი"
-                          : p.statusLabel
-                        : p.statusLabel}
+                      {localizedPartnerStatus(locale, p.status)}
                       {attention > 0 ? (
                         <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-extrabold text-white">
                           {attention > 99 ? "99+" : attention}

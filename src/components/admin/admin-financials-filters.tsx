@@ -1,6 +1,8 @@
 "use client";
 
 import { useId, useMemo, useRef, useState, useEffect } from "react";
+import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { uiText } from "@/lib/i18n/ui-text";
 import { ADMIN_BASE } from "@/lib/routes";
 
 export type FinanceCountryOption = { iso2: string; label: string };
@@ -44,6 +46,7 @@ function DmyDateField({
   const [text, setText] = useState(() => isoToDmy(defaultIso));
   const [iso, setIso] = useState(defaultIso);
   const pickerRef = useRef<HTMLInputElement>(null);
+  const { locale } = useAdminLocale();
 
   useEffect(() => {
     setText(isoToDmy(defaultIso));
@@ -108,7 +111,9 @@ function DmyDateField({
           </svg>
         </button>
       </div>
-      <span className="mt-1 block text-[11px] font-normal text-slate-400">DD / MM / YYYY</span>
+      <span className="mt-1 block text-[11px] font-normal text-slate-400">
+        {uiText(locale, "DD / MM / YYYY", "დდ / თთ / წწწწ", "ДД / ММ / ГГГГ")}
+      </span>
     </label>
   );
 }
@@ -120,6 +125,8 @@ function CountryCombobox({
   options: FinanceCountryOption[];
   defaultIso2: string;
 }) {
+  const { locale } = useAdminLocale();
+  const phrase = (en: string, ka: string, ru: string) => uiText(locale, en, ka, ru);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [iso2, setIso2] = useState(defaultIso2);
@@ -158,7 +165,7 @@ function CountryCombobox({
 
   return (
     <label className="relative text-sm font-semibold text-slate-700">
-      Partner country
+      {phrase("Partner country", "პარტნიორის ქვეყანა", "Страна партнёра")}
       <input type="hidden" name="country" value={iso2} />
       <div ref={rootRef} className="relative mt-1.5">
         <input
@@ -169,7 +176,7 @@ function CountryCombobox({
           aria-controls={listId}
           aria-autocomplete="list"
           autoComplete="off"
-          placeholder="All countries — type to search"
+          placeholder={phrase("All countries — type to search", "ყველა ქვეყანა — აკრიფეთ საძებნად", "Все страны — введите для поиска")}
           value={displayValue}
           onFocus={() => {
             setOpen(true);
@@ -197,11 +204,13 @@ function CountryCombobox({
                   setOpen(false);
                 }}
               >
-                All countries
+                {phrase("All countries", "ყველა ქვეყანა", "Все страны")}
               </button>
             </li>
             {filtered.length === 0 ? (
-              <li className="px-3 py-2 text-sm text-slate-400">No matching countries</li>
+              <li className="px-3 py-2 text-sm text-slate-400">
+                {phrase("No matching countries", "ქვეყანა ვერ მოიძებნა", "Страны не найдены")}
+              </li>
             ) : (
               filtered.map((c) => (
                 <li key={c.iso2}>
@@ -230,12 +239,7 @@ function CountryCombobox({
 
 type FinancePeriod = "1m" | "6m" | "1y" | "all";
 
-const FINANCE_PERIODS: { id: FinancePeriod; label: string }[] = [
-  { id: "1m", label: "Last month" },
-  { id: "6m", label: "Last 6 months" },
-  { id: "1y", label: "Last year" },
-  { id: "all", label: "Full period" },
-];
+const FINANCE_PERIODS: FinancePeriod[] = ["1m", "6m", "1y", "all"];
 
 function isoLocal(d: Date) {
   const y = d.getFullYear();
@@ -274,6 +278,14 @@ export function AdminFinancialsFilters({
   isPartnerCancelled: boolean;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+  const { locale } = useAdminLocale();
+  const phrase = (en: string, ka: string, ru: string) => uiText(locale, en, ka, ru);
+  const periodLabel = (id: FinancePeriod) => {
+    if (id === "1m") return phrase("Last month", "ბოლო თვე", "Последний месяц");
+    if (id === "6m") return phrase("Last 6 months", "ბოლო 6 თვე", "Последние 6 месяцев");
+    if (id === "1y") return phrase("Last year", "ბოლო წელი", "Последний год");
+    return phrase("Full period", "სრული პერიოდი", "Весь период");
+  };
   const activePeriod = matchingPeriod(from, to);
 
   function applyPeriod(id: FinancePeriod) {
@@ -296,39 +308,39 @@ export function AdminFinancialsFilters({
       method="get"
       action={`${ADMIN_BASE}/bookings`}
       className="mb-8 rounded-2xl border bg-white p-5"
-      lang="en-GB"
+      lang={locale === "ka" ? "ka" : locale === "ru" ? "ru" : "en"}
     >
       <input type="hidden" name="tab" value="financials" />
       {isPartnerCancelled ? <input type="hidden" name="view" value="partner-cancelled" /> : null}
-      <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Quick period">
-        {FINANCE_PERIODS.map((item) => {
-          const selected = item.id === activePeriod;
+      <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label={phrase("Quick period", "სწრაფი პერიოდი", "Быстрый период")}>
+        {FINANCE_PERIODS.map((id) => {
+          const selected = id === activePeriod;
           return (
             <button
-              key={item.id}
+              key={id}
               type="button"
               aria-pressed={selected}
-              onClick={() => applyPeriod(item.id)}
+              onClick={() => applyPeriod(id)}
               className={
                 selected
                   ? "rounded-xl bg-sky-600 px-3.5 py-2 text-sm font-bold text-white"
                   : "rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-semibold text-slate-700 hover:border-sky-300 hover:bg-sky-50"
               }
             >
-              {item.label}
+              {periodLabel(id)}
             </button>
           );
         })}
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
-        <DmyDateField label="Start date" name="from" defaultIso={from} />
-        <DmyDateField label="End date" name="to" defaultIso={to} />
+        <DmyDateField label={phrase("Start date", "საწყისი თარიღი", "Дата начала")} name="from" defaultIso={from} />
+        <DmyDateField label={phrase("End date", "საბოლოო თარიღი", "Дата окончания")} name="to" defaultIso={to} />
         <CountryCombobox options={countries} defaultIso2={country} />
         <button
           type="submit"
           className="rounded-xl bg-sky-600 px-5 py-2.5 font-bold text-white hover:bg-sky-700"
         >
-          Apply filters
+          {phrase("Apply filters", "ფილტრის გამოყენება", "Применить фильтры")}
         </button>
       </div>
     </form>

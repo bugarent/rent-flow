@@ -41,7 +41,7 @@ export function PartnerCarPhotoGallery({
   photos: string[];
   onChange: (next: string[]) => void;
   uploading: boolean;
-  onUploadFiles: (files: File[]) => Promise<string[]>;
+  onUploadFiles: (files: File[], startIndex: number) => Promise<{ urls: string[]; coverUrl?: string }>;
   invalid?: boolean;
   accentColor: string;
   labels: {
@@ -145,13 +145,15 @@ export function PartnerCarPhotoGallery({
     commitSlots(optimistic);
 
     try {
-      const urls = await onUploadFiles(picked);
+      const result = await onUploadFiles(picked, index);
+      const urls = result.urls;
       const next = padSlots(photosRef.current);
-      if (urls.length) {
+      if (urls.length || result.coverUrl) {
         urls.forEach((url, i) => {
           const at = index + i;
           if (at < SLOT_COUNT) next[at] = normalizePhotoUrl(url) || next[at];
         });
+        if (result.coverUrl) next[0] = normalizePhotoUrl(result.coverUrl) || next[0];
       } else {
         localUrls.forEach((_, i) => {
           const at = index + i;
@@ -178,10 +180,10 @@ export function PartnerCarPhotoGallery({
   return (
     <div className="space-y-3">
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center sm:max-w-[200px]">
-        <div className="mx-auto flex h-28 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-200 text-slate-400">
+        <div className="mx-auto flex h-28 w-full items-center justify-center overflow-hidden rounded-lg bg-white text-slate-400">
           {slots[0] ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={slots[0]} alt="" className="h-full w-full object-cover" />
+            <img src={slots[0]} alt="" className="h-full w-full object-contain" />
           ) : (
             <span className="text-xs font-semibold">{labels.cover}</span>
           )}
@@ -237,7 +239,10 @@ export function PartnerCarPhotoGallery({
                     <img
                       src={url}
                       alt=""
-                      className="h-full w-full cursor-zoom-in object-cover"
+                      className={cn(
+                        "h-full w-full cursor-zoom-in",
+                        index === 0 ? "object-contain bg-white" : "object-cover",
+                      )}
                       draggable={false}
                       onClick={() => {
                         if (suppressClick.current) {

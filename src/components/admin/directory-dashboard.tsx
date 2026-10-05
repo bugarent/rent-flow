@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { uiText } from "@/lib/i18n/ui-text";
 import { WORLD_COUNTRIES, worldCountryName } from "@/lib/catalog/world-countries";
 import { PartnerRowActions } from "@/components/admin/partner-row-actions";
 import {
@@ -57,6 +59,8 @@ export function DirectoryDashboard({
     fleetSize: number;
   }>;
 }) {
+  const { locale } = useAdminLocale();
+  const phrase = (en: string, ka: string, ru: string) => uiText(locale, en, ka, ru);
   const [tab, setTab] = useState<Tab>("partners");
   const [country, setCountry] = useState("");
   const [loading, setLoading] = useState(true);
@@ -84,7 +88,7 @@ export function DirectoryDashboard({
     fetch(`/api/admin/directory?${params}`)
       .then(async (res) => {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Could not load directory");
+        if (!res.ok) throw new Error(data.error || phrase("Could not load directory", "დირექტორიის ჩატვირთვა ვერ მოხერხდა", "Не удалось загрузить каталог"));
         return data;
       })
       .then((data) => {
@@ -151,7 +155,7 @@ export function DirectoryDashboard({
           setError("");
           return;
         }
-        setError("Could not load directory");
+        setError(phrase("Could not load directory", "დირექტორიის ჩატვირთვა ვერ მოხერხდა", "Не удалось загрузить каталог"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -172,7 +176,9 @@ export function DirectoryDashboard({
     return [...countries, ...extras].sort((a, b) => a.name.localeCompare(b.name));
   }, [countries]);
 
-  const selectedCountryName = country ? worldCountryName(country) : "all countries";
+  const selectedCountryName = country
+    ? worldCountryName(country)
+    : phrase("all countries", "ყველა ქვეყანა", "все страны");
   const selectedCount = country
     ? (countries.find((c) => c.iso2 === country)?.count ?? total)
     : total;
@@ -189,17 +195,17 @@ export function DirectoryDashboard({
               tab === value ? "bg-[#0b1f4b] text-white" : "border bg-white text-slate-600"
             }`}
           >
-            {value === "partners" ? "Partners" : "Customers"}
+            {value === "partners" ? phrase("Partners", "პარტნიორები", "Партнёры") : phrase("Customers", "მომხმარებლები", "Клиенты")}
           </button>
         ))}
         <label className="text-sm font-semibold text-slate-700">
-          Country
+          {phrase("Country", "ქვეყანა", "Страна")}
           <select
             className="mt-1 block w-full rounded-xl border bg-white p-2.5 font-normal"
             value={country}
             onChange={(e) => setCountry(e.target.value)}
           >
-            <option value="">All countries</option>
+            <option value="">{phrase("All countries", "ყველა ქვეყანა", "Все страны")}</option>
             {countryOptions.map((c) => (
               <option key={c.iso2} value={c.iso2}>
                 {c.name} {c.count ? `(${c.count})` : ""}
@@ -208,7 +214,9 @@ export function DirectoryDashboard({
           </select>
         </label>
         <div className="rounded-xl border bg-white px-4 py-2.5 text-sm">
-          <p className="text-slate-500">{tab === "partners" ? "Active partners" : "Customers"}</p>
+          <p className="text-slate-500">
+            {tab === "partners" ? phrase("Active partners", "აქტიური პარტნიორები", "Активные партнёры") : phrase("Customers", "მომხმარებლები", "Клиенты")}
+          </p>
           <p className="text-xl font-extrabold text-[#0b1f4b]">{loading ? "…" : selectedCount}</p>
           <p className="text-xs text-slate-500">{selectedCountryName}</p>
         </div>
@@ -223,24 +231,24 @@ export function DirectoryDashboard({
               <thead className="bg-slate-100">
                 <tr>
                   <th className="p-3">ID</th>
-                  <th className="p-3">{tab === "partners" ? "Company / partner" : "Customer name"}</th>
-                  <th className="p-3">Country</th>
-                  {tab === "partners" ? <th className="p-3">Active cars</th> : <th className="p-3">Status</th>}
-                  {tab === "partners" ? <th className="p-3 text-right">Actions</th> : null}
+                  <th className="p-3">{tab === "partners" ? phrase("Company / partner", "კომპანია / პარტნიორი", "Компания / партнёр") : phrase("Customer name", "მომხმარებლის სახელი", "Имя клиента")}</th>
+                  <th className="p-3">{phrase("Country", "ქვეყანა", "Страна")}</th>
+                  {tab === "partners" ? <th className="p-3">{phrase("Active cars", "აქტიური მანქანები", "Активные авто")}</th> : <th className="p-3">{phrase("Status", "სტატუსი", "Статус")}</th>}
+                  {tab === "partners" ? <th className="p-3 text-right">{phrase("Actions", "მოქმედებები", "Действия")}</th> : null}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
                     <td colSpan={tab === "partners" ? 5 : 4} className="p-8 text-center text-slate-500">
-                      Loading…
+                      {phrase("Loading…", "იტვირთება…", "Загрузка…")}
                     </td>
                   </tr>
                 ) : tab === "partners" ? (
                   partnerRows.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="p-8 text-center text-slate-500">
-                        No partners found for this filter.
+                        {phrase("No partners found for this filter.", "ამ ფილტრით პარტნიორი ვერ მოიძებნა.", "По этому фильтру партнёры не найдены.")}
                       </td>
                     </tr>
                   ) : (
@@ -265,7 +273,7 @@ export function DirectoryDashboard({
                 ) : customerRows.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="p-8 text-center text-slate-500">
-                      No customers found for this filter.
+                      {phrase("No customers found for this filter.", "ამ ფილტრით მომხმარებელი ვერ მოიძებნა.", "По этому фильтру клиенты не найдены.")}
                     </td>
                   </tr>
                 ) : (
@@ -285,12 +293,12 @@ export function DirectoryDashboard({
         mobile={
           loading ? (
             <p className="rounded-xl border bg-white p-8 text-center text-sm text-slate-500">
-              Loading…
+              {phrase("Loading…", "იტვირთება…", "Загрузка…")}
             </p>
           ) : tab === "partners" ? (
             partnerRows.length === 0 ? (
               <p className="rounded-xl border bg-white p-8 text-center text-sm text-slate-500">
-                No partners found for this filter.
+                {phrase("No partners found for this filter.", "ამ ფილტრით პარტნიორი ვერ მოიძებნა.", "По этому фильтру партнёры не найдены.")}
               </p>
             ) : (
               partnerRows.map((row) => (
@@ -298,11 +306,11 @@ export function DirectoryDashboard({
                   <MobileDataRow label="ID">
                     <span className="font-mono font-bold text-[#0b1f4b]">{row.code}</span>
                   </MobileDataRow>
-                  <MobileDataRow label="Company / partner">
+                  <MobileDataRow label={phrase("Company / partner", "კომპანია / პარტნიორი", "Компания / партнёр")}>
                     <span className="font-semibold text-sky-800">{row.name}</span>
                   </MobileDataRow>
-                  <MobileDataRow label="Country">{row.country}</MobileDataRow>
-                  <MobileDataRow label="Active cars">{row.activeCars}</MobileDataRow>
+                  <MobileDataRow label={phrase("Country", "ქვეყანა", "Страна")}>{row.country}</MobileDataRow>
+                  <MobileDataRow label={phrase("Active cars", "აქტიური მანქანები", "Активные авто")}>{row.activeCars}</MobileDataRow>
                   <div className="mt-3 border-t border-slate-100 pt-3 [&_button]:min-h-11">
                     <PartnerRowActions
                       partnerId={row.id}
@@ -317,7 +325,7 @@ export function DirectoryDashboard({
             )
           ) : customerRows.length === 0 ? (
             <p className="rounded-xl border bg-white p-8 text-center text-sm text-slate-500">
-              No customers found for this filter.
+              {phrase("No customers found for this filter.", "ამ ფილტრით მომხმარებელი ვერ მოიძებნა.", "По этому фильтру клиенты не найдены.")}
             </p>
           ) : (
             customerRows.map((row) => (
@@ -325,9 +333,9 @@ export function DirectoryDashboard({
                 <MobileDataRow label="ID">
                   <span className="font-mono font-bold text-[#0b1f4b]">{row.code}</span>
                 </MobileDataRow>
-                <MobileDataRow label="Customer name">{row.name}</MobileDataRow>
-                <MobileDataRow label="Country">{row.country}</MobileDataRow>
-                <MobileDataRow label="Status">{row.status}</MobileDataRow>
+                <MobileDataRow label={phrase("Customer name", "მომხმარებლის სახელი", "Имя клиента")}>{row.name}</MobileDataRow>
+                <MobileDataRow label={phrase("Country", "ქვეყანა", "Страна")}>{row.country}</MobileDataRow>
+                <MobileDataRow label={phrase("Status", "სტატუსი", "Статус")}>{row.status}</MobileDataRow>
               </MobileDataCard>
             ))
           )

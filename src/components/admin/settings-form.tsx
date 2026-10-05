@@ -2,6 +2,8 @@
 
 import { useRef, useState } from "react";
 import { useBpLabels } from "@/components/admin/business-partners/labels";
+import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { uiText } from "@/lib/i18n/ui-text";
 import { DEPOSIT_MAX_PERCENT, DEPOSIT_MIN_PERCENT } from "@/lib/brand";
 import { DEFAULT_FX_RATES } from "@/lib/fx";
 import { OperatingCountriesSettings } from "@/components/admin/operating-countries-settings";
@@ -84,6 +86,9 @@ export function AdminSettingsForm(props: {
   openaiApiKeySet?: boolean;
 }) {
   const L = useBpLabels();
+  const { locale } = useAdminLocale();
+  const phrase = (en: string, ka: string, ru: string) => uiText(locale, en, ka, ru);
+  const [noticeOk, setNoticeOk] = useState(false);
   const [form, setForm] = useState({
     depositPercent: props.depositPercent,
     siteDiscountPercent: clampDiscount(props.siteDiscountPercent ?? 0, props.depositPercent),
@@ -124,14 +129,14 @@ export function AdminSettingsForm(props: {
       errors.depositPercent = `Enter an integer from ${DEPOSIT_MIN_PERCENT} to ${DEPOSIT_MAX_PERCENT}`;
     }
     if (form.telegramBotSiteName.trim().length < 2) {
-      errors.telegramBotSiteName = "Enter at least 2 characters";
+      errors.telegramBotSiteName = phrase("Enter at least 2 characters", "ჩაწერეთ მინიმუმ 2 სიმბოლო", "Введите минимум 2 символа");
     }
-    if (!(fx.gelUsd > 0)) errors.gelUsd = "Enter a positive rate";
-    if (!(fx.gelEur > 0)) errors.gelEur = "Enter a positive rate";
-    if (!(fx.gelGbp > 0)) errors.gelGbp = "Enter a positive rate";
+    if (!(fx.gelUsd > 0)) errors.gelUsd = phrase("Enter a positive rate", "ჩაწერეთ დადებითი კურსი", "Введите положительный курс");
+    if (!(fx.gelEur > 0)) errors.gelEur = phrase("Enter a positive rate", "ჩაწერეთ დადებითი კურსი", "Введите положительный курс");
+    if (!(fx.gelGbp > 0)) errors.gelGbp = phrase("Enter a positive rate", "ჩაწერეთ დადებითი კურსი", "Введите положительный курс");
     const maps = form.googleMapsUrl.trim();
     if (maps && !/^https?:\/\/.+/i.test(maps)) {
-      errors.googleMapsUrl = "Enter a valid http(s) URL or leave empty";
+      errors.googleMapsUrl = phrase("Enter a valid http(s) URL or leave empty", "ჩაწერეთ სწორი http(s) ბმული ან დატოვეთ ცარიელი", "Введите корректный http(s) адрес или оставьте пустым");
     }
     return errors;
   };
@@ -139,10 +144,11 @@ export function AdminSettingsForm(props: {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage("");
+    setNoticeOk(false);
     const localErrors = validate();
     if (Object.keys(localErrors).length) {
       setFieldErrors(localErrors);
-      setMessage("Fix the highlighted fields, then save again.");
+      setMessage(phrase("Fix the highlighted fields, then save again.", "გაასწორეთ მონიშნული ველები და ისევ შეინახეთ.", "Исправьте отмеченные поля и сохраните снова."));
       return;
     }
 
@@ -191,16 +197,25 @@ export function AdminSettingsForm(props: {
         if (server.gelEur) next.gelEur = server.gelEur;
         if (server.gelGbp) next.gelGbp = server.gelGbp;
         setFieldErrors(next);
-        setMessage(data.error || "Failed to save");
+        setNoticeOk(false);
+        setMessage(data.error || phrase("Failed to save", "შენახვა ვერ მოხერხდა", "Не удалось сохранить"));
         return;
       }
 
       if (typeof data.telegramBotTokenSet === "boolean") setTokenSet(data.telegramBotTokenSet);
       if (typeof data.openaiApiKeySet === "boolean") setOpenaiKeySet(data.openaiApiKeySet);
       setForm((prev) => ({ ...prev, telegramBotToken: "", openaiApiKey: "" }));
-      setMessage("Saved — rates apply immediately site-wide.");
+      setNoticeOk(true);
+      setMessage(
+        phrase(
+          "Saved — rates apply immediately site-wide.",
+          "შენახულია — კურსები მაშინვე მოქმედებს მთელ საიტზე.",
+          "Сохранено — курсы сразу действуют на всём сайте.",
+        ),
+      );
     } catch {
-      setMessage("Network error — could not save.");
+      setNoticeOk(false);
+      setMessage(phrase("Network error — could not save.", "ქსელის შეცდომა — შენახვა ვერ მოხერხდა.", "Ошибка сети — не удалось сохранить."));
     } finally {
       setSaving(false);
     }
@@ -209,7 +224,11 @@ export function AdminSettingsForm(props: {
   return (
     <form onSubmit={submit} className="space-y-4 rounded-2xl border bg-white p-6" noValidate>
       <label className="block text-sm font-semibold">
-        Online deposit / commission percent ({DEPOSIT_MIN_PERCENT}–{DEPOSIT_MAX_PERCENT}) — use 0 for test bookings
+        {phrase(
+          `Online deposit / commission percent (${DEPOSIT_MIN_PERCENT}–${DEPOSIT_MAX_PERCENT}) — use 0 for test bookings`,
+          `ონლაინ დეპოზიტი / საკომისიო პროცენტი (${DEPOSIT_MIN_PERCENT}–${DEPOSIT_MAX_PERCENT}) — სატესტოდ ჩაწერეთ 0`,
+          `Онлайн-депозит / комиссия % (${DEPOSIT_MIN_PERCENT}–${DEPOSIT_MAX_PERCENT}) — для теста укажите 0`,
+        )}
         <input
           type="number"
           min={DEPOSIT_MIN_PERCENT}
@@ -231,7 +250,11 @@ export function AdminSettingsForm(props: {
         ) : null}
       </label>
       <label className="block text-sm font-semibold">
-        საიტის ფასდაკლება % (0–{Math.max(0, form.depositPercent || 0)})
+        {phrase(
+          `Site discount % (0–${Math.max(0, form.depositPercent || 0)})`,
+          `საიტის ფასდაკლება % (0–${Math.max(0, form.depositPercent || 0)})`,
+          `Скидка сайта % (0–${Math.max(0, form.depositPercent || 0)})`,
+        )}
         <input
           type="number"
           inputMode="numeric"
@@ -248,8 +271,11 @@ export function AdminSettingsForm(props: {
           }}
         />
         <span className="mt-1 block text-xs font-normal text-slate-500">
-          აკლდება საიტის საკომისიოს. მაგ.: საკომისიო 20%, ფასდაკლება 10% → 100€-იანი ჯავშანი
-          მომხმარებელს დაუჯდება 90€, საიტს რჩება 10€, პარტნიორის წილი უცვლელია. 0 = გამორთულია.
+          {phrase(
+            "Taken from the site commission. Example: commission 20%, discount 10% → a €100 booking costs the customer €90, the site keeps €10, the partner share stays the same. 0 = off.",
+            "აკლდება საიტის საკომისიოს. მაგ.: საკომისიო 20%, ფასდაკლება 10% → 100€-იანი ჯავშანი მომხმარებელს დაუჯდება 90€, საიტს რჩება 10€, პარტნიორის წილი უცვლელია. 0 = გამორთულია.",
+            "Вычитается из комиссии сайта. Пример: комиссия 20%, скидка 10% → бронь на 100€ стоит клиенту 90€, сайту остаётся 10€, доля партнёра не меняется. 0 = выключено.",
+          )}
         </span>
         {fieldErrors.siteDiscountPercent ? (
           <span className="mt-1 block text-xs font-normal text-red-600">
@@ -258,7 +284,7 @@ export function AdminSettingsForm(props: {
         ) : null}
       </label>
       <label className="block text-sm font-semibold">
-        Telegram bot site name
+        {phrase("Telegram bot site name", "Telegram-ბოტის საიტის სახელი", "Название сайта для Telegram-бота")}
         <input
           className={inputClass(Boolean(fieldErrors.telegramBotSiteName))}
           value={form.telegramBotSiteName}
@@ -272,7 +298,7 @@ export function AdminSettingsForm(props: {
         ) : null}
       </label>
       <label className="block text-sm font-semibold">
-        Telegram bot username (@rentairportcarsbot)
+        {phrase("Telegram bot username", "Telegram-ბოტის მომხმარებელი", "Имя пользователя Telegram-бота")}
         <input
           className={inputClass(false)}
           value={form.telegramBotUsername}
@@ -280,22 +306,33 @@ export function AdminSettingsForm(props: {
           onChange={(e) => setForm({ ...form, telegramBotUsername: e.target.value })}
         />
         <span className="mt-1 block text-xs font-normal text-slate-500">
-          Without @. Used for deep links and partner bind.
+          {phrase(
+            "Without @. Used for deep links and partner bind.",
+            "ატის გარეშე. გამოიყენება ბმულებისა და პარტნიორის მიბმისთვის.",
+            "Без @. Нужно для ссылок и привязки партнёра.",
+          )}
         </span>
       </label>
       <label className="block text-sm font-semibold">
-        Telegram Bot Token
+        {phrase("Telegram bot token", "Telegram-ბოტის ტოკენი", "Токен Telegram-бота")}
         <input
           type="password"
           autoComplete="new-password"
           className={inputClass(false)}
           value={form.telegramBotToken}
-          placeholder={tokenSet ? "•••• saved — enter new token to replace" : "123456:ABC…"}
+          placeholder={
+            tokenSet
+              ? phrase("•••• saved — enter a new token to replace", "•••• შენახულია — ჩაანაცვლეთ ახალი ტოკენით", "•••• сохранён — введите новый токен")
+              : "123456:ABC…"
+          }
           onChange={(e) => setForm({ ...form, telegramBotToken: e.target.value })}
         />
         <span className="mt-1 block text-xs font-normal text-slate-500">
-          From @BotFather for @{form.telegramBotUsername || "rentairportcarsbot"}. Leave blank to keep
-          the current token / TELEGRAM_BOT_TOKEN env. Booking + live-chat alerts use this bot.
+          {phrase(
+            `From @BotFather for @${form.telegramBotUsername || "rentairportcarsbot"}. Leave blank to keep the current token. Booking and live-chat alerts use this bot.`,
+            `@BotFather-იდან, ბოტისთვის @${form.telegramBotUsername || "rentairportcarsbot"}. ცარიელი დატოვეთ, თუ ტოკენი უცვლელია. ჯავშნისა და ჩატის შეტყობინებები ამ ბოტით იგზავნება.`,
+            `От @BotFather для @${form.telegramBotUsername || "rentairportcarsbot"}. Оставьте пустым, чтобы сохранить текущий токен. Уведомления о бронях и чате идут через этого бота.`,
+          )}
         </span>
       </label>
       <label className="block text-sm font-semibold">
@@ -311,30 +348,40 @@ export function AdminSettingsForm(props: {
         </span>
       </label>
       <label className="block text-sm font-semibold">
-        OpenAI API Key (Live Chat)
+        {phrase("OpenAI API key (live chat)", "OpenAI API გასაღები (ჩატი)", "Ключ OpenAI API (чат)")}
         <input
           type="password"
           autoComplete="new-password"
           className={inputClass(false)}
           value={form.openaiApiKey}
-          placeholder={openaiKeySet ? "•••• saved — enter new key to replace" : "sk-…"}
+          placeholder={
+            openaiKeySet
+              ? phrase("•••• saved — enter a new key to replace", "•••• შენახულია — ჩაანაცვლეთ ახალი გასაღებით", "•••• сохранён — введите новый ключ")
+              : "sk-…"
+          }
           onChange={(e) => setForm({ ...form, openaiApiKey: e.target.value })}
         />
         <span className="mt-1 block text-xs font-normal text-slate-500">
-          Optional. Without a key the chat still answers from site knowledge (FAQ, fleet, airports).
-          With a key, replies use OpenAI. Leave blank to keep the current key / OPENAI_API_KEY env.
+          {phrase(
+            "Optional. Without a key the chat answers from site knowledge. With a key, replies use OpenAI. Leave blank to keep the current key.",
+            "არასავალდებულო. გასაღების გარეშე ჩატი საიტის ცოდნით პასუხობს. გასაღებით პასუხი OpenAI-დან მოდის. ცარიელი დატოვეთ, თუ გასაღები უცვლელია.",
+            "Необязательно. Без ключа чат отвечает по материалам сайта. С ключом ответы идут через OpenAI. Оставьте пустым, чтобы сохранить текущий ключ.",
+          )}
         </span>
       </label>
 
       <div>
-        <p className="mb-2 text-sm font-semibold">Currency exchange rates</p>
+        <p className="mb-2 text-sm font-semibold">{phrase("Currency exchange rates", "ვალუტის კურსები", "Курсы валют")}</p>
         <p className="mb-3 text-xs text-slate-500">
-          Enter how many units of each currency equal <strong>1 lari (GEL)</strong>. After Save, rates apply
-          immediately for partners, customers, and admin.
+          {phrase(
+            "Enter how many units of each currency equal 1 lari (GEL). After Save, rates apply immediately for partners, customers, and admin.",
+            "ჩაწერეთ, რამდენი ერთეული უდრის 1 ლარს (GEL). შენახვის შემდეგ კურსი მაშინვე მოქმედებს პარტნიორთან, მომხმარებელთან და ადმინში.",
+            "Укажите, сколько единиц каждой валюты равно 1 лари (GEL). После сохранения курс сразу действует у партнёров, клиентов и в админке.",
+          )}
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block text-sm font-semibold">
-            Lari (GEL) — base
+            {phrase("Lari (GEL) — base", "ლარი (GEL) — საბაზისო", "Лари (GEL) — база")}
             <input
               type="number"
               step="0.0001"
@@ -344,10 +391,12 @@ export function AdminSettingsForm(props: {
               disabled
               aria-label="Lari base rate"
             />
-            <span className="mt-1 block text-xs font-normal text-slate-500">Always 1.00 — rates are relative to 1 lari</span>
+            <span className="mt-1 block text-xs font-normal text-slate-500">
+              {phrase("Always 1.00 — rates are relative to 1 lari", "ყოველთვის 1.00 — კურსები 1 ლართან შედარდება", "Всегда 1.00 — курсы считаются от 1 лари")}
+            </span>
           </label>
           <label className="block text-sm font-semibold">
-            Dollar (USD) per 1 GEL
+            {phrase("Dollar (USD) per 1 GEL", "დოლარი (USD) 1 ლარზე", "Доллар (USD) за 1 GEL")}
             <input
               type="number"
               step="0.0001"
@@ -364,7 +413,7 @@ export function AdminSettingsForm(props: {
             ) : null}
           </label>
           <label className="block text-sm font-semibold">
-            Euro (EUR) per 1 GEL
+            {phrase("Euro (EUR) per 1 GEL", "ევრო (EUR) 1 ლარზე", "Евро (EUR) за 1 GEL")}
             <input
               type="number"
               step="0.0001"
@@ -381,7 +430,7 @@ export function AdminSettingsForm(props: {
             ) : null}
           </label>
           <label className="block text-sm font-semibold">
-            Pound sterling (GBP) per 1 GEL
+            {phrase("Pound sterling (GBP) per 1 GEL", "გირვანქა სტერლინგი (GBP) 1 ლარზე", "Фунт (GBP) за 1 GEL")}
             <input
               type="number"
               step="0.0001"
@@ -401,7 +450,7 @@ export function AdminSettingsForm(props: {
       </div>
 
       <label className="block text-sm font-semibold">
-        Official Google Maps URL
+        {phrase("Official Google Maps URL", "ოფიციალური Google Maps ბმული", "Официальная ссылка Google Maps")}
         <input
           className={inputClass(Boolean(fieldErrors.googleMapsUrl))}
           value={form.googleMapsUrl}
@@ -421,11 +470,15 @@ export function AdminSettingsForm(props: {
       />
 
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-sm font-semibold text-slate-900">Site rental contract</p>
+        <p className="text-sm font-semibold text-slate-900">
+          {phrase("Site rental contract", "საიტის საიჯარო ხელშეკრულება", "Договор аренды сайта")}
+        </p>
         <p className="mt-1 text-xs text-slate-500">
-          Upload the prepared platform contract (PDF or image). Partners see it in Personal info and can
-          enable it when they have not activated their own contract. Checkout agreement links open the
-          active contract.
+          {phrase(
+            "Upload the platform contract (PDF or image). Partners see it in Personal info and can enable it when they have no contract of their own.",
+            "ატვირთეთ პლატფორმის ხელშეკრულება (PDF ან სურათი). პარტნიორი მას პირად ინფოში ხედავს და ჩართავს, თუ საკუთარი ხელშეკრულება არ აქვს.",
+            "Загрузите договор платформы (PDF или изображение). Партнёр видит его в личных данных и включает, если своего договора нет.",
+          )}
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <input
@@ -444,13 +497,22 @@ export function AdminSettingsForm(props: {
                 const up = await fetch("/api/admin/uploads", { method: "POST", body: fd });
                 const upData = (await up.json().catch(() => ({}))) as { url?: string; error?: string };
                 if (!up.ok || !upData.url) {
-                  setMessage(upData.error || "Contract upload failed");
+                  setNoticeOk(false);
+                  setMessage(upData.error || phrase("Contract upload failed", "ხელშეკრულების ატვირთვა ვერ მოხერხდა", "Не удалось загрузить договор"));
                   return;
                 }
                 setForm((prev) => ({ ...prev, siteContractUrl: upData.url! }));
-                setMessage("Contract uploaded — press Save to store it.");
+                setNoticeOk(true);
+                setMessage(
+                  phrase(
+                    "Contract uploaded — press Save to store it.",
+                    "ხელშეკრულება აიტვირთა — შესანახად დააჭირეთ შენახვას.",
+                    "Договор загружен — нажмите «Сохранить».",
+                  ),
+                );
               } catch {
-                setMessage("Contract upload failed");
+                setNoticeOk(false);
+                setMessage(phrase("Contract upload failed", "ხელშეკრულების ატვირთვა ვერ მოხერხდა", "Не удалось загрузить договор"));
               } finally {
                 setContractUploading(false);
                 if (contractInputRef.current) contractInputRef.current.value = "";
@@ -463,7 +525,11 @@ export function AdminSettingsForm(props: {
             className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60"
             onClick={() => contractInputRef.current?.click()}
           >
-            {contractUploading ? "Uploading…" : form.siteContractUrl ? "Replace contract" : "Upload contract"}
+            {contractUploading
+              ? phrase("Uploading…", "იტვირთება…", "Загрузка…")
+              : form.siteContractUrl
+                ? phrase("Replace contract", "ხელშეკრულების შეცვლა", "Заменить договор")
+                : phrase("Upload contract", "ხელშეკრულების ატვირთვა", "Загрузить договор")}
           </button>
           {form.siteContractUrl ? (
             <>
@@ -473,26 +539,30 @@ export function AdminSettingsForm(props: {
                 rel="noopener noreferrer"
                 className="text-sm font-semibold text-sky-700 underline hover:text-sky-900"
               >
-                {form.siteContractUrl.split("/").pop() || "Open contract"}
+                {form.siteContractUrl.split("/").pop() || phrase("Open contract", "ხელშეკრულების გახსნა", "Открыть договор")}
               </a>
               <button
                 type="button"
                 className="text-sm font-semibold text-red-600 hover:underline"
                 onClick={() => setForm((prev) => ({ ...prev, siteContractUrl: "" }))}
               >
-                Remove
+                {phrase("Remove", "წაშლა", "Удалить")}
               </button>
             </>
           ) : (
-            <span className="text-xs text-slate-500">PDF, PNG or JPG — max 20 MB</span>
+            <span className="text-xs text-slate-500">{phrase("PDF, PNG or JPG — max 20 MB", "PDF, PNG ან JPG — მაქს. 20 მბ", "PDF, PNG или JPG — макс. 20 МБ")}</span>
           )}
         </div>
       </div>
 
       <p className="text-xs text-slate-500">
-        Extra services and their daily price limits are managed under{" "}
+        {phrase(
+          "Extra services and their daily price limits are managed under",
+          "დამატებითი სერვისები და დღიური ფასის ლიმიტები იმართება აქ:",
+          "Дополнительные услуги и дневные лимиты цен настраиваются здесь:",
+        )}{" "}
         <a className="font-semibold text-sky-700 hover:underline" href={`${ADMIN_BASE}/extras`}>
-          Extra services
+          {phrase("Extra services", "დამატებითი სერვისები", "Дополнительные услуги")}
         </a>
         .
       </p>
@@ -501,12 +571,12 @@ export function AdminSettingsForm(props: {
         disabled={saving}
         className="w-full rounded-xl bg-sky-600 py-3 font-bold text-white disabled:bg-slate-400"
       >
-        {saving ? "Saving…" : "Save"}
+        {saving ? phrase("Saving…", "ინახება…", "Сохранение…") : phrase("Save", "შენახვა", "Сохранить")}
       </button>
       {message ? (
         <p
           className={`text-sm font-semibold ${
-            message.startsWith("Saved") ? "text-emerald-700" : "text-red-600"
+            noticeOk ? "text-emerald-700" : "text-red-600"
           }`}
         >
           {message}

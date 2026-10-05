@@ -5,6 +5,7 @@ import { formatBookingRef } from "@/lib/ids";
 import { toNumber } from "@/lib/utils";
 import { AdminMoneyText } from "@/components/admin/admin-money-text";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { uiText } from "@/lib/i18n/ui-text";
 import {
   ResponsiveDataList,
   MobileDataCard,
@@ -63,19 +64,56 @@ function PartnerCell({ booking }: { booking: FinancialBookingRow }) {
 
 export function AdminFinancialsBookingsTable({
   bookings,
-  emptyMessage,
-  title = "Active bookings",
-  subtitle,
+  cancelled = false,
+  countryLabel = "",
+  dbOffline = false,
 }: {
   bookings: FinancialBookingRow[];
-  emptyMessage: string;
-  title?: string;
-  subtitle?: string;
+  cancelled?: boolean;
+  countryLabel?: string;
+  dbOffline?: boolean;
 }) {
+  const { locale } = useAdminLocale();
+  const phrase = (en: string, ka: string, ru: string) => uiText(locale, en, ka, ru);
+  const place = countryLabel ? ` · ${countryLabel}` : "";
+  const title = cancelled
+    ? phrase("Partner cancelled bookings", "პარტნიორის გაუქმებული ჯავშნები", "Брони, отменённые партнёром")
+    : phrase("Active bookings", "აქტიური ჯავშნები", "Активные брони");
+  const resolvedSubtitle = cancelled
+    ? `${bookings.length} ${phrase("partner-cancelled", "პარტნიორმა გააუქმა", "отменено партнёром")}${place}`
+    : `${bookings.length} ${phrase("for financial calculation", "ფინანსური გაანგარიშებისთვის", "для финансового расчёта")}${place}`;
+  const emptyMessage = dbOffline
+    ? cancelled
+      ? phrase(
+          "No partner-cancelled bookings in this period. Database is offline.",
+          "ამ პერიოდში პარტნიორის გაუქმებული ჯავშანი არ არის. ბაზა მიუწვდომელია.",
+          "За этот период нет броней, отменённых партнёром. База недоступна.",
+        )
+      : phrase(
+          "No active bookings in this period. Database is offline.",
+          "ამ პერიოდში აქტიური ჯავშანი არ არის. ბაზა მიუწვდომელია.",
+          "За этот период нет активных броней. База недоступна.",
+        )
+    : cancelled
+      ? phrase(
+          `No partner-cancelled bookings in this period${place}.`,
+          `ამ პერიოდში პარტნიორის გაუქმებული ჯავშანი არ არის${place}.`,
+          `За этот период нет броней, отменённых партнёром${place}.`,
+        )
+      : phrase(
+          `No active bookings in this period${place}.`,
+          `ამ პერიოდში აქტიური ჯავშანი არ არის${place}.`,
+          `За этот период нет активных броней${place}.`,
+        );
+  const colCustomer = phrase("Customer", "მომხმარებელი", "Клиент");
+  const colCar = phrase("Car", "მანქანა", "Авто");
+  const colPartner = phrase("Partner", "პარტნიორი", "Партнёр");
+  const colCountry = phrase("Country", "ქვეყანა", "Страна");
+  const colDate = phrase("Date", "თარიღი", "Дата");
+  const colTotal = phrase("Total", "ჯამი", "Итого");
+  const colPaid = phrase("Paid", "გადახდილი", "Оплачено");
+  const colDue = phrase("Due", "დარჩენილი", "К оплате");
   const [open, setOpen] = useState(true);
-  const resolvedSubtitle =
-    subtitle ??
-    `${bookings.length} booking${bookings.length === 1 ? "" : "s"} for financial calculation`;
 
   return (
     <section className="overflow-hidden rounded-xl border bg-white shadow-sm">
@@ -104,14 +142,14 @@ export function AdminFinancialsBookingsTable({
               <thead>
                 <tr className="border-b bg-slate-100">
                   <th className="p-4">#</th>
-                  <th className="p-4">Customer</th>
-                  <th className="p-4">Car</th>
-                  <th className="p-4">Partner</th>
-                  <th className="p-4">Country</th>
-                  <th className="p-4">Date</th>
-                  <th className="p-4">Total</th>
-                  <th className="p-4">Paid</th>
-                  <th className="p-4">Due</th>
+                  <th className="p-4">{colCustomer}</th>
+                  <th className="p-4">{colCar}</th>
+                  <th className="p-4">{colPartner}</th>
+                  <th className="p-4">{colCountry}</th>
+                  <th className="p-4">{colDate}</th>
+                  <th className="p-4">{colTotal}</th>
+                  <th className="p-4">{colPaid}</th>
+                  <th className="p-4">{colDue}</th>
                 </tr>
               </thead>
               <tbody>
@@ -164,28 +202,28 @@ export function AdminFinancialsBookingsTable({
                     {formatBookingRef(booking.sequentialNumber) ??
                       `11R${booking.sequentialNumber}`}
                   </MobileDataRow>
-                  <MobileDataRow label="Customer">{booking.customerName}</MobileDataRow>
-                  <MobileDataRow label="Car">{booking.carLabel}</MobileDataRow>
-                  <MobileDataRow label="Partner">
+                  <MobileDataRow label={colCustomer}>{booking.customerName}</MobileDataRow>
+                  <MobileDataRow label={colCar}>{booking.carLabel}</MobileDataRow>
+                  <MobileDataRow label={colPartner}>
                     <PartnerCell booking={booking} />
                   </MobileDataRow>
-                  <MobileDataRow label="Country">
+                  <MobileDataRow label={colCountry}>
                     {booking.countryLabel} ({booking.countryIso2})
                   </MobileDataRow>
-                  <MobileDataRow label="Date">
+                  <MobileDataRow label={colDate}>
                     {new Date(booking.createdAt).toLocaleDateString("en-GB")}
                   </MobileDataRow>
-                  <MobileDataRow label="Total">
+                  <MobileDataRow label={colTotal}>
                     <span className="font-semibold text-green-600">
                       <AdminMoneyText amountEur={toNumber(booking.totalPriceEur)} />
                     </span>
                   </MobileDataRow>
-                  <MobileDataRow label="Paid">
+                  <MobileDataRow label={colPaid}>
                     <span className="font-semibold text-sky-700">
                       <AdminMoneyText amountEur={Number(booking.depositPaidEur) || 0} />
                     </span>
                   </MobileDataRow>
-                  <MobileDataRow label="Due">
+                  <MobileDataRow label={colDue}>
                     <span className="font-semibold text-amber-700">
                       <AdminMoneyText amountEur={Number(booking.balanceDueEur) || 0} />
                     </span>

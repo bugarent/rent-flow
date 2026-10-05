@@ -8,6 +8,7 @@ import { ImageCropUpload } from "@/components/admin/image-crop-upload";
 import { MakeModelMultiSelect } from "@/components/admin/make-model-multi-select";
 import { SortableAdminGrid } from "@/components/admin/sortable-admin-grid";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { knownText } from "@/lib/i18n/known-record-text";
 
 type Category = {
   id: string;
@@ -33,7 +34,8 @@ export function HomepageContentManager({
   initialAirports: Airport[];
   initialAirportsLayout?: PopularAirportsLayout;
 }) {
-  const { dictionary } = useAdminLocale();
+  const { dictionary, locale } = useAdminLocale();
+  const showRecord = (value: string) => knownText(locale, value);
   const e = dictionary.editor;
   const ui = dictionary.common;
   const fill = (template: string, values: Record<string, string | number>) =>
@@ -417,7 +419,7 @@ export function HomepageContentManager({
                           key={c.id}
                           className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 px-2 py-1.5"
                         >
-                          <span className="min-w-0 truncate text-xs font-semibold text-[#0b1f4b]">{c.name}</span>
+                          <span className="min-w-0 truncate text-xs font-semibold text-[#0b1f4b]">{showRecord(c.name)}</span>
                           <button
                             type="button"
                             role="switch"
@@ -488,7 +490,7 @@ export function HomepageContentManager({
                   <img src={c.imageUrl} alt={c.name} className="h-full w-full object-cover" />
                 </div>
                 <div className="p-2.5 sm:p-3">
-                  <h3 className="mb-1 truncate text-sm font-bold text-[#0b1f4b] sm:text-base">{c.name}</h3>
+                  <h3 className="mb-1 truncate text-sm font-bold text-[#0b1f4b] sm:text-base">{showRecord(c.name)}</h3>
                   <p className="mb-2 line-clamp-2 min-h-[2rem] text-[11px] leading-snug text-slate-500">
                     {mapped.length
                       ? summarizeMappedModels(mapped)
@@ -620,7 +622,7 @@ export function HomepageContentManager({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={a.imageUrl} alt={a.title} className="h-20 w-full object-cover" />
               <div className="p-2.5">
-                <h3 className="text-sm font-bold text-[#0b1f4b]">{a.title}</h3>
+                <h3 className="text-sm font-bold text-[#0b1f4b]">{showRecord(a.title)}</h3>
                 <p className="mb-2 text-[11px] text-slate-500">{a.iata}</p>
                 <div className="flex gap-2">
                   <button

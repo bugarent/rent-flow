@@ -218,6 +218,8 @@ export type PartnerCreateCarCopy = {
   uploading: string;
   cover: string;
   coverHint: string;
+  coverNeedIdentity: string;
+  coverStyleFailed: string;
   dragImage: string;
   photoFormats: string;
   certPrivate: string;
@@ -487,7 +489,10 @@ export const partnerUiEn: PartnerUiPack = {
     selectFiles: "Select files",
     uploading: "Uploading…",
     cover: "Cover",
-    coverHint: "The title photo will be selected by an administrator after the car has been moderated.",
+    coverHint:
+      "The cover becomes a studio photo of the selected make, model, year, and color. Other photos stay as uploaded.",
+    coverNeedIdentity: "Choose the make, model, year, and color before the cover photo.",
+    coverStyleFailed: "The studio cover could not be created. Try again.",
     dragImage: "Drag the image or",
     photoFormats: "PNG, JPG, GIF up to 20 Mb · auto-optimized · min {n}",
     certPrivate: "Image and info will not be available to clients.",
@@ -772,7 +777,10 @@ export const partnerUiKa: PartnerUiPack = {
     selectFiles: "ფაილების არჩევა",
     uploading: "იტვირთება…",
     cover: "ყდა",
-    coverHint: "სათაურის ფოტოს ადმინისტრატორი აირჩევს მოდერაციის შემდეგ.",
+    coverHint:
+      "ყდა იქცევა არჩეული მარკის, მოდელის, წლისა და ფერის სტუდიურ სურათად. დანარჩენი ფოტოები უცვლელი რჩება.",
+    coverNeedIdentity: "ყდის სურათისთვის ჯერ აირჩიეთ მარკა, მოდელი, წელი და ფერი.",
+    coverStyleFailed: "ყდის სტუდიური სურათი ვერ შეიქმნა. სცადეთ თავიდან.",
     dragImage: "გადაიტანეთ სურათი ან",
     photoFormats: "PNG, JPG, GIF 20 მბ-მდე · ავტომატური შეკუმშვა · მინ. {n}",
     certPrivate: "სურათი და ინფორმაცია კლიენტებისთვის ხელმისაწვდომი არ იქნება.",
@@ -1058,7 +1066,10 @@ export const partnerUiRu: PartnerUiPack = {
     selectFiles: "Выбрать файлы",
     uploading: "Загрузка…",
     cover: "Обложка",
-    coverHint: "Титульное фото выберет администратор после модерации.",
+    coverHint:
+      "Обложка становится студийным фото выбранных марки, модели, года и цвета. Остальные фото остаются как загружены.",
+    coverNeedIdentity: "Перед обложкой выберите марку, модель, год и цвет.",
+    coverStyleFailed: "Не удалось создать студийную обложку. Попробуйте ещё раз.",
     dragImage: "Перетащите изображение или",
     photoFormats: "PNG, JPG, GIF до 20 Мб · авто-сжатие · мин. {n}",
     certPrivate: "Изображение и данные недоступны клиентам.",

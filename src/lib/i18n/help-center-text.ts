@@ -3,7 +3,38 @@ import type { HelpCategory } from "@/lib/catalog/help-center";
 
 type Row = Partial<Record<Locale, string>> & { en?: string };
 
-const TABLE = new Map<string, Row>();
+type HelpEntry = { en: string; row: Row };
+
+const BY_NORM = new Map<string, HelpEntry>();
+
+function normHelp(source: string) {
+  return source
+    .replace(/\u00a0/g, " ")
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+function indexHelp(phrase: string, entry: HelpEntry) {
+  const norm = normHelp(phrase);
+  if (!norm) return;
+  BY_NORM.set(norm, entry);
+  BY_NORM.set(norm.toLowerCase(), entry);
+  BY_NORM.set(norm.replace(/\s+/g, " "), entry);
+  BY_NORM.set(norm.replace(/\s+/g, " ").toLowerCase(), entry);
+}
+
+function lookupHelp(source: string): HelpEntry | undefined {
+  const norm = normHelp(source);
+  return (
+    BY_NORM.get(norm) ||
+    BY_NORM.get(norm.toLowerCase()) ||
+    BY_NORM.get(norm.replace(/\s+/g, " ")) ||
+    BY_NORM.get(norm.replace(/\s+/g, " ").toLowerCase())
+  );
+}
 
 function pack(
   ka: string,
@@ -24,17 +55,36 @@ function pack(
 }
 
 export function registerHelpText(source: string, values: Row) {
-  TABLE.set(source, values);
+  const entry: HelpEntry = { en: source, row: values };
+  indexHelp(source, entry);
+  for (const phrase of Object.values(values)) {
+    if (typeof phrase === "string" && phrase.trim()) indexHelp(phrase, entry);
+  }
+}
+
+function helpPhrase(locale: string, entry: HelpEntry) {
+  if (!locale || locale === "en") return entry.en;
+  const value = entry.row[locale as Locale];
+  return value && value.trim() ? value : entry.en;
 }
 
 /** Show a known help-center phrase in the selected language. Unknown text stays as saved. */
 export function helpText(locale: string, source: string): string {
   const raw = String(source ?? "");
   if (!raw.trim()) return raw;
-  const hit = TABLE.get(raw);
-  if (!hit) return raw;
-  const value = hit[locale as Locale];
-  return value && value.trim() ? value : raw;
+  const hit = lookupHelp(raw);
+  if (hit) return helpPhrase(locale, hit);
+  if (raw.includes("\n")) {
+    let changed = false;
+    const lines = raw.split("\n").map((line) => {
+      const row = lookupHelp(line);
+      if (!row) return line;
+      changed = true;
+      return helpPhrase(locale, row);
+    });
+    if (changed) return lines.join("\n");
+  }
+  return raw;
 }
 
 export function fillHelpCount(template: string, n: number) {

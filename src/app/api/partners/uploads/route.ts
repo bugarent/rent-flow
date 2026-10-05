@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { requirePartnerApi } from "@/lib/auth/sessions";
 import { persistUploadedFile } from "@/lib/server/persist-upload";
+import { renderStudioCover, studioCoverIdentity } from "@/lib/server/studio-cover";
+
+export const maxDuration = 60;
 
 const MAX_BYTES = 20 * 1024 * 1024;
 
@@ -33,6 +36,7 @@ export async function POST(req: Request) {
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "file required" }, { status: 400 });
     }
+    const isCover = String(form.get("role") || "") === "cover";
     const ext = fileExtension(file);
     if (!ext) {
       return NextResponse.json({ error: "PNG, JPG, GIF, WEBP or PDF only" }, { status: 400 });
@@ -40,14 +44,40 @@ export async function POST(req: Request) {
     if (file.size > MAX_BYTES) {
       return NextResponse.json({ error: "File too large (max 20 MB)" }, { status: 400 });
     }
-    const filename = `${Date.now()}-${randomBytes(6).toString("hex")}.${ext}`;
+    if (isCover && (ext === "pdf" || ext === "gif")) {
+      return NextResponse.json({ error: "cover_style" }, { status: 400 });
+    }
     const buffer = Buffer.from(await file.arrayBuffer());
-    const contentType = ext === "pdf" ? "application/pdf" : ext === "jpg" ? "image/jpeg" : `image/${ext}`;
-    await persistUploadedFile(["partner-cars", filename], buffer, contentType);
+    let saved: Buffer = buffer;
+    let savedExt = ext;
+    let contentType = ext === "pdf" ? "application/pdf" : ext === "jpg" ? "image/jpeg" : `image/${ext}`;
+    if (isCover) {
+      const identity = studioCoverIdentity({
+        make: String(form.get("make") || ""),
+        model: String(form.get("model") || ""),
+        year: String(form.get("year") || ""),
+        color: String(form.get("color") || ""),
+      });
+      if (!identity) {
+        return NextResponse.json({ error: "cover_identity" }, { status: 400 });
+      }
+      saved = await renderStudioCover({
+        bytes: buffer,
+        mime: contentType,
+        ...identity,
+      });
+      savedExt = "png";
+      contentType = "image/png";
+    }
+    const filename = `${Date.now()}-${randomBytes(6).toString("hex")}.${savedExt}`;
+    await persistUploadedFile(["partner-cars", filename], saved, contentType);
     return NextResponse.json({ url: `/uploads/partner-cars/${filename}` });
   } catch (error) {
     console.error("[partners/uploads]", error);
     const message = error instanceof Error ? error.message : "Upload failed";
+    if (message === "cover_identity" || message === "cover_style") {
+      return NextResponse.json({ error: message }, { status: message === "cover_identity" ? 400 : 502 });
+    }
     return NextResponse.json(
       { error: message === "Could not save the image" ? message : "Upload failed" },
       { status: 500 },

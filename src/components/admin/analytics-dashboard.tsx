@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { knownText } from "@/lib/i18n/known-record-text";
 import { uiText } from "@/lib/i18n/ui-text";
 import {
   ResponsiveDataList,
@@ -33,6 +34,7 @@ export function AnalyticsDashboard({
   const router = useRouter();
   const { locale } = useAdminLocale();
   const phrase = (en: string, ka: string, ru: string) => uiText(locale, en, ka, ru);
+  const record = (value: string) => knownText(locale, value);
   const [from, setFrom] = useState(initialFrom);
   const [to, setTo] = useState(initialTo);
   const [stats, setStats] = useState(initial);
@@ -89,8 +91,8 @@ export function AnalyticsDashboard({
                 <tbody>
                   {stats.categoryStats.map((row) => (
                     <tr key={row.id} className="border-t">
-                      <td className="p-3 font-semibold">{row.name}</td>
-                      <td className="p-3 text-slate-500">{row.details}</td>
+                      <td className="p-3 font-semibold">{record(row.name)}</td>
+                      <td className="p-3 text-slate-500">{record(row.details)}</td>
                       <td className="p-3 font-bold">{row.bookings}</td>
                     </tr>
                   ))}
@@ -100,9 +102,9 @@ export function AnalyticsDashboard({
           }
           mobile={stats.categoryStats.map((row) => (
             <MobileDataCard key={row.id}>
-              <MobileDataRow label={phrase("Category", "კატეგორია", "Категория")}>{row.name}</MobileDataRow>
+              <MobileDataRow label={phrase("Category", "კატეგორია", "Категория")}>{record(row.name)}</MobileDataRow>
               <MobileDataRow label={phrase("Example / details", "მაგალითი / დეტალები", "Пример / детали")}>
-                <span className="font-medium text-slate-500">{row.details}</span>
+                <span className="font-medium text-slate-500">{record(row.details)}</span>
               </MobileDataRow>
               <MobileDataRow label={phrase("Active bookings", "აქტიური ჯავშნები", "Активные брони")}>{row.bookings}</MobileDataRow>
             </MobileDataCard>
@@ -123,7 +125,7 @@ export function AnalyticsDashboard({
                   {stats.modelStats.length === 0 ? (
                     <tr>
                       <td className="p-3 text-slate-500" colSpan={2}>
-                        No active bookings in this date range.
+                        {phrase("No active bookings in this date range.", "ამ პერიოდში აქტიური ჯავშანი არ არის.", "За этот период активных броней нет.")}
                       </td>
                     </tr>
                   ) : (
@@ -141,7 +143,7 @@ export function AnalyticsDashboard({
           mobile={
             stats.modelStats.length === 0 ? (
               <p className="rounded-xl border bg-white p-3 text-sm text-slate-500">
-                No active bookings in this date range.
+                {phrase("No active bookings in this date range.", "ამ პერიოდში აქტიური ჯავშანი არ არის.", "За этот период активных броней нет.")}
               </p>
             ) : (
               stats.modelStats.map((row) => (
@@ -178,7 +180,7 @@ export function AnalyticsDashboard({
                   ) : (
                     stats.airportStats.map((row) => (
                       <tr key={row.iata} className="border-t">
-                        <td className="p-3 font-semibold">{row.title}</td>
+                        <td className="p-3 font-semibold">{record(row.title)}</td>
                         <td className="p-3">{row.iata}</td>
                         <td className="p-3 font-bold">{row.bookings}</td>
                       </tr>
@@ -196,7 +198,7 @@ export function AnalyticsDashboard({
             ) : (
               stats.airportStats.map((row) => (
                 <MobileDataCard key={row.iata}>
-                  <MobileDataRow label={phrase("Airport", "აეროპორტი", "Аэропорт")}>{row.title}</MobileDataRow>
+                  <MobileDataRow label={phrase("Airport", "აეროპორტი", "Аэропорт")}>{record(row.title)}</MobileDataRow>
                   <MobileDataRow label="IATA">{row.iata}</MobileDataRow>
                   <MobileDataRow label={phrase("Active bookings", "აქტიური ჯავშნები", "Активные брони")}>{row.bookings}</MobileDataRow>
                 </MobileDataCard>
