@@ -214,6 +214,11 @@ export type AdminDictionary = {
     noCountryYet: string;
     placesHelp: string;
     liveBotSavedNote: string;
+    bookingMailTitle: string;
+    bookingMailHelp: string;
+    bookingMailLabel: string;
+    bookingMailPh: string;
+    bookingMailSaved: string;
     botUsername: string;
     botToken: string;
     addedFromDelivery: string;
@@ -545,6 +550,12 @@ const en: AdminDictionary = {
     noCountryYet: "No country is enabled yet. Select locations on the right to show them on the homepage.",
     placesHelp: "Turn on airports and major cities for homepage search.",
     liveBotSavedNote: "Saved. New bookings are sent to this bot.",
+    bookingMailTitle: "Booking email",
+    bookingMailHelp:
+      "When a guest finishes a booking, this address sends the car, pickup and return, extras, rental days, total, amount paid, and amount due on site to the partner and the customer.",
+    bookingMailLabel: "Sender email",
+    bookingMailPh: "bookings@example.com",
+    bookingMailSaved: "Saved. New bookings are emailed from this address.",
     botUsername: "Bot username",
     botToken: "Bot token",
     addedFromDelivery: "Added from Delivery",
@@ -877,6 +888,12 @@ const ka: AdminDictionary = {
     noCountryYet: "არც ერთი ქვეყანა არ არის ჩართული. მარჯვნივ აირჩიეთ ლოკაციები.",
     placesHelp: "ჩართეთ აეროპორტები და ქალაქები მთავარი გვერდის ძიებისთვის.",
     liveBotSavedNote: "შენახულია. ახალი ჯავშანი ამ ბოტზე გაიგზავნება.",
+    bookingMailTitle: "ჯავშნის მაილი",
+    bookingMailHelp:
+      "როცა მომხმარებელი ჯავშანს დაასრულებს, ამ მაილიდან პარტნიორს და მომხმარებელს ავტომატურად გაეგზავნება მანქანა, აყვანისა და დაბრუნების ადგილი თარიღით, დამატებითი სერვისები, დღეების რაოდენობა, ჯამი, გადახდილი და ადგილზე გადასახდელი თანხა.",
+    bookingMailLabel: "გამგზავნი მაილი",
+    bookingMailPh: "bookings@example.com",
+    bookingMailSaved: "შენახულია. ახალი ჯავშანი ამ მაილიდან გაიგზავნება.",
     botUsername: "ბოტის username",
     botToken: "ბოტის ტოკენი",
     addedFromDelivery: "დამატებულია მიწოდებიდან",
@@ -1209,6 +1226,12 @@ const ru: AdminDictionary = {
     noCountryYet: "Ни одна страна не включена. Выберите локации справа.",
     placesHelp: "Включите аэропорты и города для поиска на главной.",
     liveBotSavedNote: "Сохранено. Новые брони отправляются этому боту.",
+    bookingMailTitle: "Почта бронирования",
+    bookingMailHelp:
+      "Когда гость завершает бронь, с этого адреса партнёру и клиенту уходят машина, места и время получения и возврата, доп. услуги, число дней, сумма, оплаченное и к оплате на месте.",
+    bookingMailLabel: "Почта отправителя",
+    bookingMailPh: "bookings@example.com",
+    bookingMailSaved: "Сохранено. Новые брони отправляются с этого адреса.",
     botUsername: "Имя пользователя бота",
     botToken: "Токен бота",
     addedFromDelivery: "Добавлено из доставки",

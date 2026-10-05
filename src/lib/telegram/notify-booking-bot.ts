@@ -122,6 +122,25 @@ export function bookingBotMessage(
     .join("\n");
 }
 
+/** Partner and customer copy sent from the mailbox saved next to the booking bot. */
+export function bookingPartyMailText(
+  notice: BookingBotNotice & { extras?: string[]; days: number },
+) {
+  const car = notice.carLabel.replace(/\s+(19|20)\d{2}$/, "").trim() || "—";
+  const extras = (notice.extras || []).map((label) => label.trim()).filter(Boolean);
+  const days = Math.max(1, Math.round(Number(notice.days) || 1));
+  return [
+    car,
+    `აყვანის ადგილი: ${placeLine(notice.pickupIata, notice.pickupAddress) || "—"}, ${whenLine(notice.pickupAt, notice.pickupIata)}`,
+    `დაბრუნების ადგილი: ${placeLine(notice.dropoffIata, notice.dropoffAddress) || "—"}, ${whenLine(notice.dropoffAt, notice.dropoffIata)}`,
+    extras.length ? `დამატებითი სერვისები: ${extras.join(", ")}` : "დამატებითი სერვისები: არ არის არჩეული",
+    `ხანგრძლივობა: ${days} დღე`,
+    `სულ: ${money(notice.totalPriceEur)}`,
+    `გადახდილია: ${money(notice.paidEur)}`,
+    `ადგილზე გადასახდელი: ${money(notice.dueOnSiteEur)}`,
+  ].join("\n");
+}
+
 /** Sends the booking notice to the single bot saved in the admin homepage panel. */
 export async function sendBookingNoticeToBot(text: string): Promise<string | null> {
   const body = text.trim();

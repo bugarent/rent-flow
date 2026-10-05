@@ -22,6 +22,8 @@ import { FooterContactManager } from "@/components/admin/footer-contact-manager"
 import { LegalPagesManager } from "@/components/admin/legal-pages-manager";
 import { CustomBookingChannelsManager } from "@/components/admin/custom-booking-channels-manager";
 import { TelegramLiveBotsManager } from "@/components/admin/telegram-live-bots-manager";
+import { BookingMailManager } from "@/components/admin/booking-mail-manager";
+import { readBookingMailFrom } from "@/lib/server/booking-mail-from";
 import { LiveChatTelegramBotManager } from "@/components/admin/live-chat-telegram-bot-manager";
 import {
   getLiveChatTelegramBot,
@@ -45,6 +47,7 @@ export default async function AdminOperationsHomePage() {
     googleReviews,
     bookingChannels,
     telegramLiveBots,
+    bookingMailFrom,
     liveChatBot,
     footerContact,
     legalPages,
@@ -57,6 +60,7 @@ export default async function AdminOperationsHomePage() {
     getHomepageGoogleReviewsConfig(),
     getCustomBookingChannelsConfig(),
     getTelegramLiveBotsConfig().then(botsForAdminUi),
+    readBookingMailFrom(),
     getLiveChatTelegramBot().then(liveChatBotForAdminUi),
     getFooterContactConfig(),
     getLegalPagesConfig(),
@@ -70,6 +74,7 @@ export default async function AdminOperationsHomePage() {
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         <div className="min-w-0 space-y-3">
           <TelegramLiveBotsManager initial={telegramLiveBots} />
+          <BookingMailManager initialFromEmail={bookingMailFrom} />
           <LiveChatTelegramBotManager initial={liveChatBot} />
         </div>
         <div className="min-w-0">
