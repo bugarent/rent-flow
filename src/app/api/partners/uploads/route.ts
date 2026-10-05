@@ -44,34 +44,36 @@ export async function POST(req: Request) {
     if (file.size > MAX_BYTES) {
       return NextResponse.json({ error: "File too large (max 20 MB)" }, { status: 400 });
     }
-    if (isCover && (ext === "pdf" || ext === "gif")) {
-      return NextResponse.json({ error: "cover_style" }, { status: 400 });
-    }
     const buffer = Buffer.from(await file.arrayBuffer());
-    let saved: Buffer = buffer;
-    let savedExt = ext;
-    let contentType = ext === "pdf" ? "application/pdf" : ext === "jpg" ? "image/jpeg" : `image/${ext}`;
-    if (isCover) {
-      const identity = studioCoverIdentity({
-        make: String(form.get("make") || ""),
-        model: String(form.get("model") || ""),
-        year: String(form.get("year") || ""),
-        color: String(form.get("color") || ""),
-      });
-      if (!identity) {
-        return NextResponse.json({ error: "cover_identity" }, { status: 400 });
-      }
-      saved = await renderStudioCover({
+    const contentType = ext === "pdf" ? "application/pdf" : ext === "jpg" ? "image/jpeg" : `image/${ext}`;
+    const originalName = `${Date.now()}-${randomBytes(6).toString("hex")}.${ext}`;
+    await persistUploadedFile(["partner-cars", originalName], buffer, contentType);
+    const originalUrl = `/uploads/partner-cars/${originalName}`;
+    if (!isCover || ext === "pdf" || ext === "gif") {
+      return NextResponse.json({ url: originalUrl, styled: false });
+    }
+    const identity = studioCoverIdentity({
+      make: String(form.get("make") || ""),
+      model: String(form.get("model") || ""),
+      year: String(form.get("year") || ""),
+      color: String(form.get("color") || ""),
+    });
+    if (!identity) {
+      return NextResponse.json({ url: originalUrl, styled: false });
+    }
+    try {
+      const styled = await renderStudioCover({
         bytes: buffer,
         mime: contentType,
         ...identity,
       });
-      savedExt = "png";
-      contentType = "image/png";
+      const styledName = `${Date.now()}-${randomBytes(6).toString("hex")}.png`;
+      await persistUploadedFile(["partner-cars", styledName], styled, "image/png");
+      return NextResponse.json({ url: `/uploads/partner-cars/${styledName}`, styled: true });
+    } catch (error) {
+      console.error("[partners/uploads] studio cover kept original", error);
+      return NextResponse.json({ url: originalUrl, styled: false });
     }
-    const filename = `${Date.now()}-${randomBytes(6).toString("hex")}.${savedExt}`;
-    await persistUploadedFile(["partner-cars", filename], saved, contentType);
-    return NextResponse.json({ url: `/uploads/partner-cars/${filename}` });
   } catch (error) {
     console.error("[partners/uploads]", error);
     const message = error instanceof Error ? error.message : "Upload failed";

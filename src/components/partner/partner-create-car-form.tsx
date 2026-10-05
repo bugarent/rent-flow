@@ -343,7 +343,7 @@ function PercentInput({
 async function uploadFile(
   file: File,
   cover?: { make: string; model: string; year: string; color: string },
-): Promise<string> {
+): Promise<{ url: string; styled: boolean }> {
   const optimized = await compressImageForUpload(file);
   const fd = new FormData();
   fd.append("file", optimized);
@@ -357,7 +357,7 @@ async function uploadFile(
   const res = await fetch("/api/partners/uploads", { method: "POST", body: fd });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Upload failed");
-  return String(data.url);
+  return { url: String(data.url), styled: Boolean(data.styled) };
 }
 
 const NO_DELIVERY_CATALOG: DeliveryLocationView[] = [];
@@ -1363,48 +1363,40 @@ export function PartnerCreateCarForm({
     const coverIdentity = { make: make.trim(), model: model.trim(), year: year.trim(), color: color.trim() };
     const identityReady = Boolean(coverIdentity.make && coverIdentity.model && coverIdentity.year && coverIdentity.color);
     const coverEmpty = !String(photos[0] || "").trim();
-    const stylizeCoverSlot = files.some((_, index) => startIndex + index === 0);
-    const needsCover = stylizeCoverSlot || coverEmpty;
-    if (needsCover && !identityReady) {
-      showError(cc.coverNeedIdentity, "main-info", ["make", "model", "year", "color"]);
-      return { urls: [] };
-    }
+    const fillsCover = files.some((_, index) => startIndex + index === 0) || coverEmpty;
     setUploading(true);
     setError("");
     try {
-      let coverUrl: string | undefined;
-      if (!stylizeCoverSlot && coverEmpty) {
-        try {
-          coverUrl = await uploadFile(files[0]!, coverIdentity);
-        } catch (err) {
-          const code = err instanceof Error ? err.message : "";
-          if (code === "cover_identity") {
-            showError(cc.coverNeedIdentity, "main-info", ["make", "model", "year", "color"]);
-            return { urls: [] };
-          }
-          showError(code === "cover_style" ? cc.coverStyleFailed : code || common.uploadFailed, "photo");
-        }
-      }
       const urls: string[] = [];
-      for (let index = 0; index < files.length; index += 1) {
-        const file = files[index]!;
-        const isCover = startIndex + index === 0;
-        urls.push(await uploadFile(file, isCover ? coverIdentity : undefined));
+      for (const file of files) {
+        urls.push((await uploadFile(file)).url);
       }
-      return { urls, coverUrl };
+      const coverSource = files[0];
+      if (fillsCover && coverSource && identityReady && coverSource.type !== "image/gif") {
+        const source = coverSource;
+        const originalCover = urls[0] || "";
+        window.setTimeout(() => {
+          void uploadFile(source, coverIdentity)
+            .then((styled) => {
+              if (!styled.styled || !styled.url) return;
+              setPhotos((prev) => {
+                if (String(prev[0] || "") !== originalCover) return prev;
+                const next = [...prev];
+                next[0] = styled.url;
+                return next;
+              });
+            })
+            .catch(() => {
+              /* the uploaded photo already stays as the cover */
+            });
+        }, 0);
+      }
+      return {
+        urls,
+        coverUrl: coverEmpty && startIndex > 0 ? urls[0] : undefined,
+      };
     } catch (err) {
-      const code = err instanceof Error ? err.message : "";
-      const message =
-        code === "cover_identity"
-          ? cc.coverNeedIdentity
-          : code === "cover_style"
-            ? cc.coverStyleFailed
-            : code || common.uploadFailed;
-      showError(
-        message,
-        code === "cover_identity" ? "main-info" : "photo",
-        code === "cover_identity" ? ["make", "model", "year", "color"] : undefined,
-      );
+      showError(err instanceof Error ? err.message : common.uploadFailed, "photo");
       return { urls: [] };
     } finally {
       setUploading(false);
@@ -1417,7 +1409,7 @@ export function PartnerCreateCarForm({
     setUploading(true);
     setError("");
     try {
-      const url = await uploadFile(file);
+      const url = (await uploadFile(file)).url;
       if (side === "front") setPassportFront(url);
       else setPassportBack(url);
     } catch (err) {
@@ -1439,7 +1431,7 @@ export function PartnerCreateCarForm({
     setUploading(true);
     setError("");
     try {
-      setInsuranceUrl(await uploadFile(file));
+      setInsuranceUrl((await uploadFile(file)).url);
       setInvalidFields((prev) => {
         if (!prev.has("insurance-file")) return prev;
         const next = new Set(prev);
