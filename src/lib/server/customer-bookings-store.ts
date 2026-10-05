@@ -36,6 +36,9 @@ export type FileBookingRecord = {
   totalPriceEur: number;
   depositPercent: number;
   depositPaidEur: number;
+  /** Exact pay-now amount in the guest's currency, using the rate at payment time. */
+  platformChargeCurrency?: string;
+  platformChargeAmount?: number;
   balanceDueEur: number;
   guestFirstName: string;
   guestLastName: string;
@@ -229,6 +232,8 @@ export async function updateFileBooking(
       | "dropoffAddress"
       | "totalPriceEur"
       | "depositPaidEur"
+      | "platformChargeCurrency"
+      | "platformChargeAmount"
       | "balanceDueEur"
       | "depositPercent"
       | "status"

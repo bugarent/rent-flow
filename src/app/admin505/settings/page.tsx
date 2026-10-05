@@ -3,6 +3,7 @@ import { AdminAccountForm } from "@/components/admin/account-form";
 import { requireAdmin } from "@/lib/auth/guards";
 import { loadLocalAdminAsync, revealAdminPassword, saveLocalAdminAsync } from "@/lib/auth/local-admin-store";
 import { AdminPageHeading, AdminPlatformTitle } from "@/components/admin/admin-page-heading";
+import { ensureDailyFxRates } from "@/lib/server/fx-rates-sync";
 import { getPlatformSettings } from "@/lib/server/platform-settings-store";
 
 export default async function AdminSettingsPage() {
@@ -11,6 +12,7 @@ export default async function AdminSettingsPage() {
   const local = await loadLocalAdminAsync();
   let email = session.user.email ?? local?.email ?? "";
   let passwordHash = local?.passwordHash ?? "";
+  await ensureDailyFxRates().catch(() => undefined);
   const settings = await getPlatformSettings();
 
   try {
@@ -60,6 +62,7 @@ export default async function AdminSettingsPage() {
           eurGbpRate={settings.eurGbpRate}
           eurGelRate={settings.eurGelRate}
           eurRubRate={settings.eurRubRate}
+          fxRatesUpdatedAt={settings.fxRatesUpdatedAt}
           googleMapsUrl={settings.googleMapsUrl}
           partnerOperatingCountryIso2s={settings.partnerOperatingCountryIso2s}
           siteContractUrl={settings.siteContractUrl}

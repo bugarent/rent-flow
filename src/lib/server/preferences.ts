@@ -45,19 +45,24 @@ export function defaultFxRates(): FxRates {
   };
 }
 
-/** Load EUR→currency rates from platform settings (with safe fallbacks). */
+/** Load EUR→currency rates, refreshing them once per Tbilisi day. */
 export async function getFxRates(): Promise<FxRates> {
   const fallback = defaultFxRates();
   try {
-    const { getPlatformSettings } = await import("@/lib/server/platform-settings-store");
-    const settings = await getPlatformSettings();
-    return {
-      eurUsd: toNumber(settings.eurUsdRate, fallback.eurUsd),
-      eurGbp: toNumber(settings.eurGbpRate, fallback.eurGbp),
-      eurGel: toNumber(settings.eurGelRate, fallback.eurGel),
-      eurRub: toNumber(settings.eurRubRate, fallback.eurRub),
-    };
+    const { ensureDailyFxRates } = await import("@/lib/server/fx-rates-sync");
+    return await ensureDailyFxRates();
   } catch {
-    return fallback;
+    try {
+      const { getPlatformSettings } = await import("@/lib/server/platform-settings-store");
+      const settings = await getPlatformSettings();
+      return {
+        eurUsd: toNumber(settings.eurUsdRate, fallback.eurUsd),
+        eurGbp: toNumber(settings.eurGbpRate, fallback.eurGbp),
+        eurGel: toNumber(settings.eurGelRate, fallback.eurGel),
+        eurRub: toNumber(settings.eurRubRate, fallback.eurRub),
+      };
+    } catch {
+      return fallback;
+    }
   }
 }

@@ -210,6 +210,7 @@ export function ReserveCheckout({
     () => !(initialCar && initialRange === carRangeKey(initialStart, initialEnd)),
   );
   const [checkoutStep, setCheckoutStep] = useState<"details" | "payment">("details");
+  const [payAmountLabel, setPayAmountLabel] = useState("");
   const [guestNoticeOpen, setGuestNoticeOpen] = useState(false);
   const [previewBookingRef, setPreviewBookingRef] = useState("");
   const previewRefRequest = useRef<Promise<string> | null>(null);
@@ -884,8 +885,23 @@ export function ReserveCheckout({
     setGuestNoticeOpen(true);
   };
 
-  const proceedToPaymentAfterNotice = () => {
+  const loadPayAmountLabel = async (amountEur: number) => {
+    try {
+      const res = await fetch(
+        `/api/fx/quote?amountEur=${encodeURIComponent(amountEur.toFixed(2))}`,
+        { cache: "no-store" },
+      );
+      const data = (await res.json().catch(() => null)) as { amountLabel?: string } | null;
+      return res.ok && typeof data?.amountLabel === "string" ? data.amountLabel : "";
+    } catch {
+      return "";
+    }
+  };
+
+  const proceedToPaymentAfterNotice = async () => {
     setGuestNoticeOpen(false);
+    const label = await loadPayAmountLabel(totals.payNow);
+    if (label) setPayAmountLabel(label);
     setCheckoutStep("payment");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -1107,12 +1123,17 @@ export function ReserveCheckout({
               </p>
             </div>
             <CheckoutPaypalSandbox
-              amountLabel={formatPrice(totals.payNow)}
+              amountLabel={payAmountLabel || formatPrice(totals.payNow)}
               locale={locale}
               guestEmail={email}
               loading={loading}
               onBack={() => setCheckoutStep("details")}
               onConfirm={async () => {
+                const label = await loadPayAmountLabel(totals.payNow);
+                if (label && label !== payAmountLabel) {
+                  setPayAmountLabel(label);
+                  return;
+                }
                 await handleBooking();
               }}
             />

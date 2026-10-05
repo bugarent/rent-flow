@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { requirePartnerApi } from "@/lib/auth/sessions";
 import { persistUploadedFile } from "@/lib/server/persist-upload";
-import { renderStudioCover, studioCoverIdentity } from "@/lib/server/studio-cover";
+import { renderInstantStudioCover } from "@/lib/server/instant-studio-cover";
 
 export const maxDuration = 60;
 
@@ -49,24 +49,11 @@ export async function POST(req: Request) {
     const originalName = `${Date.now()}-${randomBytes(6).toString("hex")}.${ext}`;
     await persistUploadedFile(["partner-cars", originalName], buffer, contentType);
     const originalUrl = `/uploads/partner-cars/${originalName}`;
-    if (!isCover || ext === "pdf" || ext === "gif") {
-      return NextResponse.json({ url: originalUrl, styled: false });
-    }
-    const identity = studioCoverIdentity({
-      make: String(form.get("make") || ""),
-      model: String(form.get("model") || ""),
-      year: String(form.get("year") || ""),
-      color: String(form.get("color") || ""),
-    });
-    if (!identity) {
+    if (!isCover || ext === "pdf") {
       return NextResponse.json({ url: originalUrl, styled: false });
     }
     try {
-      const styled = await renderStudioCover({
-        bytes: buffer,
-        mime: contentType,
-        ...identity,
-      });
+      const styled = await renderInstantStudioCover(buffer);
       const styledName = `${Date.now()}-${randomBytes(6).toString("hex")}.png`;
       await persistUploadedFile(["partner-cars", styledName], styled, "image/png");
       return NextResponse.json({ url: `/uploads/partner-cars/${styledName}`, styled: true });

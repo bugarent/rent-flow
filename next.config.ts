@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  serverExternalPackages: ["@prisma/client", "prisma"],
+  serverExternalPackages: ["@prisma/client", "prisma", "sharp"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },

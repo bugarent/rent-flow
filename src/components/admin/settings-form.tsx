@@ -77,6 +77,7 @@ export function AdminSettingsForm(props: {
   eurGbpRate: number;
   eurGelRate: number;
   eurRubRate?: number;
+  fxRatesUpdatedAt?: string;
   googleMapsUrl: string;
   partnerOperatingCountryIso2s: string[];
   siteContractUrl?: string;
@@ -374,11 +375,21 @@ export function AdminSettingsForm(props: {
         <p className="mb-2 text-sm font-semibold">{phrase("Currency exchange rates", "ვალუტის კურსები", "Курсы валют")}</p>
         <p className="mb-3 text-xs text-slate-500">
           {phrase(
-            "Enter how many units of each currency equal 1 lari (GEL). After Save, rates apply immediately for partners, customers, and admin.",
-            "ჩაწერეთ, რამდენი ერთეული უდრის 1 ლარს (GEL). შენახვის შემდეგ კურსი მაშინვე მოქმედებს პარტნიორთან, მომხმარებელთან და ადმინში.",
-            "Укажите, сколько единиц каждой валюты равно 1 лари (GEL). После сохранения курс сразу действует у партнёров, клиентов и в админке.",
+            "Rates refresh automatically once a day (Tbilisi time) for lari, dollar, euro, and pound. At payment the pay-now amount is converted with that day's rate so the exact figure is transferred to the platform account. You can still edit a rate and Save.",
+            "კურსი ავტომატურად ახლდება დღეში ერთხელ (თბილისის დროით) ლარზე, დოლარზე, ევროსა და გირვანქაზე. გადახდისას თანხა იმ დღის კურსით გადაითვლება და ზუსტად ეს თანხა ირიცხება პლატფორმის ანგარიშზე. კურსის ხელით შეცვლა და შენახვაც შეიძლება.",
+            "Курс обновляется автоматически раз в день (по времени Тбилиси) для лари, доллара, евро и фунта. При оплате сумма пересчитывается по курсу этого дня и именно она зачисляется на счёт платформы. Курс можно поправить вручную и сохранить.",
           )}
         </p>
+        {props.fxRatesUpdatedAt && !Number.isNaN(new Date(props.fxRatesUpdatedAt).getTime()) ? (
+          <p className="mb-3 text-xs font-semibold text-slate-600">
+            {phrase("Last update", "ბოლო განახლება", "Последнее обновление")}:{" "}
+            {new Intl.DateTimeFormat(locale === "ka" ? "ka-GE" : locale === "ru" ? "ru-RU" : "en-GB", {
+              timeZone: "Asia/Tbilisi",
+              dateStyle: "medium",
+              timeStyle: "short",
+            }).format(new Date(props.fxRatesUpdatedAt))}
+          </p>
+        ) : null}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block text-sm font-semibold">
             {phrase("Lari (GEL) — base", "ლარი (GEL) — საბაზისო", "Лари (GEL) — база")}

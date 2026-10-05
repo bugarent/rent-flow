@@ -22,6 +22,24 @@ import { resolveListingDiscountPercent } from "@/lib/server/partner-period-disco
 import { ensureFileCarInPrisma } from "@/lib/server/ensure-file-car-in-prisma";
 import { createFileBooking } from "@/lib/server/customer-bookings-store";
 
+async function attachPlatformCharge(booking: {
+  id: string;
+  depositPaidEur: unknown;
+  fileStored?: boolean;
+}) {
+  const { quotePlatformCharge, recordPlatformCharge } = await import("@/lib/server/platform-charges");
+  const platformCharge = await quotePlatformCharge(Number(booking.depositPaidEur));
+  await recordPlatformCharge(booking.id, platformCharge);
+  if (booking.fileStored) {
+    const { updateFileBooking } = await import("@/lib/server/customer-bookings-store");
+    await updateFileBooking(booking.id, {
+      platformChargeCurrency: platformCharge.currency,
+      platformChargeAmount: platformCharge.amount,
+    });
+  }
+  return platformCharge;
+}
+
 async function creditBusinessPartnerFromBooking(input: {
   promoCode?: string;
   sequentialNumber?: number | null;
@@ -729,7 +747,8 @@ export async function POST(req: Request) {
             siteEarnedEur: bpSplit.siteEarnedEur,
           };
         }
-        return NextResponse.json({ ...booking, bpCredit }, { status: 201 });
+        const platformCharge = await attachPlatformCharge(booking);
+        return NextResponse.json({ ...booking, bpCredit, platformCharge }, { status: 201 });
       }
     }
 
@@ -1072,7 +1091,8 @@ export async function POST(req: Request) {
           siteEarnedEur: bpSplit.siteEarnedEur,
         };
       }
-      return NextResponse.json({ ...booking, bpCredit }, { status: 201 });
+      const platformCharge = await attachPlatformCharge(booking);
+      return NextResponse.json({ ...booking, bpCredit, platformCharge }, { status: 201 });
     }
 
     const resolvedFirst =
@@ -1300,7 +1320,8 @@ export async function POST(req: Request) {
         siteEarnedEur: bpSplit.siteEarnedEur,
       };
     }
-    return NextResponse.json({ ...booking, bpCredit }, { status: 201 });
+    const platformCharge = await attachPlatformCharge(booking);
+    return NextResponse.json({ ...booking, bpCredit, platformCharge }, { status: 201 });
   } catch (error) {
     console.error("[bookings] POST failed", error);
     if (isDbOfflineError(error)) {

@@ -1361,18 +1361,13 @@ export function PartnerCreateCarForm({
   ): Promise<{ urls: string[]; coverUrl?: string }> => {
     if (!files.length) return { urls: [] };
     const coverIdentity = { make: make.trim(), model: model.trim(), year: year.trim(), color: color.trim() };
-    const identityReady = Boolean(coverIdentity.make && coverIdentity.model && coverIdentity.year && coverIdentity.color);
     const coverEmpty = !String(photos[0] || "").trim();
     const fillsCover = files.some((_, index) => startIndex + index === 0) || coverEmpty;
     setUploading(true);
     setError("");
     try {
       const urls: string[] = [];
-      const styleCover =
-        fillsCover &&
-        Boolean(files[0]) &&
-        identityReady &&
-        files[0]!.type !== "image/gif";
+      const styleCover = fillsCover && Boolean(files[0]) && files[0]!.type !== "application/pdf";
       let coverUrl: string | undefined;
       if (styleCover && startIndex === 0) {
         const cover = await uploadFile(files[0]!, coverIdentity);
