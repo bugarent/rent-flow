@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 function copyFor(locale: string) {
   if (locale === "ka") {
     return {
-      title: "ძირითადი ინფო",
+      title: "პარტნიორობის შეთავაზება",
       close: "დახურვა",
       brand: "საფირმო სახელი",
       firstName: "სახელი",
@@ -51,7 +51,7 @@ function copyFor(locale: string) {
   }
   if (locale === "ru") {
     return {
-      title: "Основная информация",
+      title: "Предложение о партнёрстве",
       close: "Закрыть",
       brand: "Фирменное название",
       firstName: "Имя",
@@ -86,7 +86,7 @@ function copyFor(locale: string) {
     };
   }
   return {
-    title: "Basic info",
+    title: "Partnership offer",
     close: "Close",
     brand: "Brand name",
     firstName: "First name",
@@ -312,8 +312,8 @@ export function PartnerApplicationForm({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between border-b bg-white px-4 py-3 sm:px-5">
-          <h2 className="text-lg font-extrabold text-[#0b1f4b] sm:text-xl">{t.title}</h2>
-          <button type="button" className="min-h-10 px-2 text-sm font-semibold text-slate-500" onClick={onClose}>
+          <h2 className="min-w-0 flex-1 break-words text-lg font-extrabold text-[#0b1f4b] sm:text-xl">{t.title}</h2>
+          <button type="button" className="min-h-10 shrink-0 px-2 text-sm font-semibold text-slate-500" onClick={onClose}>
             {t.close}
           </button>
         </div>
