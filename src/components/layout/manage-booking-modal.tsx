@@ -258,14 +258,16 @@ export function ManageBookingModal({
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          type="button"
-          className="absolute right-3 top-3 z-10 rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-          onClick={onClose}
-          aria-label={dictionary.home.close}
-        >
-          <X className="h-5 w-5" />
-        </button>
+        <div className="sticky top-0 z-10 flex h-0 justify-end">
+          <button
+            type="button"
+            className="me-3 mt-3 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 shadow-sm transition hover:bg-slate-200"
+            onClick={onClose}
+            aria-label={dictionary.home.close}
+          >
+            <X className="h-5 w-5" strokeWidth={2.5} />
+          </button>
+        </div>
 
         <div className="px-4 pb-7 pt-7 sm:px-6 sm:pb-8 sm:pt-8">
           {!foundBookings.length && !foundChat ? (

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { FREE_CANCEL_HOURS, PROTECTION_CANCEL_HOURS } from "@/lib/bookings/guest-cancellation";
+import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import type { Copy } from "./types";
 
 export function GuestCancelDialog({
@@ -60,7 +61,7 @@ export function GuestCancelDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[280] flex items-end justify-center bg-black/50 p-3 sm:items-center"
+      className="fixed inset-0 z-[280] flex items-center justify-center bg-black/50 p-3"
       role="dialog"
       aria-modal="true"
       aria-labelledby="guest-cancel-title"
@@ -70,7 +71,7 @@ export function GuestCancelDialog({
       }}
     >
       <form
-        className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"
+        className="relative max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
         onSubmit={(event) => {
           event.preventDefault();
@@ -82,7 +83,8 @@ export function GuestCancelDialog({
           onConfirm(text);
         }}
       >
-        <h2 id="guest-cancel-title" className="text-lg font-extrabold leading-snug text-[#0b1f4b]">
+        <ModalCloseButton onClick={onClose} label={t.back} />
+        <h2 id="guest-cancel-title" className="pe-10 text-lg font-extrabold leading-snug text-[#0b1f4b]">
           {t.cancelReasonTitle}
         </h2>
         <textarea

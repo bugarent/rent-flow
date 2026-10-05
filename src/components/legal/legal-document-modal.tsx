@@ -61,9 +61,9 @@ export function LegalDocumentModal({
             type="button"
             onClick={onClose}
             aria-label={closeLabel}
-            className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200"
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5" strokeWidth={2.5} />
           </button>
         </header>
 

@@ -3,6 +3,7 @@
 import { Component, useCallback, useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { BookingInvoiceDocumentView } from "@/components/invoices/booking-invoice-document";
+import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import type { BookingInvoiceDocument } from "@/lib/invoices/types";
 
 function labels(locale: string) {
@@ -177,7 +178,7 @@ export function BookingInvoiceModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/50 p-2 sm:items-center sm:p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-2 sm:p-4"
       role="dialog"
       aria-modal="true"
       onMouseDown={(e) => {
@@ -186,10 +187,11 @@ export function BookingInvoiceModal({
       }}
     >
       <div
-        className="relative flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-[#eef1f6] shadow-2xl"
+        className="relative flex max-h-[calc(100dvh-1rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-[#eef1f6] shadow-2xl sm:max-h-[94dvh]"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="invoice-modal-toolbar flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
+        <ModalCloseButton onClick={onClose} label={t.close} className="invoice-modal-toolbar" />
+        <div className="invoice-modal-toolbar flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-white py-3 pe-14 ps-4">
           <h2 className="shrink-0 text-base font-extrabold text-[#0b1f4b]">{t.title}</h2>
           {shareUrl ? (
             <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -235,13 +237,6 @@ export function BookingInvoiceModal({
               className="rounded-lg bg-[#0b1f4b] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#14306a] disabled:opacity-50"
             >
               {t.print}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
-            >
-              {t.close}
             </button>
           </div>
         </div>

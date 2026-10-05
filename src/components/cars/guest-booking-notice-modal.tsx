@@ -1,6 +1,7 @@
 "use client";
 
 import { Mail, Hash, Bookmark } from "lucide-react";
+import { ModalCloseButton } from "@/components/ui/modal-close-button";
 
 export function GuestBookingNoticeModal({
   open,
@@ -46,7 +47,8 @@ export function GuestBookingNoticeModal({
         className="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="border-b border-amber-100 bg-amber-50 px-5 py-4">
+        <ModalCloseButton onClick={onClose} />
+        <div className="border-b border-amber-100 bg-amber-50 py-4 pe-14 ps-5">
           <p className="flex items-center gap-2 text-base font-extrabold text-[#0b1f4b]">
             <Bookmark className="h-5 w-5 shrink-0 text-amber-700" aria-hidden />
             {title}

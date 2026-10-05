@@ -78,11 +78,11 @@ export function HelpCenterModal({
           >
             <button
               type="button"
-              className="absolute right-3 top-3 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              className="absolute end-3 top-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200"
               onClick={onClose}
               aria-label={dictionary.common.closeMenu}
             >
-              <X className="h-5 w-5" />
+              <X className="h-5 w-5" strokeWidth={2.5} />
             </button>
             <h2
               id="help-center-title"

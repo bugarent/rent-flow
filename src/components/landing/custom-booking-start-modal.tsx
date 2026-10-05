@@ -653,7 +653,7 @@ export function CustomBookingStartModal({
     return (
       <>
         {createPortal(
-          <div className="fixed bottom-4 right-4 z-[220] flex max-w-[min(100vw-2rem,24rem)] items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-slate-900 shadow-2xl">
+          <div className="fixed bottom-[5.25rem] right-4 z-[220] flex md:bottom-4 max-w-[min(100vw-2rem,24rem)] items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-slate-900 shadow-2xl">
             <button
               type="button"
               className="min-w-0 flex-1 truncate text-left text-sm font-bold text-[#0b1f4b]"
@@ -695,7 +695,7 @@ export function CustomBookingStartModal({
     <>
       {createPortal(
         <div
-          className="fixed inset-0 z-[220] flex items-center justify-center p-4 text-slate-900"
+          className="fixed inset-0 z-[220] flex items-center justify-center p-2 text-slate-900 sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-label={dictionary.home.customTitle}
@@ -703,7 +703,7 @@ export function CustomBookingStartModal({
           <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-[1px]" aria-hidden />
           <div
             className={cn(
-              "relative max-h-[92vh] w-full max-w-[calc(32rem+10cm)] overflow-y-auto rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl",
+              "relative max-h-[calc(100dvh-1rem)] w-full max-w-[calc(32rem+10cm)] overflow-y-auto sm:max-h-[92dvh] rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl",
               dragging ? "cursor-grabbing select-none" : "",
             )}
             style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
@@ -741,17 +741,17 @@ export function CustomBookingStartModal({
                 ) : null}
                 <button
                   type="button"
-                  className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200"
                   onClick={requestClose}
                   aria-label={dictionary.home.close}
                   title={dictionary.home.close}
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-5 w-5" strokeWidth={2.5} />
                 </button>
               </div>
             </div>
 
-            <div className="px-6 py-5 sm:px-8 sm:pb-7">
+            <div className="px-4 py-5 sm:px-8 sm:pb-7">
               {error ? <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</p> : null}
 
               {chat ? (

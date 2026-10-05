@@ -63,11 +63,11 @@ export function ContactOptionsModal({
         >
           <button
             type="button"
-            className="absolute right-3 top-3 rounded-lg p-1.5 text-slate-400 hover:bg-white/80 hover:text-slate-700"
+            className="absolute end-3 top-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-white"
             onClick={onClose}
             aria-label={dictionary.common.closeMenu}
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5" strokeWidth={2.5} />
           </button>
           <h2
             id="contact-options-title"

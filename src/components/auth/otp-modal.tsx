@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { OTP_LENGTH } from "@/lib/brand";
 import { usePreferences } from "@/components/providers/preferences-context";
+import { ModalCloseButton } from "@/components/ui/modal-close-button";
 
 export function OtpModal({
   open,
@@ -27,9 +28,10 @@ export function OtpModal({
   const collect = () => refs.current.map((el) => el?.value ?? "").join("");
 
   return (
-    <div className="fixed inset-0 z-[230] flex items-end justify-center bg-slate-950/70 p-4 sm:items-center">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 text-slate-900 shadow-2xl">
-        <h2 className="text-xl font-bold">{dictionary.auth.otpTitle}</h2>
+    <div className="fixed inset-0 z-[230] flex items-center justify-center bg-slate-950/70 p-3 sm:p-4">
+      <div className="relative max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 text-slate-900 shadow-2xl">
+        <ModalCloseButton onClick={onClose} label={dictionary.home.close} />
+        <h2 className="pe-10 text-xl font-bold">{dictionary.auth.otpTitle}</h2>
         <p className="mt-1 text-sm text-slate-600">{dictionary.auth.otpHint}</p>
         {hint ? (
           <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">

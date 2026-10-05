@@ -1324,10 +1324,10 @@ export function CarsSearchResults({
                 <button
                   type="button"
                   onClick={() => setFiltersOpen(false)}
-                  className="rounded-md p-1 text-slate-500 hover:bg-slate-100"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200"
                   aria-label={c.close}
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-5 w-5" strokeWidth={2.5} />
                 </button>
               </div>
 

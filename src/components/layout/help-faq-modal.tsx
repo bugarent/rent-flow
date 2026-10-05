@@ -72,11 +72,11 @@ export function HelpFaqModal({ open, onClose }: { open: boolean; onClose: () => 
           </div>
           <button
             type="button"
-            className="absolute right-5 top-5 rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            className="absolute end-3 top-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition hover:bg-slate-200"
             onClick={onClose}
             aria-label="Close"
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5" strokeWidth={2.5} />
           </button>
         </div>
 
