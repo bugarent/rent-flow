@@ -14,6 +14,8 @@ import {
   X,
 } from "lucide-react";
 import type { CheckoutCopy } from "@/lib/i18n/checkout-copy";
+import { knownText } from "@/lib/i18n/known-record-text";
+import { usePreferences } from "@/components/providers/preferences-context";
 import { CARD_PICKUP_SURCHARGE_PERCENT } from "@/lib/cars/reserve-pricing";
 import { extraPeriodCharge } from "@/lib/extras/pricing";
 import { cn, roundMoney } from "@/lib/utils";
@@ -98,6 +100,7 @@ export function CheckoutInsurancePanel({
   /** Rental day count — daily prices are multiplied by this in the total. */
   days: number;
 }) {
+  const { locale } = usePreferences();
   const [detailId, setDetailId] = useState<string | null>(null);
   const enabledCount = packs.filter((pack) => selectedIds.has(pack.id)).length;
   const dayCount = Math.max(1, days || 1);
@@ -144,7 +147,7 @@ export function CheckoutInsurancePanel({
             return (
               <InsuranceToggleRow
                 key={pack.id}
-                title={pack.name}
+                title={knownText(locale, pack.name)}
                 selected={selected}
                 locked={locked}
                 onToggle={() => {
@@ -165,7 +168,7 @@ export function CheckoutInsurancePanel({
 
       {detail && detailPack ? (
         <InsuranceDetailModal
-          title={detail.title}
+          title={knownText(locale, detail.title)}
           body={detail.body}
           includes={detail.includes}
           warns={detail.warns}

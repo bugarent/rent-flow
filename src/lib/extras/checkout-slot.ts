@@ -1,7 +1,7 @@
-export const INSURANCE_CHECKOUT_SLOTS = ["tpl", "basic", "full", "driver"] as const;
+export const INSURANCE_CHECKOUT_SLOTS = ["tpl", "basic", "full", "accident", "theft", "driver"] as const;
 
 /** Protection packs shown in the checkout insurance panel (excludes additional driver). */
-export const PROTECTION_INSURANCE_SLOTS = ["tpl", "basic", "full"] as const;
+export const PROTECTION_INSURANCE_SLOTS = ["tpl", "basic", "full", "accident", "theft"] as const;
 
 export type InsuranceCheckoutSlot = (typeof INSURANCE_CHECKOUT_SLOTS)[number];
 export type ProtectionInsuranceSlot = (typeof PROTECTION_INSURANCE_SLOTS)[number];
@@ -11,15 +11,30 @@ export const CHECKOUT_SLOT_ORDER: Record<InsuranceCheckoutSlot, number> = {
   tpl: 0,
   basic: 1,
   full: 2,
-  driver: 3,
+  accident: 3,
+  theft: 4,
+  driver: 5,
 };
 
 export function isInsuranceCheckoutSlot(value: unknown): value is InsuranceCheckoutSlot {
-  return value === "tpl" || value === "basic" || value === "full" || value === "driver";
+  return (
+    value === "tpl" ||
+    value === "basic" ||
+    value === "full" ||
+    value === "accident" ||
+    value === "theft" ||
+    value === "driver"
+  );
 }
 
 export function isProtectionInsuranceSlot(value: unknown): value is ProtectionInsuranceSlot {
-  return value === "tpl" || value === "basic" || value === "full";
+  return (
+    value === "tpl" ||
+    value === "basic" ||
+    value === "full" ||
+    value === "accident" ||
+    value === "theft"
+  );
 }
 
 export function normalizeCheckoutSlot(value: unknown): ExtraCheckoutSlot {
@@ -39,8 +54,23 @@ export function inferCheckoutSlot(input: {
   if (String(input.slug || "").toLowerCase().trim() === "tpl") return "tpl";
   const hay = `${input.slug || ""} ${input.name || ""}`.toLowerCase();
   if (/(^|\s)tpl(\s|$)|third[-_\s]?party|მესამე მხარ|треть(я|ей) сторон/.test(hay)) return "tpl";
-  if (/basic[-_\s]?cover|საბაზისო დაფარვ|базов(ое|ая) покрыт/.test(hay)) return "basic";
-  if (/full[-_\s]?protect|სრული დაფარვ|полная защит|полная страхов/.test(hay)) return "full";
+  // SuperCDW is full coverage; plain CDW / „ძირითადი დაფარვა“ is basic. Check full first.
+  if (
+    /supercdw|super[-_\s]?cdw|სრული დაფარვ|full[-_\s]?(protect|cover)|полная защит|полная страхов/.test(
+      hay,
+    )
+  ) {
+    return "full";
+  }
+  if (
+    /ძირითადი დაფარვ|basic[-_\s]?cover|საბაზისო დაფარვ|(^|[^a-z])cdw([^a-z]|$)|базов(ое|ая) покрыт/.test(
+      hay,
+    )
+  ) {
+    return "basic";
+  }
+  if (/personal[-_\s]?accident|ჯგუფის მგზავრ|უბედური შემთხვევ|несчастн/.test(hay)) return "accident";
+  if (/theft[-_\s]?protect|ქურდობ|diebstahl|угон/.test(hay)) return "theft";
   if (
     /additional[-_\s]?driver|დამატებითი მძღოლ|доп(\.|олнительн).*вод|conducteur additionnel|zusatzfahrer|dodatkow(y|ego) kierowc/.test(
       hay,
@@ -101,6 +131,10 @@ export function checkoutSlotLabel(slot: ExtraCheckoutSlot): string {
       return "Insurance: Basic coverage";
     case "full":
       return "Insurance: Full coverage";
+    case "accident":
+      return "Insurance: Personal accident";
+    case "theft":
+      return "Insurance: Theft protection";
     case "driver":
       return "Insurance: Additional driver";
     default:

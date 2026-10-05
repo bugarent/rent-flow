@@ -13,7 +13,7 @@ async function requireAdmin() {
   return session;
 }
 
-const checkoutSlotSchema = z.enum(["none", "tpl", "basic", "full", "driver"]);
+const checkoutSlotSchema = z.enum(["none", "tpl", "basic", "full", "accident", "theft", "driver"]);
 
 const upsertSchema = z.object({
   name: z.string().trim().min(2).max(120),

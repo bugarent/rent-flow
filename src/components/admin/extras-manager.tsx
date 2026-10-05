@@ -42,7 +42,7 @@ function blankForm(): FormState {
   };
 }
 
-const SLOT_OPTIONS: ExtraCheckoutSlot[] = ["none", "tpl", "basic", "full", "driver"];
+const SLOT_OPTIONS: ExtraCheckoutSlot[] = ["none", "tpl", "basic", "full", "accident", "theft", "driver"];
 
 /** System TPL pack (seed slug `tpl`) stays mandatory and free. */
 function isCorePackTpl(item: ExtraServicePricing) {

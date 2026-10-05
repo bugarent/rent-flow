@@ -19,7 +19,7 @@ const patchSchema = z.object({
   isActive: z.boolean().optional(),
   isTpl: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
-  checkoutSlot: z.enum(["none", "tpl", "basic", "full", "driver"]).optional(),
+  checkoutSlot: z.enum(["none", "tpl", "basic", "full", "accident", "theft", "driver"]).optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
