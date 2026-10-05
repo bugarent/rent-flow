@@ -142,6 +142,7 @@ export function LanguageSelect({
           className={cn(headerChipClass, buttonClassName)}
           aria-haspopup="listbox"
           aria-expanded={open}
+          aria-label={`Language: ${LOCALE_LABELS[locale]}`}
         >
           <LocaleFlag locale={locale} />
           <span className="hidden sm:inline">{LOCALE_LABELS[locale]}</span>
@@ -199,6 +200,7 @@ export function CurrencySelect({
           className={cn(headerChipClass, buttonClassName)}
           aria-haspopup="listbox"
           aria-expanded={open}
+          aria-label={`Currency: ${CURRENCY_LABELS[currency]}`}
         >
           <span className="font-semibold tracking-tight">{CURRENCY_LABELS[currency]}</span>
           <ChevronDown className="h-4 w-4 opacity-70" />

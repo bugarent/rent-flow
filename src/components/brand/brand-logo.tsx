@@ -53,7 +53,6 @@ export function BrandLogo({
       />
       <span
         className={`whitespace-nowrap font-[family-name:var(--font-brand)] font-semibold leading-none tracking-[-0.03em] ${word}`}
-        aria-label={BRAND_WORDMARK}
       >
         <span className="text-[color:var(--brand-navy)]">Rent</span>
         <span className="text-[color:var(--brand-orange)]">airport</span>

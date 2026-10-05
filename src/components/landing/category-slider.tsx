@@ -178,7 +178,7 @@ export function CategorySlider({ categories }: { categories: Category[] }) {
             <>
               <button
                 type="button"
-                aria-label={dictionary.home.carCategories}
+                aria-label={`${dictionary.home.carCategories} — previous`}
                 onClick={() => scrollByCard(-1)}
                 className={`${arrowClass} left-5 sm:left-7`}
               >
@@ -186,7 +186,7 @@ export function CategorySlider({ categories }: { categories: Category[] }) {
               </button>
               <button
                 type="button"
-                aria-label={dictionary.home.carCategories}
+                aria-label={`${dictionary.home.carCategories} — next`}
                 onClick={() => scrollByCard(1)}
                 className={`${arrowClass} right-5 sm:right-7`}
               >

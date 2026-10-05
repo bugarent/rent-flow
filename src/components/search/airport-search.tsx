@@ -273,12 +273,14 @@ function clampDateToMin(value: string, min: string) {
 
 function DateTimeField({
   dateLabel,
+  timeLabel,
   time,
   onOpenCalendar,
   onTimeChange,
   isTimeDisabled,
 }: {
   dateLabel: string;
+  timeLabel: string;
   time: string;
   onOpenCalendar: () => void;
   onTimeChange: (value: string) => void;
@@ -298,6 +300,7 @@ function DateTimeField({
         <Clock3 className="h-4 w-4 shrink-0 text-[#1A3B5D]/80" aria-hidden />
         <select
           value={time}
+          aria-label={timeLabel}
           onChange={(e) => onTimeChange(e.target.value)}
           className="min-h-8 w-[5.25rem] shrink-0 bg-transparent text-sm font-medium text-slate-800 outline-none"
           required
@@ -805,7 +808,7 @@ export function AirportSearch({
     if (!showIndividualBooking) setCustomBookingOpen(false);
   }, [showIndividualBooking]);
   const ctaButtonClass =
-    "flex min-h-11 min-w-0 w-full items-center justify-center rounded-lg bg-[#22c55e] px-3 py-2.5 text-center text-[11px] font-extrabold uppercase leading-tight tracking-wide text-white shadow-[0_3px_10px_rgba(34,197,94,0.28)] hover:bg-[#16a34a] sm:min-h-9 sm:px-4 sm:text-sm";
+    "flex min-h-11 min-w-0 w-full items-center justify-center rounded-lg bg-[#15803d] px-3 py-2.5 text-center text-[11px] font-extrabold uppercase leading-tight tracking-wide text-white shadow-[0_3px_10px_rgba(21,128,61,0.28)] hover:bg-[#166534] sm:min-h-9 sm:px-4 sm:text-sm";
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -942,6 +945,7 @@ export function AirportSearch({
           <span className={labelClass}>{dictionary.home.pickupDateShort}</span>
           <DateTimeField
             dateLabel={formatRangeDay(pickupDate, locale)}
+            timeLabel={`${dictionary.home.pickupDateShort} — ${pickupTime}`}
             time={pickupTime}
             onOpenCalendar={() => setCalendarField("pickup")}
             isTimeDisabled={(value) => !isPickupSlotAllowed(pickupDate, value)}
@@ -956,6 +960,7 @@ export function AirportSearch({
           <span className={labelClass}>{dictionary.home.dropoffDateShort}</span>
           <DateTimeField
             dateLabel={formatRangeDay(dropoffDate, locale)}
+            timeLabel={`${dictionary.home.dropoffDateShort} — ${dropoffTime}`}
             time={dropoffTime}
             onOpenCalendar={() => setCalendarField("dropoff")}
             isTimeDisabled={(value) => dropoffDate === pickupDate && value <= pickupTime}

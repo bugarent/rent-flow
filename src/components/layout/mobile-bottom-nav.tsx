@@ -67,7 +67,7 @@ export function MobileBottomNav() {
           const Icon = item.icon;
           const className = cn(
             "flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-center text-[10px] font-medium leading-tight sm:text-[11px]",
-            item.active ? "text-sky-600" : "text-slate-500",
+            item.active ? "text-sky-700" : "text-slate-600",
           );
           const label = <span className="line-clamp-2 max-w-full">{item.label}</span>;
           return (

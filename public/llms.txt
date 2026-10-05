@@ -1,0 +1,22 @@
+# Rentairportcars.com
+
+> Airport car rental marketplace. Compare cars from local rental companies at airports and cities, see the full price up front (free cancellation, no hidden fees) and book online with instant confirmation.
+
+## How to search and book
+
+- Search form on the home page: choose country, pick-up location, drop-off location (or "Same as pick-up"), pick-up date/time and drop-off date/time, then "Search cars".
+- Search results URL format: https://rentairportcars.com/cars?pickup={IATA}&dropoff={IATA}&startDate={YYYY-MM-DDTHH:mm}&endDate={YYYY-MM-DDTHH:mm}
+- Car details and checkout: https://rentairportcars.com/cars/{carId}
+- Manage an existing booking: "Bookings" / "My Booking" — requires the booking number and the email used for the booking.
+
+## Main pages
+
+- [Home](https://rentairportcars.com/): search form, car categories, popular airports
+- [Cars](https://rentairportcars.com/cars): search results with filters
+- [Locations](https://rentairportcars.com/locations): all airports and cities served
+- [Help center](https://rentairportcars.com/help): FAQ about booking, payment, deposits and cancellation
+- [Contact](https://rentairportcars.com/contact)
+- [About](https://rentairportcars.com/about)
+- [Become a partner](https://rentairportcars.com/partnership): for rental companies
+- [Terms](https://rentairportcars.com/terms)
+- [Privacy](https://rentairportcars.com/privacy)

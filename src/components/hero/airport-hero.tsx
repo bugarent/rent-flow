@@ -1,8 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { HERO_BACKGROUND_URL } from "@/lib/brand";
 import { AirportSearch, type SearchAirportOption } from "@/components/search/airport-search";
 import type { CustomBookingChannelsConfig } from "@/lib/catalog/custom-booking-channels";
+
+const HERO_IMAGE_SRC = HERO_BACKGROUND_URL.split("?")[0];
 
 export function AirportHero({
   airports,
@@ -17,9 +20,14 @@ export function AirportHero({
 }) {
   return (
     <section className="relative isolate w-full overflow-x-clip">
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url('${HERO_BACKGROUND_URL}')` }}
+      <Image
+        src={HERO_IMAGE_SRC}
+        alt=""
+        fill
+        preload
+        fetchPriority="high"
+        sizes="100vw"
+        className="object-cover object-center"
         aria-hidden
       />
       <div className="absolute inset-0 bg-slate-950/15" aria-hidden />

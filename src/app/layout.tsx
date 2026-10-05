@@ -28,22 +28,26 @@ const geistSans = Geist({
 const inter = Inter({
   variable: "--font-brand",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["600"],
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  preload: false,
 });
 
+// Script-specific faces load on demand via unicode-range; preloading them on every page delays LCP.
 const notoGeorgian = Noto_Sans_Georgian({
   variable: "--font-noto-georgian",
   subsets: ["georgian"],
+  preload: false,
 });
 
 const notoArabic = Noto_Sans_Arabic({
   variable: "--font-noto-arabic",
   subsets: ["arabic"],
+  preload: false,
 });
 
 export async function generateMetadata(): Promise<Metadata> {

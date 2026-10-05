@@ -24,6 +24,7 @@ function FooterPaymentIcons() {
   return (
     <div
       className="flex flex-wrap items-center justify-center gap-1.5"
+      role="group"
       aria-label="Accepted payment methods"
     >
       <span className={chip} title="PayPal">
@@ -67,7 +68,7 @@ function SocialIcon({
   children: ReactNode;
 }) {
   return (
-    <span aria-label={label} className="inline-flex h-4 w-4 items-center justify-center">
+    <span role="img" aria-label={label} className="inline-flex h-4 w-4 items-center justify-center">
       {children}
     </span>
   );

@@ -114,7 +114,7 @@ function ReviewCard({
           )}
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-slate-800">{item.authorName}</p>
-            {item.relativeTime ? <p className="text-xs text-slate-400">{item.relativeTime}</p> : null}
+            {item.relativeTime ? <p className="text-xs text-slate-500">{item.relativeTime}</p> : null}
           </div>
         </div>
         <GoogleMark className="h-5 w-5 shrink-0" />
@@ -204,7 +204,7 @@ export function GoogleReviewsCarousel({
         <Stars rating={rating} />
         <p className="text-sm font-semibold text-slate-800">
           {ratingLabel}
-          <span className="mx-1.5 font-normal text-slate-400">|</span>
+          <span className="mx-1.5 font-normal text-slate-500" aria-hidden>|</span>
           <span className="font-semibold text-slate-800">{topRated}</span>
         </p>
       </div>
