@@ -25,6 +25,11 @@ import { usePreferences } from "@/components/providers/preferences-context";
 import { CustomBookingStartModal } from "@/components/landing/custom-booking-start-modal";
 import type { CustomBookingChannelsConfig } from "@/lib/catalog/custom-booking-channels";
 import { clampPickupSelection, earliestPickupIsoDate, isPickupSlotAllowed } from "@/lib/bookings/lead-time";
+import {
+  SearchDateRangePicker,
+  formatRangeDay,
+  type DateRangeField,
+} from "@/components/search/search-date-range-picker";
 
 export type SearchAirportOption = {
   iata: string;
@@ -267,33 +272,28 @@ function clampDateToMin(value: string, min: string) {
 }
 
 function DateTimeField({
-  date,
+  dateLabel,
   time,
-  min,
-  onDateChange,
+  onOpenCalendar,
   onTimeChange,
   isTimeDisabled,
 }: {
-  date: string;
+  dateLabel: string;
   time: string;
-  min?: string;
-  onDateChange: (value: string) => void;
+  onOpenCalendar: () => void;
   onTimeChange: (value: string) => void;
   isTimeDisabled?: (value: string) => boolean;
 }) {
   return (
     <FieldShell icon={<CalendarDays className="h-4 w-4" />}>
       <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1.5">
-        <input
-          type="date"
-          value={date}
-          min={min}
-          onChange={(e) =>
-            onDateChange(min ? clampDateToMin(e.target.value, min) : e.target.value)
-          }
-          className="min-h-8 min-w-[9.75rem] flex-1 bg-transparent py-0 pl-0 pr-0.5 text-sm font-medium text-slate-800 outline-none [color-scheme:light] [&::-webkit-calendar-picker-indicator]:ms-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0 [&::-webkit-datetime-edit-text]:px-0.5 [&::-webkit-datetime-edit-month-field]:p-0 [&::-webkit-datetime-edit-day-field]:p-0 [&::-webkit-datetime-edit-year-field]:p-0"
-          required
-        />
+        <button
+          type="button"
+          onClick={onOpenCalendar}
+          className="min-h-8 min-w-0 flex-1 truncate bg-transparent py-0 text-left text-sm font-medium text-slate-800 outline-none"
+        >
+          {dateLabel}
+        </button>
         <span className="h-5 w-px shrink-0 bg-slate-200" aria-hidden />
         <Clock3 className="h-4 w-4 shrink-0 text-[#1A3B5D]/80" aria-hidden />
         <select
@@ -728,6 +728,7 @@ export function AirportSearch({
   const [pickupAddress, setPickupAddress] = useState("");
   const [dropoffAddress, setDropoffAddress] = useState("");
   const [customBookingOpen, setCustomBookingOpen] = useState(false);
+  const [calendarField, setCalendarField] = useState<DateRangeField | null>(null);
 
   useEffect(() => {
     if (dropoffDate < pickupDate) setDropoffDate(pickupDate);
@@ -940,16 +941,10 @@ export function AirportSearch({
         <label className="block">
           <span className={labelClass}>{dictionary.home.pickupDateShort}</span>
           <DateTimeField
-            date={pickupDate}
+            dateLabel={formatRangeDay(pickupDate, locale)}
             time={pickupTime}
-            min={minPickupDate}
+            onOpenCalendar={() => setCalendarField("pickup")}
             isTimeDisabled={(value) => !isPickupSlotAllowed(pickupDate, value)}
-            onDateChange={(value) => {
-              const slot = clampPickupSelection(clampDateToMin(value, minPickupDate), pickupTime, TIME_OPTIONS);
-              setPickupDate(slot.date);
-              setPickupTime(slot.time);
-              if (dropoffDate < slot.date) setDropoffDate(slot.date);
-            }}
             onTimeChange={(value) => {
               if (!isPickupSlotAllowed(pickupDate, value)) return;
               setPickupTime(value);
@@ -960,17 +955,35 @@ export function AirportSearch({
         <label className="block">
           <span className={labelClass}>{dictionary.home.dropoffDateShort}</span>
           <DateTimeField
-            date={dropoffDate}
+            dateLabel={formatRangeDay(dropoffDate, locale)}
             time={dropoffTime}
-            min={pickupDate || minPickupDate}
+            onOpenCalendar={() => setCalendarField("dropoff")}
             isTimeDisabled={(value) => dropoffDate === pickupDate && value <= pickupTime}
-            onDateChange={(value) =>
-              setDropoffDate(clampDateToMin(value, pickupDate || minPickupDate))
-            }
             onTimeChange={setDropoffTime}
           />
         </label>
       </div>
+
+      {calendarField ? (
+        <SearchDateRangePicker
+          initialField={calendarField}
+          pickupDate={pickupDate}
+          dropoffDate={dropoffDate}
+          minDate={minPickupDate || earliestPickupIsoDate()}
+          locale={locale}
+          pickupLabel={dictionary.home.pickupDateShort}
+          dropoffLabel={dictionary.home.dropoffDateShort}
+          closeLabel={dictionary.common.closeMenu}
+          onClose={() => setCalendarField(null)}
+          onApply={(range) => {
+            const slot = clampPickupSelection(range.pickupDate, pickupTime, TIME_OPTIONS);
+            setPickupDate(slot.date);
+            setPickupTime(slot.time);
+            setDropoffDate(clampDateToMin(range.dropoffDate, slot.date));
+            setCalendarField(null);
+          }}
+        />
+      ) : null}
 
       <div className="mt-1.5 flex flex-col items-stretch justify-center gap-2 sm:flex-row sm:items-center">
         <button
