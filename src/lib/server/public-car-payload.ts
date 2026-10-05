@@ -141,7 +141,10 @@ export async function enrichPublicCarPayload<T extends object>(
 
 export const PUBLIC_CAR_INCLUDE = {
   photos: { orderBy: { sortOrder: "asc" as const } },
-  extras: { include: { extraService: true } },
+  extras: {
+    include: { extraService: true },
+    orderBy: { extraService: { sortOrder: "asc" as const } },
+  },
   deliveryPrices: {
     include: {
       deliveryLocation: {
@@ -203,6 +206,11 @@ export async function shapeFileCarForApi(
 
 const PUBLIC_TTL_MS = 15_000;
 const publicCache = new Map<string, { at: number; value: Promise<Record<string, unknown> | null> }>();
+
+/** Drop every cached public car payload so a catalog reorder shows up on open listings. */
+export function clearPublicCarPayloadCache() {
+  publicCache.clear();
+}
 
 /** Drop cached public payloads for a car (all date ranges) after it is edited or deleted. */
 export function clearPublicCarCache(carId: string) {

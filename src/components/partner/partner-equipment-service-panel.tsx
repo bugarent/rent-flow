@@ -1007,6 +1007,10 @@ export function PartnerEquipmentServicePanel({
     );
   }
 
+  const orderedRows = [...rows].sort(
+    (a, b) => a.service.sortOrder - b.service.sortOrder || a.service.name.localeCompare(b.service.name),
+  );
+
   /* —— List table view —— */
   return (
     <div className="flex min-h-screen flex-col bg-[#eef2f7]">
@@ -1040,7 +1044,7 @@ export function PartnerEquipmentServicePanel({
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((row, idx) => {
+                    {orderedRows.map((row, idx) => {
                       const mandatory = isMandatoryFreeExtra(row.service);
                       const mandatoryAny = isMandatoryExtra(row.service);
                       const periodFree = isPeriodForcedFreeExtra(row.service);
@@ -1205,7 +1209,7 @@ export function PartnerEquipmentServicePanel({
               }
               mobile={
                 <>
-                  {rows.map((row) => {
+                  {orderedRows.map((row) => {
                     const mandatory = isMandatoryFreeExtra(row.service);
                     const mandatoryAny = isMandatoryExtra(row.service);
                     const periodFree = isPeriodForcedFreeExtra(row.service);

@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { GripVertical } from "lucide-react";
+import { useLongPressReorder } from "@/components/admin/extras/use-long-press-reorder";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { extrasAdminCopy } from "@/lib/i18n/extras-admin-copy";
 import { knownText } from "@/lib/i18n/known-record-text";
@@ -29,8 +30,6 @@ type FormState = {
   checkoutSlot: ExtraCheckoutSlot;
 };
 
-const LONG_PRESS_MS = 420;
-
 function blankForm(): FormState {
   return {
     name: "",
@@ -41,17 +40,6 @@ function blankForm(): FormState {
     isActive: true,
     checkoutSlot: "none",
   };
-}
-
-function moveItem(list: ExtraServicePricing[], fromId: string, toId: string) {
-  if (fromId === toId) return list;
-  const fromIndex = list.findIndex((i) => i.id === fromId);
-  const toIndex = list.findIndex((i) => i.id === toId);
-  if (fromIndex < 0 || toIndex < 0) return list;
-  const next = [...list];
-  const [moved] = next.splice(fromIndex, 1);
-  next.splice(toIndex, 0, moved);
-  return next;
 }
 
 const SLOT_OPTIONS: ExtraCheckoutSlot[] = ["none", "tpl", "basic", "full", "driver"];
@@ -75,28 +63,8 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
   const [saving, setSaving] = useState(false);
   const [savingRowId, setSavingRowId] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [overId, setOverId] = useState<string | null>(null);
   const [orderSaving, setOrderSaving] = useState(false);
-
-  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const holdOrigin = useRef<{ x: number; y: number } | null>(null);
-  const dragActive = useRef(false);
-  const draggingIdRef = useRef<string | null>(null);
-  const pointerIdRef = useRef<number | null>(null);
   const orderBeforeDrag = useRef<ExtraServicePricing[] | null>(null);
-  const extrasRef = useRef(extras);
-  useLayoutEffect(() => {
-    extrasRef.current = extras;
-  });
-
-  const clearHold = () => {
-    if (holdTimer.current) {
-      clearTimeout(holdTimer.current);
-      holdTimer.current = null;
-    }
-    holdOrigin.current = null;
-  };
 
   const persistOrder = useCallback(async (next: ExtraServicePricing[]) => {
     setOrderSaving(true);
@@ -133,86 +101,24 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
     }
   }, []);
 
-  const endDrag = useCallback(
-    async (commit: boolean) => {
-      clearHold();
-      const wasDragging = dragActive.current;
-      const id = draggingIdRef.current;
-      dragActive.current = false;
-      draggingIdRef.current = null;
-      pointerIdRef.current = null;
-      setDraggingId(null);
-      setOverId(null);
-      if (!wasDragging || !id) return;
-      if (!commit) {
-        if (orderBeforeDrag.current) setExtras(orderBeforeDrag.current);
-        orderBeforeDrag.current = null;
-        return;
-      }
-      const next = extrasRef.current;
-      const changed =
-        !orderBeforeDrag.current ||
-        orderBeforeDrag.current.length !== next.length ||
-        orderBeforeDrag.current.some((row, i) => row.id !== next[i]?.id);
-      if (changed) await persistOrder(next);
-      else orderBeforeDrag.current = null;
+  const { draggingId, dropTarget, onPointerDown, onContextMenu } = useLongPressReorder({
+    items: extras,
+    setItems: setExtras,
+    onCommit: (next, previous) => {
+      orderBeforeDrag.current = previous;
+      return persistOrder(next);
     },
-    [persistOrder],
-  );
+  });
 
-  const onRowPointerDown = (itemId: string, e: React.PointerEvent) => {
-    if (e.button !== 0) return;
-    // Don't start long-press from action buttons / links.
-    const target = e.target as HTMLElement;
-    if (target.closest("button, a, input, select, textarea, label")) return;
-
-    clearHold();
-    pointerIdRef.current = e.pointerId;
-    holdOrigin.current = { x: e.clientX, y: e.clientY };
-    holdTimer.current = setTimeout(() => {
-      dragActive.current = true;
-      draggingIdRef.current = itemId;
-      orderBeforeDrag.current = extrasRef.current;
-      setDraggingId(itemId);
-      try {
-        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
-      }
-    }, LONG_PRESS_MS);
-  };
-
-  const onRowPointerMove = (_overItemId: string, e: React.PointerEvent) => {
-    if (!dragActive.current) {
-      // Cancel long-press if the pointer moves before it arms.
-      if (holdTimer.current && holdOrigin.current) {
-        const dx = Math.abs(e.clientX - holdOrigin.current.x);
-        const dy = Math.abs(e.clientY - holdOrigin.current.y);
-        if (dx > 8 || dy > 8) clearHold();
-      }
-      return;
-    }
-    const fromId = draggingIdRef.current;
-    if (!fromId) return;
-    e.preventDefault();
-
-    // With pointer capture, use hit-testing to find the row under the cursor.
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    const row = el?.closest("tr[data-extra-id]") as HTMLElement | null;
-    const hitId = row?.dataset.extraId;
-    if (!hitId) return;
-    setOverId((prev) => (prev === hitId ? prev : hitId));
-    if (hitId === fromId) return;
-    setExtras((prev) => moveItem(prev, fromId, hitId));
-  };
-
-  const onRowPointerUp = (e: React.PointerEvent) => {
-    if (pointerIdRef.current != null && e.pointerId !== pointerIdRef.current) return;
-    void endDrag(true);
-  };
-
-  const onRowPointerCancel = () => {
-    void endDrag(false);
+  const rowDragClass = (id: string) => {
+    const before = dropTarget?.id === id && !dropTarget.after;
+    const after = dropTarget?.id === id && dropTarget.after;
+    return cn(
+      draggingId === id && "bg-sky-50 opacity-70 ring-2 ring-inset ring-sky-500",
+      before && "shadow-[inset_0_3px_0_0_#0284c7]",
+      after && "shadow-[inset_0_-3px_0_0_#0284c7]",
+      draggingId ? "cursor-grabbing" : "cursor-grab",
+    );
   };
 
   const parseOptionalNumber = (raw: string): number | null => {
@@ -436,25 +342,15 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
                   extras.map((item) => {
                     const mandatory = isMandatoryExtra(item);
                     const corePack = isCorePackTpl(item);
-                    const isDragging = draggingId === item.id;
-                    const isOver = overId === item.id && draggingId !== item.id;
                     return (
                       <tr
                         key={item.id}
                         data-extra-id={item.id}
-                        onPointerDown={(e) => onRowPointerDown(item.id, e)}
-                        onPointerEnter={(e) => {
-                          if (dragActive.current) onRowPointerMove(item.id, e);
-                        }}
-                        onPointerMove={(e) => onRowPointerMove(item.id, e)}
-                        onPointerUp={onRowPointerUp}
-                        onPointerCancel={onRowPointerCancel}
+                        onPointerDown={(e) => onPointerDown(item.id, e)}
+                        onContextMenu={onContextMenu}
                         className={cn(
-                          "border-t align-top select-none touch-none",
-                          isDragging && "bg-sky-50 opacity-70",
-                          isOver && "ring-2 ring-inset ring-sky-400",
-                          draggingId && !isDragging && "cursor-grabbing",
-                          !draggingId && "cursor-grab",
+                          "border-t align-top select-none [&_input]:select-text [&_textarea]:select-text",
+                          rowDragClass(item.id),
                         )}
                       >
                         <td className="p-3 text-slate-400">
@@ -551,7 +447,17 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
               const mandatory = isMandatoryExtra(item);
               const corePack = isCorePackTpl(item);
               return (
-                <MobileDataCard key={item.id}>
+                <div
+                  key={item.id}
+                  data-extra-id={item.id}
+                  onPointerDown={(e) => onPointerDown(item.id, e)}
+                  onContextMenu={onContextMenu}
+                  className={cn(
+                    "select-none rounded-xl [&_input]:select-text [&_textarea]:select-text",
+                    rowDragClass(item.id),
+                  )}
+                >
+                <MobileDataCard>
                   <MobileDataRow label={copy.service}>
                     <div className="text-end">
                       <p className="font-semibold text-[#0b1f4b]">{text(item.name)}</p>
@@ -630,6 +536,7 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
                     </button>
                   </div>
                 </MobileDataCard>
+                </div>
               );
             })
           )

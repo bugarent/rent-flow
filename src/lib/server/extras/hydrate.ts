@@ -316,6 +316,7 @@ export async function mergePartnerOfferedExtras(
           maxPriceEur: service.maxPriceEur,
           maxPeriodEur: bounds.maxPeriodEur,
           minPeriodEur: bounds.minPeriodEur,
+          sortOrder: service.sortOrder,
           checkoutSlot: service.checkoutSlot,
         },
       });

@@ -286,13 +286,19 @@ export async function reorderExtraServices(orderedIds: string[]): Promise<ExtraS
       next.push({ ...row, sortOrder: next.length, updatedAt: now });
     }
     await writeFileStore(next);
+    try {
+      const { clearPublicCarPayloadCache } = await import("@/lib/server/public-car-payload");
+      clearPublicCarPayloadCache();
+    } catch {
+      /* cache is best-effort */
+    }
     return next.map(toPricing);
   };
 
   try {
-    await Promise.all(
+    await prisma.$transaction(
       orderedIds.map((id, index) =>
-        prisma.extraService.update({ where: { id }, data: { sortOrder: index } }),
+        prisma.extraService.updateMany({ where: { id }, data: { sortOrder: index } }),
       ),
     );
     // Keep file store in sync when present.
@@ -315,6 +321,12 @@ export async function reorderExtraServices(orderedIds: string[]): Promise<ExtraS
       }
     } catch {
       /* file optional */
+    }
+    try {
+      const { clearPublicCarPayloadCache } = await import("@/lib/server/public-car-payload");
+      clearPublicCarPayloadCache();
+    } catch {
+      /* cache is best-effort */
     }
     return listExtraServices();
   } catch (error) {

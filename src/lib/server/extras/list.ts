@@ -50,7 +50,10 @@ function mapActiveOnly(rows: ExtraServicePricing[], activeOnly?: boolean) {
 
 async function listFromFile(activeOnly?: boolean): Promise<ExtraServicePricing[]> {
   const fileRows = await readFileStore().catch(() => [] as StoredExtraService[]);
-  return mapActiveOnly(fileRows.map(toPricing), activeOnly);
+  const priced = fileRows
+    .map(toPricing)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  return mapActiveOnly(priced, activeOnly);
 }
 
 /**

@@ -2420,7 +2420,9 @@ export function PartnerCreateCarForm({
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-1.5">
-              {extrasCatalog.map((service) => {
+              {[...extrasCatalog]
+                .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+                .map((service) => {
                 const row = extraSelections.find((s) => s.extraServiceId === service.id);
                 const mandatory = isMandatoryExtra(service);
                 const forbidden = !mandatory && Boolean(row?.forbidden);
