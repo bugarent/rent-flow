@@ -1210,13 +1210,13 @@ export function ReserveCheckout({
                         <li
                           key={feature.id}
                           className={cn(
-                            "flex min-h-[1.5rem] w-full items-center justify-center rounded-md border px-1.5 py-0.5 text-center text-[10px] font-semibold leading-tight",
+                            "flex min-h-[1.5rem] w-full min-w-0 items-center justify-center rounded-md border px-1.5 py-0.5 text-center text-[10px] font-semibold leading-tight",
                             feature.enabled
                               ? "border-emerald-400 bg-emerald-50 text-emerald-800"
                               : "border-amber-400 bg-amber-50 text-amber-800 line-through decoration-amber-700",
                           )}
                         >
-                          <span className="truncate">
+                          <span className="min-w-0 break-words">
                             {feature.label}
                             {feature.enabled ? " ✓" : ""}
                           </span>
@@ -1230,12 +1230,12 @@ export function ReserveCheckout({
                   </div>
                 </div>
 
-                <ul className="mt-1.5 grid w-full grid-cols-4 gap-1.5">
+                <ul className="mt-1.5 grid w-full grid-cols-2 gap-1.5 sm:grid-cols-4">
                   {benefitBadges.map((badge) => (
                     <li
                       key={badge.id}
                       className={cn(
-                        "inline-flex min-w-0 items-center justify-center gap-1.5 rounded-full px-2 py-1.5 text-center text-[10px] font-semibold leading-tight sm:px-3 sm:text-[11px]",
+                        "inline-flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-1.5 text-center text-[11px] font-semibold leading-tight sm:rounded-full sm:px-3",
                         badge.enabled
                           ? badge.className
                           : "border border-amber-400 bg-amber-50 text-amber-800 line-through decoration-amber-700",
@@ -1244,7 +1244,7 @@ export function ReserveCheckout({
                       <span className={cn("shrink-0", badge.enabled ? "opacity-70" : "opacity-50")}>
                         {badge.icon}
                       </span>
-                      <span className="truncate">{badge.label}</span>
+                      <span className="min-w-0 break-words">{badge.label}</span>
                     </li>
                   ))}
                 </ul>
@@ -1314,7 +1314,7 @@ export function ReserveCheckout({
                             <div className="flex min-w-0 flex-1 items-center gap-1 max-sm:basis-[60%]">
                               <span
                                 className={cn(
-                                  "min-w-0 truncate text-sm font-extrabold leading-none",
+                                  "min-w-0 break-words text-sm font-extrabold leading-snug",
                                   locked || selected ? "text-[#0b1f4b]" : "text-amber-950",
                                 )}
                               >
@@ -1440,8 +1440,8 @@ export function ReserveCheckout({
                               variant="forbidden"
                               compact
                             />
-                            <div className="flex min-w-0 flex-1 items-center gap-1 truncate">
-                              <span className="truncate text-sm font-semibold text-slate-900">
+                            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+                              <span className="min-w-0 break-words text-sm font-semibold leading-snug text-slate-900">
                                 {record(extra.name)}
                               </span>
                               {extra.description?.trim() ? (
