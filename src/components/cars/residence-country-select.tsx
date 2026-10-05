@@ -93,6 +93,8 @@ export function ResidenceCountrySelect({
   locale,
   invalid = false,
   label,
+  placeholder,
+  required = false,
 }: {
   /** ISO 3166-1 alpha-2, or empty when unset. */
   valueIso2: string;
@@ -101,6 +103,8 @@ export function ResidenceCountrySelect({
   invalid?: boolean;
   /** Visible label, e.g. “ვცხოვრობ”. */
   label: string;
+  placeholder?: string;
+  required?: boolean;
 }) {
   const t = copyFor(locale);
   const [open, setOpen] = useState(false);
@@ -222,7 +226,7 @@ export function ResidenceCountrySelect({
                 }}
                 onKeyDown={onSearchKey}
                 placeholder={t.search}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-sky-400"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-base outline-none placeholder:text-slate-400 focus:border-sky-400"
                 aria-label={t.search}
               />
             </div>
@@ -236,7 +240,7 @@ export function ResidenceCountrySelect({
                     type="button"
                     data-active={index === highlight ? "true" : "false"}
                     className={cn(
-                      "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm",
+                      "flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm",
                       c.iso2 === valueIso2
                         ? "bg-sky-50 font-semibold text-sky-950"
                         : "text-slate-800",
@@ -259,7 +263,10 @@ export function ResidenceCountrySelect({
 
   return (
     <div ref={rootRef} className="relative w-full">
-      <p className="mb-1 text-sm font-semibold text-slate-700">{label}</p>
+      <p className={cn("mb-1 text-sm font-semibold", invalid ? "text-red-700" : "text-slate-700")}>
+        {label}
+        {required ? <span className="text-[#e11d48]"> *</span> : null}
+      </p>
       <button
         ref={buttonRef}
         type="button"
@@ -267,7 +274,7 @@ export function ResidenceCountrySelect({
         aria-haspopup="listbox"
         data-invalid={invalid || undefined}
         className={cn(
-          "flex w-full items-center gap-2.5 rounded-md border px-3 py-2.5 text-left text-sm outline-none transition",
+          "mt-1 flex min-h-11 w-full items-center gap-2.5 rounded-md border px-3 py-2.5 text-left text-base outline-none transition",
           invalid
             ? "border-2 border-red-500 bg-red-50 ring-2 ring-red-200"
             : "border-slate-300 bg-white focus:border-sky-400 focus:ring-2 focus:ring-sky-100",
@@ -291,7 +298,7 @@ export function ResidenceCountrySelect({
             </span>
           </>
         ) : (
-          <span className="min-w-0 flex-1 truncate text-slate-400">{t.placeholder}</span>
+          <span className="min-w-0 flex-1 truncate text-slate-400">{placeholder || t.placeholder}</span>
         )}
         <ChevronDown
           className={cn("h-4 w-4 shrink-0 text-slate-400 transition", open && "rotate-180")}
