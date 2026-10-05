@@ -12,18 +12,11 @@ import { PARTNER_LOGIN } from "@/lib/routes";
 import { PARTNER_SOCIAL_PLATFORMS, type PartnerSocialPlatform } from "@/lib/partner";
 import { cn } from "@/lib/utils";
 
-const inputClass =
-  "mt-1 w-full rounded-md border border-[#c5ced8] bg-white px-3 py-2.5 text-base font-normal text-slate-900 outline-none focus:border-sky-500";
-
 function copyFor(locale: string) {
   if (locale === "ka") {
     return {
       title: "ძირითადი ინფო",
       close: "დახურვა",
-      logo: "ლოგო",
-      upload: "ატვირთვა",
-      replace: "შეცვლა",
-      deleteLogo: "წაშლა",
       brand: "საფირმო სახელი",
       firstName: "სახელი",
       lastName: "გვარი",
@@ -51,10 +44,6 @@ function copyFor(locale: string) {
       received: "განაცხადი მიღებულია",
       receivedBody: "ადმინისტრატორი დაინახავს ამ მონაცემებს, ქვეყნებს და აყვანის პუნქტებს.",
       done: "დახურვა",
-      fill: "შეავსეთ ყველა სავალდებულო ველი.",
-      placesRequired: "თითოეულ ქვეყანას მიუთითეთ აყვანის პუნქტი.",
-      passwordShort: "პაროლი უნდა იყოს მინიმუმ 6 სიმბოლო.",
-      mismatch: "პაროლები არ ემთხვევა.",
       loginPrompt: "უკვე გავლილი გაქვთ მოდერაცია?",
       loginLink: "პარტნიორის შესვლა",
     };
@@ -63,10 +52,6 @@ function copyFor(locale: string) {
     return {
       title: "Основная информация",
       close: "Закрыть",
-      logo: "Логотип",
-      upload: "Загрузить",
-      replace: "Заменить",
-      deleteLogo: "Удалить",
       brand: "Фирменное название",
       firstName: "Имя",
       lastName: "Фамилия",
@@ -94,10 +79,6 @@ function copyFor(locale: string) {
       received: "Заявка получена",
       receivedBody: "Администратор увидит эти данные, страны и пункты выдачи.",
       done: "Закрыть",
-      fill: "Заполните все обязательные поля.",
-      placesRequired: "Укажите пункт выдачи для каждой страны.",
-      passwordShort: "Пароль должен быть не короче 6 символов.",
-      mismatch: "Пароли не совпадают.",
       loginPrompt: "Модерация уже пройдена?",
       loginLink: "Вход партнёра",
     };
@@ -105,10 +86,6 @@ function copyFor(locale: string) {
   return {
     title: "Basic info",
     close: "Close",
-    logo: "Logo",
-    upload: "Upload",
-    replace: "Replace",
-    deleteLogo: "Remove",
     brand: "Brand name",
     firstName: "First name",
     lastName: "Last name",
@@ -136,10 +113,6 @@ function copyFor(locale: string) {
     received: "Application received",
     receivedBody: "An administrator will see these details, countries, and pickup points.",
     done: "Close",
-    fill: "Fill in every required field.",
-    placesRequired: "Choose a pickup point for each country.",
-    passwordShort: "Password must be at least 6 characters.",
-    mismatch: "Passwords do not match.",
     loginPrompt: "Already approved?",
     loginLink: "Partner login",
   };
@@ -150,6 +123,26 @@ function placesForCountry(iso2: string) {
     code: normalizeLocationCode(place.code),
     label: place.label,
   }));
+}
+
+function emailOk(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function phoneOk(value: string) {
+  return splitStoredPhone(value).national.length >= 8;
+}
+
+function websiteOk(value: string) {
+  const site = value.trim();
+  return site.length >= 4 && !/\s/.test(site) && site.includes(".");
+}
+
+function fieldClass(invalid: boolean) {
+  return cn(
+    "mt-1 w-full rounded-md border bg-white px-3 py-2.5 text-base font-normal text-slate-900 outline-none",
+    invalid ? "border-red-500 bg-red-50" : "border-[#c5ced8] focus:border-sky-500",
+  );
 }
 
 export function PartnerApplicationForm({
@@ -167,9 +160,7 @@ export function PartnerApplicationForm({
 }) {
   const { locale } = useSurfaceDictionary();
   const t = copyFor(locale);
-  const logoRef = useRef<HTMLInputElement>(null);
-  const [logoUrl, setLogoUrl] = useState("");
-  const [logoBusy, setLogoBusy] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
   const [title, setTitle] = useState(initialCompany);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -194,12 +185,35 @@ export function PartnerApplicationForm({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [ok, setOk] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
 
   if (!open) return null;
 
   const messengerLabels = Object.fromEntries(
     PARTNER_SOCIAL_PLATFORMS.map((item) => [item.value, item.label]),
   ) as Record<PartnerSocialPlatform, string>;
+
+  const countryMissingPlace = (iso2: string) =>
+    !placesForCountry(iso2).some((place) => locationCodes.includes(place.code));
+
+  const invalid = {
+    title: !title.trim(),
+    firstName: !firstName.trim(),
+    lastName: !lastName.trim(),
+    email: !emailOk(email),
+    officeCountry: !officeCountry.trim(),
+    centralOffice: !centralOffice.trim(),
+    address: !address.trim(),
+    languages: languages.length === 0,
+    countries: countryIso2s.length === 0 || countryIso2s.some(countryMissingPlace),
+    primaryPhone: !phoneOk(primaryPhone) || primaryMessengers.length === 0,
+    managerPhone: !phoneOk(managerPhone) || managerMessengers.length === 0,
+    website: !websiteOk(website),
+    login: !emailOk(loginEmail),
+    password: password.length < 6,
+    confirm: confirmPassword.length < 6 || confirmPassword !== password,
+  };
+  const mark = (key: keyof typeof invalid) => showErrors && invalid[key];
 
   const addOperatingCountry = () => {
     const iso2 = addCountry.toUpperCase();
@@ -219,63 +233,21 @@ export function PartnerApplicationForm({
     setLocationCodes((current) => [...current, code]);
   };
 
-  const uploadLogo = async (file: File | undefined) => {
-    if (!file) return;
-    setLogoBusy(true);
-    setError("");
-    try {
-      const body = new FormData();
-      body.set("file", file);
-      const res = await fetch("/api/partners/apply-logo", { method: "POST", body });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Upload failed");
-      setLogoUrl(String(data.url || ""));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setLogoBusy(false);
-      if (logoRef.current) logoRef.current.value = "";
-    }
-  };
-
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError("");
-    const login = (loginEmail || email).trim();
+    setShowErrors(true);
+    if (Object.values(invalid).some(Boolean)) {
+      requestAnimationFrame(() => {
+        formRef.current
+          ?.querySelector("[data-invalid='true']")
+          ?.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
+      return;
+    }
+    const login = loginEmail.trim();
     const phoneSplit = splitStoredPhone(primaryPhone);
-    const managerSplit = managerPhone.trim() ? splitStoredPhone(managerPhone) : null;
-    const missingPlace = countryIso2s.some(
-      (iso2) => !placesForCountry(iso2).some((place) => locationCodes.includes(place.code)),
-    );
-    if (
-      !title.trim() ||
-      !firstName.trim() ||
-      !lastName.trim() ||
-      !login ||
-      !officeCountry.trim() ||
-      !centralOffice.trim() ||
-      !address.trim() ||
-      !languages.length ||
-      !countryIso2s.length ||
-      !primaryPhone.trim() ||
-      !primaryMessengers.length ||
-      !password
-    ) {
-      setError(t.fill);
-      return;
-    }
-    if (missingPlace) {
-      setError(t.placesRequired);
-      return;
-    }
-    if (password.length < 6) {
-      setError(t.passwordShort);
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError(t.mismatch);
-      return;
-    }
+    const managerSplit = splitStoredPhone(managerPhone);
     const idSeed = title.trim().replace(/\s+/g, "");
     const identificationNumber = (idSeed.length >= 5 ? idSeed : `${idSeed}00000`).slice(0, 40);
     setLoading(true);
@@ -289,13 +261,11 @@ export function PartnerApplicationForm({
           kind: "COMPANY",
           identificationNumber,
           email: login,
-          contactEmail: email.trim() || login,
+          contactEmail: email.trim(),
           phone: phoneSplit.national || primaryPhone.trim(),
           phoneCountryIso2: phoneSplit.iso2,
-          secondaryPhone:
-            managerSplit && managerSplit.national.length >= 8 ? managerSplit.national : undefined,
-          secondaryPhoneCountryIso2:
-            managerSplit && managerSplit.national.length >= 8 ? managerSplit.iso2 : undefined,
+          secondaryPhone: managerSplit.national,
+          secondaryPhoneCountryIso2: managerSplit.iso2,
           messengers: primaryMessengers,
           secondaryMessengers: managerMessengers,
           fleetSize: 1,
@@ -307,17 +277,16 @@ export function PartnerApplicationForm({
           centralOffice: centralOffice.trim(),
           address: address.trim(),
           clientLanguages: languages,
-          logoUrl,
           website: website.trim(),
           password,
           confirmPassword,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t.fill);
+      if (!res.ok) throw new Error(data.error || "Request failed");
       setOk(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.fill);
+      setError(err instanceof Error ? err.message : "Request failed");
     } finally {
       setLoading(false);
     }
@@ -349,91 +318,42 @@ export function PartnerApplicationForm({
             </button>
           </div>
         ) : (
-          <form onSubmit={submit} noValidate className="p-3 sm:p-5">
+          <form ref={formRef} onSubmit={submit} noValidate className="p-3 sm:p-5">
             {error ? <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
             <div className="rounded-xl border border-slate-200 bg-[#eef3f8] p-3 sm:p-4">
               <div className="grid gap-6 lg:grid-cols-2">
                 <div className="space-y-4">
-                  <div className="w-[120px] rounded-none border border-dashed border-slate-300 bg-white p-2">
-                    <p className="mb-1 text-xs font-semibold text-[#3a4553]">{t.logo}</p>
-                    {logoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={logoUrl} alt="" className="h-[96px] w-[96px] bg-slate-50 object-cover" />
-                    ) : (
-                      <div className="flex h-[96px] w-[96px] items-center justify-center border border-dashed border-slate-200 bg-slate-50 text-[10px] text-slate-400">
-                        —
-                      </div>
-                    )}
-                    <input
-                      ref={logoRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(event) => void uploadLogo(event.target.files?.[0])}
-                    />
-                    <div className="mt-2 flex flex-col gap-1">
-                      <button
-                        type="button"
-                        disabled={logoBusy}
-                        className="min-h-10 rounded border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-slate-700"
-                        onClick={() => logoRef.current?.click()}
-                      >
-                        {logoBusy ? "…" : logoUrl ? t.replace : t.upload}
-                      </button>
-                      {logoUrl ? (
-                        <button
-                          type="button"
-                          className="min-h-10 rounded border border-red-200 bg-red-50 px-2 py-1 text-xs font-bold text-red-800"
-                          onClick={() => setLogoUrl("")}
-                        >
-                          {t.deleteLogo}
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                  <label className="block text-sm font-semibold text-[#3a4553]">
-                    {t.brand} <span className="text-[#e11d48]">*</span>
-                    <input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} required />
-                  </label>
+                  <TextField label={t.brand} value={title} onChange={setTitle} invalid={mark("title")} />
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block text-sm font-semibold text-[#3a4553]">
-                      {t.firstName} <span className="text-[#e11d48]">*</span>
-                      <input className={inputClass} value={firstName} onChange={(event) => setFirstName(event.target.value)} required />
-                    </label>
-                    <label className="block text-sm font-semibold text-[#3a4553]">
-                      {t.lastName} <span className="text-[#e11d48]">*</span>
-                      <input className={inputClass} value={lastName} onChange={(event) => setLastName(event.target.value)} required />
-                    </label>
+                    <TextField label={t.firstName} value={firstName} onChange={setFirstName} invalid={mark("firstName")} />
+                    <TextField label={t.lastName} value={lastName} onChange={setLastName} invalid={mark("lastName")} />
                   </div>
-                  <label className="block text-sm font-semibold text-[#3a4553]">
-                    {t.email} <span className="text-[#e11d48]">*</span>
-                    <input
-                      type="email"
-                      className={inputClass}
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      required
-                    />
-                  </label>
+                  <TextField label={t.email} value={email} onChange={setEmail} invalid={mark("email")} type="email" />
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block text-sm font-semibold text-[#3a4553]">
-                      {t.country} <span className="text-[#e11d48]">*</span>
-                      <input className={inputClass} value={officeCountry} onChange={(event) => setOfficeCountry(event.target.value)} required />
-                    </label>
-                    <label className="block text-sm font-semibold text-[#3a4553]">
-                      {t.city} <span className="text-[#e11d48]">*</span>
-                      <input className={inputClass} value={centralOffice} onChange={(event) => setCentralOffice(event.target.value)} required />
-                    </label>
+                    <TextField
+                      label={t.country}
+                      value={officeCountry}
+                      onChange={setOfficeCountry}
+                      invalid={mark("officeCountry")}
+                    />
+                    <TextField
+                      label={t.city}
+                      value={centralOffice}
+                      onChange={setCentralOffice}
+                      invalid={mark("centralOffice")}
+                    />
                   </div>
-                  <label className="block text-sm font-semibold text-[#3a4553]">
-                    {t.address} <span className="text-[#e11d48]">*</span>
-                    <input className={inputClass} value={address} onChange={(event) => setAddress(event.target.value)} required />
-                  </label>
-                  <div>
-                    <p className="mb-1.5 text-sm font-semibold text-[#3a4553]">
+                  <TextField label={t.address} value={address} onChange={setAddress} invalid={mark("address")} />
+                  <div data-invalid={mark("languages") ? "true" : undefined}>
+                    <p className={cn("mb-1.5 text-sm font-semibold", mark("languages") ? "text-red-700" : "text-[#3a4553]")}>
                       {t.languages} <span className="text-[#e11d48]">*</span>
                     </p>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div
+                      className={cn(
+                        "flex flex-wrap gap-1.5 rounded-md p-1",
+                        mark("languages") && "border border-red-500 bg-red-50",
+                      )}
+                    >
                       {LOCALES.map((code) => {
                         const on = languages.includes(code);
                         return (
@@ -461,96 +381,116 @@ export function PartnerApplicationForm({
                 </div>
 
                 <div className="space-y-4">
-                  <div>
-                    <p className="mb-1.5 text-sm font-semibold text-[#3a4553]">
+                  <div data-invalid={mark("countries") ? "true" : undefined}>
+                    <p className={cn("mb-1.5 text-sm font-semibold", mark("countries") ? "text-red-700" : "text-[#3a4553]")}>
                       {t.countries} <span className="text-[#e11d48]">*</span>
                     </p>
-                    <div className="mb-3 flex flex-wrap items-center gap-2">
-                      <select
-                        className="h-11 min-w-0 flex-1 rounded-md border border-[#c5ced8] bg-white px-3 text-base"
-                        value={addCountry}
-                        onChange={(event) => setAddCountry(event.target.value)}
-                      >
-                        <option value="">{t.selectCountry}</option>
-                        {WORLD_COUNTRIES.filter((country) => !countryIso2s.includes(country.iso2)).map((country) => (
-                          <option key={country.iso2} value={country.iso2}>
-                            {country.name}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        disabled={!addCountry}
-                        onClick={addOperatingCountry}
-                        className="min-h-11 rounded-md bg-[#28a745] px-3 text-sm font-bold text-white disabled:opacity-45"
-                      >
-                        {t.add}
-                      </button>
-                    </div>
-                    {countryIso2s.length === 0 ? (
-                      <p className="text-sm text-slate-400">{t.noCountries}</p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {countryIso2s.map((iso2) => {
-                          const places = placesForCountry(iso2);
-                          const selected = places.filter((place) => locationCodes.includes(place.code));
-                          return (
-                            <li key={iso2} className="rounded-md border border-slate-200 bg-white px-3 py-2">
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-800">
-                                  <CountryFlag iso2={iso2} />
-                                  <span className="truncate">{worldCountryName(iso2)}</span>
-                                  <span className="text-xs font-medium text-slate-400">({iso2})</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  className="min-h-10 shrink-0 text-xs font-semibold text-red-700"
-                                  onClick={() => removeOperatingCountry(iso2)}
-                                >
-                                  {t.remove}
-                                </button>
-                              </div>
-                              <select
-                                className="mt-2 h-11 w-full rounded-md border border-[#c5ced8] bg-white px-3 text-base"
-                                value=""
-                                disabled={places.length === 0}
-                                onChange={(event) => {
-                                  if (event.target.value) addPlace(event.target.value);
-                                }}
+                    <div
+                      className={cn(
+                        "rounded-md",
+                        mark("countries") && countryIso2s.length === 0 && "border border-red-500 bg-red-50 p-2",
+                      )}
+                    >
+                      <div className="mb-3 flex flex-wrap items-center gap-2">
+                        <select
+                          className="h-11 min-w-0 flex-1 rounded-md border border-[#c5ced8] bg-white px-3 text-base"
+                          value={addCountry}
+                          onChange={(event) => setAddCountry(event.target.value)}
+                        >
+                          <option value="">{t.selectCountry}</option>
+                          {WORLD_COUNTRIES.filter((country) => !countryIso2s.includes(country.iso2)).map((country) => (
+                            <option key={country.iso2} value={country.iso2}>
+                              {country.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          disabled={!addCountry}
+                          onClick={addOperatingCountry}
+                          className="min-h-11 rounded-md bg-[#28a745] px-3 text-sm font-bold text-white disabled:opacity-45"
+                        >
+                          {t.add}
+                        </button>
+                      </div>
+                      {countryIso2s.length === 0 ? (
+                        <p className={cn("text-sm", mark("countries") ? "font-semibold text-red-700" : "text-slate-400")}>
+                          {t.noCountries}
+                        </p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {countryIso2s.map((iso2) => {
+                            const places = placesForCountry(iso2);
+                            const selected = places.filter((place) => locationCodes.includes(place.code));
+                            const missing = showErrors && selected.length === 0;
+                            return (
+                              <li
+                                key={iso2}
+                                data-invalid={missing ? "true" : undefined}
+                                className={cn(
+                                  "rounded-md border bg-white px-3 py-2",
+                                  missing ? "border-red-500 bg-red-50" : "border-slate-200",
+                                )}
                               >
-                                <option value="">{places.length ? t.selectPlace : t.noPlaces}</option>
-                                {places
-                                  .filter((place) => !locationCodes.includes(place.code))
-                                  .map((place) => (
-                                    <option key={place.code} value={place.code}>
-                                      {place.label}
-                                    </option>
-                                  ))}
-                              </select>
-                              <ul className="mt-2 space-y-1">
-                                {selected.map((place) => (
-                                  <li
-                                    key={place.code}
-                                    className="flex items-center justify-between gap-2 rounded border border-slate-100 bg-slate-50 px-2 py-1.5 text-xs"
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-800">
+                                    <CountryFlag iso2={iso2} />
+                                    <span className="truncate">{worldCountryName(iso2)}</span>
+                                    <span className="text-xs font-medium text-slate-400">({iso2})</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className="min-h-10 shrink-0 text-xs font-semibold text-red-700"
+                                    onClick={() => removeOperatingCountry(iso2)}
                                   >
-                                    <span className="min-w-0 break-words font-semibold text-slate-800">{place.label}</span>
-                                    <button
-                                      type="button"
-                                      className="min-h-10 shrink-0 font-semibold text-red-700"
-                                      onClick={() =>
-                                        setLocationCodes((current) => current.filter((code) => code !== place.code))
-                                      }
+                                    {t.remove}
+                                  </button>
+                                </div>
+                                <select
+                                  className={cn(
+                                    "mt-2 h-11 w-full rounded-md border bg-white px-3 text-base",
+                                    missing ? "border-red-500" : "border-[#c5ced8]",
+                                  )}
+                                  value=""
+                                  disabled={places.length === 0}
+                                  onChange={(event) => {
+                                    if (event.target.value) addPlace(event.target.value);
+                                  }}
+                                >
+                                  <option value="">{places.length ? t.selectPlace : t.noPlaces}</option>
+                                  {places
+                                    .filter((place) => !locationCodes.includes(place.code))
+                                    .map((place) => (
+                                      <option key={place.code} value={place.code}>
+                                        {place.label}
+                                      </option>
+                                    ))}
+                                </select>
+                                <ul className="mt-2 space-y-1">
+                                  {selected.map((place) => (
+                                    <li
+                                      key={place.code}
+                                      className="flex items-center justify-between gap-2 rounded border border-slate-100 bg-slate-50 px-2 py-1.5 text-xs"
                                     >
-                                      {t.remove}
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
+                                      <span className="min-w-0 break-words font-semibold text-slate-800">{place.label}</span>
+                                      <button
+                                        type="button"
+                                        className="min-h-10 shrink-0 font-semibold text-red-700"
+                                        onClick={() =>
+                                          setLocationCodes((current) => current.filter((code) => code !== place.code))
+                                        }
+                                      >
+                                        {t.remove}
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </div>
                   </div>
 
                   <PhoneRow
@@ -560,7 +500,7 @@ export function PartnerApplicationForm({
                     messengers={primaryMessengers}
                     onMessengers={setPrimaryMessengers}
                     messengerLabels={messengerLabels}
-                    required
+                    invalid={mark("primaryPhone")}
                   />
                   <PhoneRow
                     label={t.managerPhone}
@@ -569,46 +509,34 @@ export function PartnerApplicationForm({
                     messengers={managerMessengers}
                     onMessengers={setManagerMessengers}
                     messengerLabels={messengerLabels}
-                    required
+                    invalid={mark("managerPhone")}
                   />
-                  <label className="block text-sm font-semibold text-[#3a4553]">
-                    {t.website}
-                    <input className={inputClass} value={website} onChange={(event) => setWebsite(event.target.value)} />
-                  </label>
-                  <div className="space-y-3 rounded-md border border-slate-200 bg-white p-3">
+                  <TextField label={t.website} value={website} onChange={setWebsite} invalid={mark("website")} />
+                  <div
+                    data-invalid={mark("login") || mark("password") || mark("confirm") ? "true" : undefined}
+                    className={cn(
+                      "space-y-3 rounded-md border bg-white p-3",
+                      mark("login") || mark("password") || mark("confirm") ? "border-red-500" : "border-slate-200",
+                    )}
+                  >
                     <p className="text-sm font-semibold text-[#3a4553]">{t.credentials}</p>
-                    <label className="block text-sm font-semibold text-[#3a4553]">
-                      {t.login} <span className="text-[#e11d48]">*</span>
-                      <input
-                        type="email"
-                        className={inputClass}
-                        value={loginEmail}
-                        onChange={(event) => setLoginEmail(event.target.value)}
-                        required
-                      />
-                    </label>
-                    <label className="block text-sm font-semibold text-[#3a4553]">
-                      {t.password} <span className="text-[#e11d48]">*</span>
-                      <input
-                        type="password"
-                        className={inputClass}
-                        value={password}
-                        onChange={(event) => setPassword(event.target.value)}
-                        required
-                        autoComplete="new-password"
-                      />
-                    </label>
-                    <label className="block text-sm font-semibold text-[#3a4553]">
-                      {t.confirm} <span className="text-[#e11d48]">*</span>
-                      <input
-                        type="password"
-                        className={inputClass}
-                        value={confirmPassword}
-                        onChange={(event) => setConfirmPassword(event.target.value)}
-                        required
-                        autoComplete="new-password"
-                      />
-                    </label>
+                    <TextField label={t.login} value={loginEmail} onChange={setLoginEmail} invalid={mark("login")} type="email" />
+                    <TextField
+                      label={t.password}
+                      value={password}
+                      onChange={setPassword}
+                      invalid={mark("password")}
+                      type="password"
+                      autoComplete="new-password"
+                    />
+                    <TextField
+                      label={t.confirm}
+                      value={confirmPassword}
+                      onChange={setConfirmPassword}
+                      invalid={mark("confirm")}
+                      type="password"
+                      autoComplete="new-password"
+                    />
                   </div>
                 </div>
               </div>
@@ -633,6 +561,39 @@ export function PartnerApplicationForm({
   );
 }
 
+function TextField({
+  label,
+  value,
+  onChange,
+  invalid,
+  type = "text",
+  autoComplete,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  invalid: boolean;
+  type?: string;
+  autoComplete?: string;
+}) {
+  return (
+    <label
+      data-invalid={invalid ? "true" : undefined}
+      className={cn("block text-sm font-semibold", invalid ? "text-red-700" : "text-[#3a4553]")}
+    >
+      {label} <span className="text-[#e11d48]">*</span>
+      <input
+        type={type}
+        autoComplete={autoComplete}
+        aria-invalid={invalid || undefined}
+        className={fieldClass(invalid)}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
+}
+
 function PhoneRow({
   label,
   value,
@@ -640,7 +601,7 @@ function PhoneRow({
   messengers,
   onMessengers,
   messengerLabels,
-  required,
+  invalid,
 }: {
   label: string;
   value: string;
@@ -648,19 +609,25 @@ function PhoneRow({
   messengers: PartnerSocialPlatform[];
   onMessengers: (next: PartnerSocialPlatform[]) => void;
   messengerLabels: Record<PartnerSocialPlatform, string>;
-  required?: boolean;
+  invalid: boolean;
 }) {
   return (
-    <div>
-      <p className="mb-1.5 text-sm font-semibold text-[#3a4553]">
-        {label} {required ? <span className="text-[#e11d48]">*</span> : null}
+    <div data-invalid={invalid ? "true" : undefined}>
+      <p className={cn("mb-1.5 text-sm font-semibold", invalid ? "text-red-700" : "text-[#3a4553]")}>
+        {label} <span className="text-[#e11d48]">*</span>
       </p>
-      <div className="flex flex-wrap items-center gap-2 rounded-md border border-[#c5ced8] bg-white px-3 py-2">
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-2 rounded-md border bg-white px-3 py-2",
+          invalid ? "border-red-500 bg-red-50" : "border-[#c5ced8]",
+        )}
+      >
         <input
           className="min-h-11 min-w-0 flex-1 border-0 bg-transparent text-base outline-none"
           value={value}
           onChange={(event) => onChange(event.target.value)}
           inputMode="tel"
+          aria-invalid={invalid || undefined}
         />
         <PhoneMessengerIcons selected={messengers} onChange={onMessengers} labels={messengerLabels} />
       </div>
