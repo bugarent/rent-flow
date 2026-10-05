@@ -58,13 +58,14 @@ export function BookingCustomersPanel({ customers }: { customers: BookingCustome
       "აქ ინახება ყველა მომხმარებელი, ვინც ჯავშანს გააკეთებს, ანგარიშის გარეშე სტუმრების ჩათვლით.",
       "Здесь сохраняется каждый, кто оформил бронь, включая гостей без аккаунта.",
     ),
-    idCol: t("Identification number", "საიდენტიფიკაციო ნომერი", "Идентификационный номер"),
-    nameCol: t("Name", "სახელი", "Имя"),
+    idCol: t("First and last name", "სახელი გვარი", "Имя и фамилия"),
+    nameCol: t("Email", "იმაილი", "Эл. почта"),
     countryCol: t("Country", "ქვეყანა", "Страна"),
-    typeCol: t("Type", "ტიპი", "Тип"),
+    typeCol: t("Phone", "ტელეფონი", "Телефон"),
     bookingsCol: t("Bookings", "ჯავშნები", "Брони"),
     statusCol: t("Status", "სტატუსი", "Статус"),
     actionsCol: t("Actions", "მოქმედებები", "Действия"),
+    kind: t("Type", "ტიპი", "Тип"),
     account: t("Account", "ანგარიში", "Аккаунт"),
     guest: t("Guest", "სტუმარი", "Гость"),
     active: t("Active", "აქტიური", "Активен"),
@@ -76,8 +77,6 @@ export function BookingCustomersPanel({ customers }: { customers: BookingCustome
     empty: t("No booking customers yet.", "ჯავშნის მომხმარებელი ჯერ არ არის.", "Клиентов с бронью пока нет."),
     close: t("Close", "დახურვა", "Закрыть"),
     cancel: t("Cancel", "გაუქმება", "Отмена"),
-    email: t("Email", "ელფოსტა", "Эл. почта"),
-    phone: t("Phone", "ტელეფონი", "Телефон"),
     messenger: t("Messenger", "მესენჯერი", "Мессенджер"),
     bookings: t("Bookings", "ჯავშნები", "Брони"),
     detailsTitle: t("Customer", "მომხმარებელი", "Клиент"),
@@ -265,24 +264,23 @@ export function BookingCustomersPanel({ customers }: { customers: BookingCustome
                 ) : (
                   rows.map((row) => (
                     <tr key={row.id} className="border-t border-l-4 border-l-transparent bg-white">
-                      <td className="whitespace-nowrap px-2 py-0.5 align-middle font-mono font-bold leading-none">
-                        {row.customerNumber ?? "—"}
-                      </td>
-                      <td className="max-w-[16rem] px-2 py-0.5 align-middle leading-none">
+                      <td className="max-w-[14rem] px-2 py-1 align-middle">
                         <button
                           type="button"
                           onClick={() => setDetails(row)}
-                          className="font-semibold text-sky-800 hover:underline"
+                          className="block text-left font-semibold text-sky-800 break-words hover:underline"
                         >
-                          {row.displayName}
+                          {row.displayName || "—"}
                         </button>
-                        <span className="ml-2 text-[10px] text-slate-500">{row.email || "—"}</span>
                       </td>
-                      <td className="whitespace-nowrap px-2 py-0.5 align-middle text-slate-700">
+                      <td className="max-w-[16rem] px-2 py-1 align-middle">
+                        <span className="block break-all text-slate-800">{row.email || "—"}</span>
+                      </td>
+                      <td className="whitespace-nowrap px-2 py-1 align-middle text-slate-700">
                         {row.countryLabel || "—"}
                       </td>
-                      <td className="whitespace-nowrap px-2 py-0.5 align-middle">
-                        {row.hasAccount ? labels.account : labels.guest}
+                      <td className="whitespace-nowrap px-2 py-1 align-middle">
+                        <span className="block">{row.phone && row.phone !== "—" ? row.phone : "—"}</span>
                       </td>
                       <td className="whitespace-nowrap px-2 py-0.5 align-middle">
                         <span className="font-bold">{row.bookingCount}</span>
@@ -302,13 +300,16 @@ export function BookingCustomersPanel({ customers }: { customers: BookingCustome
           ) : (
             rows.map((row) => (
               <MobileDataCard key={row.id}>
-                <MobileDataRow label={labels.idCol}>{row.customerNumber ?? "—"}</MobileDataRow>
+                <MobileDataRow label={labels.idCol}>
+                  <span className="block break-words">{row.displayName || "—"}</span>
+                </MobileDataRow>
                 <MobileDataRow label={labels.nameCol}>
-                  <span className="block break-words">{row.displayName}</span>
-                  <span className="mt-0.5 block text-xs font-medium text-slate-500 break-all">{row.email || "—"}</span>
+                  <span className="block break-all">{row.email || "—"}</span>
                 </MobileDataRow>
                 <MobileDataRow label={labels.countryCol}>{row.countryLabel || "—"}</MobileDataRow>
-                <MobileDataRow label={labels.typeCol}>{row.hasAccount ? labels.account : labels.guest}</MobileDataRow>
+                <MobileDataRow label={labels.typeCol}>
+                  <span className="block break-all">{row.phone && row.phone !== "—" ? row.phone : "—"}</span>
+                </MobileDataRow>
                 <MobileDataRow label={labels.bookingsCol}>{row.bookingCount}</MobileDataRow>
                 <MobileDataRow label={labels.statusCol}>{statusPill(row)}</MobileDataRow>
                 <div className="pt-3">{actions(row, false)}</div>
@@ -334,12 +335,11 @@ export function BookingCustomersPanel({ customers }: { customers: BookingCustome
             </div>
             <div className="space-y-3 overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <dl className="space-y-1 text-sm">
-                <Detail label={labels.idCol} value={details.customerNumber ? String(details.customerNumber) : "—"} />
-                <Detail label={labels.nameCol} value={details.displayName} />
-                <Detail label={labels.email} value={details.email || "—"} />
-                <Detail label={labels.phone} value={details.phone || "—"} />
+                <Detail label={labels.idCol} value={details.displayName || "—"} />
+                <Detail label={labels.nameCol} value={details.email || "—"} />
+                <Detail label={labels.typeCol} value={details.phone && details.phone !== "—" ? details.phone : "—"} />
                 <Detail label={labels.countryCol} value={details.countryLabel || "—"} />
-                <Detail label={labels.typeCol} value={details.hasAccount ? labels.account : labels.guest} />
+                <Detail label={labels.kind} value={details.hasAccount ? labels.account : labels.guest} />
                 <Detail
                   label={labels.messenger}
                   value={details.messengers.length ? details.messengers.map(messengerLabel).join(", ") : "—"}
