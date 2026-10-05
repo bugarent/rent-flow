@@ -484,12 +484,12 @@ export function DeliveryLocationsManager({
       {error ? <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</p> : null}
       {message ? <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p> : null}
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+      <div className="flex min-w-0 flex-nowrap items-end gap-2">
         <button
           type="button"
           aria-pressed={!countryIso2}
           onClick={() => setCountryIso2("")}
-          className={`min-h-11 shrink-0 rounded-xl border px-4 text-base font-bold ${
+          className={`min-h-11 shrink-0 rounded-xl border px-3 text-sm font-bold sm:px-4 sm:text-base ${
             !countryIso2
               ? "border-[#0b1f4b] bg-[#0b1f4b] text-white"
               : "border-slate-300 bg-white text-[#0b1f4b] hover:bg-slate-50"
@@ -506,16 +506,13 @@ export function DeliveryLocationsManager({
           searchLabel={phrase("Search country", "მოძებნეთ ქვეყანა", "Найти страну")}
           emptyLabel={phrase("No matching country", "ქვეყანა ვერ მოიძებნა", "Страна не найдена")}
         />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-          <p className="text-2xl font-black tabular-nums text-[#0b1f4b]">{locationCounts.airports}</p>
-          <p className="text-sm font-semibold text-slate-600">{phrase("airports", "აეროპორტი", "аэропорта")}</p>
+        <div className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3">
+          <span className="text-lg font-black tabular-nums text-[#0b1f4b] sm:text-xl">{locationCounts.airports}</span>
+          <span className="text-xs font-semibold text-slate-600 sm:text-sm">{phrase("airports", "აეროპორტი", "аэропорта")}</span>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-          <p className="text-2xl font-black tabular-nums text-[#0b1f4b]">{locationCounts.cities}</p>
-          <p className="text-sm font-semibold text-slate-600">{phrase("cities", "ქალაქი", "города")}</p>
+        <div className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3">
+          <span className="text-lg font-black tabular-nums text-[#0b1f4b] sm:text-xl">{locationCounts.cities}</span>
+          <span className="text-xs font-semibold text-slate-600 sm:text-sm">{phrase("cities", "ქალაქი", "города")}</span>
         </div>
       </div>
 

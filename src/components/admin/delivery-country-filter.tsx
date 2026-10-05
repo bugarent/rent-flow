@@ -19,6 +19,7 @@ export function DeliveryCountryFilter({
   allLabel,
   searchLabel,
   emptyLabel,
+  className,
 }: {
   countries: DeliveryCountryOption[];
   valueIso2: string;
@@ -27,6 +28,7 @@ export function DeliveryCountryFilter({
   allLabel: string;
   searchLabel: string;
   emptyLabel: string;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -59,7 +61,7 @@ export function DeliveryCountryFilter({
   };
 
   return (
-    <div ref={rootRef} className="relative w-full sm:max-w-md">
+    <div ref={rootRef} className={cn("relative min-w-0 flex-1", className)}>
       <p className="mb-1.5 text-sm font-semibold text-[#3a4553]">{label}</p>
       <button
         type="button"
