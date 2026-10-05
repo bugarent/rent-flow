@@ -353,7 +353,7 @@ const en: AdminDictionary = {
     },
     partners: {
       title: "Partner applications",
-      body: "Pending approvals, active company/private partners, and rejected requests.",
+      body: "Pending approvals, active company/private partners, rejected requests, and customers who made a booking.",
     },
     moderation: {
       title: "Moderation",
@@ -684,7 +684,7 @@ const ka: AdminDictionary = {
     },
     partners: {
       title: "პარტნიორთა განაცხადები",
-      body: "დასამტკიცებელი განაცხადები, აქტიური კომპანია/კერძო პარტნიორები და უარყოფილი მოთხოვნები.",
+      body: "დასამტკიცებელი განაცხადები, აქტიური კომპანია/კერძო პარტნიორები, უარყოფილი მოთხოვნები და მომხმარებლები, რომლებმაც ჯავშანი გააკეთეს.",
     },
     moderation: {
       title: "მოდერაცია",
@@ -1016,7 +1016,7 @@ const ru: AdminDictionary = {
     },
     partners: {
       title: "Заявки партнёров",
-      body: "Заявки на одобрение, активные компании/частные партнёры и отклонённые запросы.",
+      body: "Заявки на одобрение, активные компании/частные партнёры, отклонённые запросы и клиенты, оформившие бронь.",
     },
     moderation: {
       title: "Модерация",

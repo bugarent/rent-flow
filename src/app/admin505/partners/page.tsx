@@ -7,12 +7,16 @@ import {
   filterDirectoryPartners,
   loadAdminPartnerRows,
 } from "@/lib/server/admin-partner-rows";
+import { loadBookingCustomers } from "@/lib/server/load-booking-customers";
 
 export default async function AdminPartnersPage() {
   await requireAdmin();
   const locale = await readAdminLocale();
   const t = getAdminDictionary(locale);
-  const partnerRows = await loadAdminPartnerRows();
+  const [partnerRows, bookingCustomers] = await Promise.all([
+    loadAdminPartnerRows(),
+    loadBookingCustomers(),
+  ]);
   const partners = filterDirectoryPartners(partnerRows.partners);
 
   return (
@@ -40,7 +44,26 @@ export default async function AdminPartnersPage() {
               ) : null}
             </div>
           )}
-          <PartnersManager initialPartners={partners} mode="directory" />
+          {(bookingCustomers.dbOffline || bookingCustomers.queryError) && (
+            <div
+              role="status"
+              className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+            >
+              <p className="font-semibold">
+                {bookingCustomers.dbOffline
+                  ? "Booking customers could not be loaded from the online database"
+                  : "Could not load booking customers"}
+              </p>
+              {bookingCustomers.queryError ? (
+                <p className="mt-1 leading-relaxed">{bookingCustomers.queryError}</p>
+              ) : null}
+            </div>
+          )}
+          <PartnersManager
+            initialPartners={partners}
+            mode="directory"
+            customers={bookingCustomers.customers}
+          />
         </section>
       </div>
     </Suspense>

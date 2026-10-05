@@ -71,7 +71,24 @@ export async function PATCH(
     }
 
     const local = findLocalCustomerById(id);
-    if (!local) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!local) {
+      const guestEmail = String(body.email || "").trim();
+      const guestPhone = String(body.phone || "").trim();
+      if (!guestEmail && !guestPhone) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
+      if (action === "block") {
+        await upsertCustomerBan({
+          email: guestEmail,
+          phone: guestPhone,
+          customerId: null,
+          reason: "Blocked by admin",
+        });
+        return NextResponse.json({ ok: true, action, status: "SUSPENDED", source: "guest" });
+      }
+      await removeCustomerBan({ email: guestEmail, phone: guestPhone });
+      return NextResponse.json({ ok: true, action, status: "ACTIVE", source: "guest" });
+    }
     source = "local";
     email = local.email;
     phone = local.phone || "";

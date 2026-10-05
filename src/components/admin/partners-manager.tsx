@@ -9,6 +9,8 @@ import { worldCountryName } from "@/lib/catalog/world-countries";
 import { cn } from "@/lib/utils";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { PartnerRowActions } from "@/components/admin/partner-row-actions";
+import { BookingCustomersPanel } from "@/components/admin/booking-customers-panel";
+import type { BookingCustomerRow } from "@/lib/admin/booking-customer-row";
 import { ADMIN_BASE } from "@/lib/routes";
 import {
   ResponsiveDataList,
@@ -49,7 +51,7 @@ const PENDING_STATUSES = new Set([
 ]);
 const ACTIVE_STATUSES = new Set(["APPROVED", "SUSPENDED"]);
 
-type Filter = "PRIMARY" | "PENDING" | "COMPANY" | "PRIVATE" | "REJECTED" | "DIRECTORY";
+type Filter = "PRIMARY" | "PENDING" | "COMPANY" | "PRIVATE" | "REJECTED" | "CUSTOMERS" | "DIRECTORY";
 
 function partnerUnread(p: PartnerRow) {
   return Number(p.unreadForAdmin) || Number(p.unreadReapplyCount) || 0;
@@ -93,6 +95,7 @@ function partnersInFilter(list: PartnerRow[], filter: Filter) {
         (ACTIVE_STATUSES.has(p.status) || p.status === "PENDING_REMODERATION"),
     );
   }
+  if (filter === "CUSTOMERS") return [];
   return list.filter((p) => p.status === "REJECTED");
 }
 
@@ -163,18 +166,34 @@ type PartnersManagerMode = "directory" | "queue" | "primary" | "catalog";
 export function PartnersManager({
   initialPartners,
   mode = "directory",
+  customers = [],
 }: {
   initialPartners: PartnerRow[];
   /** directory = approved/rejected partners; queue = pending applications for moderation */
   mode?: PartnersManagerMode;
+  /** People who have made a booking. Shown on the directory Customers tab. */
+  customers?: BookingCustomerRow[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { locale } = useAdminLocale();
-  const [filter, setFilter] = useState<Filter>(
-    mode === "queue" ? "PENDING" : mode === "primary" ? "PRIMARY" : mode === "catalog" ? "DIRECTORY" : "COMPANY",
-  );
+  const [filter, setFilter] = useState<Filter>(() => {
+    if (mode === "queue") return "PENDING";
+    if (mode === "primary") return "PRIMARY";
+    if (mode === "catalog") return "DIRECTORY";
+    const partnerTab = searchParams.get("partnerTab")?.trim().toUpperCase();
+    if (
+      partnerTab === "COMPANY" ||
+      partnerTab === "PRIVATE" ||
+      partnerTab === "REJECTED" ||
+      partnerTab === "CUSTOMERS" ||
+      partnerTab === "PENDING"
+    ) {
+      return partnerTab;
+    }
+    return "COMPANY";
+  });
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -187,6 +206,7 @@ export function PartnersManager({
         company: "კომპანიის პარტნიორები",
         private: "კერძო პარტნიორები",
         rejected: "უარყოფილი მოთხოვნები",
+        customers: "მომხმარებლები",
         directory: "დირექტორია",
         pending: "დასამტკიცებელი პარტნიორები",
         idCol: "საიდენტიფიკაციო ნომერი",
@@ -216,6 +236,7 @@ export function PartnersManager({
         company: "Компании-партнёры",
         private: "Частные партнёры",
         rejected: "Отклонённые заявки",
+        customers: "Клиенты",
         directory: "Каталог",
         pending: "Партнёры на одобрение",
         idCol: "Идентификационный номер",
@@ -244,6 +265,7 @@ export function PartnersManager({
       company: "Company partners",
       private: "Private partners",
       rejected: "Rejected requests",
+      customers: "Customers",
       directory: "Directory",
       pending: "Partners pending approval",
       idCol: "Identification number",
@@ -337,6 +359,7 @@ export function PartnersManager({
       partnerTab === "COMPANY" ||
       partnerTab === "PRIVATE" ||
       partnerTab === "REJECTED" ||
+      partnerTab === "CUSTOMERS" ||
       partnerTab === "PENDING"
     ) {
       setFilter(partnerTab as Filter);
@@ -422,6 +445,7 @@ export function PartnersManager({
             { value: "COMPANY", label: t.company },
             { value: "PRIVATE", label: t.private },
             { value: "REJECTED", label: t.rejected },
+            { value: "CUSTOMERS", label: t.customers },
           ];
 
   return (
@@ -435,8 +459,8 @@ export function PartnersManager({
       <div className="mb-4 flex flex-wrap gap-2">
         {filters.map((item) => {
           const badge = filterBadges[item.value] ?? { count: 0, pending: 0 };
-          const hasPending = badge.pending > 0;
-          const count = badge.count;
+          const hasPending = item.value === "CUSTOMERS" ? false : badge.pending > 0;
+          const count = item.value === "CUSTOMERS" ? customers.length : badge.count;
           return (
             <button
               key={item.value}
@@ -445,7 +469,7 @@ export function PartnersManager({
                 selectFilter(item.value);
               }}
               className={cn(
-                "relative rounded-full px-4 py-2 text-sm font-semibold transition",
+                "relative min-h-10 rounded-full px-4 py-2 text-sm font-semibold transition",
                 filter === item.value && !hasPending && "bg-[#0b1f4b] text-white",
                 filter === item.value && hasPending && "bg-amber-400 text-amber-950 ring-2 ring-amber-500",
                 filter !== item.value && !hasPending && "border bg-white text-slate-600",
@@ -485,7 +509,9 @@ export function PartnersManager({
         </div>
       ) : null}
 
-      {(() => {
+      {filter === "CUSTOMERS" ? (
+        <BookingCustomersPanel customers={customers} />
+      ) : (() => {
         const showCountry = filter === "DIRECTORY" || mode === "directory";
         const hideId = filter === "DIRECTORY";
         const colCount = 5 + (hideId ? 0 : 1) + (showCountry ? 1 : 0);
