@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Car, CircleHelp, Home, Search, UserRound } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { Car, CircleHelp, Home, Search } from "lucide-react";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { requestOpenManageBooking } from "@/components/layout/open-manage-booking";
 import { cn } from "@/lib/utils";
@@ -11,7 +10,6 @@ import { cn } from "@/lib/utils";
 export function MobileBottomNav() {
   const pathname = usePathname() || "/";
   const { dictionary } = usePreferences();
-  const { data: session } = useSession();
   const hideCustomerTools =
     pathname === "/partnership" ||
     pathname.startsWith("/partnership/") ||
@@ -62,17 +60,9 @@ export function MobileBottomNav() {
     });
   }
 
-  items.push({
-    key: "account",
-    href: session?.user ? "/account" : "/",
-    label: dictionary.nav.account,
-    icon: UserRound,
-    active: session?.user ? pathname === "/account" : false,
-  });
-
   return (
     <nav className="fixed inset-x-0 bottom-0 z-[80] border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-      <ul className={cn("grid", hideCustomerTools ? "grid-cols-4" : "grid-cols-5")}>
+      <ul className={cn("grid", hideCustomerTools ? "grid-cols-3" : "grid-cols-4")}>
         {items.map((item) => {
           const Icon = item.icon;
           const className = cn(
