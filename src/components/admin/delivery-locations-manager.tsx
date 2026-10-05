@@ -16,6 +16,7 @@ import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { uiText } from "@/lib/i18n/ui-text";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { DeliveryCountryFilter } from "@/components/admin/delivery-country-filter";
+import { isCityLocationCode } from "@/lib/catalog/search-places";
 import {
   ResponsiveDataList,
   MobileDataCard,
@@ -46,6 +47,12 @@ function daysDraftsFromLocations(list: DeliveryLocationView[]) {
     next[item.id] = item.maxFreeAfterDays == null ? "" : String(item.maxFreeAfterDays);
   }
   return next;
+}
+
+function isCityLocation(item: DeliveryLocationView) {
+  if (item.kind === "city") return true;
+  if (item.kind === "airport") return false;
+  return isCityLocationCode(item.iata) || isCityLocationCode(item.airportId);
 }
 
 function sortLocationsByCountry(list: DeliveryLocationView[]) {
@@ -129,6 +136,16 @@ export function DeliveryLocationsManager({
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
   }, [locations]);
 
+  const locationCounts = useMemo(() => {
+    const scoped = locations.filter(
+      (item) => !countryIso2 || item.countryIso2.trim().toUpperCase() === countryIso2,
+    );
+    let cities = 0;
+    for (const item of scoped) {
+      if (isCityLocation(item)) cities += 1;
+    }
+    return { airports: scoped.length - cities, cities };
+  }, [locations, countryIso2]);
   const activeLocations = useMemo(
     () =>
       sortLocationsByCountry(
@@ -489,6 +506,17 @@ export function DeliveryLocationsManager({
           searchLabel={phrase("Search country", "მოძებნეთ ქვეყანა", "Найти страну")}
           emptyLabel={phrase("No matching country", "ქვეყანა ვერ მოიძებნა", "Страна не найдена")}
         />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+          <p className="text-2xl font-black tabular-nums text-[#0b1f4b]">{locationCounts.airports}</p>
+          <p className="text-sm font-semibold text-slate-600">{phrase("airports", "აეროპორტი", "аэропорта")}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+          <p className="text-2xl font-black tabular-nums text-[#0b1f4b]">{locationCounts.cities}</p>
+          <p className="text-sm font-semibold text-slate-600">{phrase("cities", "ქალაქი", "города")}</p>
+        </div>
       </div>
 
       <ResponsiveDataList
