@@ -72,8 +72,8 @@ import { isAllowedInsuranceFile, insuranceFileName, isPdfUrl } from "@/lib/files
 import {
   PartnerCarPhotoGallery,
   filledPhotoCount,
-  photosForSave,
 } from "@/components/partner/partner-car-photo-gallery";
+import { isStudioCoverUrl } from "@/lib/cars/studio-cover-url";
 import { PartnerImageLightbox } from "@/components/partner/partner-image-lightbox";
 
 function mdToDateInput(md: string): string {
@@ -340,24 +340,24 @@ function PercentInput({
   );
 }
 
-async function uploadFile(
-  file: File,
-  cover?: { make: string; model: string; year: string; color: string },
-): Promise<{ url: string; styled: boolean }> {
+async function uploadFile(file: File): Promise<{ url: string }> {
   const optimized = await compressImageForUpload(file);
   const fd = new FormData();
   fd.append("file", optimized);
-  if (cover) {
-    fd.append("role", "cover");
-    fd.append("make", cover.make);
-    fd.append("model", cover.model);
-    fd.append("year", cover.year);
-    fd.append("color", cover.color);
-  }
   const res = await fetch("/api/partners/uploads", { method: "POST", body: fd });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Upload failed");
-  return { url: String(data.url), styled: Boolean(data.styled) };
+  return { url: String(data.url) };
+}
+
+function splitListingPhotos(urls: string[]): { cover: string; gallery: string[] } {
+  const clean = urls.map((url) => String(url || "").trim()).filter(Boolean);
+  const cover = clean[0] && isStudioCoverUrl(clean[0]) ? clean[0] : "";
+  const rest = cover ? clean.slice(1) : clean;
+  return {
+    cover,
+    gallery: Array.from({ length: MIN_PUBLIC_PHOTOS }, (_, index) => rest[index] || ""),
+  };
 }
 
 const NO_DELIVERY_CATALOG: DeliveryLocationView[] = [];
@@ -454,6 +454,8 @@ export function PartnerCreateCarForm({
   const [photos, setPhotos] = useState<string[]>(() =>
     Array.from({ length: MIN_PUBLIC_PHOTOS }, () => ""),
   );
+  const [studioCover, setStudioCover] = useState("");
+  const [coverBusy, setCoverBusy] = useState(false);
   const [passportFront, setPassportFront] = useState("");
   const [passportBack, setPassportBack] = useState("");
   const [insuranceUrl, setInsuranceUrl] = useState("");
@@ -634,7 +636,9 @@ export function PartnerCreateCarForm({
           setEbd(Boolean(details?.ebd));
           setEsp(Boolean(details?.esp));
           setMusic(Array.isArray(details?.music) ? details.music.map(String) : []);
-          setPhotos(Array.from({ length: MIN_PUBLIC_PHOTOS }, (_, i) => photoUrls[i] || ""));
+          const loadedPhotos = splitListingPhotos(photoUrls);
+          if (!isAdminReview) setStudioCover(loadedPhotos.cover);
+          setPhotos(isAdminReview ? Array.from({ length: MIN_PUBLIC_PHOTOS }, (_, i) => photoUrls[i] || "") : loadedPhotos.gallery);
           setPassportFront(String(car.passport?.frontUrl || ""));
           setPassportBack(String(car.passport?.backUrl || ""));
           setInsuranceUrl(String(car.insuranceUrl || car.passport?.insuranceUrl || ""));
@@ -1010,8 +1014,12 @@ export function PartnerCreateCarForm({
           setEsp(Boolean(details?.esp));
           setMusic(Array.isArray(details?.music) ? details.music.map(String) : []);
 
+          const loadedPhotos = splitListingPhotos(photoUrls);
+          if (!isAdminReview) setStudioCover(loadedPhotos.cover);
           setPhotos(
-            Array.from({ length: MIN_PUBLIC_PHOTOS }, (_, i) => photoUrls[i] || ""),
+            isAdminReview
+              ? Array.from({ length: MIN_PUBLIC_PHOTOS }, (_, i) => photoUrls[i] || "")
+              : loadedPhotos.gallery,
           );
           setPassportFront(String(car.passport?.frontUrl || ""));
           setPassportBack(String(car.passport?.backUrl || ""));
@@ -1333,6 +1341,40 @@ export function PartnerCreateCarForm({
     setModel("");
   };
 
+  const coverIdentity = `${make.trim()}|${model.trim()}|${year.trim()}|${color.trim()}`.toLowerCase();
+  useEffect(() => {
+    if (isAdminReview) return;
+    const [makeName, modelName, yearName, colorName] = coverIdentity.split("|");
+    if (!makeName || !modelName || !yearName || !colorName) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        setCoverBusy(true);
+        try {
+          const res = await fetch("/api/partners/studio-cover", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ make: makeName, model: modelName, year: yearName, color: colorName }),
+            signal: controller.signal,
+          });
+          const data = (await res.json()) as { url?: string; error?: string };
+          if (!res.ok || !data.url) throw new Error(data.error || "cover_style");
+          setStudioCover(data.url);
+        } catch (error) {
+          if (controller.signal.aborted) return;
+          if (error instanceof DOMException && error.name === "AbortError") return;
+          setError(cc.coverStyleFailed);
+        } finally {
+          if (!controller.signal.aborted) setCoverBusy(false);
+        }
+      })();
+    }, 400);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [coverIdentity, isAdminReview, cc.coverStyleFailed]);
+
   const scrollTo = (id: string) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -1355,41 +1397,16 @@ export function PartnerCreateCarForm({
     setMusic((prev) => (prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]));
   };
 
-  const onGalleryFiles = async (
-    files: File[],
-    startIndex: number,
-  ): Promise<{ urls: string[]; coverUrl?: string }> => {
+  const onGalleryFiles = async (files: File[]): Promise<{ urls: string[] }> => {
     if (!files.length) return { urls: [] };
-    const coverIdentity = { make: make.trim(), model: model.trim(), year: year.trim(), color: color.trim() };
-    const coverEmpty = !String(photos[0] || "").trim();
-    const fillsCover = files.some((_, index) => startIndex + index === 0) || coverEmpty;
     setUploading(true);
     setError("");
     try {
       const urls: string[] = [];
-      const styleCover = fillsCover && Boolean(files[0]) && files[0]!.type !== "application/pdf";
-      let coverUrl: string | undefined;
-      if (styleCover && startIndex === 0) {
-        const cover = await uploadFile(files[0]!, coverIdentity);
-        urls.push(cover.url);
-        if (!cover.styled) setError(cc.coverStyleFailed);
-        for (let index = 1; index < files.length; index += 1) {
-          urls.push((await uploadFile(files[index]!)).url);
-        }
-      } else {
-        for (const file of files) {
-          urls.push((await uploadFile(file)).url);
-        }
-        if (styleCover) {
-          const cover = await uploadFile(files[0]!, coverIdentity);
-          coverUrl = cover.url;
-          if (!cover.styled) setError(cc.coverStyleFailed);
-        }
+      for (const file of files) {
+        urls.push((await uploadFile(file)).url);
       }
-      return {
-        urls,
-        coverUrl: coverUrl || (coverEmpty && startIndex > 0 ? urls[0] : undefined),
-      };
+      return { urls };
     } catch (err) {
       showError(err instanceof Error ? err.message : common.uploadFailed, "photo");
       return { urls: [] };
@@ -1690,7 +1707,11 @@ export function PartnerCreateCarForm({
           doors: Number(doors) || 4,
           transmission,
           fuelType: fuel,
-          photos: photosForSave(photos),
+          photos: (() => {
+            const gallery = photos.map((url) => url.trim()).filter(Boolean);
+            if (isAdminReview || !studioCover) return gallery;
+            return [studioCover, ...gallery.filter((url) => url !== studioCover)];
+          })(),
           passportFrontUrl: passportFront || undefined,
           passportBackUrl: passportBack || undefined,
           insuranceUrl: insuranceUrl || undefined,
@@ -2739,6 +2760,8 @@ export function PartnerCreateCarForm({
             onChange={setPhotos}
             uploading={uploading}
             onUploadFiles={onGalleryFiles}
+            coverUrl={isAdminReview ? undefined : studioCover}
+            coverBusy={coverBusy}
             invalid={fieldInvalid("photos")}
             accentColor={ACCENT_GREEN}
             labels={{

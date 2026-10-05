@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { requirePartnerApi } from "@/lib/auth/sessions";
 import { persistUploadedFile } from "@/lib/server/persist-upload";
-import { renderInstantStudioCover } from "@/lib/server/instant-studio-cover";
 
 export const maxDuration = 60;
 
@@ -36,7 +35,6 @@ export async function POST(req: Request) {
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "file required" }, { status: 400 });
     }
-    const isCover = String(form.get("role") || "") === "cover";
     const ext = fileExtension(file);
     if (!ext) {
       return NextResponse.json({ error: "PNG, JPG, GIF, WEBP or PDF only" }, { status: 400 });
@@ -48,25 +46,10 @@ export async function POST(req: Request) {
     const contentType = ext === "pdf" ? "application/pdf" : ext === "jpg" ? "image/jpeg" : `image/${ext}`;
     const originalName = `${Date.now()}-${randomBytes(6).toString("hex")}.${ext}`;
     await persistUploadedFile(["partner-cars", originalName], buffer, contentType);
-    const originalUrl = `/uploads/partner-cars/${originalName}`;
-    if (!isCover || ext === "pdf") {
-      return NextResponse.json({ url: originalUrl, styled: false });
-    }
-    try {
-      const styled = await renderInstantStudioCover(buffer);
-      const styledName = `${Date.now()}-${randomBytes(6).toString("hex")}.png`;
-      await persistUploadedFile(["partner-cars", styledName], styled, "image/png");
-      return NextResponse.json({ url: `/uploads/partner-cars/${styledName}`, styled: true });
-    } catch (error) {
-      console.error("[partners/uploads] studio cover kept original", error);
-      return NextResponse.json({ url: originalUrl, styled: false });
-    }
+    return NextResponse.json({ url: `/uploads/partner-cars/${originalName}`, styled: false });
   } catch (error) {
     console.error("[partners/uploads]", error);
     const message = error instanceof Error ? error.message : "Upload failed";
-    if (message === "cover_identity" || message === "cover_style") {
-      return NextResponse.json({ error: message }, { status: message === "cover_identity" ? 400 : 502 });
-    }
     return NextResponse.json(
       { error: message === "Could not save the image" ? message : "Upload failed" },
       { status: 500 },

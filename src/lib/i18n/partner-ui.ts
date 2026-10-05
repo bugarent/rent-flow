@@ -490,7 +490,7 @@ export const partnerUiEn: PartnerUiPack = {
     uploading: "Uploading…",
     cover: "Cover",
     coverHint:
-      "The first photo becomes a white studio cover as soon as it is uploaded. Other photos stay as uploaded.",
+      "As soon as make, model, year, and color are filled, a white studio cover is created and set as the main photo. Gallery photos stay exactly as uploaded.",
     coverNeedIdentity: "Choose the make, model, year, and color before the cover photo.",
     coverStyleFailed: "The studio cover could not be created. Try again.",
     dragImage: "Drag the image or",
@@ -778,7 +778,7 @@ export const partnerUiKa: PartnerUiPack = {
     uploading: "იტვირთება…",
     cover: "ყდა",
     coverHint:
-      "პირველი სურათი ატვირთვისთანავე იქცევა თეთრ სტუდიურ ყდად. დანარჩენი ფოტოები უცვლელი რჩება.",
+      "მარკის, მოდელის, წლის და ფერის შევსებისთანავე იქმნება თეთრი სტუდიური ყდა და დგება მთავარ სურათად. გალერეის ფოტოები რჩება ზუსტად ისე, როგორც ატვირთულია.",
     coverNeedIdentity: "ყდის სურათისთვის ჯერ აირჩიეთ მარკა, მოდელი, წელი და ფერი.",
     coverStyleFailed: "ყდის სტუდიური სურათი ვერ შეიქმნა. სცადეთ თავიდან.",
     dragImage: "გადაიტანეთ სურათი ან",
@@ -1067,7 +1067,7 @@ export const partnerUiRu: PartnerUiPack = {
     uploading: "Загрузка…",
     cover: "Обложка",
     coverHint:
-      "Первое фото сразу при загрузке становится белой студийной обложкой. Остальные фото остаются как загружены.",
+      "Как только указаны марка, модель, год и цвет, создаётся белая студийная обложка и ставится главным фото. Фото галереи остаются как загружены.",
     coverNeedIdentity: "Перед обложкой выберите марку, модель, год и цвет.",
     coverStyleFailed: "Не удалось создать студийную обложку. Попробуйте ещё раз.",
     dragImage: "Перетащите изображение или",
