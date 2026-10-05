@@ -3,6 +3,7 @@ import { getAdminSession } from "@/lib/auth/sessions";
 import {
   getRefundUnreadTotal,
   listBookingRefunds,
+  deleteBookingRefund,
   markAllRefundsRead,
   markBookingRefunded,
   type BookingRefundStatus,
@@ -80,7 +81,7 @@ export async function POST(req: Request) {
   try {
     const body = (await req.json().catch(() => ({}))) as {
       refundId?: string;
-      action?: "refund" | "markAllRead";
+      action?: "refund" | "markAllRead" | "delete";
     };
     if (body.action === "markAllRead") {
       const cleared = await markAllRefundsRead();
@@ -90,9 +91,23 @@ export async function POST(req: Request) {
         { headers: { "Cache-Control": "no-store" } },
       );
     }
+    if (body.action === "delete") {
+      if (!body.refundId) {
+        return NextResponse.json({ error: "refundId required" }, { status: 400 });
+      }
+      const removed = await deleteBookingRefund(String(body.refundId));
+      if (!removed) {
+        return NextResponse.json({ error: "Refund not found" }, { status: 404 });
+      }
+      const unreadTotal = await getRefundUnreadTotal();
+      return NextResponse.json(
+        { ok: true, unreadTotal },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
     if (body.action !== "refund" || !body.refundId) {
       return NextResponse.json(
-        { error: "refundId and action=refund|markAllRead required" },
+        { error: "refundId and action=refund|markAllRead|delete required" },
         { status: 400 },
       );
     }

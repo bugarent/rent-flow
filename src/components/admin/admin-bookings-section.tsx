@@ -4,7 +4,7 @@ import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { uiText } from "@/lib/i18n/ui-text";
 import { AdminBookingsPillTabs } from "@/components/admin/bookings/admin-bookings-pill-tabs";
 
-type BookingsTab = "bookings" | "financials" | "chat" | "statistics" | "users" | "refunds";
+type BookingsTab = "bookings" | "financials" | "chat" | "statistics" | "refunds";
 
 export function AdminBookingsSection({
   tab,
@@ -17,7 +17,6 @@ export function AdminBookingsSection({
     refunds: string;
     financials: string;
     stats: string;
-    users: string;
     chat: string;
   };
   children: React.ReactNode;
@@ -29,9 +28,7 @@ export function AdminBookingsSection({
       ? dictionary.pages.analytics.title
       : tab === "financials"
         ? dictionary.pages.financials.title
-        : tab === "users"
-          ? dictionary.pages.users.title
-          : tab === "chat"
+        : tab === "chat"
             ? dictionary.pages.customBooking.title
             : tab === "refunds"
               ? refunds
@@ -41,9 +38,7 @@ export function AdminBookingsSection({
       ? dictionary.pages.analytics.body
       : tab === "financials"
         ? dictionary.pages.financials.body
-        : tab === "users"
-          ? dictionary.pages.users.body
-          : tab === "chat"
+        : tab === "chat"
             ? dictionary.pages.customBooking.body
             : tab === "refunds"
               ? uiText(
@@ -64,7 +59,6 @@ export function AdminBookingsSection({
           { href: hrefs.refunds, label: refunds, active: tab === "refunds" },
           { href: hrefs.financials, label: dictionary.nav.financials, active: tab === "financials" },
           { href: hrefs.stats, label: dictionary.nav.statistics, active: tab === "statistics" },
-          { href: hrefs.users, label: dictionary.nav.users, active: tab === "users" },
           { href: hrefs.chat, label: dictionary.nav.customBooking, active: tab === "chat" },
         ]}
       />

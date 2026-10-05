@@ -4,11 +4,7 @@ import { CustomBookingInbox } from "@/components/admin/custom-booking-inbox";
 import { AdminBookingsDashboard } from "@/components/admin/admin-bookings-dashboard";
 import { AnalyticsDashboard } from "@/components/admin/analytics-dashboard";
 import { AdminFinancialsPanel } from "@/components/admin/admin-financials-panel";
-import {
-  AdminCustomersTable,
-} from "@/components/admin/admin-customers-table";
 import { AdminBookingRefundsPanel } from "@/components/admin/admin-booking-refunds-panel";
-import { loadAdminCustomerRows } from "@/lib/server/load-admin-customers";
 import { loadAdminBookingRows } from "@/lib/server/load-admin-bookings";
 import { AdminBookingsSection } from "@/components/admin/admin-bookings-section";
 import { ADMIN_BASE } from "@/lib/routes";
@@ -19,11 +15,10 @@ function isoDate(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
-type BookingsTab = "bookings" | "financials" | "chat" | "statistics" | "users" | "refunds";
+type BookingsTab = "bookings" | "financials" | "chat" | "statistics" | "refunds";
 
 function parseTab(raw?: string): BookingsTab {
   if (raw === "statistics" || raw === "analytics") return "statistics";
-  if (raw === "users") return "users";
   if (raw === "chat" || raw === "custom-booking") return "chat";
   if (raw === "financials" || raw === "finance") return "financials";
   if (raw === "refunds" || raw === "refund") return "refunds";
@@ -55,7 +50,6 @@ export default async function AdminBookingsPage({
   const chatHref = `${ADMIN_BASE}/bookings?tab=chat`;
   const refundsHref = `${ADMIN_BASE}/bookings?tab=refunds`;
   const statsHref = `${ADMIN_BASE}/bookings?tab=statistics&${dateQs}`;
-  const usersHref = `${ADMIN_BASE}/bookings?tab=users`;
 
   let stats = {
     totalActive: 0,
@@ -73,11 +67,6 @@ export default async function AdminBookingsPage({
     }
   }
 
-  const customers =
-    tab === "users"
-      ? await loadAdminCustomerRows()
-      : { users: [], dbOffline: false, queryError: "" };
-
   const bookingRows = tab === "bookings" ? await loadAdminBookingRows() : [];
 
   return (
@@ -89,7 +78,6 @@ export default async function AdminBookingsPage({
           refunds: refundsHref,
           financials: financialsHref,
           stats: statsHref,
-          users: usersHref,
           chat: chatHref,
         }}
       >
@@ -111,12 +99,6 @@ export default async function AdminBookingsPage({
             month: sp.month,
             view: sp.view,
           }}
-        />
-      ) : tab === "users" ? (
-        <AdminCustomersTable
-          users={customers.users}
-          dbOffline={customers.dbOffline}
-          queryError={customers.queryError}
         />
       ) : tab === "chat" ? (
         <Suspense fallback={<p className="text-sm text-slate-500">…</p>}>

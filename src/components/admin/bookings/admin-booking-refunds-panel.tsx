@@ -44,6 +44,9 @@ function copy(locale: string) {
       source: "გადახდის წყარო",
       refundBtn: "თანხის დაბრუნება",
       detailsBtn: "დეტალები",
+      deleteBtn: "წაშლა",
+      deleteConfirm: "ნამდვილად გსურთ ამ განცხადების წაშლა?",
+      deleteFailed: "განცხადების წაშლა ვერ მოხერხდა",
       refundedAt: "დაბრუნების დრო",
       loadFailed: "ჩატვირთვა ვერ მოხერხდა",
       refundFailed: "დაბრუნება ვერ მოხერხდა",
@@ -64,6 +67,9 @@ function copy(locale: string) {
       source: "Источник оплаты",
       refundBtn: "Вернуть средства",
       detailsBtn: "Детали",
+      deleteBtn: "Удалить",
+      deleteConfirm: "Удалить эту запись?",
+      deleteFailed: "Не удалось удалить запись",
       refundedAt: "Время возврата",
       loadFailed: "Не удалось загрузить",
       refundFailed: "Не удалось вернуть",
@@ -83,6 +89,9 @@ function copy(locale: string) {
     source: "Payment source",
     refundBtn: "Refund payment",
     detailsBtn: "Details",
+    deleteBtn: "Delete",
+    deleteConfirm: "Delete this listing?",
+    deleteFailed: "Could not delete this listing",
     refundedAt: "Refunded at",
     loadFailed: "Could not load",
     refundFailed: "Refund failed",
@@ -122,8 +131,29 @@ export function AdminBookingRefundsPanel() {
   }, [t.loadFailed]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
+
+  const deleteRefund = async (id: string) => {
+    if (!window.confirm(t.deleteConfirm)) return;
+    setBusyId(id);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/bookings/refunds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refundId: id, action: "delete" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : t.deleteFailed);
+      setRows((prev) => prev.filter((row) => row.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.deleteFailed);
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const processRefund = async (id: string) => {
     if (!window.confirm(t.confirm)) return;
@@ -248,7 +278,7 @@ export function AdminBookingRefundsPanel() {
                     type="button"
                     disabled={detailsBusyId === r.bookingId}
                     onClick={() => void openDetails(r.bookingId)}
-                    className="rounded-lg bg-[#0b1f4b] px-2.5 py-1.5 text-xs font-bold text-white hover:bg-[#14306a] disabled:opacity-50"
+                    className="min-h-10 rounded-lg bg-[#0b1f4b] px-3 py-2 text-sm font-bold text-white hover:bg-[#14306a] disabled:opacity-50"
                   >
                     {t.detailsBtn}
                   </button>
@@ -257,11 +287,19 @@ export function AdminBookingRefundsPanel() {
                       type="button"
                       disabled={busyId === r.id}
                       onClick={() => void processRefund(r.id)}
-                      className="rounded-lg bg-amber-500 px-2.5 py-1.5 text-xs font-bold text-[#0b1f4b] hover:bg-amber-400 disabled:opacity-50"
+                      className="min-h-10 rounded-lg bg-amber-500 px-3 py-2 text-sm font-bold text-[#0b1f4b] hover:bg-amber-400 disabled:opacity-50"
                     >
                       {t.refundBtn}
                     </button>
                   ) : null}
+                  <button
+                    type="button"
+                    disabled={busyId === r.id}
+                    onClick={() => void deleteRefund(r.id)}
+                    className="min-h-10 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                  >
+                    {t.deleteBtn}
+                  </button>
                 </div>
               </li>
             );

@@ -125,6 +125,17 @@ export async function markBookingRefunded(
   return next;
 }
 
+export async function deleteBookingRefund(id: string): Promise<boolean> {
+  const refundId = String(id || "").trim();
+  if (!refundId) return false;
+  const store = await readStore();
+  const next = store.refunds.filter((r) => r.id !== refundId);
+  if (next.length === store.refunds.length) return false;
+  store.refunds = next;
+  await writeStore(store);
+  return true;
+}
+
 export async function getPendingRefundTotal(): Promise<number> {
   const store = await readStore();
   return store.refunds.filter((r) => r.status === "PENDING").length;

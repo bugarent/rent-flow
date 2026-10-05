@@ -10,12 +10,8 @@ export default async function AdminAnalyticsPage({
   await requireAdmin();
   const sp = await searchParams;
   const params = new URLSearchParams();
-  if (sp.tab === "users") {
-    params.set("tab", "users");
-  } else {
-    params.set("tab", "statistics");
-    if (sp.from) params.set("from", sp.from);
-    if (sp.to) params.set("to", sp.to);
-  }
+  params.set("tab", "statistics");
+  if (sp.from) params.set("from", sp.from);
+  if (sp.to) params.set("to", sp.to);
   redirect(`${ADMIN_BASE}/bookings?${params.toString()}`);
 }
