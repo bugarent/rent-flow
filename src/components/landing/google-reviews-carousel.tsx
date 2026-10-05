@@ -7,28 +7,21 @@ import { usePreferences } from "@/components/providers/preferences-context";
 
 const AVATAR_COLORS = ["#e67e22", "#34495e", "#16a085", "#8e44ad", "#c0392b", "#2980b9"];
 
+// Brand colours fail text-contrast checks, so the wordmark is an image with alt text.
+const GOOGLE_WORDMARK_SRC = `data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 28"><text x="0" y="22" font-family="Arial,Helvetica,sans-serif" font-size="24" font-weight="500" letter-spacing="-0.5"><tspan fill="#4285F4">G</tspan><tspan fill="#EA4335">o</tspan><tspan fill="#FBBC05">o</tspan><tspan fill="#4285F4">g</tspan><tspan fill="#34A853">l</tspan><tspan fill="#EA4335">e</tspan></text></svg>',
+)}`;
+
 function GoogleWordmark() {
   return (
-    <span className="inline-flex items-end font-medium leading-none tracking-tight" aria-label="Google">
-      <span className="text-[22px] sm:text-[24px]" style={{ color: "#4285F4" }}>
-        G
-      </span>
-      <span className="text-[22px] sm:text-[24px]" style={{ color: "#EA4335" }}>
-        o
-      </span>
-      <span className="text-[22px] sm:text-[24px]" style={{ color: "#FBBC05" }}>
-        o
-      </span>
-      <span className="text-[22px] sm:text-[24px]" style={{ color: "#4285F4" }}>
-        g
-      </span>
-      <span className="text-[22px] sm:text-[24px]" style={{ color: "#34A853" }}>
-        l
-      </span>
-      <span className="text-[22px] sm:text-[24px]" style={{ color: "#EA4335" }}>
-        e
-      </span>
-    </span>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={GOOGLE_WORDMARK_SRC}
+      alt="Google"
+      width={72}
+      height={28}
+      className="inline-block h-[26px] w-auto sm:h-[28px]"
+    />
   );
 }
 

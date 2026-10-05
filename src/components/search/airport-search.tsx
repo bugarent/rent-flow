@@ -418,11 +418,13 @@ export function LocationPicker({
   emptyMessage,
   restoreOnClear,
   inputClassName,
+  ariaLabel,
 }: {
   options: LocationChoice[];
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
+  ariaLabel?: string;
   required?: boolean;
   airportsGroup?: string;
   citiesGroup?: string;
@@ -616,8 +618,9 @@ export function LocationPicker({
         ref={inputRef}
         type="text"
         role="combobox"
+        aria-label={ariaLabel}
         aria-expanded={open}
-        aria-controls={listId}
+        aria-controls={open ? listId : undefined}
         aria-autocomplete="list"
         aria-haspopup="listbox"
         value={displayValue}
@@ -857,6 +860,7 @@ export function AirportSearch({
       </ul>
 
       <h1 className="mb-1 text-center text-sm font-extrabold uppercase tracking-wide text-white sm:text-base md:text-lg">
+        <span className="sr-only">{dictionary.meta.title.split("|")[0].trim()} — </span>
         {dictionary.home.searchTitle}
       </h1>
 
@@ -888,6 +892,7 @@ export function AirportSearch({
               value={pickup}
               onChange={setPickup}
               placeholder={dictionary.home.selectPickup}
+              ariaLabel={dictionary.home.pickupLocation}
               required
               airportsGroup={useLocationGroups ? dictionary.home.airportsGroup : undefined}
               citiesGroup={useLocationGroups ? dictionary.home.citiesGroup : undefined}
@@ -903,6 +908,7 @@ export function AirportSearch({
               value={dropoff}
               onChange={setDropoff}
               placeholder={dictionary.home.sameAsPickup}
+              ariaLabel={dictionary.home.dropoffLocation}
               required
               restoreOnClear={SAME_AS_PICKUP}
               airportsGroup={useLocationGroups ? dictionary.home.airportsGroup : undefined}

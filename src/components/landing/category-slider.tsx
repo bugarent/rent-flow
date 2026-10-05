@@ -16,9 +16,12 @@ type Category = { id: string; slug: string; name: string; details: string; image
 function CategoryCard({
   category,
   viewLabel,
+  loopCopy = false,
 }: {
   category: Category;
   viewLabel: string;
+  /** Duplicate slide used only for the infinite loop — hidden from assistive tech. */
+  loopCopy?: boolean;
 }) {
   const { locale } = usePreferences();
   const country = useHomeCountry();
@@ -26,12 +29,15 @@ function CategoryCard({
   const name = knownText(locale, category.name);
   const href = `/cars?category=${encodeURIComponent(category.slug)}${country ? `&country=${encodeURIComponent(country)}` : ""}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
   return (
-    <article className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <article
+      className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      aria-hidden={loopCopy || undefined}
+    >
       <div className="h-36 bg-slate-100">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={category.imageUrl}
-          alt={name}
+          alt=""
           className="h-full w-full object-cover"
           loading="lazy"
           decoding="async"
@@ -41,6 +47,8 @@ function CategoryCard({
         <h3 className="mb-3 text-lg font-bold text-[#0b1f4b]">{name}</h3>
         <Link
           href={href}
+          tabIndex={loopCopy ? -1 : undefined}
+          aria-label={`${viewLabel}: ${name}`}
           className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#1d6fe8] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#1558c0]"
         >
           {viewLabel}
@@ -170,6 +178,7 @@ export function CategorySlider({ categories }: { categories: Category[] }) {
                 key={`${category.id}-${index}`}
                 category={category}
                 viewLabel={dictionary.home.viewVehicles}
+                loopCopy={canLoop && (index < categories.length || index >= categories.length * 2)}
               />
             ))}
           </div>

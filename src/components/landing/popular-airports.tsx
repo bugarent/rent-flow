@@ -15,18 +15,24 @@ const SLIDE_MS = 650;
 function AirportCard({
   airport,
   locale,
+  loopCopy = false,
 }: {
   airport: PopularAirportCard;
   locale: string;
+  /** Duplicate slide used only for the infinite loop — hidden from assistive tech. */
+  loopCopy?: boolean;
 }) {
   const href = `/airport/${encodeURIComponent(airport.iata)}`;
   return (
-    <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <article
+      className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      aria-hidden={loopCopy || undefined}
+    >
       <div className="h-40 bg-slate-200 sm:h-44">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={airport.image}
-          alt={placeLabel(locale, airport.name)}
+          alt=""
           className="h-full w-full object-cover"
           loading="lazy"
           decoding="async"
@@ -36,6 +42,7 @@ function AirportCard({
         <h3 className="mb-4 text-lg font-bold text-[#0b1f4b]">{placeLabel(locale, airport.name)}</h3>
         <Link
           href={href}
+          tabIndex={loopCopy ? -1 : undefined}
           className="mt-auto inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#1d6fe8] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#1558c0]"
         >
           {airportCarsLabel(locale, airport.iata)}
@@ -183,6 +190,7 @@ export function PopularAirports({
                 key={`${airport.iata}-${airport.rank}-${index}`}
                 airport={airport}
                 locale={locale}
+                loopCopy={canLoop && (index < airports.length || index >= airports.length * 2)}
               />
             ))}
           </div>
