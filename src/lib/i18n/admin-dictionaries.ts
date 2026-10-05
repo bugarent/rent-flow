@@ -218,6 +218,11 @@ export type AdminDictionary = {
     bookingMailLabel: string;
     bookingMailPh: string;
     bookingMailSaved: string;
+    bookingSmtpHost: string;
+    bookingSmtpPort: string;
+    bookingSmtpUser: string;
+    bookingSmtpPass: string;
+    bookingSmtpPassKeep: string;
     botUsername: string;
     botToken: string;
     addedFromDelivery: string;
@@ -551,10 +556,15 @@ const en: AdminDictionary = {
     liveBotSavedNote: "Saved. New bookings are sent to this bot.",
     bookingMailTitle: "Booking email",
     bookingMailHelp:
-      "When a guest finishes a booking, this address sends the car, pickup and return, extras, rental days, total, amount paid, and amount due on site to the partner and the customer.",
+      "When a guest finishes a booking, this address sends the car, pickup and return, extras, rental days, total, amount paid, and amount due on site to the partner and the customer. The mail server, login, and password below are required for the message to leave.",
     bookingMailLabel: "Sender email",
     bookingMailPh: "bookings@example.com",
     bookingMailSaved: "Saved. New bookings are emailed from this address.",
+    bookingSmtpHost: "Mail server",
+    bookingSmtpPort: "Port",
+    bookingSmtpUser: "Mailbox login",
+    bookingSmtpPass: "Mailbox password",
+    bookingSmtpPassKeep: "Saved. Leave blank to keep it",
     botUsername: "Bot username",
     botToken: "Bot token",
     addedFromDelivery: "Added from Delivery",
@@ -889,10 +899,15 @@ const ka: AdminDictionary = {
     liveBotSavedNote: "შენახულია. ახალი ჯავშანი ამ ბოტზე გაიგზავნება.",
     bookingMailTitle: "ჯავშნის მაილი",
     bookingMailHelp:
-      "როცა მომხმარებელი ჯავშანს დაასრულებს, ამ მაილიდან პარტნიორს და მომხმარებელს ავტომატურად გაეგზავნება მანქანა, აყვანისა და დაბრუნების ადგილი თარიღით, დამატებითი სერვისები, დღეების რაოდენობა, ჯამი, გადახდილი და ადგილზე გადასახდელი თანხა.",
+      "როცა მომხმარებელი ჯავშანს დაასრულებს, ამ მაილიდან პარტნიორს და მომხმარებელს ავტომატურად გაეგზავნება მანქანა, აყვანისა და დაბრუნების ადგილი თარიღით, დამატებითი სერვისები, დღეების რაოდენობა, ჯამი, გადახდილი და ადგილზე გადასახდელი თანხა. წერილი რომ გავიდეს, ქვემოთ ჩაწერეთ ფოსტის სერვერი, მომხმარებელი და პაროლი.",
     bookingMailLabel: "გამგზავნი მაილი",
     bookingMailPh: "bookings@example.com",
     bookingMailSaved: "შენახულია. ახალი ჯავშანი ამ მაილიდან გაიგზავნება.",
+    bookingSmtpHost: "ფოსტის სერვერი",
+    bookingSmtpPort: "პორტი",
+    bookingSmtpUser: "ფოსტის მომხმარებელი",
+    bookingSmtpPass: "ფოსტის პაროლი",
+    bookingSmtpPassKeep: "შენახულია. ცარიელი დატოვება ინახავს ძველს",
     botUsername: "ბოტის username",
     botToken: "ბოტის ტოკენი",
     addedFromDelivery: "დამატებულია მიწოდებიდან",
@@ -1227,10 +1242,15 @@ const ru: AdminDictionary = {
     liveBotSavedNote: "Сохранено. Новые брони отправляются этому боту.",
     bookingMailTitle: "Почта бронирования",
     bookingMailHelp:
-      "Когда гость завершает бронь, с этого адреса партнёру и клиенту уходят машина, места и время получения и возврата, доп. услуги, число дней, сумма, оплаченное и к оплате на месте.",
+      "Когда гость завершает бронь, с этого адреса партнёру и клиенту уходят машина, места и время получения и возврата, доп. услуги, число дней, сумма, оплаченное и к оплате на месте. Чтобы письмо ушло, укажите ниже сервер, логин и пароль почты.",
     bookingMailLabel: "Почта отправителя",
     bookingMailPh: "bookings@example.com",
     bookingMailSaved: "Сохранено. Новые брони отправляются с этого адреса.",
+    bookingSmtpHost: "Почтовый сервер",
+    bookingSmtpPort: "Порт",
+    bookingSmtpUser: "Логин почты",
+    bookingSmtpPass: "Пароль почты",
+    bookingSmtpPassKeep: "Сохранён. Пустое поле оставляет прежний",
     botUsername: "Имя пользователя бота",
     botToken: "Токен бота",
     addedFromDelivery: "Добавлено из доставки",

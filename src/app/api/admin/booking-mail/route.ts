@@ -1,13 +1,29 @@
 import { NextResponse } from "next/server";
 import { isValidEmail } from "@/lib/crypto";
 import { requireAdminApi } from "@/lib/auth/sessions";
-import { readBookingMailFrom, writeBookingMailFrom } from "@/lib/server/booking-mail-from";
+import { readBookingMailConfig, writeBookingMailConfig } from "@/lib/server/booking-mail-from";
+
+function publicConfig(config: {
+  fromEmail: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpUser: string;
+  smtpPass: string;
+}) {
+  return {
+    fromEmail: config.fromEmail,
+    smtpHost: config.smtpHost,
+    smtpPort: config.smtpPort,
+    smtpUser: config.smtpUser,
+    smtpPassSet: Boolean(config.smtpPass),
+  };
+}
 
 export async function GET() {
   if (!(await requireAdminApi())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  return NextResponse.json({ fromEmail: await readBookingMailFrom() });
+  return NextResponse.json(publicConfig(await readBookingMailConfig()));
 }
 
 export async function PUT(req: Request) {
@@ -19,6 +35,12 @@ export async function PUT(req: Request) {
   if (!isValidEmail(fromEmail)) {
     return NextResponse.json({ error: "Enter a valid email" }, { status: 400 });
   }
-  await writeBookingMailFrom(fromEmail);
-  return NextResponse.json({ fromEmail });
+  const saved = await writeBookingMailConfig({
+    fromEmail,
+    smtpHost: String(body.smtpHost || "").trim().slice(0, 200),
+    smtpPort: Number(body.smtpPort || 587),
+    smtpUser: String(body.smtpUser || "").trim().slice(0, 200),
+    smtpPass: typeof body.smtpPass === "string" ? body.smtpPass.slice(0, 200) : "",
+  });
+  return NextResponse.json(publicConfig(saved));
 }

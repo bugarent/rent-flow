@@ -32,10 +32,10 @@ function FieldBox({
         className,
       )}
     >
-      <p className="text-[9px] font-bold uppercase leading-none tracking-wide text-slate-500">
+      <p className="text-[10px] font-bold uppercase leading-none tracking-wide text-slate-500 sm:text-[9px]">
         {label}
       </p>
-      <div className="mt-0.5 text-xs font-semibold leading-tight text-slate-900">
+      <div className="mt-0.5 break-words text-sm font-semibold leading-snug text-slate-900 sm:text-xs sm:leading-tight">
         {children}
       </div>
     </div>

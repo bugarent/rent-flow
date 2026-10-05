@@ -872,7 +872,7 @@ export function BookingInfoModal({
           "relative flex w-full flex-col overflow-hidden shadow-2xl",
           calendarView
             ? "h-auto max-h-[min(92dvh,960px)] max-w-5xl rounded-xl border-2 border-slate-300 bg-slate-200"
-            : "max-h-[94vh] max-w-5xl rounded-2xl bg-[#f4f6fa]",
+            : "max-h-[94dvh] max-w-5xl rounded-2xl bg-[#f4f6fa]",
         )}
         onClick={(e) => e.stopPropagation()}
       >
@@ -974,6 +974,12 @@ export function BookingInfoModal({
               calendarView={calendarView}
             />
 
+            {!hidePartner && guestCompact ? (
+              <div className="lg:hidden">
+                <PartnerSection t={t} locale={locale} booking={booking} compact />
+              </div>
+            ) : null}
+
             <div
               className={cn(
                 "grid",
@@ -1011,13 +1017,15 @@ export function BookingInfoModal({
                 )}
               >
                 {hidePartner ? null : (
-                  <PartnerSection
-                    t={t}
-                    locale={locale}
-                    booking={booking}
-                    calendarView={calendarView}
-                    compact={guestCompact}
-                  />
+                  <div className={guestCompact ? "hidden lg:block" : undefined}>
+                    <PartnerSection
+                      t={t}
+                      locale={locale}
+                      booking={booking}
+                      calendarView={calendarView}
+                      compact={guestCompact}
+                    />
+                  </div>
                 )}
                 <GuestSection
                   t={t}

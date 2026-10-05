@@ -51,16 +51,18 @@ export async function sendPartnerMail(input: SendMailInput): Promise<{ logged: t
     console.warn(`[mail:${input.event}] notification log skipped`, error);
   }
 
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const { readBookingMailConfig } = await import("@/lib/server/booking-mail-from");
+  const stored = await readBookingMailConfig().catch(() => null);
+  const host = process.env.SMTP_HOST?.trim() || stored?.smtpHost || "";
+  const user = process.env.SMTP_USER?.trim() || stored?.smtpUser || "";
+  const pass = process.env.SMTP_PASS?.trim() || stored?.smtpPass || "";
+  const port = Number(process.env.SMTP_PORT || stored?.smtpPort || 587);
   if (!host || !user || !pass) {
-    console.info(`[mail:${input.event}] to=${input.to} subject=${input.subject}\n${input.text}`);
+    console.info(`[mail:${input.event}] SMTP is not configured; to=${input.to} subject=${input.subject}`);
     return { logged: true, sent: false };
   }
 
   try {
-    // Optional dependency — resolve by name so bundlers do not hard-fail when missing
     const modName = "nodemailer";
     const nodemailer = (await import(/* webpackIgnore: true */ modName).catch(() => null)) as {
       createTransport?: (opts: unknown) => { sendMail: (opts: unknown) => Promise<unknown> };
@@ -76,8 +78,8 @@ export async function sendPartnerMail(input: SendMailInput): Promise<{ logged: t
     }
     const transporter = createTransport({
       host,
-      port: Number(process.env.SMTP_PORT || 587),
-      secure: process.env.SMTP_SECURE === "true",
+      port: Number.isInteger(port) && port > 0 ? port : 587,
+      secure: process.env.SMTP_SECURE === "true" || port === 465,
       auth: { user, pass },
     });
     const fromAddress = input.from?.trim() || process.env.SMTP_FROM || `${SITE_NAME} <noreply@${SITE_NAME}>`;

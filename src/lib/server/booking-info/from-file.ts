@@ -90,22 +90,66 @@ export async function resolvedDiscountPercentForBooking(input: {
   }
 }
 
+/** Partner of a DB-listed car — file bookings can reference cars that only exist in Postgres. */
+async function dbCarPartner(carId: string) {
+  if (!carId) return null;
+  try {
+    const { prisma } = await import("@/lib/prisma");
+    const car = await prisma.car.findUnique({
+      where: { id: carId },
+      select: {
+        partner: {
+          select: {
+            id: true,
+            companyName: true,
+            logoUrl: true,
+            phone: true,
+            secondaryPhone: true,
+            email: true,
+            messengers: true,
+            messenger: true,
+            companySettings: true,
+            sequentialNumber: true,
+          },
+        },
+      },
+    });
+    return car?.partner ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fromFile(
   file: FileBookingRecord,
   fileCar: FileCarListing | null,
   catalogExtras: BookingInfoDetailPayload["catalogExtras"],
 ): Promise<BookingInfoDetailPayload> {
-  const partner = await resolvePartnerPayload({
-    partnerId: fileCar?.partnerId,
-    emailHint: fileCar?.partnerEmail,
-    companyName: fileCar?.partnerName || fileCar?.partnerEmail,
-  });
+  const dbPartner = fileCar ? null : await dbCarPartner(file.carId);
+  const partner = dbPartner
+    ? await resolvePartnerPayload({
+        partnerId: dbPartner.id,
+        emailHint: dbPartner.email,
+        companyName: dbPartner.companyName,
+        phone: dbPartner.phone,
+        secondaryPhone: dbPartner.secondaryPhone,
+        messengers: dbPartner.messengers,
+        messenger: dbPartner.messenger,
+        companySettings: dbPartner.companySettings,
+        logoUrl: dbPartner.logoUrl,
+        sequentialNumber: dbPartner.sequentialNumber,
+      })
+    : await resolvePartnerPayload({
+        partnerId: fileCar?.partnerId,
+        emailHint: fileCar?.partnerEmail,
+        companyName: fileCar?.partnerName || fileCar?.partnerEmail,
+      });
 
   const bookingCountryIso2 = await resolveCountryIso2ForIata(file.pickupAirportIata);
 
   const { rows: feeRows } = await buildMergedDeliveryRows({
     deliveryPrices: fileCar?.deliveryPrices,
-    partnerId: fileCar?.partnerId,
+    partnerId: fileCar?.partnerId ?? dbPartner?.id,
     partnerUserId: fileCar?.partnerUserId,
   }).catch(() => ({ rows: [] as DeliveryPriceRowLike[] }));
 
@@ -156,7 +200,7 @@ export async function fromFile(
     pickupCity: pickupAirport.city,
     dropoffCity: dropoffAirport.city,
     rentalDays,
-    partnerId: fileCar?.partnerId,
+    partnerId: fileCar?.partnerId ?? dbPartner?.id,
     partnerUserId: fileCar?.partnerUserId,
   });
 
