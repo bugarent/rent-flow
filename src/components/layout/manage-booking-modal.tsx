@@ -238,7 +238,7 @@ export function ManageBookingModal({
 
   return (
     <div
-      className="fixed inset-0 z-[220] flex items-center justify-center p-4 sm:p-6"
+      className="fixed inset-0 z-[220] flex items-center justify-center p-2 sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-label={t.title}
@@ -253,7 +253,7 @@ export function ManageBookingModal({
 
       <div
         className={cn(
-          "relative max-h-[92vh] w-full overflow-y-auto rounded-xl border border-white/70 bg-white shadow-[0_24px_60px_rgba(11,31,75,0.35)]",
+          "relative max-h-[94dvh] w-full overflow-y-auto overflow-x-hidden rounded-xl border border-white/70 bg-white shadow-[0_24px_60px_rgba(11,31,75,0.35)]",
           foundBookings.length ? "max-w-5xl" : "max-w-[760px]",
         )}
         onClick={(e) => e.stopPropagation()}

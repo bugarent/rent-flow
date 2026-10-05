@@ -1305,7 +1305,7 @@ export function CarsSearchResults({
 
         {filtersOpen ? (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-2 sm:p-3"
+            className="fixed inset-0 z-[230] flex items-center justify-center bg-black/45 p-2 sm:p-3"
             onClick={() => setFiltersOpen(false)}
             role="presentation"
           >

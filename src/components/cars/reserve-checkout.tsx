@@ -1142,9 +1142,9 @@ export function ReserveCheckout({
           <form
             noValidate
             onSubmit={goToPaymentStep}
-            className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]"
+            className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]"
           >
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               {/* Car summary */}
               <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch sm:gap-4">
@@ -1299,7 +1299,7 @@ export function ReserveCheckout({
                           <li
                             key={extra.id}
                             className={cn(
-                              "flex flex-nowrap items-center gap-2 rounded-lg border px-2 py-1.5 sm:gap-2.5",
+                              "flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border px-2 py-1.5 sm:flex-nowrap sm:gap-2.5",
                               locked || selected
                                 ? "border-emerald-200 bg-emerald-50/70 ring-1 ring-emerald-100"
                                 : "border-amber-200 bg-amber-50/60 ring-1 ring-amber-100",
@@ -1311,7 +1311,7 @@ export function ReserveCheckout({
                               description={extra.description}
                               compact
                             />
-                            <div className="flex min-w-0 flex-1 items-center gap-1">
+                            <div className="flex min-w-0 flex-1 items-center gap-1 max-sm:basis-[60%]">
                               <span
                                 className={cn(
                                   "min-w-0 truncate text-sm font-extrabold leading-none",
@@ -1356,7 +1356,7 @@ export function ReserveCheckout({
                               </div>
                             ) : null}
 
-                            <div className="flex shrink-0 flex-nowrap items-center gap-x-1.5 whitespace-nowrap text-end sm:gap-x-2">
+                            <div className="flex shrink-0 flex-nowrap items-center gap-x-1.5 whitespace-nowrap text-end max-sm:ms-auto sm:gap-x-2">
                               {isFree ? (
                                 <span className="inline-flex items-center gap-1 text-sm font-extrabold text-[#0a7a52]">
                                   {dictionary.common.free}
@@ -1513,7 +1513,7 @@ export function ReserveCheckout({
                   {t.driverInfo}
                 </div>
                 <div className="space-y-4 p-4 sm:p-5">
-                  <div className="grid gap-3 sm:grid-cols-[120px_1fr_1fr]">
+                  <div className="grid gap-3 sm:grid-cols-[120px_minmax(0,1fr)_minmax(0,1fr)]">
                     <label className="block text-sm font-semibold text-slate-700">
                       {t.titleLabel}
                       <select
@@ -1913,7 +1913,7 @@ export function ReserveCheckout({
             </div>
 
             {/* Sidebar */}
-            <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+            <aside className="min-w-0 space-y-4 lg:sticky lg:top-20 lg:self-start">
               <section className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
                 <div className="space-y-1.5 text-sm">
                   <div className="space-y-0.5">

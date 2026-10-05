@@ -43,7 +43,7 @@ export function GuestBookingNoticeModal({
     >
       <div aria-hidden className="absolute inset-0 bg-slate-950/55 backdrop-blur-[2px]" />
       <div
-        className="relative w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+        className="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-amber-100 bg-amber-50 px-5 py-4">

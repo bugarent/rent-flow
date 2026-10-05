@@ -173,13 +173,13 @@ function GalleryLightbox({
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/55 p-4 sm:p-8"
+      className="fixed inset-0 z-[230] flex items-center justify-center bg-slate-900/55 p-2 sm:p-8"
       role="dialog"
       aria-modal="true"
       onClick={onClose}
     >
       <div
-        className="relative flex w-full max-w-[min(94vw,56rem)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="relative flex max-h-[92dvh] w-full max-w-[min(94vw,56rem)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2">

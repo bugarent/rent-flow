@@ -42,7 +42,7 @@ export function RentalTermsModal({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-[1px] sm:p-6"
+      className="fixed inset-0 z-[230] flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-[1px] sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="rental-terms-modal-title"

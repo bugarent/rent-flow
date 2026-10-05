@@ -55,14 +55,14 @@ export function HelpFaqModal({ open, onClose }: { open: boolean; onClose: () => 
 
   return (
     <div
-      className="fixed inset-0 z-[220] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px] sm:p-6"
+      className="fixed inset-0 z-[220] flex items-center justify-center bg-slate-950/50 p-2 backdrop-blur-[2px] sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-label={dictionary.nav.help}
       onClick={onClose}
     >
       <div
-        className="flex h-[96vh] max-h-[96vh] w-full max-w-[1080px] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_24px_64px_rgba(11,31,75,0.22)] ring-1 ring-slate-200/80"
+        className="flex h-[96dvh] max-h-[96dvh] w-full max-w-[1080px] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_24px_64px_rgba(11,31,75,0.22)] ring-1 ring-slate-200/80"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative shrink-0 border-b border-slate-100 bg-gradient-to-b from-slate-50 to-white px-7 pb-5 pt-6 sm:px-8">

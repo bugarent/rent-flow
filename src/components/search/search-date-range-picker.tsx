@@ -141,14 +141,14 @@ export function SearchDateRangePicker({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[130] flex items-end justify-center bg-slate-950/50 sm:items-center sm:p-4"
+      className="fixed inset-0 z-[240] flex items-center justify-center bg-slate-950/50 p-3 sm:p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
       role="dialog"
       aria-modal="true"
     >
-      <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white pb-[env(safe-area-inset-bottom)] text-slate-800 shadow-2xl sm:rounded-2xl">
+      <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-sm overflow-y-auto rounded-2xl bg-white text-slate-800 shadow-2xl">
         <div className="flex items-start gap-2 border-b border-slate-100 p-3">
           <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
             {(
@@ -219,7 +219,7 @@ export function SearchDateRangePicker({
 
           <div className="grid grid-cols-7 gap-y-1" onMouseLeave={() => setHoverIso(null)}>
             {cells.map((day, idx) => {
-              if (!day) return <div key={`e-${idx}`} className="h-11" />;
+              if (!day) return <div key={`e-${idx}`} className="h-10" />;
               const iso = toIso(day);
               const disabled = iso < minDate;
               const isStart = iso === start;
@@ -233,7 +233,7 @@ export function SearchDateRangePicker({
                   onClick={() => pick(iso)}
                   onMouseEnter={() => setHoverIso(iso)}
                   className={cn(
-                    "h-11 text-sm font-bold tabular-nums transition",
+                    "h-10 min-h-0 min-w-0 text-sm font-bold tabular-nums transition",
                     disabled && "cursor-not-allowed text-slate-300",
                     !disabled && inRange && "bg-sky-100 text-sky-900",
                     !disabled && (isStart || isEnd) && "rounded-lg bg-[#1d6fe8] text-white shadow-sm",

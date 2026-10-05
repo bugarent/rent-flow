@@ -27,7 +27,7 @@ export function OtpModal({
   const collect = () => refs.current.map((el) => el?.value ?? "").join("");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/70 p-4 sm:items-center">
+    <div className="fixed inset-0 z-[230] flex items-end justify-center bg-slate-950/70 p-4 sm:items-center">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 text-slate-900 shadow-2xl">
         <h2 className="text-xl font-bold">{dictionary.auth.otpTitle}</h2>
         <p className="mt-1 text-sm text-slate-600">{dictionary.auth.otpHint}</p>

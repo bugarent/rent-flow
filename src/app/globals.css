@@ -102,6 +102,19 @@ body {
   }
 }
 
+/*
+ * A `.grid` without a base `grid-cols-*` gets an implicit `auto` column that grows to its widest
+ * child on phones (cards pushed off-screen). Give it a shrinkable column; any responsive
+ * `sm:/md:/lg:grid-cols-*` utility still wins because utilities outrank the base layer.
+ */
+@layer base {
+  .grid:not([class*=" grid-cols-"]):not([class^="grid-cols-"]):not([class*="grid-flow-col"]):not(
+      [class*="auto-cols"]
+    ):not([class*="place-content"]):not([class*="justify-center"]):not([class*="justify-between"]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* Comfortable mobile tap targets & prevent accidental page-wide horizontal scroll */
 @media (max-width: 767px) {
   button:not([class*="h-"]):not([class*="size-"]),
