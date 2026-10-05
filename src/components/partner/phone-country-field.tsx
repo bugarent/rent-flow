@@ -266,7 +266,7 @@ export function PhoneCountryField({
           type="tel"
           inputMode="tel"
           className={cn(
-            "min-w-0 flex-1 rounded-xl border bg-white p-3 text-sm font-normal text-slate-900 caret-slate-900 outline-none transition placeholder:text-slate-400",
+            "min-w-0 flex-1 rounded-xl border bg-white p-3 text-base font-normal text-slate-900 caret-slate-900 outline-none transition placeholder:text-slate-400",
             invalid
               ? "border-2 border-red-500 bg-red-50 ring-2 ring-red-200"
               : "border-slate-200 focus:border-sky-500 focus:ring-2 focus:ring-sky-200",

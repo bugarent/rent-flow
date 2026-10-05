@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { FLEET_AGE_RANGES, type PartnerSocialPlatform } from "@/lib/partner";
 import { cn } from "@/lib/utils";
@@ -53,15 +53,18 @@ export function BecomePartnerModal({
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setForm((prev) => ({
-      ...prev,
-      email: initialEmail || prev.email,
-      countryIso2s: initialCountry ? [initialCountry] : prev.countryIso2s,
-    }));
-  }, [open, initialEmail, initialCountry]);
+  const seed = open ? `${initialEmail}\0${initialCountry}` : "";
+  const [appliedSeed, setAppliedSeed] = useState("");
+  if (seed !== appliedSeed) {
+    setAppliedSeed(seed);
+    if (seed) {
+      setForm((prev) => ({
+        ...prev,
+        email: initialEmail || prev.email,
+        countryIso2s: initialCountry ? [initialCountry] : prev.countryIso2s,
+      }));
+    }
+  }
 
   if (!open) return null;
 
@@ -88,7 +91,7 @@ export function BecomePartnerModal({
 
   const inputClass = (invalid: boolean, extra?: string) =>
     cn(
-      "w-full rounded-xl border px-3 py-2 font-normal outline-none",
+      "w-full rounded-xl border px-3 py-2.5 text-base font-normal outline-none",
       extra,
       invalid ? "border-red-500 bg-red-50 ring-2 ring-red-200" : "border-slate-200",
     );
@@ -192,20 +195,20 @@ export function BecomePartnerModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
       role="dialog"
       aria-modal="true"
       onClick={onClose}
     >
       <div
-        className="max-h-[calc(100vh-1.5rem)] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white text-slate-900 shadow-2xl"
+        className="max-h-[90dvh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white text-slate-900 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between border-b px-5 py-3">
           <h2 className="text-xl font-extrabold text-[#0b1f4b]">{t.title}</h2>
           <button
             type="button"
-            className="mt-1.5 text-sm font-semibold text-slate-500 hover:text-slate-800"
+            className="min-h-10 px-2 text-sm font-semibold text-slate-500 hover:text-slate-800"
             onClick={onClose}
           >
             {t.close}
@@ -399,7 +402,7 @@ export function BecomePartnerModal({
               {t.fleetAge}
               <RequiredMark />
               <select
-                className="mt-1 w-full rounded-xl border px-3 py-2 font-normal"
+                className="mt-1 w-full rounded-xl border px-3 py-2.5 text-base font-normal"
                 required
                 value={form.fleetAgeRange}
                 onChange={(e) => setForm({ ...form, fleetAgeRange: e.target.value })}
@@ -424,7 +427,7 @@ export function BecomePartnerModal({
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-xl bg-[#22c55e] py-2.5 font-bold text-white hover:bg-[#16a34a] disabled:bg-slate-400 md:col-span-2"
+              className="min-h-11 w-full rounded-xl bg-[#22c55e] py-2.5 text-base font-bold text-white hover:bg-[#16a34a] disabled:bg-slate-400 md:col-span-2"
             >
               {loading ? t.submitting : t.submit}
             </button>
