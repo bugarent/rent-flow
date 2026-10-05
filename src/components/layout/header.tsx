@@ -12,6 +12,7 @@ import { CurrencySelect, LanguageSelect, headerChipClass } from "@/components/la
 import { getBusinessPartnershipCopy } from "@/lib/i18n/business-partnership-copy";
 import { BUSINESS_PARTNER_LOGIN } from "@/lib/routes";
 import { RouteLoadingSpinner } from "@/components/layout/route-loading-spinner";
+import { subscribeOpenManageBooking } from "@/components/layout/open-manage-booking";
 
 const ManageBookingModal = dynamic(
   () =>
@@ -55,20 +56,36 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
   const bpCopy = isPartnershipPage ? getBusinessPartnershipCopy(locale) : null;
 
   useEffect(() => {
-    if (bookingOpen) setBookingMounted(true);
-  }, [bookingOpen]);
+    return subscribeOpenManageBooking(() => {
+      setOpen(false);
+      setLookupRef("");
+      setLookupEmail("");
+      setBookingMounted(true);
+      setBookingOpen(true);
+    });
+  }, []);
+
+  // `?booked=1&ref=…&email=…` after checkout opens "My booking" once, then the URL is cleaned.
+  const bookedFlag = searchParams.get("booked");
+  const bookedRef = (searchParams.get("ref") || "").trim();
+  const bookedEmail = (searchParams.get("email") || "").trim();
+  const bookedKey =
+    bookedFlag === "1" || bookedFlag === "true" ? `${bookedRef}|${bookedEmail}` : "";
+  const [handledBookedKey, setHandledBookedKey] = useState("");
+  if (bookedKey !== handledBookedKey) {
+    setHandledBookedKey(bookedKey);
+    if (bookedKey) {
+      setLookupRef(bookedRef);
+      setLookupEmail(bookedEmail);
+      setBookingMounted(true);
+      setBookingOpen(true);
+    }
+  }
 
   useEffect(() => {
-    const booked = searchParams.get("booked");
-    if (booked !== "1" && booked !== "true") return;
-    const ref = (searchParams.get("ref") || "").trim();
-    const email = (searchParams.get("email") || "").trim();
-    setLookupRef(ref);
-    setLookupEmail(email);
-    setBookingMounted(true);
-    setBookingOpen(true);
+    if (!bookedKey) return;
     router.replace(pathname || "/", { scroll: false });
-  }, [searchParams, pathname, router]);
+  }, [bookedKey, pathname, router]);
 
   const myBookingButton = (
     <button
@@ -78,6 +95,7 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
         setOpen(false);
         setLookupRef("");
         setLookupEmail("");
+        setBookingMounted(true);
         setBookingOpen(true);
       }}
     >
@@ -141,7 +159,7 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
           <div className="flex h-9 w-full min-w-0 items-center justify-end gap-1.5 sm:ms-auto sm:h-11 sm:w-auto sm:gap-4 lg:gap-5">
             {!hideCustomerNav ? (
               <>
-                <span className="hidden sm:inline-flex">{helpButton}</span>
+                <span className="hidden md:inline-flex">{helpButton}</span>
                 <nav className="hidden h-11 items-center lg:flex">{myBookingButton}</nav>
               </>
             ) : null}
@@ -160,14 +178,16 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
             ) : null}
             {authButton}
             {!hideCustomerNav ? (
-              <button
-                type="button"
-                className={`${headerChipClass} h-9 w-9 justify-center px-0 sm:h-11 sm:w-11 sm:px-0 lg:hidden`}
-                aria-label={open ? dictionary.common.closeMenu : dictionary.common.openMenu}
-                onClick={() => setOpen((v) => !v)}
-              >
-                {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </button>
+              <span className="hidden md:inline-flex lg:hidden">
+                <button
+                  type="button"
+                  className={`${headerChipClass} h-11 w-11 justify-center px-0`}
+                  aria-label={open ? dictionary.common.closeMenu : dictionary.common.openMenu}
+                  onClick={() => setOpen((v) => !v)}
+                >
+                  {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                </button>
+              </span>
             ) : null}
           </div>
         </div>
@@ -176,11 +196,10 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
           <nav
             className={
               overlay
-                ? "flex flex-col gap-2 border-t border-white/25 bg-slate-950/55 px-4 py-3 backdrop-blur-sm lg:hidden"
-                : "flex flex-col gap-2 border-t border-slate-100 bg-white px-4 py-3 lg:hidden"
+                ? "hidden flex-col gap-2 border-t border-white/25 bg-slate-950/55 px-4 py-3 backdrop-blur-sm md:flex lg:hidden"
+                : "hidden flex-col gap-2 border-t border-slate-100 bg-white px-4 py-3 md:flex lg:hidden"
             }
           >
-            <span className="sm:hidden">{helpButton}</span>
             {myBookingButton}
           </nav>
         ) : null}

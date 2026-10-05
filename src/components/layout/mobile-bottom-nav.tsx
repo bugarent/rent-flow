@@ -2,45 +2,97 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Car, Home, Search, UserRound } from "lucide-react";
+import { Car, CircleHelp, Home, Search, UserRound } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { usePreferences } from "@/components/providers/preferences-context";
+import { requestOpenManageBooking } from "@/components/layout/open-manage-booking";
 import { cn } from "@/lib/utils";
 
 export function MobileBottomNav() {
-  const pathname = usePathname();
+  const pathname = usePathname() || "/";
   const { dictionary } = usePreferences();
   const { data: session } = useSession();
+  const hideCustomerTools =
+    pathname === "/partnership" ||
+    pathname.startsWith("/partnership/") ||
+    pathname === "/business-partnership" ||
+    pathname.startsWith("/business-partnership/") ||
+    pathname === "/business-portal" ||
+    pathname.startsWith("/business-portal/");
 
-  const items = [
-    { href: "/", label: dictionary.nav.home, icon: Home },
-    { href: "/cars", label: dictionary.nav.search, icon: Search },
-    { href: "/account", label: dictionary.nav.bookings, icon: Car },
+  const items: Array<{
+    key: string;
+    label: string;
+    icon: typeof Home;
+    href?: string;
+    active?: boolean;
+    onClick?: () => void;
+  }> = [
+    { key: "home", href: "/", label: dictionary.nav.home, icon: Home, active: pathname === "/" },
     {
-      href: session?.user ? "/account" : "/",
-      label: dictionary.nav.account,
-      icon: UserRound,
+      key: "search",
+      href: "/cars",
+      label: dictionary.nav.search,
+      icon: Search,
+      active: pathname === "/cars",
     },
+    hideCustomerTools
+      ? {
+          key: "bookings",
+          href: "/account",
+          label: dictionary.nav.bookings,
+          icon: Car,
+          active: pathname === "/account",
+        }
+      : {
+          key: "bookings",
+          label: dictionary.nav.bookings,
+          icon: Car,
+          onClick: () => requestOpenManageBooking(),
+        },
   ];
+
+  if (!hideCustomerTools) {
+    items.push({
+      key: "help",
+      href: "/help",
+      label: dictionary.nav.help,
+      icon: CircleHelp,
+      active: pathname === "/help" || pathname.startsWith("/help/"),
+    });
+  }
+
+  items.push({
+    key: "account",
+    href: session?.user ? "/account" : "/",
+    label: dictionary.nav.account,
+    icon: UserRound,
+    active: session?.user ? pathname === "/account" : false,
+  });
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-[80] border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-      <ul className="grid grid-cols-4">
-        {items.map((item, index) => {
-          const active = pathname === item.href;
+      <ul className={cn("grid", hideCustomerTools ? "grid-cols-4" : "grid-cols-5")}>
+        {items.map((item) => {
           const Icon = item.icon;
+          const className = cn(
+            "flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-center text-[10px] font-medium leading-tight sm:text-[11px]",
+            item.active ? "text-sky-600" : "text-slate-500",
+          );
+          const label = <span className="line-clamp-2 max-w-full">{item.label}</span>;
           return (
-            <li key={`${item.href}-${index}`}>
-              <Link
-                href={item.href}
-                className={cn(
-                  "flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] font-medium",
-                  active ? "text-sky-600" : "text-slate-500",
-                )}
-              >
-                <Icon className="h-5 w-5" />
-                {item.label}
-              </Link>
+            <li key={item.key} className="min-w-0">
+              {item.href ? (
+                <Link href={item.href} className={className}>
+                  <Icon className="h-5 w-5 shrink-0" />
+                  {label}
+                </Link>
+              ) : (
+                <button type="button" className={cn(className, "w-full")} onClick={item.onClick}>
+                  <Icon className="h-5 w-5 shrink-0" />
+                  {label}
+                </button>
+              )}
             </li>
           );
         })}
