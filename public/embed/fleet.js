@@ -8,7 +8,7 @@
   var origin = "";
   try {
     origin = new URL(script.src).origin;
-  } catch (e) {
+  } catch (_e) {
     return;
   }
   var mount = document.getElementById("rentairportcars-fleet");

@@ -36,19 +36,14 @@ export function PartnerCarPhotoGallery({
   onUploadFiles,
   invalid,
   accentColor,
-  coverUrl,
-  coverBusy = false,
   labels,
 }: {
   photos: string[];
   onChange: (next: string[]) => void;
   uploading: boolean;
-  onUploadFiles: (files: File[], startIndex: number) => Promise<{ urls: string[] }>;
+  onUploadFiles: (files: File[], startIndex: number) => Promise<{ urls: string[]; coverUrl?: string }>;
   invalid?: boolean;
   accentColor: string;
-  /** Studio cover. Omit to preview the first gallery slot. */
-  coverUrl?: string;
-  coverBusy?: boolean;
   labels: {
     upload: string;
     uploading: string;
@@ -138,14 +133,14 @@ export function PartnerCarPhotoGallery({
 
   const handleFilesAt = async (index: number, files: FileList | null) => {
     if (!files?.length) return;
-    const picked = Array.from(files).slice(0, SLOT_COUNT - index);
+    const placeAt = index === 0 ? 1 : index;
+    const picked = Array.from(files).slice(0, SLOT_COUNT - placeAt);
     if (!picked.length) return;
-
     const localUrls = picked.map((file) => URL.createObjectURL(file));
     const optimistic = padSlots(photosRef.current);
     localUrls.forEach((localUrl, i) => {
-      const at = index + i;
-      if (at < SLOT_COUNT) optimistic[at] = localUrl;
+      const at = placeAt + i;
+      if (at > 0 && at < SLOT_COUNT) optimistic[at] = localUrl;
     });
     commitSlots(optimistic);
 
@@ -153,23 +148,24 @@ export function PartnerCarPhotoGallery({
       const result = await onUploadFiles(picked, index);
       const urls = result.urls;
       const next = padSlots(photosRef.current);
-      if (urls.length) {
+      if (urls.length || result.coverUrl) {
         urls.forEach((url, i) => {
-          const at = index + i;
-          if (at < SLOT_COUNT) next[at] = normalizePhotoUrl(url) || next[at];
+          const at = placeAt + i;
+          if (at > 0 && at < SLOT_COUNT) next[at] = normalizePhotoUrl(url) || next[at];
         });
+        if (result.coverUrl) next[0] = normalizePhotoUrl(result.coverUrl) || next[0];
       } else {
         localUrls.forEach((_, i) => {
-          const at = index + i;
-          if (at < SLOT_COUNT && next[at]?.startsWith("blob:")) next[at] = "";
+          const at = placeAt + i;
+          if (at > 0 && at < SLOT_COUNT && next[at]?.startsWith("blob:")) next[at] = "";
         });
       }
       commitSlots(next);
     } catch {
       const next = padSlots(photosRef.current);
       localUrls.forEach((_, i) => {
-        const at = index + i;
-        if (at < SLOT_COUNT && next[at]?.startsWith("blob:")) next[at] = "";
+        const at = placeAt + i;
+        if (at > 0 && at < SLOT_COUNT && next[at]?.startsWith("blob:")) next[at] = "";
       });
       commitSlots(next);
     } finally {
@@ -183,23 +179,19 @@ export function PartnerCarPhotoGallery({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center sm:max-w-[220px]">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center sm:max-w-[200px]">
         <div className="mx-auto flex h-28 w-full items-center justify-center overflow-hidden rounded-lg bg-white text-slate-400">
-          {(coverUrl !== undefined ? coverUrl : slots[0]) ? (
+          {slots[0] ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={coverUrl !== undefined ? coverUrl : slots[0]}
-              alt=""
-              className="h-full w-full object-contain"
-            />
+            <img src={slots[0]} alt="" className="h-full w-full object-contain" />
           ) : (
-            <span className="px-2 text-xs font-semibold">{coverBusy ? labels.uploading : labels.cover}</span>
+            <span className="text-xs font-semibold">{labels.cover}</span>
           )}
         </div>
-        <p className="mt-2 text-[11px] leading-snug text-slate-500">{labels.coverHint}</p>
+        <p className="mt-2 text-xs leading-snug text-slate-500">{labels.coverHint}</p>
       </div>
 
-      <p className="text-[11px] text-slate-500">{labels.formats}</p>
+      <p className="text-xs text-slate-500">{labels.formats}</p>
 
       <div
         className={cn(
@@ -247,7 +239,10 @@ export function PartnerCarPhotoGallery({
                     <img
                       src={url}
                       alt=""
-                      className="h-full w-full cursor-zoom-in object-cover"
+                      className={cn(
+                        "h-full w-full cursor-zoom-in",
+                        index === 0 ? "object-contain bg-white" : "object-cover",
+                      )}
                       draggable={false}
                       onClick={() => {
                         if (suppressClick.current) {

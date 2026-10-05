@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, EyeOff, FileText, Trash2, UploadCloud } from "lucide-react";
 import { CREATE_AUTO_BACKDROP_URL, MIN_PUBLIC_PHOTOS } from "@/lib/brand";
+import { isStudioCoverUrl } from "@/lib/cars/studio-cover-url";
 import { PARTNER_BASE } from "@/lib/routes";
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
 import { isMandatoryExtra, isMandatoryFreeExtra } from "@/lib/extras/pricing";
@@ -72,8 +73,8 @@ import { isAllowedInsuranceFile, insuranceFileName, isPdfUrl } from "@/lib/files
 import {
   PartnerCarPhotoGallery,
   filledPhotoCount,
+  photosForSave,
 } from "@/components/partner/partner-car-photo-gallery";
-import { isStudioCoverUrl } from "@/lib/cars/studio-cover-url";
 import { PartnerImageLightbox } from "@/components/partner/partner-image-lightbox";
 
 function mdToDateInput(md: string): string {
@@ -340,24 +341,29 @@ function PercentInput({
   );
 }
 
-async function uploadFile(file: File): Promise<{ url: string }> {
-  const optimized = await compressImageForUpload(file);
+async function uploadFile(file: File, options?: { original?: boolean }): Promise<{ url: string; styled: boolean }> {
+  const payload = options?.original ? file : await compressImageForUpload(file);
   const fd = new FormData();
-  fd.append("file", optimized);
+  fd.append("file", payload);
   const res = await fetch("/api/partners/uploads", { method: "POST", body: fd });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Upload failed");
-  return { url: String(data.url) };
+  return { url: String(data.url), styled: Boolean(data.styled) };
 }
 
-function splitListingPhotos(urls: string[]): { cover: string; gallery: string[] } {
-  const clean = urls.map((url) => String(url || "").trim()).filter(Boolean);
-  const cover = clean[0] && isStudioCoverUrl(clean[0]) ? clean[0] : "";
-  const rest = cover ? clean.slice(1) : clean;
-  return {
-    cover,
-    gallery: Array.from({ length: MIN_PUBLIC_PHOTOS }, (_, index) => rest[index] || ""),
-  };
+function placeStudioCover(photos: string[], url: string) {
+  const next = Array.from({ length: MIN_PUBLIC_PHOTOS }, (_, index) => String(photos[index] || "").trim());
+  const current = next[0];
+  if (current && current !== url && !isStudioCoverUrl(current)) {
+    const empty = next.findIndex((slot, index) => index > 0 && !slot);
+    if (empty > 0) next[empty] = current;
+    else {
+      for (let index = next.length - 1; index > 1; index -= 1) next[index] = next[index - 1] || "";
+      next[1] = current;
+    }
+  }
+  next[0] = url;
+  return next;
 }
 
 const NO_DELIVERY_CATALOG: DeliveryLocationView[] = [];
@@ -454,8 +460,6 @@ export function PartnerCreateCarForm({
   const [photos, setPhotos] = useState<string[]>(() =>
     Array.from({ length: MIN_PUBLIC_PHOTOS }, () => ""),
   );
-  const [studioCover, setStudioCover] = useState("");
-  const [coverBusy, setCoverBusy] = useState(false);
   const [passportFront, setPassportFront] = useState("");
   const [passportBack, setPassportBack] = useState("");
   const [insuranceUrl, setInsuranceUrl] = useState("");
@@ -636,9 +640,7 @@ export function PartnerCreateCarForm({
           setEbd(Boolean(details?.ebd));
           setEsp(Boolean(details?.esp));
           setMusic(Array.isArray(details?.music) ? details.music.map(String) : []);
-          const loadedPhotos = splitListingPhotos(photoUrls);
-          if (!isAdminReview) setStudioCover(loadedPhotos.cover);
-          setPhotos(isAdminReview ? Array.from({ length: MIN_PUBLIC_PHOTOS }, (_, i) => photoUrls[i] || "") : loadedPhotos.gallery);
+          setPhotos(Array.from({ length: MIN_PUBLIC_PHOTOS }, (_, i) => photoUrls[i] || ""));
           setPassportFront(String(car.passport?.frontUrl || ""));
           setPassportBack(String(car.passport?.backUrl || ""));
           setInsuranceUrl(String(car.insuranceUrl || car.passport?.insuranceUrl || ""));
@@ -1014,12 +1016,8 @@ export function PartnerCreateCarForm({
           setEsp(Boolean(details?.esp));
           setMusic(Array.isArray(details?.music) ? details.music.map(String) : []);
 
-          const loadedPhotos = splitListingPhotos(photoUrls);
-          if (!isAdminReview) setStudioCover(loadedPhotos.cover);
           setPhotos(
-            isAdminReview
-              ? Array.from({ length: MIN_PUBLIC_PHOTOS }, (_, i) => photoUrls[i] || "")
-              : loadedPhotos.gallery,
+            Array.from({ length: MIN_PUBLIC_PHOTOS }, (_, i) => photoUrls[i] || ""),
           );
           setPassportFront(String(car.passport?.frontUrl || ""));
           setPassportBack(String(car.passport?.backUrl || ""));
@@ -1224,6 +1222,54 @@ export function PartnerCreateCarForm({
     };
   }, [carId, cc.errUpdateFailed, initialDeliveryCatalog, isAdminReview]);
 
+  const [coverTick, setCoverTick] = useState(0);
+  const [coverBusy, setCoverBusy] = useState(false);
+  const studioReq = useRef(0);
+  const studioKeyRef = useRef("");
+  useEffect(() => {
+    if (isAdminReview) return;
+    const identity = {
+      make: make.trim(),
+      model: model.trim(),
+      year: year.trim(),
+      color: color.trim(),
+    };
+    if (!identity.make || !identity.model || !identity.year || !identity.color) return;
+    const key = [identity.year, identity.make, identity.model, identity.color].join("|").toLowerCase();
+    if (studioKeyRef.current === key) return;
+    const timer = window.setTimeout(() => {
+      const req = ++studioReq.current;
+      setCoverBusy(true);
+      void (async () => {
+        try {
+          const res = await fetch("/api/partners/studio-cover", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(identity),
+          });
+          const data = (await res.json().catch(() => null)) as { url?: string } | null;
+          if (req !== studioReq.current) return;
+          if (!res.ok || !data?.url) {
+            setError(cc.coverStyleFailed);
+            return;
+          }
+          studioKeyRef.current = key;
+          setPhotos((prev) => placeStudioCover(prev, data.url!));
+          setError((current) => (current === cc.coverStyleFailed ? "" : current));
+        } catch {
+          if (req === studioReq.current) setError(cc.coverStyleFailed);
+        } finally {
+          if (req === studioReq.current) setCoverBusy(false);
+        }
+      })();
+    }, 400);
+    return () => {
+      window.clearTimeout(timer);
+      studioReq.current += 1;
+      setCoverBusy(false);
+    };
+  }, [make, model, year, color, isAdminReview, cc.coverStyleFailed, coverTick]);
+
   useEffect(() => {
     const nodes = SECTION_IDS.map((id) => document.getElementById(id)).filter(Boolean) as HTMLElement[];
     if (!nodes.length) return;
@@ -1341,40 +1387,6 @@ export function PartnerCreateCarForm({
     setModel("");
   };
 
-  const coverIdentity = `${make.trim()}|${model.trim()}|${year.trim()}|${color.trim()}`.toLowerCase();
-  useEffect(() => {
-    if (isAdminReview) return;
-    const [makeName, modelName, yearName, colorName] = coverIdentity.split("|");
-    if (!makeName || !modelName || !yearName || !colorName) return;
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        setCoverBusy(true);
-        try {
-          const res = await fetch("/api/partners/studio-cover", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ make: makeName, model: modelName, year: yearName, color: colorName }),
-            signal: controller.signal,
-          });
-          const data = (await res.json()) as { url?: string; error?: string };
-          if (!res.ok || !data.url) throw new Error(data.error || "cover_style");
-          setStudioCover(data.url);
-        } catch (error) {
-          if (controller.signal.aborted) return;
-          if (error instanceof DOMException && error.name === "AbortError") return;
-          setError(cc.coverStyleFailed);
-        } finally {
-          if (!controller.signal.aborted) setCoverBusy(false);
-        }
-      })();
-    }, 400);
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [coverIdentity, isAdminReview, cc.coverStyleFailed]);
-
   const scrollTo = (id: string) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -1397,14 +1409,17 @@ export function PartnerCreateCarForm({
     setMusic((prev) => (prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]));
   };
 
-  const onGalleryFiles = async (files: File[]): Promise<{ urls: string[] }> => {
+  const onGalleryFiles = async (
+    files: File[],
+    _startIndex: number,
+  ): Promise<{ urls: string[]; coverUrl?: string }> => {
     if (!files.length) return { urls: [] };
     setUploading(true);
     setError("");
     try {
       const urls: string[] = [];
       for (const file of files) {
-        urls.push((await uploadFile(file)).url);
+        urls.push((await uploadFile(file, { original: true })).url);
       }
       return { urls };
     } catch (err) {
@@ -1707,11 +1722,7 @@ export function PartnerCreateCarForm({
           doors: Number(doors) || 4,
           transmission,
           fuelType: fuel,
-          photos: (() => {
-            const gallery = photos.map((url) => url.trim()).filter(Boolean);
-            if (isAdminReview || !studioCover) return gallery;
-            return [studioCover, ...gallery.filter((url) => url !== studioCover)];
-          })(),
+          photos: photosForSave(photos),
           passportFrontUrl: passportFront || undefined,
           passportBackUrl: passportBack || undefined,
           insuranceUrl: insuranceUrl || undefined,
@@ -2757,11 +2768,16 @@ export function PartnerCreateCarForm({
         >
           <PartnerCarPhotoGallery
             photos={photos}
-            onChange={setPhotos}
-            uploading={uploading}
+            onChange={(next) => {
+              setPhotos(next);
+              const ready = Boolean(make.trim() && model.trim() && year.trim() && color.trim());
+              if (ready && !isStudioCoverUrl(next[0] || "")) {
+                studioKeyRef.current = "";
+                setCoverTick((tick) => tick + 1);
+              }
+            }}
+            uploading={uploading || coverBusy}
             onUploadFiles={onGalleryFiles}
-            coverUrl={isAdminReview ? undefined : studioCover}
-            coverBusy={coverBusy}
             invalid={fieldInvalid("photos")}
             accentColor={ACCENT_GREEN}
             labels={{
@@ -3094,7 +3110,7 @@ export function PartnerCreateCarForm({
               <>
                 <button
                   type="button"
-                  disabled={loading || uploading || booting || deleting}
+                  disabled={loading || uploading || coverBusy || booting || deleting}
                   onClick={() => void save("update")}
                   className="inline-flex items-center gap-1.5 rounded-md px-4 py-1.5 text-xs font-bold text-white shadow-sm disabled:opacity-60"
                   style={{ backgroundColor: ACCENT_GREEN }}
@@ -3104,7 +3120,7 @@ export function PartnerCreateCarForm({
                 </button>
                 <button
                   type="button"
-                  disabled={loading || uploading || booting || deleting}
+                  disabled={loading || uploading || coverBusy || booting || deleting}
                   onClick={() => void deleteListing()}
                   className="inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-white px-4 py-1.5 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-60"
                 >
@@ -3116,7 +3132,7 @@ export function PartnerCreateCarForm({
               <>
                 <button
                   type="button"
-                  disabled={loading || uploading}
+                  disabled={loading || uploading || coverBusy}
                   onClick={() => void save("sales")}
                   className="inline-flex items-center gap-1.5 rounded-md px-4 py-1.5 text-xs font-bold text-white shadow-sm disabled:opacity-60"
                   style={{ backgroundColor: ACCENT_GREEN }}
@@ -3126,7 +3142,7 @@ export function PartnerCreateCarForm({
                 </button>
                 <button
                   type="button"
-                  disabled={loading || uploading}
+                  disabled={loading || uploading || coverBusy}
                   onClick={() => void save("internal")}
                   className="inline-flex items-center gap-1.5 rounded-md border bg-white/70 px-4 py-1.5 text-xs font-bold hover:bg-white disabled:opacity-60"
                   style={{ borderColor: HEADER_BORDER, color: HEADER_TEXT }}

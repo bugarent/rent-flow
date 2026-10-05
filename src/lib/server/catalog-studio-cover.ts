@@ -42,10 +42,10 @@ function identityKey(identity: StudioCoverIdentity): string {
 
 function coverPrompt(identity: StudioCoverIdentity): string {
   return [
-    `Professional automotive catalog photograph of one ${identity.year} ${identity.make} ${identity.model}.`,
-    `Body paint is exactly ${identity.color}.`,
-    "Front three-quarter view, the entire vehicle visible, realistic proportions.",
-    "Flat pure white studio background, soft commercial lighting, no people, no text, no logo, no watermark, no license plate.",
+    `Photorealistic rental catalog photo of one ${identity.year} ${identity.color} ${identity.make} ${identity.model}.`,
+    "That exact make, model, year, and paint color. Three-quarter front view, the whole car visible and centered.",
+    "Seamless pure white studio background, light gray floor, one thin circular turntable ring under the car.",
+    "Soft even studio lighting, blank white license plate, no people, no text, no watermark, no extra objects.",
   ].join(" ");
 }
 
@@ -100,15 +100,47 @@ async function generateWithCatalog(prompt: string, seed: number): Promise<Buffer
   return bytes;
 }
 
-async function placeOnWhite(bytes: Buffer): Promise<Buffer> {
-  const fitted = await sharp(bytes, { failOn: "none" })
-    .rotate()
-    .resize({ width: 1320, height: 860, fit: "inside" })
+/** Covers the small generator mark in the bottom-right corner without touching the car. */
+async function hideCornerMark(bytes: Buffer): Promise<Buffer> {
+  const upright = await sharp(bytes, { failOn: "none" }).rotate().jpeg({ quality: 90 }).toBuffer();
+  const meta = await sharp(upright).metadata();
+  const width = meta.width || 1280;
+  const height = meta.height || 854;
+  const boxW = Math.max(8, Math.round(width * 0.2));
+  const boxH = Math.max(8, Math.round(height * 0.07));
+  const sample = await sharp(upright)
+    .extract({
+      left: Math.max(0, width - boxW - 6),
+      top: Math.max(0, height - boxH - 6),
+      width: 4,
+      height: 4,
+    })
+    .raw()
+    .toBuffer();
+  const patch = await sharp({
+    create: {
+      width: boxW,
+      height: boxH,
+      channels: 3,
+      background: { r: sample[0] || 255, g: sample[1] || 255, b: sample[2] || 255 },
+    },
+  })
     .png()
     .toBuffer();
+  return sharp(upright)
+    .composite([{ input: patch, left: width - boxW, top: height - boxH }])
+    .jpeg({ quality: 86 })
+    .toBuffer();
+}
+
+async function placeOnWhite(bytes: Buffer): Promise<Buffer> {
+  const fitted = await sharp(await hideCornerMark(bytes), { failOn: "none" })
+    .resize({ width: 1400, height: 900, fit: "inside" })
+    .jpeg({ quality: 86 })
+    .toBuffer();
   const meta = await sharp(fitted).metadata();
-  const width = meta.width || 1320;
-  const height = meta.height || 860;
+  const width = meta.width || 1400;
+  const height = meta.height || 900;
   const left = Math.max(0, Math.round((CANVAS_W - width) / 2));
   const top = Math.max(0, Math.round((CANVAS_H - height) / 2));
   return sharp({

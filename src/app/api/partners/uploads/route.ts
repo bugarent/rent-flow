@@ -50,6 +50,9 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("[partners/uploads]", error);
     const message = error instanceof Error ? error.message : "Upload failed";
+    if (message === "cover_identity" || message === "cover_style") {
+      return NextResponse.json({ error: message }, { status: message === "cover_identity" ? 400 : 502 });
+    }
     return NextResponse.json(
       { error: message === "Could not save the image" ? message : "Upload failed" },
       { status: 500 },

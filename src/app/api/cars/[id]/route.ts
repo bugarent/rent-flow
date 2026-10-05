@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { getAdminSession, getPartnerSession } from "@/lib/auth/sessions";
 import { prisma } from "@/lib/prisma";
 import { MIN_PUBLIC_PHOTOS } from "@/lib/brand";
@@ -108,7 +109,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     });
   }
 
-  let car: any = null;
+  let car: Prisma.CarGetPayload<{ include: typeof PUBLIC_CAR_INCLUDE & { passport: true } }> | null = null;
   try {
     car = await prisma.car.findUnique({
       where: { id },
@@ -205,7 +206,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const { id } = await params;
   clearPublicCarCache(id);
-  let car: any = null;
+  let car: Prisma.CarGetPayload<{ include: { partner: true; photos: true; passport: true } }> | null = null;
   try {
     car = await prisma.car.findUnique({
       where: { id },

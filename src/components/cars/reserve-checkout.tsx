@@ -1142,9 +1142,9 @@ export function ReserveCheckout({
           <form
             noValidate
             onSubmit={goToPaymentStep}
-            className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]"
+            className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]"
           >
-            <div className="min-w-0 space-y-4">
+            <div className="space-y-4">
               {/* Car summary */}
               <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch sm:gap-4">
@@ -1210,13 +1210,13 @@ export function ReserveCheckout({
                         <li
                           key={feature.id}
                           className={cn(
-                            "flex min-h-[1.5rem] w-full min-w-0 items-center justify-center rounded-md border px-1.5 py-0.5 text-center text-[10px] font-semibold leading-tight",
+                            "flex min-h-[1.5rem] w-full items-center justify-center rounded-md border px-1.5 py-0.5 text-center text-[10px] font-semibold leading-tight",
                             feature.enabled
                               ? "border-emerald-400 bg-emerald-50 text-emerald-800"
                               : "border-amber-400 bg-amber-50 text-amber-800 line-through decoration-amber-700",
                           )}
                         >
-                          <span className="min-w-0 break-words">
+                          <span className="truncate">
                             {feature.label}
                             {feature.enabled ? " ✓" : ""}
                           </span>
@@ -1230,12 +1230,12 @@ export function ReserveCheckout({
                   </div>
                 </div>
 
-                <ul className="mt-1.5 grid w-full grid-cols-2 gap-1.5 sm:grid-cols-4">
+                <ul className="mt-1.5 grid w-full grid-cols-4 gap-1.5">
                   {benefitBadges.map((badge) => (
                     <li
                       key={badge.id}
                       className={cn(
-                        "inline-flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-1.5 text-center text-[11px] font-semibold leading-tight sm:rounded-full sm:px-3",
+                        "inline-flex min-w-0 items-center justify-center gap-1.5 rounded-full px-2 py-1.5 text-center text-[10px] font-semibold leading-tight sm:px-3 sm:text-[11px]",
                         badge.enabled
                           ? badge.className
                           : "border border-amber-400 bg-amber-50 text-amber-800 line-through decoration-amber-700",
@@ -1244,7 +1244,7 @@ export function ReserveCheckout({
                       <span className={cn("shrink-0", badge.enabled ? "opacity-70" : "opacity-50")}>
                         {badge.icon}
                       </span>
-                      <span className="min-w-0 break-words">{badge.label}</span>
+                      <span className="truncate">{badge.label}</span>
                     </li>
                   ))}
                 </ul>
@@ -1299,7 +1299,7 @@ export function ReserveCheckout({
                           <li
                             key={extra.id}
                             className={cn(
-                              "flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border px-2 py-1.5 sm:flex-nowrap sm:gap-2.5",
+                              "flex flex-nowrap items-center gap-2 rounded-lg border px-2 py-1.5 sm:gap-2.5",
                               locked || selected
                                 ? "border-emerald-200 bg-emerald-50/70 ring-1 ring-emerald-100"
                                 : "border-amber-200 bg-amber-50/60 ring-1 ring-amber-100",
@@ -1311,10 +1311,10 @@ export function ReserveCheckout({
                               description={extra.description}
                               compact
                             />
-                            <div className="flex min-w-0 flex-1 items-center gap-1 max-sm:basis-[60%]">
+                            <div className="flex min-w-0 flex-1 items-center gap-1">
                               <span
                                 className={cn(
-                                  "min-w-0 break-words text-sm font-extrabold leading-snug",
+                                  "min-w-0 truncate text-sm font-extrabold leading-none",
                                   locked || selected ? "text-[#0b1f4b]" : "text-amber-950",
                                 )}
                               >
@@ -1356,7 +1356,7 @@ export function ReserveCheckout({
                               </div>
                             ) : null}
 
-                            <div className="flex shrink-0 flex-nowrap items-center gap-x-1.5 whitespace-nowrap text-end max-sm:ms-auto sm:gap-x-2">
+                            <div className="flex shrink-0 flex-nowrap items-center gap-x-1.5 whitespace-nowrap text-end sm:gap-x-2">
                               {isFree ? (
                                 <span className="inline-flex items-center gap-1 text-sm font-extrabold text-[#0a7a52]">
                                   {dictionary.common.free}
@@ -1440,8 +1440,8 @@ export function ReserveCheckout({
                               variant="forbidden"
                               compact
                             />
-                            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
-                              <span className="min-w-0 break-words text-sm font-semibold leading-snug text-slate-900">
+                            <div className="flex min-w-0 flex-1 items-center gap-1 truncate">
+                              <span className="truncate text-sm font-semibold text-slate-900">
                                 {record(extra.name)}
                               </span>
                               {extra.description?.trim() ? (
@@ -1513,7 +1513,7 @@ export function ReserveCheckout({
                   {t.driverInfo}
                 </div>
                 <div className="space-y-4 p-4 sm:p-5">
-                  <div className="grid gap-3 sm:grid-cols-[120px_minmax(0,1fr)_minmax(0,1fr)]">
+                  <div className="grid gap-3 sm:grid-cols-[120px_1fr_1fr]">
                     <label className="block text-sm font-semibold text-slate-700">
                       {t.titleLabel}
                       <select
@@ -1913,7 +1913,7 @@ export function ReserveCheckout({
             </div>
 
             {/* Sidebar */}
-            <aside className="min-w-0 space-y-4 lg:sticky lg:top-20 lg:self-start">
+            <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
               <section className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
                 <div className="space-y-1.5 text-sm">
                   <div className="space-y-0.5">

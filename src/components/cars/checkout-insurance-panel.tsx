@@ -321,7 +321,7 @@ function InsuranceDetailModal({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[230] flex items-center justify-center bg-[#06281f]/55 p-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-[#06281f]/55 p-4 backdrop-blur-[2px]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="insurance-detail-title"
@@ -450,8 +450,8 @@ function InsuranceToggleRow({
         locked || free || selected ? onGreen : offYellow,
       )}
     >
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 sm:flex-nowrap sm:gap-3">
-        <div className="flex min-w-0 basis-full items-center gap-2 sm:flex-1 sm:basis-auto">
+      <div className="flex flex-nowrap items-center gap-2 sm:gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <ShieldCheck
             className={cn(
               "h-4 w-4 shrink-0",
@@ -460,7 +460,7 @@ function InsuranceToggleRow({
           />
           <h3
             className={cn(
-              "min-w-0 flex-1 break-words text-sm font-extrabold leading-snug sm:flex-initial",
+              "shrink truncate text-sm font-extrabold leading-none",
               locked || selected ? "text-[#0b1f4b]" : inactive ? "text-amber-950" : "text-[#0b1f4b]",
             )}
           >
@@ -470,7 +470,7 @@ function InsuranceToggleRow({
             type="button"
             onClick={onOpenDetails}
             className={cn(
-              "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm font-extrabold underline-offset-2 hover:underline sm:text-[15px]",
+              "inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-sm font-extrabold underline-offset-2 hover:underline sm:text-[15px]",
               inactive
                 ? "bg-amber-50 text-amber-800 ring-1 ring-amber-200"
                 : "bg-white text-[#0f766e] ring-1 ring-[#0f766e]/25 shadow-sm",
@@ -481,7 +481,7 @@ function InsuranceToggleRow({
           </button>
         </div>
 
-        <div className="ms-auto flex min-w-0 shrink-0 flex-nowrap items-center gap-x-1.5 whitespace-nowrap text-end sm:ms-0 sm:gap-x-2">
+        <div className="flex shrink-0 flex-nowrap items-center gap-x-1.5 whitespace-nowrap text-end sm:gap-x-2">
           {free ? (
             <span
               className={cn(

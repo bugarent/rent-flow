@@ -9,14 +9,13 @@ export async function POST(req: Request) {
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
+  let body: { make?: unknown; model?: unknown; year?: unknown; color?: unknown };
   try {
-    const body = (await req.json()) as {
-      make?: unknown;
-      model?: unknown;
-      year?: unknown;
-      color?: unknown;
-    };
+    body = (await req.json()) as typeof body;
+  } catch {
+    return NextResponse.json({ error: "cover_identity" }, { status: 400 });
+  }
+  try {
     const url = await ensureCatalogStudioCover({
       make: String(body.make || ""),
       model: String(body.model || ""),
@@ -27,7 +26,6 @@ export async function POST(req: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "cover_style";
     const status = message === "cover_identity" ? 400 : 502;
-    console.error("[partners/studio-cover]", message);
     return NextResponse.json({ error: message }, { status });
   }
 }

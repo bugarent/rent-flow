@@ -53,26 +53,18 @@ export function ExtraPriceWindows({
   const [minPrice, setMinPrice] = useState(() => asText(item.minPriceEur));
   const [maxPrice, setMaxPrice] = useState(() => asText(item.maxPriceEur));
   const [periodPrice, setPeriodPrice] = useState(() => asText(item.maxPeriodEur));
-  const draftRef = useRef({ minPrice, maxPrice, periodPrice });
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (rootRef.current?.contains(document.activeElement)) return;
-    const next = {
-      minPrice: asText(item.minPriceEur),
-      maxPrice: asText(item.maxPriceEur),
-      periodPrice: asText(item.maxPeriodEur),
-    };
-    draftRef.current = next;
-    setMinPrice(next.minPrice);
-    setMaxPrice(next.maxPrice);
-    setPeriodPrice(next.periodPrice);
+    setMinPrice(asText(item.minPriceEur));
+    setMaxPrice(asText(item.maxPriceEur));
+    setPeriodPrice(asText(item.maxPeriodEur));
   }, [item.minPriceEur, item.maxPriceEur, item.maxPeriodEur]);
 
   const commit = () => {
     if (disabled) return;
-    const { minPrice: minRaw, maxPrice: maxRaw, periodPrice: periodRaw } = draftRef.current;
-    const next = parsePriceWindows(minRaw, maxRaw, periodRaw);
+    const next = parsePriceWindows(minPrice, maxPrice, periodPrice);
     const same =
       next.minPriceEur === (item.minPriceEur ?? null) &&
       next.maxPriceEur === (item.maxPriceEur ?? null) &&
@@ -118,18 +110,9 @@ export function ExtraPriceWindows({
 
   return (
     <div ref={rootRef} className="grid min-w-[16rem] grid-cols-3 gap-2">
-      {field(copy.minDay, copy.minDayHint, minPrice, (value) => {
-        draftRef.current.minPrice = value;
-        setMinPrice(value);
-      }, "default")}
-      {field(copy.maxDay, copy.maxDayHint, maxPrice, (value) => {
-        draftRef.current.maxPrice = value;
-        setMaxPrice(value);
-      }, "default")}
-      {field(copy.periodMax, copy.periodHint, periodPrice, (value) => {
-        draftRef.current.periodPrice = value;
-        setPeriodPrice(value);
-      }, "cap")}
+      {field(copy.minDay, copy.minDayHint, minPrice, setMinPrice, "default")}
+      {field(copy.maxDay, copy.maxDayHint, maxPrice, setMaxPrice, "default")}
+      {field(copy.periodMax, copy.periodHint, periodPrice, setPeriodPrice, "cap")}
     </div>
   );
 }
