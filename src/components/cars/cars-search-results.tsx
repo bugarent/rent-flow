@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { CarsSearchTripEditor } from "@/components/cars/cars-search-trip-editor";
+import { carsSearchHeading } from "@/components/cars/cars-search-heading";
 import { SEARCH_EXTRA } from "@/components/cars/cars-search-locale-copy";
 import type { SearchAirportOption } from "@/components/search/airport-search";
 import {
@@ -918,6 +919,15 @@ export function CarsSearchResults({
   const newCarsFromYear = newCarsMinYear();
   const newCarsLabel = c.newCars.replace("{year}", String(newCarsFromYear));
 
+  const heading = useMemo(() => {
+    const pickupCountry =
+      searchOptions.find((o) => o.iata.toUpperCase() === pickup.trim().toUpperCase())?.countryIso2 || "";
+    return (
+      carsSearchHeading({ locale, options: searchOptions, countryIso2: pickupCountry || country }) ||
+      dictionary.home.heading
+    );
+  }, [searchOptions, pickup, country, locale, dictionary.home.heading]);
+
   const [brand, setBrand] = useState("");
   const [sort, setSort] = useState<"asc" | "desc">("asc");
   const [quick, setQuick] = useState<Set<QuickFilter>>(new Set());
@@ -1211,7 +1221,7 @@ export function CarsSearchResults({
     <div className="min-h-screen bg-[#eef2f6]">
       <div className="mx-auto max-w-[1400px] space-y-3 px-3 py-4 sm:px-4 sm:py-5">
         <h1 className="text-lg font-extrabold tracking-tight text-[#0b1f4b] sm:text-xl">
-          {dictionary.home.heading}
+          {heading}
         </h1>
         {/* Editable trip summary */}
         <CarsSearchTripEditor
