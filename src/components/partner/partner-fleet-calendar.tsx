@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import { PARTNER_BASE } from "@/lib/routes";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { cn } from "@/lib/utils";
@@ -190,6 +190,7 @@ export function PartnerFleetCalendar() {
   const t = dictionary.calendar;
   const [query, setQuery] = useState("");
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
+  const [carsColumnNarrow, setCarsColumnNarrow] = useState(false);
   const [debouncedQ, setDebouncedQ] = useState("");
   const [cars, setCars] = useState<CarRow[]>([]);
   const [bookings, setBookings] = useState<BookingBar[]>([]);
@@ -746,6 +747,19 @@ export function PartnerFleetCalendar() {
     };
   }, []);
 
+  const carColumnWidth = carsColumnNarrow ? "w-[4.5rem] md:w-[84px]" : "w-36 md:w-[168px]";
+  const carColumnToggleLabel = carsColumnNarrow
+    ? locale === "ka"
+      ? "სვეტის გაშლა"
+      : locale === "ru"
+        ? "Развернуть колонку"
+        : "Expand column"
+    : locale === "ka"
+      ? "სვეტის შეკეცვა"
+      : locale === "ru"
+        ? "Свернуть колонку"
+        : "Collapse column";
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#f4f6f9]">
       <div className="relative m-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[#d5dde6] bg-white shadow-[0_1px_2px_rgba(26,0,64,0.04)] sm:m-3">
@@ -756,7 +770,7 @@ export function PartnerFleetCalendar() {
         <div ref={gridRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-auto overscroll-x-contain">
           {/* Sticky header. On a phone each day keeps its own width and the month scrolls sideways. */}
           <div className="sticky top-0 z-20 flex h-20 w-max border-b-2 border-slate-300 bg-white md:h-14 md:w-full">
-            <div className="sticky start-0 z-30 flex h-full w-36 shrink-0 flex-col border-e-2 border-slate-300 bg-white md:w-[168px]">
+            <div className={cn("sticky start-0 z-30 flex h-full shrink-0 flex-col border-e-2 border-slate-300 bg-white", carColumnWidth)}>
               <div className="flex h-11 items-center gap-0.5 border-b border-[#cfd8e3] bg-[#d9e2e8] px-1 md:h-8">
                 <select
                   aria-label="Month"
@@ -792,7 +806,12 @@ export function PartnerFleetCalendar() {
                   onChange={(e) =>
                     setMonth(new Date(Number(e.target.value), month.getMonth(), 1))
                   }
-                  className="h-11 w-16 shrink-0 rounded border-0 bg-transparent text-base font-bold text-[#1e1b4b] outline-none md:h-auto md:w-[4.25rem] md:text-[11px] md:font-extrabold"
+                  className={cn(
+                    "h-11 shrink-0 rounded border-0 bg-transparent font-bold text-[#1e1b4b] outline-none",
+                    carsColumnNarrow
+                      ? "w-10 px-0 text-xs md:h-auto md:w-12 md:text-[10px]"
+                      : "w-16 text-base md:h-auto md:w-[4.25rem] md:text-[11px] md:font-extrabold",
+                  )}
                 >
                   {yearOptions.map((y) => (
                     <option key={y} value={y}>
@@ -801,8 +820,8 @@ export function PartnerFleetCalendar() {
                   ))}
                 </select>
               </div>
-              <div className="flex min-h-0 flex-1 items-center justify-between gap-1 px-1.5">
-                <p className="truncate text-xs font-bold text-slate-800 md:text-[11px]">
+              <div className="relative flex min-h-0 flex-1 items-center justify-between gap-1 px-1.5 pe-6">
+                <p className={cn("truncate text-xs font-bold text-slate-800 md:text-[11px]", carsColumnNarrow && "sr-only")}>
                   {t.allCars} ({cars.length})
                 </p>
                 <Link
@@ -812,6 +831,20 @@ export function PartnerFleetCalendar() {
                 >
                   <Plus className="h-4 w-4 md:h-3.5 md:w-3.5" />
                 </Link>
+                <button
+                  type="button"
+                  aria-pressed={carsColumnNarrow}
+                  aria-label={carColumnToggleLabel}
+                  title={carColumnToggleLabel}
+                  onClick={() => setCarsColumnNarrow((open) => !open)}
+                  className="absolute end-0 top-1/2 z-40 inline-flex h-10 w-10 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border border-slate-300 bg-white text-[#0b1f4b] shadow-sm"
+                >
+                  {carsColumnNarrow ? (
+                    <ChevronRight className="h-4 w-4 rtl:rotate-180" />
+                  ) : (
+                    <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -871,7 +904,8 @@ export function PartnerFleetCalendar() {
               >
                 <div
                   className={cn(
-                    "sticky start-0 z-10 flex h-full w-36 shrink-0 items-center gap-1 border-e-2 px-1.5 md:w-[168px] md:gap-1.5",
+                    "sticky start-0 z-10 flex h-full shrink-0 items-center gap-1 border-e-2 px-1.5 md:gap-1.5",
+                    carColumnWidth,
                     attention
                       ? "border-amber-300 bg-amber-200/90"
                       : "border-slate-300 bg-white",
@@ -897,7 +931,7 @@ export function PartnerFleetCalendar() {
                     >
                       {(car.make || "A").slice(0, 1).toUpperCase()}
                     </span>
-                    <div className="min-w-0 flex-1">
+                    <div className={cn("min-w-0 flex-1", carsColumnNarrow && "hidden")}>
                       <p className="truncate text-[12px] font-bold leading-tight text-slate-900">
                         {car.make} {car.model}
                       </p>
@@ -917,7 +951,10 @@ export function PartnerFleetCalendar() {
                     type="button"
                     title={blockCopy.title}
                     onClick={() => openBlockModal(car.id)}
-                    className="inline-flex h-9 min-w-9 shrink-0 items-center justify-center rounded border border-sky-300 bg-sky-50 px-1.5 text-sm font-bold text-sky-800 hover:bg-sky-100"
+                    className={cn(
+                      "inline-flex h-9 min-w-9 shrink-0 items-center justify-center rounded border border-sky-300 bg-sky-50 px-1.5 text-sm font-bold text-sky-800 hover:bg-sky-100",
+                      carsColumnNarrow && "h-8 min-w-8 px-0 text-xs",
+                    )}
                   >
                     +
                   </button>
