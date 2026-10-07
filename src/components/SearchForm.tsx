@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { earliestPickupLocalInput, pickupInstantTooSoon } from "@/lib/bookings/lead-time";
+import { DateInput } from "@/components/ui/date-input";
 
 export default function SearchForm() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function SearchForm() {
     <form onSubmit={handleSearch} className="bg-white p-6 rounded-xl shadow-md flex flex-col md:flex-row gap-4 items-center">
       <div className="flex flex-col w-full">
         <label className="text-sm font-semibold mb-1 text-gray-700">Pickup Date & Time</label>
-        <input
+        <DateInput
           type="datetime-local"
           value={startDate}
           min={earliestPickupLocalInput()}
@@ -35,7 +36,7 @@ export default function SearchForm() {
 
       <div className="flex flex-col w-full">
         <label className="text-sm font-semibold mb-1 text-gray-700">Drop-off Date & Time</label>
-        <input
+        <DateInput
           type="datetime-local"
           value={endDate}
           min={startDate || earliestPickupLocalInput()}

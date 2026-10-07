@@ -6,6 +6,7 @@ import { socialLabel } from "@/components/bookings/booking-info-modal/helpers";
 import { parsePartnerMessengers } from "@/lib/partner";
 import { cn } from "@/lib/utils";
 import { clampPickupSelection, earliestPickupIsoDate, isPickupSlotAllowed } from "@/lib/bookings/lead-time";
+import { DateInput } from "@/components/ui/date-input";
 
 export type FleetBookingDetail = {
   id: string;
@@ -418,7 +419,7 @@ export function PartnerBookingDetailModal({
                   <label className="text-xs font-semibold text-slate-600">
                     {t.pickup}
                     <div className="mt-1 flex gap-1">
-                      <input
+                      <DateInput
                         type="date"
                         value={pickupDate}
                         min={start.date < earliestPickupIsoDate() ? start.date : earliestPickupIsoDate()}
@@ -462,7 +463,7 @@ export function PartnerBookingDetailModal({
                   <label className="text-xs font-semibold text-slate-600">
                     {t.dropoff}
                     <div className="mt-1 flex gap-1">
-                      <input
+                      <DateInput
                         type="date"
                         value={dropoffDate}
                         min={pickupDate}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { knownText } from "@/lib/i18n/known-record-text";
 import { uiText } from "@/lib/i18n/ui-text";
+import { DateInput } from "@/components/ui/date-input";
 import {
   ResponsiveDataList,
   MobileDataCard,
@@ -61,11 +62,11 @@ export function AnalyticsDashboard({
       <form onSubmit={search} className="flex flex-wrap items-end gap-3 rounded-2xl border bg-white p-4">
         <label className="text-sm font-semibold">
           {phrase("From", "დან", "С")}
-          <input type="date" className="mt-1 block rounded-xl border p-2" value={from} onChange={(e) => setFrom(e.target.value)} required />
+          <DateInput type="date" className="mt-1 block rounded-xl border p-2" value={from} onChange={(e) => setFrom(e.target.value)} required />
         </label>
         <label className="text-sm font-semibold">
           {phrase("To", "მდე", "По")}
-          <input type="date" className="mt-1 block rounded-xl border p-2" value={to} onChange={(e) => setTo(e.target.value)} required />
+          <DateInput type="date" className="mt-1 block rounded-xl border p-2" value={to} onChange={(e) => setTo(e.target.value)} required />
         </label>
         <button disabled={loading} className="rounded-xl bg-sky-600 px-5 py-2.5 font-bold text-white">
           {loading ? phrase("Loading...", "იტვირთება...", "Загрузка...") : phrase("Search", "ძებნა", "Поиск")}

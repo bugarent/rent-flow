@@ -12,6 +12,7 @@ import { isCityLocationCode } from "@/lib/catalog/search-places";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { cn } from "@/lib/utils";
 import { clampPickupSelection, earliestPickupIsoDate, isPickupSlotAllowed } from "@/lib/bookings/lead-time";
+import { DateInput } from "@/components/ui/date-input";
 
 const SAME_AS_PICKUP = "SAME";
 
@@ -444,7 +445,7 @@ export function CarsSearchTripEditor({
           className="sm:min-w-[12.5rem] sm:flex-1 sm:basis-0"
         >
           <div className="flex flex-col items-stretch gap-1 sm:flex-row sm:flex-nowrap sm:items-center">
-            <input
+            <DateInput
               type="date"
               value={pickupDate}
               min={minPickupDate}
@@ -485,7 +486,7 @@ export function CarsSearchTripEditor({
           className="sm:min-w-[12.5rem] sm:flex-1 sm:basis-0"
         >
           <div className="flex flex-col items-stretch gap-1 sm:flex-row sm:flex-nowrap sm:items-center">
-            <input
+            <DateInput
               type="date"
               value={dropoffDate}
               min={pickupDate || minPickupDate}

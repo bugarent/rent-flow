@@ -18,6 +18,7 @@ import {
 import type { CustomBookingChatStatus } from "@/lib/catalog/custom-booking-chat";
 import { ChatMessageThread } from "@/components/chat/chat-message-thread";
 import { earliestPickupLocalInput } from "@/lib/bookings/lead-time";
+import { DateInput } from "@/components/ui/date-input";
 
 function toLocalInput(iso: string) {
   const d = new Date(iso);
@@ -547,7 +548,7 @@ export function CustomBookingInbox() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="block text-xs font-semibold text-slate-600">
                     Pick-up date & time
-                    <input
+                    <DateInput
                       type="datetime-local"
                       className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
                       value={pickupLocal}
@@ -564,7 +565,7 @@ export function CustomBookingInbox() {
                   </label>
                   <label className="block text-xs font-semibold text-slate-600">
                     Drop-off date & time
-                    <input
+                    <DateInput
                       type="datetime-local"
                       className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
                       value={dropoffLocal}

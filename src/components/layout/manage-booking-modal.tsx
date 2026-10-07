@@ -77,10 +77,11 @@ type Props = {
 
 function formatWhen(iso: string, locale: string) {
   try {
-    return new Intl.DateTimeFormat(locale, {
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(new Date(iso));
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const month = new Intl.DateTimeFormat(locale, { month: "short" }).format(d);
+    return `${d.getDate()} ${month} ${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   } catch {
     return iso;
   }

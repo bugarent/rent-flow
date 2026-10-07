@@ -6,6 +6,7 @@ import { Trash2 } from "lucide-react";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { AdminMoneyText } from "@/components/admin/admin-money-text";
 import { cn } from "@/lib/utils";
+import { DateInput } from "@/components/ui/date-input";
 
 type Mode = "bookings" | "finances" | "both";
 
@@ -177,7 +178,7 @@ export function AdminPeriodPurgePanel({ from, to }: { from: string; to: string }
           {(["from", "to"] as const).map((key) => (
             <label key={key} className="block text-xs font-semibold text-slate-600">
               {key === "from" ? t.from : t.to}
-              <input
+              <DateInput
                 type="date"
                 value={range[key]}
                 disabled={busy}

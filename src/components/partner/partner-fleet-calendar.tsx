@@ -19,6 +19,7 @@ import {
 import { formatBookingRef } from "@/lib/ids";
 import { clampPickupSelection, earliestPickupIsoDate, isPickupSlotAllowed } from "@/lib/bookings/lead-time";
 import { uiLocaleTag } from "@/lib/i18n/ui-text";
+import { DateInput } from "@/components/ui/date-input";
 import {
   insuranceExpiryReasonLabel,
   isInsuranceExpiryReason,
@@ -1106,7 +1107,7 @@ export function PartnerFleetCalendar() {
                   <div className="grid gap-1.5 sm:grid-cols-2">
                     <label className="text-[11px] font-semibold text-slate-700">
                       {blockCopy.from}
-                      <input
+                      <DateInput
                         type="date"
                         value={blockFromDate}
                         min={earliestPickupIsoDate()}
@@ -1120,7 +1121,7 @@ export function PartnerFleetCalendar() {
                     </label>
                     <label className="text-[11px] font-semibold text-slate-700">
                       {blockCopy.to}
-                      <input
+                      <DateInput
                         type="date"
                         value={blockToDate}
                         min={blockFromDate || earliestPickupIsoDate()}

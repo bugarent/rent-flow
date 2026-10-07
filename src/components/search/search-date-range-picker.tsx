@@ -29,11 +29,8 @@ export function formatRangeDay(iso: string, locale: string) {
   const d = parseIso(iso);
   if (!d) return "—";
   try {
-    return new Intl.DateTimeFormat(locale || "en", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    }).format(d);
+    const month = new Intl.DateTimeFormat(locale || "en", { month: "short" }).format(d);
+    return `${d.getDate()} ${month} ${d.getFullYear()}`;
   } catch {
     return iso;
   }

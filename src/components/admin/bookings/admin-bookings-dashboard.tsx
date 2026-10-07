@@ -10,6 +10,7 @@ import { BookingInvoiceModal } from "@/components/invoices/booking-invoice-modal
 import { formatBookingRef } from "@/lib/ids";
 import { cn, convertFromEur } from "@/lib/utils";
 import { earliestPickupLocalInput } from "@/lib/bookings/lead-time";
+import { DateInput } from "@/components/ui/date-input";
 
 export type AdminBookingDashRow = {
   id: string;
@@ -551,7 +552,7 @@ export function AdminBookingsDashboard({ bookings: initialBookings }: { bookings
               </label>
               <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
                 {t.colPickup}
-                <input
+                <DateInput
                   type="datetime-local"
                   className={inputClass}
                   value={draft.pickupAt}
@@ -569,7 +570,7 @@ export function AdminBookingsDashboard({ bookings: initialBookings }: { bookings
               </label>
               <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
                 {t.colDropoff}
-                <input
+                <DateInput
                   type="datetime-local"
                   className={inputClass}
                   min={draft.pickupAt || earliestPickupLocalInput()}

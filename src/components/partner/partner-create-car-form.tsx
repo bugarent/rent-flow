@@ -76,6 +76,7 @@ import {
   photosForSave,
 } from "@/components/partner/partner-car-photo-gallery";
 import { PartnerImageLightbox } from "@/components/partner/partner-image-lightbox";
+import { DateInput } from "@/components/ui/date-input";
 
 function mdToDateInput(md: string): string {
   const n = normalizeMd(md) || "01-01";
@@ -2320,7 +2321,7 @@ export function PartnerCreateCarForm({
                           <td className="p-2 font-semibold">#{meta.index}</td>
                           <td className="p-2 whitespace-nowrap text-slate-700">
                             <div className="flex flex-wrap items-center gap-1">
-                              <input
+                              <DateInput
                                 type="date"
                                 className={cn(inputClass, "w-[9.5rem] px-2 py-1.5 text-xs")}
                                 value={mdToDateInput(meta.from)}
@@ -2329,7 +2330,7 @@ export function PartnerCreateCarForm({
                                 }
                               />
                               <span className="text-slate-400">–</span>
-                              <input
+                              <DateInput
                                 type="date"
                                 className={cn(inputClass, "w-[9.5rem] px-2 py-1.5 text-xs")}
                                 value={mdToDateInput(meta.to)}
@@ -3029,7 +3030,7 @@ export function PartnerCreateCarForm({
                   <span className="ms-1 font-extrabold">· {insuranceExpiryReasonLabel(locale)}</span>
                 ) : null}
               </label>
-              <input
+              <DateInput
                 type="date"
                 value={insuranceExpiresAt}
                 disabled={isAdminReview}

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
+import { DateInput } from "@/components/ui/date-input";
 import {
   MobileDataCard,
   MobileDataRow,
@@ -429,7 +430,7 @@ export function PartnerDiscountsPanel() {
                   <div className="grid grid-cols-2 gap-3">
                     <label className="block text-xs font-semibold text-slate-600">
                       {t.from}
-                      <input
+                      <DateInput
                         type="date"
                         value={from}
                         onChange={(e) => setFrom(e.target.value)}
@@ -438,7 +439,7 @@ export function PartnerDiscountsPanel() {
                     </label>
                     <label className="block text-xs font-semibold text-slate-600">
                       {t.to}
-                      <input
+                      <DateInput
                         type="date"
                         value={to}
                         onChange={(e) => setTo(e.target.value)}
