@@ -223,7 +223,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!fileOwner && !fileAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const fileBody = await req.json();
     const photos: string[] | undefined = fileBody.photos ?? fileBody.images;
-    if (fileOwner && !fileAdmin && photos && photos.length < MIN_PUBLIC_PHOTOS) {
+    if (fileOwner && photos && photos.length < MIN_PUBLIC_PHOTOS) {
       return NextResponse.json(
         { error: `At least ${MIN_PUBLIC_PHOTOS} public photos are required` },
         { status: 400 },
@@ -256,27 +256,26 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           ? nextListingStatusAfterPartnerEdit(fileCar.status)
           : fileCar.status;
     const insuranceBefore = await readCarInsuranceUrl(id);
-    const beforeLive =
-      fileOwner && !fileAdmin
-        ? liveInputFromCarFields({
-            title: fileCar.title,
-            description: fileCar.description,
-            dailyRateEur: fileCar.dailyRateEur,
-            discountPercent: (fileCar as { discountPercent?: number }).discountPercent || 0,
-            make: fileCar.make,
-            model: fileCar.model,
-            year: fileCar.year,
-            registrationNumber: fileCar.registrationNumber || "",
-            seats: fileCar.seats,
-            doors: fileCar.doors,
-            fuelType: fileCar.fuelType,
-            transmission: fileCar.transmission,
-            photoUrls: Array.isArray(fileCar.photos) ? fileCar.photos.map(String) : [],
-            passportFrontUrl: fileCar.passportFrontUrl || "",
-            passportBackUrl: fileCar.passportBackUrl || "",
-            insuranceUrl: insuranceBefore || "",
-          })
-        : null;
+    const beforeLive = fileOwner
+      ? liveInputFromCarFields({
+          title: fileCar.title,
+          description: fileCar.description,
+          dailyRateEur: fileCar.dailyRateEur,
+          discountPercent: (fileCar as { discountPercent?: number }).discountPercent || 0,
+          make: fileCar.make,
+          model: fileCar.model,
+          year: fileCar.year,
+          registrationNumber: fileCar.registrationNumber || "",
+          seats: fileCar.seats,
+          doors: fileCar.doors,
+          fuelType: fileCar.fuelType,
+          transmission: fileCar.transmission,
+          photoUrls: Array.isArray(fileCar.photos) ? fileCar.photos.map(String) : [],
+          passportFrontUrl: fileCar.passportFrontUrl || "",
+          passportBackUrl: fileCar.passportBackUrl || "",
+          insuranceUrl: insuranceBefore || "",
+        })
+      : null;
     const nextMake = fileBody.make != null ? String(fileBody.make) : fileCar.make;
     const nextModel = fileBody.model != null ? String(fileBody.model) : fileCar.model;
     let nextCategorySlug = fileCar.categorySlug;
@@ -418,7 +417,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const body = await req.json();
 
-  if (isOwner && !isAdmin) {
+  // Partner "Update" always saves the listing and sends it to re-moderation.
+  // An admin cookie in the same browser must not skip that write.
+  if (isOwner) {
     const photos: string[] | undefined = body.photos ?? body.images;
     if (photos && photos.length < MIN_PUBLIC_PHOTOS) {
       return NextResponse.json(
