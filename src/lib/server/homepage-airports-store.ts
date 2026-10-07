@@ -6,6 +6,10 @@ import { join } from "node:path";
 import { getPopularAirports as getStaticPopularAirports } from "@/lib/catalog/popular-airports";
 import { prisma } from "@/lib/prisma";
 import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
+import {
+  cleanAirportTranslations,
+  type AirportCardTranslations,
+} from "@/lib/catalog/homepage-airport-i18n";
 
 export type StoredHomepageAirport = {
   id: string;
@@ -13,6 +17,8 @@ export type StoredHomepageAirport = {
   title: string;
   imageUrl: string;
   infoText: string;
+  /** Per-language title/details; stored only in the published JSON (like infoText). */
+  translations: AirportCardTranslations;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -37,6 +43,7 @@ function defaultAirports(): StoredHomepageAirport[] {
     title: a.name,
     imageUrl: a.image,
     infoText: "",
+    translations: {},
     sortOrder: index,
     createdAt: now,
     updatedAt: now,
@@ -56,6 +63,7 @@ async function readFileStore(): Promise<StoredHomepageAirport[]> {
         title: String(item.title || "Airport"),
         imageUrl: String(item.imageUrl || ""),
         infoText: String(item.infoText || ""),
+        translations: cleanAirportTranslations(item.translations),
         sortOrder: typeof item.sortOrder === "number" ? item.sortOrder : index,
         createdAt: String(item.createdAt || new Date().toISOString()),
         updatedAt: String(item.updatedAt || new Date().toISOString()),
@@ -74,10 +82,11 @@ async function writeFileStore(rows: StoredHomepageAirport[]) {
 
 async function publishFromDb(db: AirportDelegate, saved?: StoredHomepageAirport) {
   const previous = await readFileStore();
-  const infoById = new Map(previous.map((row) => [row.id, row.infoText]));
+  const previousById = new Map(previous.map((row) => [row.id, row]));
   const rows = (await db.findMany({ orderBy: { sortOrder: "asc" } })).map((row) => {
     const stored = toStored(row);
-    return { ...stored, infoText: infoById.get(stored.id) || "" };
+    const prev = previousById.get(stored.id);
+    return { ...stored, infoText: prev?.infoText || "", translations: prev?.translations || {} };
   });
   if (saved) {
     const index = rows.findIndex((row) => row.id === saved.id);
@@ -108,6 +117,7 @@ function toStored(row: Record<string, unknown>): StoredHomepageAirport {
     title: String(row.title),
     imageUrl: String(row.imageUrl),
     infoText: String(row.infoText || ""),
+    translations: cleanAirportTranslations(row.translations),
     sortOrder: typeof row.sortOrder === "number" ? row.sortOrder : 0,
     createdAt:
       row.createdAt instanceof Date
@@ -125,6 +135,7 @@ async function createInFileStore(input: {
   iata: string;
   imageUrl: string;
   infoText: string;
+  translations: AirportCardTranslations;
 }): Promise<StoredHomepageAirport> {
   const rows = await readFileStore();
   const now = new Date().toISOString();
@@ -134,6 +145,7 @@ async function createInFileStore(input: {
     iata: input.iata.toUpperCase(),
     imageUrl: input.imageUrl,
     infoText: input.infoText,
+    translations: input.translations,
     sortOrder: rows.reduce((max, r) => Math.max(max, r.sortOrder), -1) + 1,
     createdAt: now,
     updatedAt: now,
@@ -172,12 +184,14 @@ export async function createHomepageAirport(input: {
   iata: string;
   imageUrl: string;
   infoText?: string;
+  translations?: unknown;
 }): Promise<StoredHomepageAirport> {
   const payload = {
     title: input.title.trim(),
     iata: input.iata.trim().toUpperCase(),
     imageUrl: input.imageUrl.trim(),
     infoText: input.infoText?.trim() ?? "",
+    translations: cleanAirportTranslations(input.translations),
   };
 
   const db = getDbDelegate();
@@ -193,7 +207,7 @@ export async function createHomepageAirport(input: {
         sortOrder: (max._max.sortOrder ?? -1) + 1,
       },
     });
-    const stored = { ...toStored(row), infoText: payload.infoText };
+    const stored = { ...toStored(row), infoText: payload.infoText, translations: payload.translations };
     await publishFromDb(db, stored);
     return stored;
   } catch (error) {
@@ -209,8 +223,11 @@ export async function updateHomepageAirport(
     iata?: string;
     imageUrl?: string;
     infoText?: string;
+    translations?: unknown;
   },
 ): Promise<StoredHomepageAirport> {
+  const nextTranslations =
+    input.translations === undefined ? undefined : cleanAirportTranslations(input.translations);
   const applyFileUpdate = async () => {
     const rows = await readFileStore();
     const index = rows.findIndex((r) => r.id === id);
@@ -222,6 +239,7 @@ export async function updateHomepageAirport(
       iata: input.iata ? input.iata.trim().toUpperCase() : current.iata,
       imageUrl: input.imageUrl?.trim() ?? current.imageUrl,
       infoText: input.infoText?.trim() ?? current.infoText,
+      translations: nextTranslations ?? current.translations,
       updatedAt: new Date().toISOString(),
     };
     rows[index] = updated;
@@ -245,6 +263,7 @@ export async function updateHomepageAirport(
     const stored = {
       ...toStored(row),
       infoText: input.infoText?.trim() ?? previous?.infoText ?? "",
+      translations: nextTranslations ?? previous?.translations ?? {},
     };
     await publishFromDb(db, stored);
     return stored;

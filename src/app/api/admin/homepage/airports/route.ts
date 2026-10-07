@@ -18,6 +18,7 @@ const schema = z.object({
   iata: z.string().trim().min(2).max(8),
   imageUrl: z.string().trim().min(1),
   infoText: z.string().trim().max(8000).optional(),
+  translations: z.record(z.string(), z.unknown()).optional(),
 });
 
 export async function GET() {
@@ -60,6 +61,7 @@ export async function POST(req: Request) {
       iata: body.iata,
       imageUrl: body.imageUrl,
       infoText: body.infoText,
+      translations: body.translations,
     });
     return NextResponse.json(row, { status: 201 });
   } catch (error) {

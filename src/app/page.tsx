@@ -17,6 +17,7 @@ import { getPublicHomepageGoogleReviews } from "@/lib/server/homepage-google-rev
 import { getPublicCustomBookingChannels } from "@/lib/server/custom-booking-channels-store";
 import { DEFAULT_CUSTOM_BOOKING_CHANNELS } from "@/lib/catalog/custom-booking-channels";
 import { softTimeout } from "@/lib/server/soft-timeout";
+import type { AirportCardTranslations } from "@/lib/catalog/homepage-airport-i18n";
 import { getPopularAirports as getStaticPopularAirports } from "@/lib/catalog/popular-airports";
 import { VEHICLE_CATEGORIES } from "@/lib/catalog/categories";
 import { summarizeMappedModels } from "@/lib/cars/category-mapping";
@@ -67,6 +68,7 @@ export default async function Home() {
           city: a.iata,
           image: a.imageUrl,
           rank: index + 1,
+          translations: "translations" in a ? (a.translations as AirportCardTranslations) : undefined,
         }))}
       />
       <WhyChooseUsPanel content={infoContent} />

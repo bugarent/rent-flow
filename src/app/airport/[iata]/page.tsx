@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { placeLabel } from "@/lib/i18n/place-label";
+import { localizedAirportInfo, localizedAirportTitle } from "@/lib/catalog/homepage-airport-i18n";
 import { listHomepageAirports } from "@/lib/server/homepage-airports-store";
 import { readPreferences } from "@/lib/server/preferences";
 
@@ -27,7 +27,7 @@ export async function generateMetadata({
   const { iata } = await params;
   const airport = await findAirport(iata);
   const { locale } = await readPreferences();
-  const title = airport ? placeLabel(locale, airport.title) : iata.toUpperCase();
+  const title = airport ? localizedAirportTitle(airport, locale) : iata.toUpperCase();
   return { title };
 }
 
@@ -41,8 +41,8 @@ export default async function AirportInfoPage({
   if (!airport) notFound();
 
   const { locale } = await readPreferences();
-  const title = placeLabel(locale, airport.title);
-  const text = airport.infoText.trim();
+  const title = localizedAirportTitle(airport, locale);
+  const text = localizedAirportInfo(airport, locale);
 
   return (
     <article className="mx-auto w-full max-w-3xl px-4 py-10 sm:py-14">

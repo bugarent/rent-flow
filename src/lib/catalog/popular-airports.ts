@@ -3,6 +3,8 @@
  * Phase 1 is hardcoded Georgia hubs. Swap `RANKING_MODE` to `booking_count`
  * and pass live aggregates when the booking table is populated.
  */
+import type { AirportCardTranslations } from "@/lib/catalog/homepage-airport-i18n";
+
 export type AirportRankingMode = "hardcoded" | "booking_count";
 
 export const RANKING_MODE: AirportRankingMode = "hardcoded";
@@ -14,6 +16,8 @@ export type PopularAirportCard = {
   image: string;
   rank: number;
   bookingCount?: number;
+  /** Admin per-language titles for the homepage card. */
+  translations?: AirportCardTranslations;
 };
 
 const HARDCODED_GEORGIA: PopularAirportCard[] = [

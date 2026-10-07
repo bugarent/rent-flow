@@ -7,7 +7,7 @@ import type { PopularAirportCard } from "@/lib/catalog/popular-airports";
 import type { PopularAirportsLayout } from "@/lib/catalog/popular-airports-layout";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { airportCarsLabel } from "@/lib/i18n/airport-cars-label";
-import { placeLabel } from "@/lib/i18n/place-label";
+import { localizedAirportTitle } from "@/lib/catalog/homepage-airport-i18n";
 
 const AUTO_MS = 4000;
 const SLIDE_MS = 650;
@@ -39,7 +39,12 @@ function AirportCard({
         />
       </div>
       <div className="flex flex-1 flex-col p-4 sm:p-5">
-        <h3 className="mb-4 text-lg font-bold text-[#0b1f4b]">{placeLabel(locale, airport.name)}</h3>
+        <h3 className="mb-4 text-lg font-bold text-[#0b1f4b]">
+          {localizedAirportTitle(
+            { iata: airport.iata, title: airport.name, translations: airport.translations },
+            locale,
+          )}
+        </h3>
         <Link
           href={href}
           tabIndex={loopCopy ? -1 : undefined}

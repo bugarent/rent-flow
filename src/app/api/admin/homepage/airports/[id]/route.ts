@@ -17,6 +17,7 @@ const schema = z.object({
   iata: z.string().trim().min(2).max(8).optional(),
   imageUrl: z.string().trim().min(1).optional(),
   infoText: z.string().trim().max(8000).optional(),
+  translations: z.record(z.string(), z.unknown()).optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -9,6 +9,11 @@ import { MakeModelMultiSelect } from "@/components/admin/make-model-multi-select
 import { SortableAdminGrid } from "@/components/admin/sortable-admin-grid";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { knownText } from "@/lib/i18n/known-record-text";
+import { AirportCardTranslationsFields } from "@/components/admin/airport-card-translations-fields";
+import {
+  localizedAirportTitle,
+  type AirportCardTranslations,
+} from "@/lib/catalog/homepage-airport-i18n";
 
 type Category = {
   id: string;
@@ -19,7 +24,18 @@ type Category = {
   mappedModels?: MappedCarModel[];
   isActive?: boolean;
 };
-type Airport = { id: string; iata: string; title: string; imageUrl: string; infoText: string };
+type Airport = {
+  id: string;
+  iata: string;
+  title: string;
+  imageUrl: string;
+  infoText: string;
+  translations?: AirportCardTranslations;
+};
+
+function blankAirportForm() {
+  return { title: "", iata: "", imageUrl: "", infoText: "", translations: {} as AirportCardTranslations };
+}
 
 function blankCategoryForm() {
   return { name: "", imageUrl: "", mappedModels: [] as MappedCarModel[] };
@@ -54,7 +70,7 @@ export function HomepageContentManager({
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [panelForm, setPanelForm] = useState(blankCategoryForm);
   const [savingPanelCategory, setSavingPanelCategory] = useState(false);
-  const [airForm, setAirForm] = useState({ title: "", iata: "", imageUrl: "", infoText: "" });
+  const [airForm, setAirForm] = useState(blankAirportForm);
   const [editingAirport, setEditingAirport] = useState<Airport | null>(null);
 
   const visibleCategories = categories.filter((c) => c.isActive !== false);
@@ -248,6 +264,7 @@ export function HomepageContentManager({
           iata: payload.iata.trim(),
           imageUrl: payload.imageUrl.trim(),
           infoText: (payload.infoText || "").trim(),
+          translations: payload.translations || {},
         }),
       });
       const data = await readJsonResponse<Airport & { error?: string }>(res);
@@ -266,7 +283,7 @@ export function HomepageContentManager({
         }
         return [...prev, data];
       });
-      setAirForm({ title: "", iata: "", imageUrl: "", infoText: "" });
+      setAirForm(blankAirportForm());
       setEditingAirport(null);
       try {
         await refreshAirports();
@@ -292,7 +309,7 @@ export function HomepageContentManager({
       setAirports((prev) => prev.filter((a) => a.id !== id));
       if (editingAirport?.id === id) {
         setEditingAirport(null);
-        setAirForm({ title: "", iata: "", imageUrl: "", infoText: "" });
+        setAirForm(blankAirportForm());
       }
       try {
         await refreshAirports();
@@ -622,7 +639,7 @@ export function HomepageContentManager({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={a.imageUrl} alt={a.title} className="h-20 w-full object-cover" />
               <div className="p-2.5">
-                <h3 className="text-sm font-bold text-[#0b1f4b]">{showRecord(a.title)}</h3>
+                <h3 className="text-sm font-bold text-[#0b1f4b]">{localizedAirportTitle(a, locale)}</h3>
                 <p className="mb-2 text-[11px] text-slate-500">{a.iata}</p>
                 <div className="flex gap-2">
                   <button
@@ -711,6 +728,16 @@ export function HomepageContentManager({
               }
             />
           </label>
+          <AirportCardTranslationsFields
+            key={editingAirport?.id || "new"}
+            adminLocale={locale}
+            value={(editingAirport ? editingAirport.translations : airForm.translations) || {}}
+            onChange={(translations) =>
+              editingAirport
+                ? setEditingAirport({ ...editingAirport, translations })
+                : setAirForm((prev) => ({ ...prev, translations }))
+            }
+          />
           <div className="flex gap-2">
             <button
               type="submit"
@@ -725,7 +752,7 @@ export function HomepageContentManager({
                 className="rounded-lg border px-3 py-1.5 text-xs font-semibold"
                 onClick={() => {
                   setEditingAirport(null);
-                  setAirForm({ title: "", iata: "", imageUrl: "", infoText: "" });
+                  setAirForm(blankAirportForm());
                 }}
               >
                 {ui.cancel}

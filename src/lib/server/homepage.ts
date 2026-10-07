@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { VEHICLE_CATEGORIES } from "@/lib/catalog/categories";
 import { getPopularAirports as getStaticPopularAirports } from "@/lib/catalog/popular-airports";
 import type { PopularAirportsLayout } from "@/lib/catalog/popular-airports-layout";
+import type { AirportCardTranslations } from "@/lib/catalog/homepage-airport-i18n";
 import type { MappedCarModel } from "@/lib/catalog/car-models";
 import { summarizeMappedModels } from "@/lib/cars/category-mapping";
 import { listHomepageCategories } from "@/lib/server/homepage-categories-store";
@@ -24,6 +25,7 @@ export type HomepageAirportCard = {
   title: string;
   imageUrl: string;
   infoText: string;
+  translations?: AirportCardTranslations;
 };
 
 export async function ensureHomepageDefaults() {
@@ -134,6 +136,7 @@ export async function getHomepageAirports(): Promise<HomepageAirportCard[]> {
       title: a.title,
       imageUrl: a.imageUrl,
       infoText: a.infoText,
+      translations: a.translations,
     }));
   } catch {
     return getStaticPopularAirports().map((a) => ({
