@@ -224,6 +224,7 @@ function Field({
   invalid,
   changed,
   previous,
+  className,
 }: {
   label: string;
   required?: boolean;
@@ -232,9 +233,10 @@ function Field({
   invalid?: boolean;
   changed?: boolean;
   previous?: string;
+  className?: string;
 }) {
   return (
-    <label className={cn("block text-xs", changed && "rounded-md border-2 border-red-500 bg-red-50 p-1.5")}>
+    <label className={cn("block text-xs", changed && "rounded-md border-2 border-red-500 bg-red-50 p-1.5", className)}>
       <span
         className={cn(
           "mb-0.5 block text-[11px] font-semibold leading-tight",
@@ -1963,6 +1965,7 @@ export function PartnerCreateCarForm({
             <Field
               label={cc.brand}
               required
+              className="order-1"
               invalid={fieldInvalid("make")}
               changed={isChanged("make")}
               previous={changePrev("make")}
@@ -1985,6 +1988,7 @@ export function PartnerCreateCarForm({
             <Field
               label={cc.bodyColor}
               required
+              className="order-3 sm:order-2"
               invalid={fieldInvalid("color")}
               changed={isChanged("color")}
               previous={changePrev("color")}
@@ -2011,6 +2015,7 @@ export function PartnerCreateCarForm({
             <Field
               label={cc.model}
               required
+              className="order-2 sm:order-3"
               invalid={fieldInvalid("model")}
               changed={isChanged("model")}
               previous={changePrev("model")}
@@ -2033,6 +2038,7 @@ export function PartnerCreateCarForm({
             <Field
               label={cc.bodyType}
               required
+              className="order-4"
               invalid={fieldInvalid("bodyType")}
               changed={isChanged("bodyType") || isChanged("categorySlug")}
               previous={changePrev("bodyType") || changePrev("categorySlug")}
@@ -2056,7 +2062,7 @@ export function PartnerCreateCarForm({
                 ) : null}
               </select>
             </Field>
-            <div className="grid min-w-0 grid-cols-2 gap-2">
+            <div className="order-5 grid min-w-0 grid-cols-2 gap-2">
               <Field
                 label={cc.registration}
                 required
@@ -2100,6 +2106,7 @@ export function PartnerCreateCarForm({
             </div>
             <Field
               label={cc.licenseCat}
+              className="order-6"
               changed={isChanged("licenseCat")}
               previous={changePrev("licenseCat")}
             >
@@ -2116,7 +2123,7 @@ export function PartnerCreateCarForm({
                 ))}
               </select>
             </Field>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="order-7 grid gap-3 sm:grid-cols-2">
               <Field
                 label={cc.minDriverAge}
                 changed={isChanged("minDriverAge")}
