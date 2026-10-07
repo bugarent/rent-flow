@@ -510,7 +510,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       bookingNumber: "Booking number",
       bookingEmailHint: "Use the email saved with your booking",
       retentionNotice:
-        "Booking information is kept for 12 months. After 12 months it is deleted automatically.",
+        "Booking information is kept for 30 days from the rental start date, then deleted automatically. If you book in advance, those 30 days start on the start date and the booking stays searchable here until then.",
       bookingsWindowTitle: "Your bookings",
       bookingsNotFound: "No booking was found for this email and booking number.",
       viewDetails: "View details",
@@ -879,7 +879,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       bookingNumber: "ჯავშნის ნომერი",
       bookingEmailHint: "ჩაწერეთ ჯავშნისას გამოყენებული ელფოსტა",
       retentionNotice:
-        "ჯავშნის ინფორმაცია ინახება 12 თვის განმავლობაში. 12 თვის შემდეგ ინფორმაცია ავტომატურად იშლება.",
+        "ჯავშნის ინფორმაცია ინახება დაწყების დღიდან 30 დღე, შემდეგ ავტომატურად იშლება. წინასწარ დაჯავშნისას ათვლა იწყება დაწყების დღეს და მანამდე ინფორმაცია აქ იძებნება.",
       bookingsWindowTitle: "თქვენი ჯავშნები",
       bookingsNotFound: "ამ ელფოსტითა და ჯავშნის ნომრით ჯავშანი ვერ მოიძებნა.",
       viewDetails: "დეტალების ნახვა",
@@ -1248,7 +1248,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       bookingNumber: "Номер бронирования",
       bookingEmailHint: "Укажите почту, сохранённую при бронировании",
       retentionNotice:
-        "Информация о бронировании хранится 12 месяцев. Через 12 месяцев она удаляется автоматически.",
+        "Информация о бронировании хранится 30 дней с даты начала аренды, затем удаляется автоматически. Если бронь сделана заранее, отсчёт начинается в день начала и до этого бронь можно найти здесь.",
       bookingsWindowTitle: "Ваши бронирования",
       bookingsNotFound: "Бронирование с этой почтой и номером не найдено.",
       viewDetails: "Подробнее",
@@ -1617,7 +1617,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       bookingNumber: "Numéro de réservation",
       bookingEmailHint: "Indiquez l’e-mail enregistré lors de la réservation",
       retentionNotice:
-        "Les informations de réservation sont conservées pendant 12 mois. Passé ce délai, elles sont supprimées automatiquement.",
+        "Les informations de réservation sont conservées 30 jours à partir du début de la location, puis supprimées automatiquement. En cas de réservation à l’avance, le décompte commence ce jour-là et la réservation reste consultable ici jusque-là.",
       bookingsWindowTitle: "Vos réservations",
       bookingsNotFound: "Aucune réservation ne correspond à cet e-mail et à ce numéro.",
       viewDetails: "Voir les détails",
@@ -1986,7 +1986,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       bookingNumber: "Buchungsnummer",
       bookingEmailHint: "E-Mail-Adresse aus der Buchung verwenden",
       retentionNotice:
-        "Buchungsdaten werden 12 Monate gespeichert. Danach werden sie automatisch gelöscht.",
+        "Buchungsdaten werden 30 Tage ab dem Mietbeginn gespeichert und danach automatisch gelöscht. Bei einer früheren Buchung beginnt die Frist am Starttag; bis dahin bleibt die Buchung hier auffindbar.",
       bookingsWindowTitle: "Ihre Buchungen",
       bookingsNotFound: "Zu dieser E-Mail und Buchungsnummer wurde keine Buchung gefunden.",
       viewDetails: "Details ansehen",
@@ -2355,7 +2355,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       bookingNumber: "Numer rezerwacji",
       bookingEmailHint: "Podaj e-mail zapisany przy rezerwacji",
       retentionNotice:
-        "Informacje o rezerwacji są przechowywane przez 12 miesięcy. Po tym czasie są usuwane automatycznie.",
+        "Informacje o rezerwacji są przechowywane przez 30 dni od dnia rozpoczęcia wynajmu, a potem usuwane automatycznie. Przy wcześniejszej rezerwacji odliczanie zaczyna się w dniu startu i do tego czasu rezerwację można tu znaleźć.",
       bookingsWindowTitle: "Twoje rezerwacje",
       bookingsNotFound: "Nie znaleziono rezerwacji dla tego e-maila i numeru.",
       viewDetails: "Zobacz szczegóły",
@@ -2722,7 +2722,8 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       passwordsMismatch: "كلمتا المرور غير متطابقتين",
       bookingNumber: "رقم الحجز",
       bookingEmailHint: "أدخل البريد المسجّل عند الحجز",
-      retentionNotice: "تُحفظ معلومات الحجز لمدة 12 شهرًا. بعد 12 شهرًا تُحذف تلقائيًا.",
+      retentionNotice:
+        "تُحفظ معلومات الحجز لمدة 30 يومًا من تاريخ بدء الإيجار، ثم تُحذف تلقائيًا. إذا تم الحجز مسبقًا، يبدأ العد من يوم البدء ويبقى الحجز قابلاً للبحث هنا حتى ذلك الحين.",
       bookingsWindowTitle: "حجوزاتك",
       bookingsNotFound: "لم يُعثر على حجز بهذا البريد ورقم الحجز.",
       viewDetails: "عرض التفاصيل",

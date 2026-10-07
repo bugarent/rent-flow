@@ -25,8 +25,8 @@ async function purgeExpiredBookingsNow(): Promise<{ removed: number }> {
   const files = await listAllFileBookings();
   const expiredFileIds = files
     .filter((row) => {
-      const created = new Date(row.createdAt).getTime();
-      return Number.isFinite(created) && created < cutoffMs;
+      const start = new Date(row.pickupAt).getTime();
+      return Number.isFinite(start) && start < cutoffMs;
     })
     .map((row) => row.id);
 
@@ -45,7 +45,7 @@ async function purgeExpiredBookingsNow(): Promise<{ removed: number }> {
   };
   try {
     const expired = await bookingDb.findMany({
-      where: { createdAt: { lt: cutoff } },
+      where: { pickupAt: { lt: cutoff } },
       select: { id: true },
     });
     for (const row of expired) {
@@ -72,8 +72,8 @@ async function purgeExpiredBookingsNow(): Promise<{ removed: number }> {
   try {
     const chats = await listCustomBookingChats();
     for (const chat of chats) {
-      const created = new Date(chat.createdAt).getTime();
-      if (!Number.isFinite(created) || created >= cutoffMs) continue;
+      const start = new Date(chat.pickupAt || chat.createdAt).getTime();
+      if (!Number.isFinite(start) || start >= cutoffMs) continue;
       if (await deleteCustomBookingChat(chat.id)) removed += 1;
     }
   } catch (error) {
@@ -83,7 +83,7 @@ async function purgeExpiredBookingsNow(): Promise<{ removed: number }> {
   return { removed };
 }
 
-/** Drop guest booking records older than 12 months. Finance archives stay. */
+/** Drop guest bookings 30 days after the rental start. Finance archives stay. */
 export async function purgeExpiredBookings(opts?: { force?: boolean }): Promise<{ removed: number }> {
   const now = Date.now();
   if (!opts?.force && now - lastPurgeAt < PURGE_INTERVAL_MS) {

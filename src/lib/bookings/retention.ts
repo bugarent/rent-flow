@@ -1,15 +1,24 @@
-/** Guest booking details stay available for one year, then are removed. */
-export const BOOKING_RETENTION_MONTHS = 12;
+/** Guest booking details stay searchable for 30 days after the rental starts. */
+export const BOOKING_RETENTION_DAYS = 30;
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Bookings whose start is older than this instant are past retention.
+ * A trip booked weeks ahead stays searchable until 30 days after its start.
+ */
 export function bookingRetentionCutoff(now = new Date()): Date {
-  const cutoff = new Date(now.getTime());
-  cutoff.setMonth(cutoff.getMonth() - BOOKING_RETENTION_MONTHS);
-  return cutoff;
+  return new Date(now.getTime() - BOOKING_RETENTION_DAYS * DAY_MS);
 }
 
-export function isWithinBookingRetention(createdAt: string | Date, now = new Date()): boolean {
-  const created = createdAt instanceof Date ? createdAt : new Date(createdAt);
-  const createdMs = created.getTime();
-  if (!Number.isFinite(createdMs)) return false;
-  return createdMs >= bookingRetentionCutoff(now).getTime();
+/** True until 30 days after `startAt` (the rental start). Missing dates are not kept. */
+export function isWithinBookingRetention(
+  startAt: string | Date | null | undefined,
+  now = new Date(),
+): boolean {
+  if (startAt == null || startAt === "") return false;
+  const start = startAt instanceof Date ? startAt : new Date(startAt);
+  const startMs = start.getTime();
+  if (!Number.isFinite(startMs)) return false;
+  return startMs >= bookingRetentionCutoff(now).getTime();
 }

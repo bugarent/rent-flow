@@ -38,7 +38,7 @@ export async function loadEmailBookingHistory(input: { email: string; bookingNum
   const cutoff = bookingRetentionCutoff();
 
   const fileRows = (await listFileBookingsByEmail(email)).filter((row) =>
-    isWithinBookingRetention(row.createdAt),
+    isWithinBookingRetention(row.pickupAt),
   );
 
   let prismaRows: Array<{ id: string; sequentialNumber: number; createdAt: Date }> = [];
@@ -53,7 +53,7 @@ export async function loadEmailBookingHistory(input: { email: string; bookingNum
     prismaRows = await bookingDb.findMany({
       where: {
         guestEmail: { equals: email, mode: "insensitive" },
-        createdAt: { gte: cutoff },
+        pickupAt: { gte: cutoff },
       },
       select: { id: true, sequentialNumber: true, createdAt: true },
       orderBy: { createdAt: "desc" },
@@ -65,7 +65,8 @@ export async function loadEmailBookingHistory(input: { email: string; bookingNum
   }
 
   const chats = (await listCustomBookingChats()).filter(
-    (chat) => sameEmail(chat.email, email) && isWithinBookingRetention(chat.createdAt),
+    (chat) =>
+      sameEmail(chat.email, email) && isWithinBookingRetention(chat.pickupAt || chat.createdAt),
   );
 
   const numberMatches =
