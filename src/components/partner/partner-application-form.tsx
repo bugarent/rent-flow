@@ -51,8 +51,9 @@ function copyFor(locale: string) {
       confirm: "გაიმეორეთ პაროლი",
       submit: "განაცხადის გაგზავნა",
       submitting: "იგზავნება…",
-      received: "განაცხადი მიღებულია",
-      receivedBody: "ადმინისტრატორი დაინახავს ამ მონაცემებს, ქვეყნებს და აყვანის პუნქტებს.",
+      received: "შეთავაზება წარმატებით გაიგზავნა",
+      receivedBody:
+        "დაელოდეთ შეთავაზების განხილვას. დამტკიცების შემთხვევაში თქვენს მიერ მითითებული მაილი და პაროლი ავტომატურად გააქტიურდება პირად კაბინეტში შესასვლელად.",
       done: "დახურვა",
       loginPrompt: "უკვე გავლილი გაქვთ მოდერაცია?",
       loginLink: "პარტნიორის შესვლა",
@@ -93,8 +94,9 @@ function copyFor(locale: string) {
       confirm: "Повторите пароль",
       submit: "Отправить заявку",
       submitting: "Отправка…",
-      received: "Заявка получена",
-      receivedBody: "Администратор увидит эти данные, страны и пункты выдачи.",
+      received: "Предложение успешно отправлено",
+      receivedBody:
+        "Дождитесь рассмотрения предложения. В случае одобрения указанные вами почта и пароль автоматически активируются для входа в личный кабинет.",
       done: "Закрыть",
       loginPrompt: "Модерация уже пройдена?",
       loginLink: "Вход партнёра",
@@ -134,8 +136,9 @@ function copyFor(locale: string) {
     confirm: "Confirm password",
     submit: "Submit application",
     submitting: "Sending…",
-    received: "Application received",
-    receivedBody: "An administrator will see these details, countries, and pickup points.",
+    received: "Your offer was sent successfully",
+    receivedBody:
+      "Please wait while the offer is reviewed. If it is approved, the email and password you entered will be activated automatically so you can sign in to your partner cabinet.",
     done: "Close",
     loginPrompt: "Already approved?",
     loginLink: "Partner login",
@@ -346,7 +349,7 @@ export function PartnerApplicationForm({
         {ok ? (
           <div className="space-y-3 p-6 text-center">
             <p className="text-lg font-bold text-emerald-800">{t.received}</p>
-            <p className="text-sm text-slate-600">{t.receivedBody}</p>
+            <p className="mx-auto max-w-xl text-base leading-relaxed text-slate-600">{t.receivedBody}</p>
             <button type="button" className="min-h-11 rounded-xl bg-[#1d6fe8] px-5 py-2.5 font-bold text-white" onClick={onClose}>
               {t.done}
             </button>
