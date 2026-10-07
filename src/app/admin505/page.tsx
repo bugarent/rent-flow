@@ -71,9 +71,17 @@ export default async function AdminOperationsHomePage() {
     <div className="mx-auto max-w-7xl px-3 py-5 sm:px-4 sm:py-6">
       <AdminPageHeading page="homepage" />
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <div className="min-w-0 space-y-3">
+      <div className="columns-1 gap-3 md:columns-2 xl:columns-3 [&>div]:mb-3 [&>div]:min-w-0 [&>div]:break-inside-avoid">
+        <div>
           <TelegramLiveBotsManager initial={telegramLiveBots} />
+        </div>
+        <div>
+          <HomepageGoogleReviewsManager initial={googleReviews} />
+        </div>
+        <div>
+          <FooterContactManager initial={footerContact} />
+        </div>
+        <div>
           <BookingMailManager
             initialFromEmail={bookingMail.fromEmail}
             initialSmtpHost={bookingMail.smtpHost}
@@ -81,30 +89,29 @@ export default async function AdminOperationsHomePage() {
             initialSmtpUser={bookingMail.smtpUser}
             smtpPassSet={Boolean(bookingMail.smtpPass)}
           />
+        </div>
+        <div>
           <LiveChatTelegramBotManager initial={liveChatBot} />
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3">
         <div className="min-w-0">
-          <HomepageGoogleReviewsManager initial={googleReviews} />
-        </div>
-        <div className="min-w-0">
-          <FooterContactManager initial={footerContact} />
-        </div>
-        <div className="min-w-0 md:col-span-2 xl:col-span-3">
           <LegalPagesManager initial={legalPages} />
         </div>
-        <div className="min-w-0 md:col-span-2 xl:col-span-3">
+        <div className="min-w-0">
           <CustomBookingChannelsManager initial={bookingChannels} />
         </div>
-        <div className="min-w-0 md:col-span-2 xl:col-span-3">
+        <div className="min-w-0">
           <section className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
             <AdminSearchCountriesHeading />
             <HomepageSearchCountries initialLocations={searchLocations} compact />
           </section>
         </div>
-        <div className="min-w-0 md:col-span-2 xl:col-span-3">
+        <div className="min-w-0">
           <HomepageInfoBlocksManager initial={infoContent} />
         </div>
-        <div className="min-w-0 md:col-span-2 xl:col-span-3">
+        <div className="min-w-0">
           <HomepageContentManager
             initialCategories={categories}
             initialAirports={airports}
