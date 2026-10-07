@@ -138,7 +138,8 @@ export function DeliveryLocationsManager({
 
   const locationCounts = useMemo(() => {
     const scoped = locations.filter(
-      (item) => !countryIso2 || item.countryIso2.trim().toUpperCase() === countryIso2,
+      (item) =>
+        item.isActive && (!countryIso2 || item.countryIso2.trim().toUpperCase() === countryIso2),
     );
     let cities = 0;
     for (const item of scoped) {
