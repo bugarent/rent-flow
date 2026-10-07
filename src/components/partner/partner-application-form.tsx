@@ -41,6 +41,7 @@ function copyFor(locale: string) {
       managerPhone: "მეორე ტელეფონი",
       phoneCodeRequired: "ქვეყნის კოდი აუცილებელია. აირჩიეთ სიიდან და ნომერში მხოლოდ ციფრები ჩაწერეთ.",
       website: "ვებსაიტი",
+      noWebsite: "არ მაქვს ვებსაიტი",
       credentials: "შესვლის მონაცემები",
       login: "ლოგინი (ელ. ფოსტა)",
       emailMismatch: "ელ. ფოსტა და ლოგინი უნდა იყოს ერთი და იგივე მისამართი. სანამ არ დაემთხვევა, მოთხოვნა არ გაიგზავნება.",
@@ -81,6 +82,7 @@ function copyFor(locale: string) {
       managerPhone: "Второй телефон",
       phoneCodeRequired: "Код страны обязателен. Выберите его в списке и вводите только номер.",
       website: "Сайт",
+      noWebsite: "У меня нет сайта",
       credentials: "Данные входа",
       login: "Логин (эл. почта)",
       emailMismatch: "Эл. почта и логин должны быть одним и тем же адресом. Пока они не совпадут, заявка не отправится.",
@@ -120,6 +122,7 @@ function copyFor(locale: string) {
     managerPhone: "Secondary phone",
     phoneCodeRequired: "A country code is required. Choose it in the list and enter only the number.",
     website: "Website",
+    noWebsite: "I don't have a website",
     credentials: "Login credentials",
     login: "Login (email)",
     emailMismatch: "Email and login must be the same address. The request will not be sent until they match.",
@@ -207,6 +210,7 @@ export function PartnerApplicationForm({
   const [managerIso2, setManagerIso2] = useState(defaultIso2);
   const [managerMessengers, setManagerMessengers] = useState<PartnerSocialPlatform[]>([]);
   const [website, setWebsite] = useState("");
+  const [noWebsite, setNoWebsite] = useState(false);
   const [loginEmail, setLoginEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -240,7 +244,7 @@ export function PartnerApplicationForm({
     countries: countryIso2s.length === 0 || countryIso2s.some(countryMissingPlace),
     primaryPhone: !phoneOk(primaryPhone) || primaryMessengers.length === 0,
     managerPhone: !phoneOk(managerPhone) || managerMessengers.length === 0,
-    website: !websiteOk(website),
+    website: !noWebsite && !websiteOk(website),
     login: !emailOk(loginEmail) || emailsDiffer,
     password: password.length < 6,
     confirm: confirmPassword.length < 6 || confirmPassword !== password,
@@ -308,7 +312,7 @@ export function PartnerApplicationForm({
           centralOffice: "",
           address: address.trim(),
           clientLanguages: languages,
-          website: website.trim(),
+          website: noWebsite ? "" : website.trim(),
           password,
           confirmPassword,
         }),
@@ -579,7 +583,41 @@ export function PartnerApplicationForm({
                     invalid={mark("managerPhone")}
                     hint={t.phoneCodeRequired}
                   />
-                  <TextField label={t.website} value={website} onChange={setWebsite} invalid={mark("website")} />
+                  <div data-invalid={mark("website") ? "true" : undefined}>
+                    <p className={cn("mb-1.5 text-sm font-semibold", mark("website") ? "text-red-700" : "text-[#3a4553]")}>
+                      {t.website}
+                      {noWebsite ? null : <span className="text-[#e11d48]"> *</span>}
+                    </p>
+                    <div
+                      className={cn(
+                        "rounded-md border bg-white px-3 py-2",
+                        mark("website") ? "border-red-500 bg-red-50" : "border-[#c5ced8]",
+                      )}
+                    >
+                      <input
+                        type="text"
+                        inputMode="url"
+                        disabled={noWebsite}
+                        aria-invalid={mark("website") || undefined}
+                        className="min-h-11 w-full border-0 bg-transparent text-base font-normal text-slate-900 outline-none disabled:text-slate-400"
+                        value={noWebsite ? "" : website}
+                        onChange={(event) => setWebsite(event.target.value)}
+                      />
+                      <label className="mt-1 flex min-h-10 cursor-pointer items-center gap-2 border-t border-slate-200 pt-1.5 text-sm font-semibold text-slate-700">
+                        <input
+                          type="checkbox"
+                          className="h-5 w-5 shrink-0 accent-sky-600"
+                          checked={noWebsite}
+                          onChange={(event) => {
+                            const checked = event.target.checked;
+                            setNoWebsite(checked);
+                            if (checked) setWebsite("");
+                          }}
+                        />
+                        <span>{t.noWebsite}</span>
+                      </label>
+                    </div>
+                  </div>
                   <div
                     data-invalid={mark("login") || mark("password") || mark("confirm") ? "true" : undefined}
                     className={cn(
