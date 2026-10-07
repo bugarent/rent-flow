@@ -2452,8 +2452,9 @@ export function PartnerCreateCarForm({
               {cc.extrasEmpty}
             </p>
           ) : (
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="flex flex-col gap-2 md:grid md:grid-cols-2 md:gap-1.5">
               {[...extrasCatalog]
+                .filter((service) => service.isActive !== false)
                 .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
                 .map((service) => {
                 const row = extraSelections.find((s) => s.extraServiceId === service.id);
@@ -2461,6 +2462,7 @@ export function PartnerCreateCarForm({
                 const forbidden = !mandatory && Boolean(row?.forbidden);
                 const enabled = mandatory || (!forbidden && Boolean(row?.enabled));
                 const off = !mandatory && !forbidden && !Boolean(row?.enabled);
+                const carActive = mandatory || (enabled && !forbidden);
                 const priceNum = Number(row?.priceEur);
                 const isFree =
                   isMandatoryFreeExtra(service) ||
@@ -2482,10 +2484,10 @@ export function PartnerCreateCarForm({
                   );
                 };
                 return (
+                  <div key={service.id} className={cn(!carActive && "hidden md:contents")}>
                   <div
-                    key={service.id}
                     className={cn(
-                      "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded border bg-white px-2 py-1 text-xs shadow-sm",
+                      "flex flex-col gap-2 rounded-lg border px-3 py-2.5 shadow-sm md:grid md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-x-2 md:rounded md:px-2 md:py-1 md:text-xs",
                       forbidden
                         ? "border-red-400 bg-red-50/70 ring-1 ring-red-200"
                         : enabled
@@ -2494,15 +2496,15 @@ export function PartnerCreateCarForm({
                     )}
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-[11px] font-bold leading-tight text-slate-900">
+                      <p className="break-words text-sm font-bold leading-snug text-slate-900 md:truncate md:text-[11px] md:leading-tight">
                         {extraLabel(service)}
                       </p>
                       {mandatory ? (
-                        <p className="truncate text-[9px] font-bold leading-tight text-emerald-800">
+                        <p className="text-xs font-bold leading-tight text-emerald-800 md:truncate md:text-[9px]">
                           {cc.mandatory}
                         </p>
                       ) : null}
-                      <p className="mt-0.5 whitespace-nowrap text-[10px] font-semibold text-slate-600">
+                      <p className="mt-0.5 text-xs font-semibold text-slate-600 md:whitespace-nowrap md:text-[10px]">
                         {cc.extrasPricePerDay}:{" "}
                         {forbidden || off ? (
                           <span className="font-bold text-slate-400">—</span>
@@ -2516,9 +2518,9 @@ export function PartnerCreateCarForm({
                         )}
                       </p>
                     </div>
-                    <div className="flex flex-wrap items-center justify-end gap-1">
+                    <div className="flex flex-wrap items-center gap-2 md:justify-end md:gap-1">
                       {mandatory ? (
-                        <span className="rounded border border-emerald-500 bg-emerald-600 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white">
+                        <span className="inline-flex min-h-11 items-center rounded border border-emerald-500 bg-emerald-600 px-3 text-xs font-bold uppercase tracking-wide text-white md:min-h-0 md:px-1 md:py-0.5 md:text-[8px]">
                           {cc.mandatory}
                         </span>
                       ) : (
@@ -2527,7 +2529,7 @@ export function PartnerCreateCarForm({
                             type="button"
                             onClick={() => setOffer("on")}
                             className={cn(
-                              "rounded border px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide",
+                              "inline-flex min-h-11 items-center rounded border px-3 text-xs font-bold uppercase tracking-wide md:min-h-0 md:px-1 md:py-0.5 md:text-[8px]",
                               enabled && !forbidden
                                 ? "border-[#28a745] bg-[#28a745] text-white"
                                 : "border-emerald-200 text-emerald-700 hover:bg-emerald-50",
@@ -2539,7 +2541,7 @@ export function PartnerCreateCarForm({
                             type="button"
                             onClick={() => setOffer("forbidden")}
                             className={cn(
-                              "rounded border px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide",
+                              "inline-flex min-h-11 items-center rounded border px-3 text-xs font-bold uppercase tracking-wide md:min-h-0 md:px-1 md:py-0.5 md:text-[8px]",
                               forbidden
                                 ? "border-red-500 bg-red-600 text-white"
                                 : "border-red-200 text-red-600 hover:bg-red-50",
@@ -2551,7 +2553,7 @@ export function PartnerCreateCarForm({
                             type="button"
                             onClick={() => setOffer("off")}
                             className={cn(
-                              "rounded border px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide",
+                              "inline-flex min-h-11 items-center rounded border px-3 text-xs font-bold uppercase tracking-wide md:min-h-0 md:px-1 md:py-0.5 md:text-[8px]",
                               off
                                 ? "border-slate-600 bg-slate-600 text-white"
                                 : "border-slate-200 text-slate-600 hover:bg-slate-50",
@@ -2562,6 +2564,7 @@ export function PartnerCreateCarForm({
                         </>
                       )}
                     </div>
+                  </div>
                   </div>
                 );
               })}
