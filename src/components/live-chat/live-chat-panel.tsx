@@ -275,7 +275,7 @@ export function LiveChatPanel({ onClose }: { onClose: () => void }) {
             renderMessage={(m) => (
               <div
                 className={cn(
-                  "max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
+                  "max-w-[85%] whitespace-pre-line break-words rounded-2xl px-3 py-2 text-sm leading-relaxed",
                   m.role === "user"
                     ? "ml-auto bg-[#1d6fe8] text-white"
                     : "bg-white text-slate-800 ring-1 ring-slate-200",

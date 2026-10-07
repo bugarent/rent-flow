@@ -10,10 +10,10 @@ export type LiveChatAiResult = {
   userWantsOperator: boolean;
 };
 
-const MAX_REPLY_CHARS = 280;
+const MAX_REPLY_CHARS = 700;
 
 function clip(text: string, max = MAX_REPLY_CHARS): string {
-  const t = text.replace(/\s+/g, " ").trim();
+  const t = text.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
   if (t.length <= max) return t;
   const cut = t.slice(0, max - 1);
   const lastSpace = cut.lastIndexOf(" ");
@@ -91,18 +91,45 @@ function shortCopy(
   return pack[key];
 }
 
-/** Short answers from site data when OpenAI is unavailable. */
+function clarifyCopy(locale: string): string {
+  if (locale === "ka") {
+    return "რომ ზუსტად გიპასუხოთ, დამიზუსტეთ: რომელი აეროპორტი/ქალაქი, რა თარიღები და რა ტიპის მანქანა გაინტერესებთ? თუ პარტნიორი ხართ — რომელ საკითხს ეხება კითხვა (განცხადება, დაზღვევა, ჯავშანი, ანგარიშსწორება)?";
+  }
+  if (locale === "ru") {
+    return "Чтобы ответить точно, уточните: какой аэропорт/город, какие даты и какой тип авто вас интересует? Если вы партнёр — к чему относится вопрос (объявление, страховка, бронь, расчёты)?";
+  }
+  return "To answer precisely, could you clarify: which airport/city, which dates and what type of car? If you are a partner — which topic is it about (listing, insurance, booking, payouts)?";
+}
+
+function sameText(a: string, b: string) {
+  return norm(a) === norm(b);
+}
+
+function wasSaid(text: string, previous: string[]) {
+  const head = norm(clip(text, 160));
+  if (!head) return false;
+  return previous.some((p) => sameText(p, text) || norm(p).includes(head));
+}
+
+function isMultiPart(message: string): boolean {
+  const questions = (message.match(/\?/g) || []).length;
+  return questions >= 2 || /\n\s*(\d+[.)]|[-•])/.test(message);
+}
+
+/** Answers from site data when OpenAI is unavailable; avoids repeating earlier replies. */
 export async function answerFromSiteKnowledge(input: {
   locale: Locale | string;
   message: string;
+  previousReplies?: string[];
 }): Promise<LiveChatAiResult> {
   const locale = input.locale === "ka" || input.locale === "ru" ? input.locale : "en";
   const msg = input.message.trim();
+  const previous = input.previousReplies ?? [];
   const operatorAsk = wantsOperator(msg);
 
   const help = await getHelpCenterConfig().catch(() => null);
 
-  let bestFaq: { a: string; score: number } | null = null;
+  const ranked: Array<{ q: string; a: string; score: number }> = [];
   if (help) {
     for (const cat of help.categories) {
       for (const topic of cat.topics) {
@@ -110,16 +137,22 @@ export async function answerFromSiteKnowledge(input: {
           const score =
             scoreOverlap(msg, `${article.question} ${article.answer}`) * 2 +
             scoreOverlap(msg, article.question) * 3;
-          if (score > 0 && (!bestFaq || score > bestFaq.score)) {
-            bestFaq = { a: article.answer, score };
-          }
+          if (score >= 2) ranked.push({ q: article.question, a: article.answer, score });
         }
       }
     }
   }
+  ranked.sort((x, y) => y.score - x.score);
+  const fresh = ranked.filter((r) => !wasSaid(r.a, previous));
+  const bestFaq = fresh[0] ?? null;
 
   let reply: string;
-  if (bestFaq && bestFaq.score >= 2) {
+  if (bestFaq && isMultiPart(msg) && fresh.length > 1) {
+    reply = fresh
+      .slice(0, 3)
+      .map((r, i) => `${i + 1}. ${r.q}\n${clip(r.a, 320)}`)
+      .join("\n\n");
+  } else if (bestFaq) {
     reply = clip(bestFaq.a, MAX_REPLY_CHARS);
   } else if (rentalIntent(msg) || bookingIntent(msg)) {
     reply = shortCopy(locale, "rent");
@@ -130,6 +163,7 @@ export async function answerFromSiteKnowledge(input: {
   } else {
     reply = shortCopy(locale, "help");
   }
+  if (wasSaid(reply, previous)) reply = clarifyCopy(locale);
 
   if (operatorAsk) {
     const open = isOperatorHours();
@@ -145,7 +179,7 @@ export async function answerFromSiteKnowledge(input: {
   }
 
   const exhausted =
-    !(bestFaq && bestFaq.score >= 2) &&
+    !bestFaq &&
     !rentalIntent(msg) &&
     !priceIntent(msg) &&
     !deliveryIntent(msg) &&

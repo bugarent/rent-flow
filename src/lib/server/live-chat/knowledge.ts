@@ -30,10 +30,10 @@ export async function buildLiveChatKnowledge(locale: Locale = "en"): Promise<str
 
   const faqLines: string[] = [];
   if (help) {
-    for (const cat of help.categories.slice(0, 8)) {
-      for (const topic of cat.topics.slice(0, 6)) {
-        for (const article of topic.articles.slice(0, 4)) {
-          faqLines.push(`Q: ${article.question}\nA: ${article.answer.slice(0, 500)}`);
+    for (const cat of help.categories) {
+      for (const topic of cat.topics) {
+        for (const article of topic.articles) {
+          faqLines.push(`[${cat.title} / ${topic.title}]\nQ: ${article.question}\nA: ${article.answer.slice(0, 900)}`);
         }
       }
     }
@@ -61,6 +61,10 @@ export async function buildLiveChatKnowledge(locale: Locale = "en"): Promise<str
     "About:",
     dictionary.common.aboutParagraphs.join("\n"),
     "",
+    "For rental companies (partners):",
+    `${dictionary.partner.title} — ${dictionary.partner.subtitle}`,
+    dictionary.partner.pageBody,
+    "",
     "Terms summary:",
     dictionary.common.termsBody,
     "",
@@ -80,7 +84,7 @@ export async function buildLiveChatKnowledge(locale: Locale = "en"): Promise<str
     deliveryLines.join("\n") || "(none listed)",
     "",
     "Help center Q&A:",
-    faqLines.slice(0, 40).join("\n\n") || "(no articles)",
+    faqLines.slice(0, 120).join("\n\n") || "(no articles)",
   ].join("\n");
 
   cacheByLocale.set(key, { at: Date.now(), value: text });
