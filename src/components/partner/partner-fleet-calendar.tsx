@@ -188,6 +188,7 @@ function carWindowClass(status: string) {
 
 export function PartnerFleetCalendar() {
   const router = useRouter();
+  const gridRef = useRef<HTMLDivElement>(null);
   const { locale, dictionary } = usePartnerLocale();
   const t = dictionary.calendar;
   const [sidebarW, setSidebarW] = useState(SIDEBAR_W_DESKTOP);
@@ -722,14 +723,42 @@ export function PartnerFleetCalendar() {
   const rangeStartMs = rangeFrom.getTime();
   const rangeSpanMs = dayCount * DAY_MS;
 
+  useEffect(() => {
+    const previous = window.history.scrollRestoration;
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    window.history.scrollRestoration = "manual";
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    const pinToTop = () => {
+      window.scrollTo(0, 0);
+      html.scrollTop = 0;
+      body.scrollTop = 0;
+      if (gridRef.current) {
+        gridRef.current.scrollTop = 0;
+        gridRef.current.scrollLeft = 0;
+      }
+    };
+    pinToTop();
+    const frame = window.requestAnimationFrame(pinToTop);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      window.history.scrollRestoration = previous;
+    };
+  }, []);
+
   return (
-    <div className="flex min-h-screen flex-col overflow-x-clip bg-[#f4f6f9]">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#f4f6f9]">
       <div className="relative m-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[#d5dde6] bg-white shadow-[0_1px_2px_rgba(26,0,64,0.04)] sm:m-3">
         {error ? (
           <p className="m-4 shrink-0 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>
         ) : null}
 
-        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-auto">
+        <div ref={gridRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-auto">
           {/* Sticky header */}
           <div
             className="sticky top-0 z-20 flex border-b-2 border-slate-300 bg-white"

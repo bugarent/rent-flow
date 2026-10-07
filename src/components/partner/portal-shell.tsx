@@ -7,6 +7,7 @@ import { PartnerIdleLogout } from "@/components/partner/partner-idle-logout";
 import { PartnerRemoderationBanner } from "@/components/partner/partner-remoderation-banner";
 import { PARTNER_BASE, PARTNER_LOGIN, PARTNER_REGISTER, PARTNER_VERIFY } from "@/lib/routes";
 import { HERO_BACKGROUND_URL } from "@/lib/brand";
+import { cn } from "@/lib/utils";
 
 function isAuthPath(pathname: string) {
   return pathname === PARTNER_LOGIN || pathname === PARTNER_REGISTER || pathname === PARTNER_VERIFY;
@@ -38,9 +39,15 @@ export function PartnerPortalShell({ children }: { children: ReactNode }) {
   }
 
   const ownBg = usesOwnPageBackground(pathname);
+  const calendar = isCalendarPath(pathname);
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-x-clip">
+    <div
+      className={cn(
+        "relative flex min-h-screen flex-col overflow-x-clip",
+        calendar && "fixed inset-0 z-30 h-dvh max-h-dvh overflow-hidden",
+      )}
+    >
       <PartnerIdleLogout />
       {!ownBg ? (
         <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
@@ -53,13 +60,20 @@ export function PartnerPortalShell({ children }: { children: ReactNode }) {
           <div className="absolute inset-x-0 bottom-0 h-[55%] bg-gradient-to-t from-[#eef2f7] via-[#eef2f7]/95 to-transparent" />
         </div>
       ) : null}
-      <header className="sticky top-0 z-50 border-b border-slate-800 bg-[#0b1f4b] text-white shadow-sm">
+      <header
+        className={cn(
+          "z-50 border-b border-slate-800 bg-[#0b1f4b] text-white shadow-sm",
+          calendar ? "shrink-0" : "sticky top-0",
+        )}
+      >
         <div className="px-2 py-1.5 sm:px-3 sm:py-1">
           <PartnerPortalTopBar variant="dark" className="w-full" />
         </div>
       </header>
       <PartnerRemoderationBanner />
-      <div className="relative z-0 flex-1">{children}</div>
+      <div className={cn("relative z-0 flex-1", calendar && "flex min-h-0 flex-col overflow-hidden")}>
+        {children}
+      </div>
     </div>
   );
 }
