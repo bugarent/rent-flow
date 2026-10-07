@@ -87,22 +87,9 @@ async function readStoreFile(): Promise<StoreFile> {
   }
 }
 
-let reconcilingMoney = false;
-
+/** Booked money is frozen at checkout — never reprice stored bookings from the live listing. */
 async function readStore(): Promise<StoreFile> {
-  const store = await readStoreFile();
-  if (reconcilingMoney) return store;
-  reconcilingMoney = true;
-  try {
-    const { applyCanonicalMoney } = await import("@/lib/server/bookings/apply-canonical-money");
-    const changed = await applyCanonicalMoney(store.bookings);
-    if (changed) await writeStore(store);
-  } catch (error) {
-    console.warn("[bookings] canonical money", error);
-  } finally {
-    reconcilingMoney = false;
-  }
-  return store;
+  return readStoreFile();
 }
 
 async function writeStore(store: StoreFile) {

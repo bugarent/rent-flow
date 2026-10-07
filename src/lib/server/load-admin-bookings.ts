@@ -5,6 +5,7 @@ import { fullName, toNumber } from "@/lib/utils";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import { listAllFileBookings } from "@/lib/server/customer-bookings-store";
 import { loadCarsByIds } from "@/lib/server/booking-car-label";
+import { withBookedCarLabels } from "@/lib/server/booking-terms-store";
 import {
   businessPartnerCodeForBooking,
   loadBusinessPartnerCodeIndex,
@@ -118,5 +119,5 @@ export async function loadAdminBookingRows(): Promise<AdminBookingListRow[]> {
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
-  return rows;
+  return withBookedCarLabels(rows);
 }

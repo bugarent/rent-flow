@@ -8,6 +8,8 @@ import {
   rentalDayCount,
   roundMoney,
 } from "@/lib/cars/reserve-pricing";
+import { effectiveOneWayDeliveryPrice } from "@/lib/delivery/pricing";
+import type { BookedTerms } from "@/lib/server/booking-terms-store";
 
 export type GuestCorrectionMoney = {
   payNow: number;
@@ -23,6 +25,8 @@ type ExtraLine = { id: string; priceEur: number };
  * Delivery stays off the commission. Returns payNow 0 when nothing commissionable was added.
  */
 export async function quoteGuestBookingCorrection(input: {
+  /** Legs at the booked places keep the delivery price from checkout. */
+  bookingId?: string;
   carId: string;
   promoCode?: string | null;
   /** Site discount stored for this booking at checkout (0 = none). */
@@ -59,9 +63,11 @@ export async function quoteGuestBookingCorrection(input: {
     ),
   );
 
+  const { readBookedTerms } = await import("@/lib/server/booking-terms-store");
+  const terms = input.bookingId ? await readBookedTerms(input.bookingId) : null;
   const [originalDeliveryEur, projectedDeliveryEur] = await Promise.all([
-    deliveryFeeEur(input.carId, input.oldPickupIata, input.oldDropoffIata, oldDays),
-    deliveryFeeEur(input.carId, input.newPickupIata, input.newDropoffIata, newDays),
+    deliveryFeeEur(input.carId, input.oldPickupIata, input.oldDropoffIata, oldDays, terms),
+    deliveryFeeEur(input.carId, input.newPickupIata, input.newDropoffIata, newDays, terms),
   ]);
 
   const discount = resolveBookingDiscount({
@@ -115,12 +121,44 @@ export async function quoteGuestBookingCorrection(input: {
   };
 }
 
+function bookedLegFee(terms: BookedTerms | null, iata: string, days: number): number | null {
+  if (!terms) return null;
+  const code = iata.toUpperCase();
+  const row = terms.locations.find((o) => o.iata.toUpperCase() === code);
+  if (row) return roundMoney(effectiveOneWayDeliveryPrice(Number(row.priceEur) || 0, row.freeAfterDays ?? null, days));
+  if (code === terms.pickupIata) return roundMoney(terms.delivery.pickupFeeEur);
+  if (code === terms.dropoffIata) return roundMoney(terms.delivery.dropoffFeeEur);
+  return null;
+}
+
 async function deliveryFeeEur(
   carId: string,
   pickupIata: string,
   dropoffIata: string,
   days: number,
+  terms: BookedTerms | null,
 ): Promise<number> {
+  const bookedPickup = bookedLegFee(terms, pickupIata, days);
+  const bookedDropoff = bookedLegFee(terms, dropoffIata, days);
+  if (bookedPickup != null && bookedDropoff != null) return roundMoney(bookedPickup + bookedDropoff);
+  if (bookedPickup != null || bookedDropoff != null) {
+    const live = await liveDeliveryLegs(carId, pickupIata, dropoffIata, days);
+    return roundMoney((bookedPickup ?? live.pickup) + (bookedDropoff ?? live.dropoff));
+  }
+  const live = await liveDeliveryLegs(carId, pickupIata, dropoffIata, days);
+  return roundMoney(live.pickup + live.dropoff);
+}
+
+async function liveDeliveryLegs(
+  carId: string,
+  pickupIata: string,
+  dropoffIata: string,
+  days: number,
+): Promise<{ pickup: number; dropoff: number }> {
+  const legs = (summary: { pickupFeeEur?: number; dropoffFeeEur?: number } | null | undefined) => ({
+    pickup: roundMoney(Number(summary?.pickupFeeEur) || 0),
+    dropoff: roundMoney(Number(summary?.dropoffFeeEur) || 0),
+  });
   const { resolveDeliverySummary } = await import("@/lib/server/booking-info/delivery");
   try {
     const { listFileCars } = await import("@/lib/server/partner-cars-store");
@@ -134,7 +172,7 @@ async function deliveryFeeEur(
         partnerId: car.partnerId,
         partnerUserId: car.partnerUserId,
       });
-      return roundMoney(Number(summary?.totalFeeEur) || 0);
+      return legs(summary);
     }
   } catch {
     /* try the database listing */
@@ -155,7 +193,7 @@ async function deliveryFeeEur(
         },
       },
     });
-    if (!car) return 0;
+    if (!car) return legs(null);
     const summary = await resolveDeliverySummary({
       deliveryPrices: car.deliveryPrices.map((row) => ({
         deliveryLocationId: row.deliveryLocationId,
@@ -168,8 +206,8 @@ async function deliveryFeeEur(
       rentalDays: days,
       partnerId: car.partnerId,
     });
-    return roundMoney(Number(summary?.totalFeeEur) || 0);
+    return legs(summary);
   } catch {
-    return 0;
+    return legs(null);
   }
 }

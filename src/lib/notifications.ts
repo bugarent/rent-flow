@@ -123,6 +123,23 @@ async function adminChatIds(): Promise<string[]> {
   return resolveAdminTelegramChatIds();
 }
 
+/** Emails name the car exactly as it was booked, even if the listing changed later. */
+async function withBookedCar(booking: NoticeSnapshot): Promise<NoticeSnapshot> {
+  try {
+    const { readBookedTerms } = await import("@/lib/server/booking-terms-store");
+    const car = (await readBookedTerms(booking.id))?.car;
+    if (!car) return booking;
+    const label = `${car.make} ${car.model} ${car.year || ""}`.replace(/\s+/g, " ").trim();
+    return {
+      ...booking,
+      carLabel: label || booking.carLabel,
+      carPlate: String(car.registrationNumber || "").trim() || booking.carPlate,
+    };
+  } catch {
+    return booking;
+  }
+}
+
 async function deliverBookingNotice(input: {
   event: BookingNoticeEvent;
   booking: NoticeSnapshot;
@@ -132,6 +149,7 @@ async function deliverBookingNotice(input: {
   cancellationReason?: string;
   refundEur?: number;
 }) {
+  input = { ...input, booking: await withBookedCar(input.booking) };
   const name = await siteName();
   const reference = formatBookingRef(input.booking.sequentialNumber);
   const days = rentalDayCount(input.booking.pickupAt.toISOString(), input.booking.dropoffAt.toISOString());

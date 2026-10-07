@@ -126,6 +126,7 @@ export async function POST(req: Request) {
       const nextExtras = await hydrateBookingExtraLabels(draftedExtras);
       const { quoteGuestBookingCorrection } = await import("@/lib/server/guest-correction-quote");
       const quote = await quoteGuestBookingCorrection({
+        bookingId: file.id,
         carId: file.carId,
         promoCode: file.promoCode,
         siteDiscountPercent: await readBookingSiteDiscount(file.id),
@@ -290,6 +291,7 @@ export async function POST(req: Request) {
 
       const { quoteGuestBookingCorrection } = await import("@/lib/server/guest-correction-quote");
       const quote = await quoteGuestBookingCorrection({
+        bookingId: booking.id,
         carId: booking.carId,
         promoCode: booking.promoCode,
         siteDiscountPercent: await readBookingSiteDiscount(booking.id),

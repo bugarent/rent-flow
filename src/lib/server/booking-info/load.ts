@@ -299,7 +299,9 @@ export async function loadBookingInfoDetail(
         delivery,
       };
       return withSiteDiscount(
-        await withBusinessPartnerCode(await withCancelNote(await withAdminRefundAlerts(prismaDetail))),
+        await withBusinessPartnerCode(
+          await withCancelNote(await withAdminRefundAlerts(await withBookedTerms(prismaDetail))),
+        ),
       );
     }
   } catch (error) {
@@ -317,8 +319,35 @@ export async function loadBookingInfoDetail(
     detail.countryOfResidence = await readBookingResidence(file.id);
   }
   return withSiteDiscount(
-    await withBusinessPartnerCode(await withCancelNote(await withAdminRefundAlerts(detail))),
+    await withBusinessPartnerCode(
+      await withCancelNote(await withAdminRefundAlerts(await withBookedTerms(detail))),
+    ),
   );
+}
+
+/** Call right after checkout so the booking keeps the terms the guest saw. */
+export async function freezeBookingTermsAtCheckout(bookingId: string) {
+  try {
+    await loadBookingInfoDetail(bookingId);
+  } catch (error) {
+    console.warn("[bookings] freeze booked terms", error);
+  }
+}
+
+async function withBookedTerms(detail: BookingInfoDetailPayload) {
+  try {
+    const { applyBookedTerms, freezeBookedTerms, readBookedTerms } = await import(
+      "@/lib/server/booking-terms-store"
+    );
+    const saved = await readBookedTerms(detail.id);
+    if (saved) return applyBookedTerms(detail, saved);
+    const hasCar = Boolean(detail.car.make || detail.car.model) && detail.car.dailyRateEur > 0;
+    if (hasCar) await freezeBookedTerms(detail);
+    return detail;
+  } catch (error) {
+    console.warn("[booking-info-detail] booked terms", error);
+    return detail;
+  }
 }
 
 async function withSiteDiscount(detail: BookingInfoDetailPayload) {

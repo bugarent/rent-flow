@@ -8,6 +8,7 @@ import { normalizeLogin } from "@/lib/crypto";
 import { listFileCarsForPartner } from "@/lib/server/partner-cars-store";
 import { listFileBookingsForCars } from "@/lib/server/customer-bookings-store";
 import { loadCarsByIds } from "@/lib/server/booking-car-label";
+import { withBookedCarLabels } from "@/lib/server/booking-terms-store";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 
 export default async function PartnerBookingsPage() {
@@ -151,7 +152,7 @@ export default async function PartnerBookingsPage() {
 
   return (
     <div className="min-h-screen bg-[#eef2f7]">
-      <PartnerBookingsDashboard bookings={rows} />
+      <PartnerBookingsDashboard bookings={await withBookedCarLabels(rows)} />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { getCustomerSession } from "@/lib/auth/sessions";
 import { prisma } from "@/lib/prisma";
 import { computeBufferEndsAt, rangesOverlap } from "@/lib/calendar/buffer";
 import { notifyBookingEvent } from "@/lib/notifications";
+import { freezeBookingTermsAtCheckout } from "@/lib/server/booking-info/load";
 import { cityStreetLabel, isCityLocationCode, nearestAirportCode, parseCityLocationCode } from "@/lib/catalog/search-places";
 import {
   CANCELLATION_DAILY_EUR,
@@ -727,6 +728,7 @@ export async function POST(req: Request) {
             ? { promoCode: bpCode || bookingPromoCode }
             : {}),
         });
+        await freezeBookingTermsAtCheckout(booking.id);
 
         try {
           const { notifyFileBookingEvent } = await import("@/lib/notifications");
@@ -1077,6 +1079,7 @@ export async function POST(req: Request) {
         ...(guestCountry ? { countryOfResidence: guestCountry } : {}),
         ...(bookingPromoCode || bpCode ? { promoCode: bpCode || bookingPromoCode } : {}),
       });
+      await freezeBookingTermsAtCheckout(booking.id);
       try {
         const { notifyFileBookingEvent } = await import("@/lib/notifications");
         await notifyFileBookingEvent(booking);
@@ -1236,6 +1239,7 @@ export async function POST(req: Request) {
     } catch (extraErr) {
       console.warn("[bookings] BookingExtra create failed", extraErr);
     }
+    await freezeBookingTermsAtCheckout(booking.id);
 
     try {
       await notifyBookingEvent(booking.id, "BOOKING_NEW");
