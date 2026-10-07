@@ -1228,6 +1228,8 @@ export function PartnerCreateCarForm({
   const studioReq = useRef(0);
   /** Gallery photo the current cover was built from (or the one present when the listing loaded). */
   const coverSourceRef = useRef<string | null>(null);
+  /** True after the partner deletes the cover; cleared by the next new photo upload. */
+  const coverDismissedRef = useRef(false);
   const coverSource =
     photos.slice(1).find((url) => {
       const value = String(url || "").trim();
@@ -1235,7 +1237,7 @@ export function PartnerCreateCarForm({
     }) || "";
   const hasCover = Boolean(String(photos[0] || "").trim()) && !String(photos[0]).startsWith("blob:");
   useEffect(() => {
-    if (isAdminReview || booting || !coverSource) return;
+    if (isAdminReview || booting || !coverSource || coverDismissedRef.current) return;
     if (coverSourceRef.current === null && hasCover) {
       coverSourceRef.current = coverSource;
       return;
@@ -2779,12 +2781,15 @@ export function PartnerCreateCarForm({
             photos={photos}
             onChange={(incoming) => {
               const next = [...incoming];
-              const coverRemoved = isStudioCoverUrl(String(photos[0] || "")) && !String(next[0] || "").trim();
-              if (coverRemoved) {
-                // The cover is built from a gallery photo; deleting it deletes that photo too.
-                const from = coverSourceRef.current || coverSource;
-                const at = from ? next.findIndex((url, index) => index > 0 && url === from) : -1;
-                if (at > 0) next[at] = "";
+              const before = new Set(photos.map((url) => String(url || "").trim()).filter(Boolean));
+              const newUpload = next.some((url, index) => {
+                const value = String(url || "").trim();
+                return index > 0 && value && !value.startsWith("blob:") && !before.has(value);
+              });
+              if (newUpload) coverDismissedRef.current = false;
+              else if (String(photos[0] || "").trim() && !String(next[0] || "").trim()) {
+                // Partner deleted the cover: keep it empty until a new photo is uploaded.
+                coverDismissedRef.current = true;
               }
               const sourceLeft = next.slice(1).some((url) => {
                 const value = String(url || "").trim();
@@ -2792,10 +2797,7 @@ export function PartnerCreateCarForm({
               });
               if (!sourceLeft && isStudioCoverUrl(String(next[0] || ""))) next[0] = "";
               setPhotos(next);
-              if (!String(next[0] || "").trim()) {
-                coverSourceRef.current = "";
-                setCoverTick((tick) => tick + 1);
-              }
+              if (newUpload) setCoverTick((tick) => tick + 1);
             }}
             uploading={uploading || coverBusy}
             onUploadFiles={onGalleryFiles}
