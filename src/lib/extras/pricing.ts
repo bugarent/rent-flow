@@ -1,4 +1,5 @@
 import { toNumber } from "@/lib/utils";
+import { readExtraI18n, type ExtraCopyBag } from "@/lib/extras/localized-copy";
 import {
   extractCheckoutSlotFromDescription,
   extractStoredMaxPeriod,
@@ -13,6 +14,10 @@ export type ExtraServicePricing = {
   slug: string;
   name: string;
   description?: string;
+  /** Machine and catalog translations of `name`. */
+  nameI18n?: ExtraCopyBag;
+  /** Machine and catalog translations of `description`. */
+  descriptionI18n?: ExtraCopyBag;
   isTpl: boolean;
   isActive: boolean;
   sortOrder: number;
@@ -135,6 +140,8 @@ export function toExtraServicePricing(row: {
   maxPriceEur?: unknown;
   maxPeriodEur?: unknown;
   checkoutSlot?: unknown;
+  nameI18n?: ExtraCopyBag;
+  descriptionI18n?: ExtraCopyBag;
 }): ExtraServicePricing {
   const min =
     row.minPriceEur == null || row.minPriceEur === ""
@@ -159,6 +166,8 @@ export function toExtraServicePricing(row: {
   }
   const name = localizeExtraName(row.name);
   const description = localizeExtraName(row.description, "");
+  const nameI18n = { ...readExtraI18n(row.name), ...(row.nameI18n || {}) };
+  const descriptionI18n = { ...readExtraI18n(row.description), ...(row.descriptionI18n || {}) };
   const checkoutSlot = resolveCheckoutSlot({
     checkoutSlot: row.checkoutSlot ?? extractCheckoutSlotFromDescription(row.description),
     slug: row.slug,
@@ -171,6 +180,8 @@ export function toExtraServicePricing(row: {
     slug: row.slug,
     name,
     description,
+    nameI18n: Object.keys(nameI18n).length ? nameI18n : undefined,
+    descriptionI18n: Object.keys(descriptionI18n).length ? descriptionI18n : undefined,
     isTpl: row.isTpl,
     isActive: row.isActive,
     sortOrder: row.sortOrder,

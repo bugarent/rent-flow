@@ -15,6 +15,8 @@ export type StoredExtraService = {
   maxPriceEur: number | null;
   maxPeriodEur: number | null;
   checkoutSlot: ExtraCheckoutSlot;
+  nameI18n?: Partial<Record<import("@/lib/i18n/config").Locale, string>>;
+  descriptionI18n?: Partial<Record<import("@/lib/i18n/config").Locale, string>>;
   createdAt: string;
   updatedAt: string;
 };
@@ -53,6 +55,8 @@ export type HydratedListingExtra = {
     slug?: string;
     name: string;
     description: string;
+    nameI18n?: Partial<Record<import("@/lib/i18n/config").Locale, string>>;
+    descriptionI18n?: Partial<Record<import("@/lib/i18n/config").Locale, string>>;
     isTpl: boolean;
     isActive: boolean;
     minPriceEur: number | null;

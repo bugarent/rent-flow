@@ -35,6 +35,7 @@ import {
 import type { PublishedCarSnapshot } from "@/lib/server/car-published-store";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { knownText } from "@/lib/i18n/known-record-text";
+import { localizedExtraCopy } from "@/lib/extras/localized-copy";
 import { usePartnerMoneyOptional } from "@/components/providers/partner-money-context";
 import { cn, formatMoney } from "@/lib/utils";
 import { compressImageForUpload } from "@/lib/files/compress-image";
@@ -1729,7 +1730,8 @@ export function PartnerCreateCarForm({
     }
   };
 
-  const extraLabel = (service: ExtraServicePricing) => knownText(locale, service.name || service.slug);
+  const extraLabel = (service: ExtraServicePricing) =>
+    localizedExtraCopy(locale, service.name || service.slug, service.nameI18n);
 
   const deleteListing = async () => {
     if (!carId || deleting) return;

@@ -38,6 +38,7 @@ import {
 } from "@/lib/cars/listing-visibility";
 import { listExtraServices } from "@/lib/server/extras-store";
 import { localizeExtraName } from "@/lib/extras/pricing";
+import type { ExtraCopyBag } from "@/lib/extras/localized-copy";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
 import { getSearchDeliveryAirports } from "@/lib/server/delivery-locations";
 import { buildPageMetadata } from "@/lib/seo/metadata";
@@ -676,8 +677,8 @@ export default async function CarsPage({
     return da - db;
   });
 
-  let filterExtras: Array<{ id: string; slug: string; name: string }> = [];
-  let crossBorderFilter: { id: string; name: string } | null = null;
+  let filterExtras: Array<{ id: string; slug: string; name: string; nameI18n?: ExtraCopyBag }> = [];
+  let crossBorderFilter: { id: string; name: string; nameI18n?: ExtraCopyBag } | null = null;
   try {
     const catalog = (await extrasCatalogPromise) ?? [];
     for (const service of catalog) {
@@ -686,6 +687,7 @@ export default async function CarsPage({
         crossBorderFilter = {
           id: service.id,
           name: localizeExtraName(service.name, service.slug),
+          nameI18n: service.nameI18n,
         };
         continue;
       }
@@ -693,6 +695,7 @@ export default async function CarsPage({
         id: service.id,
         slug: service.slug,
         name: localizeExtraName(service.name, service.slug),
+        nameI18n: service.nameI18n,
       });
     }
     filterExtras.sort((a, b) => a.name.localeCompare(b.name));

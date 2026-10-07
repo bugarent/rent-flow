@@ -9,6 +9,7 @@ import {
 import { formatAmountNumber } from "@/lib/utils";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { knownText } from "@/lib/i18n/known-record-text";
+import { localizedExtraCopy } from "@/lib/extras/localized-copy";
 
 export type PartnerExtraSelection = {
   extraServiceId: string;
@@ -144,9 +145,9 @@ export function PartnerExtrasFields({
               <li key={service.id} className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold text-slate-900">{text(service.name)}</p>
+                    <p className="font-semibold text-slate-900">{localizedExtraCopy(locale, service.name, service.nameI18n)}</p>
                     {service.description ? (
-                      <p className="text-xs text-slate-600">{text(service.description)}</p>
+                      <p className="text-xs text-slate-600">{localizedExtraCopy(locale, service.description, service.descriptionI18n)}</p>
                     ) : null}
                     <p className="mt-1 text-xs font-semibold text-emerald-800">
                       Mandatory — must stay active. Locked at {currencySymbol}0/day; shown free to customers.
@@ -169,8 +170,10 @@ export function PartnerExtrasFields({
                 className="flex items-center justify-between gap-3 rounded-xl border bg-slate-50 px-4 py-3"
               >
                 <div>
-                  <p className="font-semibold text-slate-900">{text(service.name)}</p>
-                  {service.description ? <p className="text-xs text-slate-500">{text(service.description)}</p> : null}
+                  <p className="font-semibold text-slate-900">{localizedExtraCopy(locale, service.name, service.nameI18n)}</p>
+                  {service.description ? (
+                    <p className="text-xs text-slate-500">{localizedExtraCopy(locale, service.description, service.descriptionI18n)}</p>
+                  ) : null}
                   <p className="mt-1 text-xs text-slate-500">Toggle-only (no price limits)</p>
                 </div>
                 <label className="flex items-center gap-2 text-sm font-semibold">
@@ -190,8 +193,10 @@ export function PartnerExtrasFields({
             <li key={service.id} className="rounded-xl border bg-white px-4 py-3">
               <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                 <div>
-                  <p className="font-semibold text-slate-900">{text(service.name)}</p>
-                  {service.description ? <p className="text-xs text-slate-500">{text(service.description)}</p> : null}
+                  <p className="font-semibold text-slate-900">{localizedExtraCopy(locale, service.name, service.nameI18n)}</p>
+                  {service.description ? (
+                    <p className="text-xs text-slate-500">{localizedExtraCopy(locale, service.description, service.descriptionI18n)}</p>
+                  ) : null}
                 </div>
                 <p className="text-xs font-semibold text-slate-500">
                   Allowed {labelAmount(service.minPriceEur ?? 0)} – {labelAmount(service.maxPriceEur ?? 0)}/day

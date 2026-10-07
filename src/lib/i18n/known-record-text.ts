@@ -337,6 +337,139 @@ const EXTRAS: Array<[string, Row]> = [
 
 for (const [source, values] of EXTRAS) add(source, values);
 
+add("დეპოზიტის გარეშე", row("Without deposit", "დეპოზიტის გარეშე", "Ohne Kaution", "Sin depósito", "Sans caution", "Senza deposito", "Zonder borg", "Bez kaucji", "Depozitosuz", "Без залога", "بدون تأمين", "无需押金", "보증금 없음", "ไม่มีมัดจำ"));
+add("სახურავის საბარგული", row("Roof cargo box", "სახურავის საბარგული", "Dachbox", "Cofre de techo", "Coffre de toit", "Box da tetto", "Dakkoffer", "Box dachowy", "Tavan bagajı", "Бокс на крышу", "صندوق سقف", "车顶行李箱", "루프박스", "กล่องหลังคา"));
+add("სათხილამურო თარო", row("Ski rack", "სათხილამურო თარო", "Skiträger", "Portaesquís", "Porte-skis", "Portasci", "Skidrager", "Bagażnik na narty", "Kayak taşıyıcı", "Багажник для лыж", "حامل تزلج", "滑雪板架", "스키 캐리어", "แร็คสกี"));
+add("სნოუბორდის სადგამი", row("Snowboard rack", "სნოუბორდის სადგამი", "Snowboardhalter", "Portatablas", "Porte-snowboard", "Porta snowboard", "Snowboarddrager", "Bagażnik na snowboard", "Snowboard taşıyıcı", "Крепление для сноуборда", "حامل سنوبورد", "单板滑雪架", "스노보드 거치대", "แร็คสโนว์บอร์ด"));
+add("შეუზღუდავი გარბენი", row("Unlimited mileage", "შეუზღუდავი გარბენი", "Unbegrenzte Kilometer", "Kilometraje ilimitado", "Kilométrage illimité", "Chilometraggio illimitato", "Onbeperkte kilometers", "Nielimitowany przebieg", "Sınırsız kilometre", "Безлимитный пробег", "كيلومترات غير محدودة", "不限里程", "무제한 주행", "ไมล์ไม่จำกัด"));
+add(
+  "მგზავრობა \"მესტია-უშგული-ლენტეხი\" მარშრუტით",
+  row(
+    "Travel on the Mestia–Ushguli–Lentekhi route",
+    "მგზავრობა \"მესტია-უშგული-ლენტეხი\" მარშრუტით",
+    "Fahrt auf der Route Mestia–Ushguli–Lentekhi",
+    "Viaje por la ruta Mestia–Ushguli–Lentekhi",
+    "Trajet Mestia–Ushguli–Lentekhi",
+    "Percorso Mestia–Ushguli–Lentekhi",
+    "Rit Mestia–Ushguli–Lentekhi",
+    "Trasa Mestia–Ushguli–Lentekhi",
+    "Mestia–Ushguli–Lentekhi güzergahı",
+    "Поездка по маршруту Местиа–Ушгули–Лентехи",
+    "السفر عبر طريق مستيا–أوشغولي–لينتيخي",
+    "梅斯蒂亚–乌什古利–连捷希线路",
+    "메스티아–우슈굴리–렌테히 경로",
+    "เส้นทางเมสเทีย–อุชกูลี–เลนเตคี",
+  ),
+);
+add(
+  "Wireless hotspot on board555",
+  row(
+    "Wireless hotspot on board555",
+    "უკაბელო ჰოთსპოტი მანქანაში555",
+    "WLAN-Hotspot an Bord555",
+    "Punto de acceso inalámbrico a bordo555",
+    "Hotspot Wi-Fi à bord555",
+    "Hotspot wireless a bordo555",
+    "Draadloze hotspot aan boord555",
+    "Hotspot Wi-Fi w aucie555",
+    "Araç içi kablosuz erişim noktası555",
+    "Беспроводная точка доступа в авто555",
+    "نقطة اتصال لاسلكية في السيارة555",
+    "车载无线热点555",
+    "차량 무선 핫스팟555",
+    "ฮอตสปอตไร้สายในรถ555",
+  ),
+);
+add(
+  "Wi-Fi working range is up to 10 meters. The Internet speed is enough for voice calls but not enough for video. It has a built-in battery so that you can take it with you to the beach or when you are hiking",
+  row(
+    "Wi-Fi working range is up to 10 meters. The Internet speed is enough for voice calls but not enough for video. It has a built-in battery so that you can take it with you to the beach or when you are hiking",
+    "Wi-Fi მუშაობს 10 მეტრამდე. სიჩქარე საკმარისია ზარებისთვის, ვიდეოსთვის — არა. აქვს ჩაშენებული ბატარეა, ამიტომ შეგიძლიათ წაიღოთ სანაპიროზე ან ლაშქრობაზე.",
+    "WLAN reicht bis 10 Meter. Die Geschwindigkeit reicht für Anrufe, nicht für Video. Der Akku lässt sich mitnehmen, etwa an den Strand oder auf eine Wanderung.",
+    "El Wi-Fi llega hasta 10 metros. La velocidad basta para llamadas, no para vídeo. La batería integrada permite llevarlo a la playa o de excursión.",
+    "La portée Wi-Fi va jusqu’à 10 mètres. Le débit suffit pour les appels, pas pour la vidéo. La batterie intégrée permet de l’emporter à la plage ou en randonnée.",
+    "Il Wi-Fi arriva fino a 10 metri. La velocità basta per le chiamate, non per i video. La batteria integrata permette di portarlo in spiaggia o in escursione.",
+    "Wifi werkt tot 10 meter. De snelheid volstaat voor bellen, niet voor video. De ingebouwde batterij neemt u mee naar het strand of op een wandeling.",
+    "Zasięg Wi-Fi do 10 metrów. Prędkość wystarcza do rozmów, nie do wideo. Wbudowana bateria pozwala zabrać urządzenie na plażę lub wędrówkę.",
+    "Wi-Fi menzili 10 metreye kadardır. Hız aramalar için yeter, video için yetmez. Dahili pille sahile veya yürüyüşe götürebilirsiniz.",
+    "Wi-Fi работает до 10 метров. Скорости хватает для звонков, но не для видео. Встроенный аккумулятор можно взять на пляж или в поход.",
+    "يصل مدى الواي فاي إلى 10 أمتار. السرعة تكفي للمكالمات لا للفيديو. البطارية المدمجة تسمح بحمله إلى الشاطئ أو أثناء المشي.",
+    "Wi-Fi 覆盖约 10 米。网速够语音通话，不够看视频。内置电池，可以带到海边或徒步时使用。",
+    "Wi-Fi 범위는 최대 10미터입니다. 속도는 음성 통화에는 충분하고 동영상에는 부족합니다. 내장 배터리로 해변이나 하이킹에 가져갈 수 있습니다.",
+    "Wi-Fi ใช้ได้ในระยะไม่เกิน 10 เมตร ความเร็วพอสำหรับโทร แต่ไม่พอสำหรับวิดีโอ มีแบตในตัว พกไปชายหาดหรือเดินป่าได้",
+  ),
+);
+add("Winter Tyres", row("Winter Tyres", "ზამთრის საბურავები", "Winterreifen", "Neumáticos de invierno", "Pneus hiver", "Pneumatici invernali", "Winterbanden", "Opony zimowe", "Kış lastikleri", "Зимние шины", "إطارات شتوية", "冬季轮胎", "윈터 타이어", "ยางฤดูหนาว"));
+add(
+  "Winter tyres (marked with a \"snowflake\") or all- season tyres (marked with M+S and a \"snowflake\").",
+  row(
+    "Winter tyres (marked with a \"snowflake\") or all- season tyres (marked with M+S and a \"snowflake\").",
+    "ზამთრის საბურავები (ფიფქის ნიშნით) ან ყველა სეზონის საბურავები (M+S და ფიფქის ნიშნით).",
+    "Winterreifen (mit Schneeflocke) oder Ganzjahresreifen (mit M+S und Schneeflocke).",
+    "Neumáticos de invierno (con copo) o de todo tiempo (con M+S y copo).",
+    "Pneus hiver (flocon) ou toutes saisons (M+S et flocon).",
+    "Pneumatici invernali (fiocco) o quattro stagioni (M+S e fiocco).",
+    "Winterbanden (sneeuwvlok) of all-season (M+S en sneeuwvlok).",
+    "Opony zimowe (płatek) lub całoroczne (M+S i płatek).",
+    "Kış lastikleri (kar tanesi) veya dört mevsim lastikler (M+S ve kar tanesi).",
+    "Зимние шины (со снежинкой) или всесезонные (M+S и снежинка).",
+    "إطارات شتوية (علامة ندفة) أو لكل المواسم (M+S وندفة).",
+    "冬季轮胎（雪花标志）或四季轮胎（M+S 和雪花标志）。",
+    "윈터 타이어(눈송이 표시) 또는 사계절 타이어(M+S와 눈송이 표시).",
+    "ยางฤดูหนาว (เครื่องหมายเกล็ดหิมะ) หรือยางทุกฤดู (M+S และเกล็ดหิมะ)",
+  ),
+);
+add("SIM-card", row("SIM-card", "SIM ბარათი", "SIM-Karte", "Tarjeta SIM", "Carte SIM", "Scheda SIM", "SIM-kaart", "Karta SIM", "SIM kart", "SIM-карта", "شريحة SIM", "SIM 卡", "SIM 카드", "ซิมการ์ด"));
+add(
+  "Pre-paid SIM card of the local operator with the standard travel tariff. If the initial balance is exhausted, you will need to add funds to the card yourself.",
+  row(
+    "Pre-paid SIM card of the local operator with the standard travel tariff. If the initial balance is exhausted, you will need to add funds to the card yourself.",
+    "ადგილობრივი ოპერატორის წინასწარ შევსებული SIM ბარათი სამოგზაურო ტარიფით. ბალანსის ამოწურვის შემდეგ თანხას თავად დაამატებთ.",
+    "Prepaid-SIM des lokalen Anbieters mit Reisetarif. Ist das Guthaben aufgebraucht, laden Sie selbst nach.",
+    "SIM prepago del operador local con tarifa de viaje. Si se agota el saldo, hay que recargarla.",
+    "SIM prépayée de l’opérateur local au tarif voyage. Si le crédit est épuisé, il faut recharger soi-même.",
+    "SIM prepagata dell’operatore locale con tariffa viaggio. A credito esaurito si ricarica da soli.",
+    "Prepaid SIM van de lokale aanbieder met reistarief. Is het tegoed op, dan laadt u zelf bij.",
+    "Karta SIM prepaid lokalnego operatora w taryfie podróżnej. Po wyczerpaniu środków doładowanie jest po stronie klienta.",
+    "Yerel operatörün seyahat tarifeli ön ödemeli SIM kartı. Bakiye bitince yüklemeyi siz yaparsınız.",
+    "Предоплаченная SIM местного оператора с туристическим тарифом. Когда баланс кончится, пополнение на вас.",
+    "شريحة مسبقة الدفع من المشغل المحلي بتعرفة السفر. عند نفاد الرصيد تضيف الرصيد بنفسك.",
+    "当地运营商预付费 SIM，旅行套餐。余额用完后需自行充值。",
+    "현지 통신사의 여행 요금제 선불 SIM. 잔액이 소진되면 직접 충전하셔야 합니다.",
+    "ซิมเติมเงินของผู้ให้บริการท้องถิ่นในแพ็กเกจท่องเที่ยว ถ้าเครดิตหมดต้องเติมเอง",
+  ),
+);
+add(
+  "Included free by default on every rental.",
+  row(
+    "Included free by default on every rental.",
+    "ყოველ ქირავნობაში უფასოდ შედის.",
+    "Bei jeder Miete standardmäßig kostenlos enthalten.",
+    "Incluido gratis por defecto en cada alquiler.",
+    "Inclus gratuitement par défaut dans chaque location.",
+    "Incluso gratis di default in ogni noleggio.",
+    "Standaard gratis bij elke huur.",
+    "Domyślnie gratis przy każdym wynajmie.",
+    "Her kiralamada varsayılan olarak ücretsiz dahildir.",
+    "По умолчанию бесплатно в каждой аренде.",
+    "مشمول مجانًا افتراضيًا في كل تأجير.",
+    "每次租车默认免费包含。",
+    "모든 대여에 기본으로 무료 포함됩니다.",
+    "รวมฟรีโดยปริยายในทุกการเช่า",
+  ),
+);
+
+alias("Child Booster seat", "Child Booster seat 5+ years");
+alias("Free cancellation", "Free cancellation 48");
+alias(
+  "Group 1 child seat. Child weight 9-18 kg. Age of the child (approx.) 1-5 years",
+  "Group 1 child seat.\nChild weight 9-18 kg.\nAge of the child (approx.) 1-4 years.\nX",
+);
+alias(
+  "We will refund the full amount of advance payment if you cancel 48 hours or more before scheduled car pickup. If you cancel in less than 48 hours before pickup, the advance payment wil not be refunded",
+  "We will refund the full amount of advance payment if you cancel 48 hours or more before scheduled car pickup. If you cancel in less than 48 hours before pickup, the advance payment will not be refunded\nX",
+);
+
 alias("TPL — შესაძლო ზიანის პასუხისმგებლობა", "TPL — Third Party Liability");
 alias("ჯგუფის მგზავრების დაზღვევა", "Personal Accident Insurance");
 alias("ძირითადი დაფარვა (CDW)", "Basic coverage");

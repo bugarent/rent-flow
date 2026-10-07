@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { knownText } from "@/lib/i18n/known-record-text";
+import { localizedExtraCopy, type ExtraCopyBag } from "@/lib/extras/localized-copy";
 import { useBusinessPartnerReferralDiscount } from "@/components/business/use-business-partner-referral-discount";
 import { parseCarDetails } from "@/lib/cars/car-details";
 import { listingDailyWithDeliveryEur, rentalDayCount } from "@/lib/cars/reserve-pricing";
@@ -91,6 +92,7 @@ export type SearchFilterExtra = {
   id: string;
   slug: string;
   name: string;
+  nameI18n?: ExtraCopyBag;
 };
 
 type QuickFilter = "new2020" | "noDeposit";
@@ -1737,7 +1739,7 @@ export function CarsSearchResults({
                             onChange={() => toggleDraftSet("extraOptions", extra.id)}
                             className="h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-[#1d6fe8]"
                           />
-                          <FilterOptionText>{knownText(locale, extra.name)}</FilterOptionText>
+                          <FilterOptionText>{localizedExtraCopy(locale, extra.name, extra.nameI18n)}</FilterOptionText>
                           <FilterCount value={extraCounts[extra.id] ?? 0} />
                         </label>
                       ))}

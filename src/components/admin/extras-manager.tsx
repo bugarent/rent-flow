@@ -6,6 +6,7 @@ import { useLongPressReorder } from "@/components/admin/extras/use-long-press-re
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { extrasAdminCopy } from "@/lib/i18n/extras-admin-copy";
 import { knownText } from "@/lib/i18n/known-record-text";
+import { localizedExtraCopy, type ExtraCopyBag } from "@/lib/extras/localized-copy";
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
 import { isMandatoryExtra, isMandatoryPricedExtra } from "@/lib/extras/pricing";
 import {
@@ -53,12 +54,20 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
   const { locale } = useAdminLocale();
   const copy = extrasAdminCopy(locale);
   const text = (value: string) => knownText(locale, value);
+  const serviceName = (item: ExtraServicePricing) => localizedExtraCopy(locale, item.name, item.nameI18n);
+  const serviceAbout = (item: ExtraServicePricing) =>
+    localizedExtraCopy(locale, item.description || "", item.descriptionI18n);
   const [extras, setExtras] = useState(() =>
     [...initialExtras].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
   );
   const [form, setForm] = useState<FormState>(blankForm);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editSource, setEditSource] = useState<{ name: string; description: string } | null>(null);
+  const [editSource, setEditSource] = useState<{
+    name: string;
+    description: string;
+    nameI18n?: ExtraCopyBag;
+    descriptionI18n?: ExtraCopyBag;
+  } | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [savingRowId, setSavingRowId] = useState<string | null>(null);
@@ -134,19 +143,24 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
     if (editSource) {
       setForm((prev) => ({
         ...prev,
-        name: knownText(locale, editSource.name),
-        description: knownText(locale, editSource.description),
+        name: localizedExtraCopy(locale, editSource.name, editSource.nameI18n),
+        description: localizedExtraCopy(locale, editSource.description, editSource.descriptionI18n),
       }));
     }
   }
 
   const startEdit = (item: ExtraServicePricing) => {
-    const source = { name: item.name, description: item.description || "" };
+    const source = {
+      name: item.name,
+      description: item.description || "",
+      nameI18n: item.nameI18n,
+      descriptionI18n: item.descriptionI18n,
+    };
     setEditingId(item.id);
     setEditSource(source);
     setForm({
-      name: knownText(locale, source.name),
-      description: knownText(locale, source.description),
+      name: localizedExtraCopy(locale, source.name, source.nameI18n),
+      description: localizedExtraCopy(locale, source.description, source.descriptionI18n),
       minPriceEur: item.minPriceEur == null ? "" : String(item.minPriceEur),
       maxPriceEur: item.maxPriceEur == null ? "" : String(item.maxPriceEur),
       maxPeriodEur: item.maxPeriodEur == null ? "" : String(item.maxPeriodEur),
@@ -187,12 +201,12 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
     }
     setSaving(true);
     try {
-      const keptSource = (source: string, edited: string) =>
-        editSource != null && edited.trim() === knownText(locale, source).trim();
+      const keptSource = (source: string, edited: string, i18n?: ExtraCopyBag) =>
+        editSource != null && edited.trim() === localizedExtraCopy(locale, source, i18n).trim();
       const payload = {
-        name: editSource && keptSource(editSource.name, form.name) ? editSource.name : form.name.trim(),
+        name: editSource && keptSource(editSource.name, form.name, editSource.nameI18n) ? editSource.name : form.name.trim(),
         description:
-          editSource && keptSource(editSource.description, form.description)
+          editSource && keptSource(editSource.description, form.description, editSource.descriptionI18n)
             ? editSource.description
             : form.description.trim(),
         minPriceEur,
@@ -365,9 +379,9 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
                           <GripVertical className="h-4 w-4" aria-hidden />
                         </td>
                         <td className="p-3">
-                          <p className="font-semibold text-[#0b1f4b]">{text(item.name)}</p>
+                          <p className="font-semibold text-[#0b1f4b]">{serviceName(item)}</p>
                           {item.description ? (
-                            <p className="text-xs text-slate-500">{text(item.description)}</p>
+                            <p className="text-xs text-slate-500">{serviceAbout(item)}</p>
                           ) : null}
                           {corePack ? (
                             <p className="mt-1 text-xs font-semibold text-sky-700">{copy.tplHint}</p>
@@ -468,9 +482,9 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
                 <MobileDataCard>
                   <MobileDataRow label={copy.service}>
                     <div className="text-end">
-                      <p className="font-semibold text-[#0b1f4b]">{text(item.name)}</p>
+                      <p className="font-semibold text-[#0b1f4b]">{serviceName(item)}</p>
                       {item.description ? (
-                        <p className="text-xs font-medium text-slate-500">{text(item.description)}</p>
+                        <p className="text-xs font-medium text-slate-500">{serviceAbout(item)}</p>
                       ) : null}
                       {corePack ? (
                         <p className="mt-1 text-xs font-semibold text-sky-700">{copy.tplHint}</p>

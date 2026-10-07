@@ -7,7 +7,9 @@ export type {
   HydratedListingExtra,
 } from "./types";
 
-export { syncExtrasFileToDb, listExtraServices } from "./list";
+export { syncExtrasFileToDb, listExtraServices, clearExtrasCatalogCache } from "./list";
+
+export { ensureExtraCopyTranslations, fillExtraCopy } from "./translate-copy";
 
 export {
   createExtraService,

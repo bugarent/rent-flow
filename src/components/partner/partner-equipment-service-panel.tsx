@@ -14,6 +14,7 @@ import {
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { knownText } from "@/lib/i18n/known-record-text";
+import { localizedExtraCopy } from "@/lib/extras/localized-copy";
 import {
   PartnerExtraCarPicker,
   type PartnerExtraCarOption,
@@ -623,7 +624,7 @@ export function PartnerEquipmentServicePanel({
 
   /* —— Create / Edit detail view —— */
   if (creating || editingRow) {
-    const title = creating ? t.add.replace("+ ", "") : knownText(locale, editingRow!.service.name);
+    const title = creating ? t.add.replace("+ ", "") : localizedExtraCopy(locale, editingRow!.service.name, editingRow!.service.nameI18n);
     const mandatory = editingRow ? isMandatoryExtra(editingRow.service) : false;
     const mandatoryFree = editingRow ? isMandatoryFreeExtra(editingRow.service) : false;
     const periodFree = editingRow ? isPeriodForcedFreeExtra(editingRow.service) : false;
@@ -1106,10 +1107,10 @@ export function PartnerEquipmentServicePanel({
                           )}
                         >
                           <td className="px-3 py-3 align-top">
-                            <p className="font-bold text-[#0b1f4b]">{knownText(locale, row.service.name)}</p>
+                            <p className="font-bold text-[#0b1f4b]">{localizedExtraCopy(locale, row.service.name, row.service.nameI18n)}</p>
                             {row.service.description ? (
                               <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">
-                                {knownText(locale, row.service.description)}
+                                {localizedExtraCopy(locale, row.service.description, row.service.descriptionI18n)}
                               </p>
                             ) : null}
                             {mandatoryAny ? (
@@ -1265,10 +1266,10 @@ export function PartnerEquipmentServicePanel({
                       >
                         <MobileDataRow label={t.colService}>
                           <div className="text-end">
-                            <p className="font-bold text-[#0b1f4b]">{knownText(locale, row.service.name)}</p>
+                            <p className="font-bold text-[#0b1f4b]">{localizedExtraCopy(locale, row.service.name, row.service.nameI18n)}</p>
                             {row.service.description ? (
                               <p className="mt-0.5 line-clamp-2 text-xs font-medium text-slate-500">
-                                {knownText(locale, row.service.description)}
+                                {localizedExtraCopy(locale, row.service.description, row.service.descriptionI18n)}
                               </p>
                             ) : null}
                             {mandatoryAny ? (

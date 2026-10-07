@@ -1,11 +1,12 @@
 import { requireAdmin } from "@/lib/auth/guards";
-import { listExtraServices } from "@/lib/server/extras-store";
+import { ensureExtraCopyTranslations, listExtraServices } from "@/lib/server/extras-store";
 import { ExtrasManager } from "@/components/admin/extras-manager";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
 
 export default async function AdminExtrasPage() {
   await requireAdmin();
 
+  await ensureExtraCopyTranslations();
   const extras = await listExtraServices();
 
   return (

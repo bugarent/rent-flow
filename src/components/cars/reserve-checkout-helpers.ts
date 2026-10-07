@@ -14,6 +14,7 @@ import {
   type InsuranceCheckoutSlot,
 } from "@/lib/extras/checkout-slot";
 import { pickServiceLabel } from "@/lib/extras/service-label";
+import { readExtraI18n, type ExtraCopyBag } from "@/lib/extras/localized-copy";
 import { toNumber } from "@/lib/utils";
 
 export { isFreeCancellation48Extra };
@@ -35,6 +36,8 @@ export type ReservePaidExtra = {
   /** Partner forbidden territory/service notice — not purchasable */
   forbidden?: boolean;
   slug?: string;
+  nameI18n?: ExtraCopyBag;
+  descriptionI18n?: ExtraCopyBag;
   /** Admin catalog display order */
   sortOrder?: number;
 };
@@ -70,6 +73,8 @@ export type ReserveCarPayload = {
       minPeriodEur?: unknown;
       sortOrder?: unknown;
       checkoutSlot?: unknown;
+      nameI18n?: ExtraCopyBag;
+      descriptionI18n?: ExtraCopyBag;
     } | null;
   }>;
   partner?: {
@@ -180,6 +185,8 @@ function mapCarExtraRow(row: NonNullable<ReserveCarPayload["extras"]>[number]): 
         maxPriceEur: svc.maxPriceEur,
         maxPeriodEur: svc.maxPeriodEur,
         checkoutSlot: svc.checkoutSlot,
+        nameI18n: svc.nameI18n,
+        descriptionI18n: svc.descriptionI18n,
       })
     : null;
   const checkoutSlot = resolveCheckoutSlot({
@@ -198,6 +205,8 @@ function mapCarExtraRow(row: NonNullable<ReserveCarPayload["extras"]>[number]): 
       forbidden: true,
       slug,
       sortOrder,
+      nameI18n: { ...readExtraI18n(svc.name), ...(svc.nameI18n || {}), ...(priced?.nameI18n || {}) },
+      descriptionI18n: { ...readExtraI18n(svc.description), ...(svc.descriptionI18n || {}), ...(priced?.descriptionI18n || {}) },
     };
   }
   const freeCancel48 = isFreeCancellation48Extra({ slug, name, id });
@@ -243,6 +252,8 @@ function mapCarExtraRow(row: NonNullable<ReserveCarPayload["extras"]>[number]): 
     locked: mandatory,
     slug,
     sortOrder,
+    nameI18n: { ...readExtraI18n(svc.name), ...(svc.nameI18n || {}), ...(priced?.nameI18n || {}) },
+    descriptionI18n: { ...readExtraI18n(svc.description), ...(svc.descriptionI18n || {}), ...(priced?.descriptionI18n || {}) },
   };
 }
 

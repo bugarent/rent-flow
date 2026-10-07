@@ -21,8 +21,11 @@ export async function syncExtrasFileToDb(): Promise<void> {
         create: {
           id: row.id,
           slug: row.slug,
-          name: { en: row.name },
-          description: descriptionWithCheckoutSlot(row.description, row.checkoutSlot, row.maxPeriodEur),
+          name: { en: row.name, ...(row.nameI18n ? { i18n: row.nameI18n } : {}) },
+          description: {
+            ...descriptionWithCheckoutSlot(row.description, row.checkoutSlot, row.maxPeriodEur),
+            ...(row.descriptionI18n ? { i18n: row.descriptionI18n } : {}),
+          },
           isTpl: row.isTpl,
           isActive: row.isActive,
           sortOrder: row.sortOrder,
@@ -31,8 +34,11 @@ export async function syncExtrasFileToDb(): Promise<void> {
           maxPriceEur: row.maxPriceEur,
         },
         update: {
-          name: { en: row.name },
-          description: descriptionWithCheckoutSlot(row.description, row.checkoutSlot, row.maxPeriodEur),
+          name: { en: row.name, ...(row.nameI18n ? { i18n: row.nameI18n } : {}) },
+          description: {
+            ...descriptionWithCheckoutSlot(row.description, row.checkoutSlot, row.maxPeriodEur),
+            ...(row.descriptionI18n ? { i18n: row.descriptionI18n } : {}),
+          },
           isTpl: row.isTpl,
           isActive: row.isActive,
           sortOrder: row.sortOrder,

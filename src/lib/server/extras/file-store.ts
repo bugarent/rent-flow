@@ -29,6 +29,8 @@ export function toPricing(row: StoredExtraService): ExtraServicePricing {
     maxPriceEur: row.maxPriceEur,
     maxPeriodEur: row.maxPeriodEur,
     checkoutSlot: row.checkoutSlot,
+    nameI18n: row.nameI18n,
+    descriptionI18n: row.descriptionI18n,
   });
 }
 
@@ -51,6 +53,8 @@ export function fromPrismaRow(row: {
     slug: priced.slug,
     name: priced.name,
     description: priced.description || "",
+    nameI18n: priced.nameI18n,
+    descriptionI18n: priced.descriptionI18n,
     isTpl: priced.isTpl,
     isActive: priced.isActive,
     sortOrder: priced.sortOrder,

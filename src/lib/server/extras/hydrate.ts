@@ -14,8 +14,16 @@ import {
   isPeriodForcedFreeExtra,
   localizeExtraName,
 } from "@/lib/extras/pricing";
+import { readExtraI18n } from "@/lib/extras/localized-copy";
 import { listExtraServices } from "./list";
 import type { HydratedListingExtra } from "./types";
+
+function copyBags(service: { name?: unknown; description?: unknown; nameI18n?: Record<string, string>; descriptionI18n?: Record<string, string> } | null | undefined) {
+  return {
+    nameI18n: { ...readExtraI18n(service?.name), ...(service?.nameI18n || {}) },
+    descriptionI18n: { ...readExtraI18n(service?.description), ...(service?.descriptionI18n || {}) },
+  };
+}
 
 function sortHydratedExtras(rows: HydratedListingExtra[]): HydratedListingExtra[] {
   return [...rows].sort(
@@ -82,6 +90,8 @@ export async function hydrateListingExtras(raw: unknown): Promise<HydratedListin
           slug,
           name,
           description,
+          nameI18n: { ...readExtraI18n(nested?.name), ...(catalogSvc?.nameI18n || {}) },
+          descriptionI18n: { ...readExtraI18n(nested?.description), ...(catalogSvc?.descriptionI18n || {}) },
           isTpl,
           isActive: nested.isActive !== false && catalogSvc?.isActive !== false,
           minPriceEur:
@@ -98,6 +108,7 @@ export async function hydrateListingExtras(raw: unknown): Promise<HydratedListin
             slug: catalogSvc.slug,
             name: catalogSvc.name,
             description: catalogSvc.description || "",
+            ...copyBags(catalogSvc),
             isTpl: catalogSvc.isTpl,
             isActive: catalogSvc.isActive,
             minPriceEur: catalogSvc.minPriceEur,
@@ -310,6 +321,7 @@ export async function mergePartnerOfferedExtras(
           slug: service.slug,
           name: service.name,
           description: service.description || "",
+          ...copyBags(service),
           isTpl: service.isTpl,
           isActive: service.isActive,
           minPriceEur: service.minPriceEur,
@@ -358,6 +370,7 @@ export async function mergeFreeInsuranceExtras(
         slug: service.slug,
         name: service.name,
         description: service.description || "",
+        ...copyBags(service),
         isTpl: service.isTpl,
         isActive: service.isActive,
         minPriceEur: service.minPriceEur,

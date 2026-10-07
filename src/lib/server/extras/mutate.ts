@@ -15,6 +15,8 @@ import {
   toExtraServicePricing,
   type ExtraServicePricing,
 } from "@/lib/extras/pricing";
+import { missingExtraCopyLocales, readExtraI18n } from "@/lib/extras/localized-copy";
+import { fillExtraCopy } from "./translate-copy";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import {
   allocateSlug,
@@ -47,7 +49,11 @@ export async function createExtraService(input: ExtraCreateInput): Promise<Extra
     name,
   });
   const baseSlug = slugifyExtraName(name);
-  const descriptionJson = descriptionWithCheckoutSlot(description, checkoutSlot, maxPeriodEur);
+  const copy = await fillExtraCopy(name, description);
+  const descriptionJson = {
+    ...descriptionWithCheckoutSlot(description, checkoutSlot, maxPeriodEur),
+    i18n: copy.descriptionI18n,
+  };
 
   try {
     let slug = baseSlug;
@@ -60,7 +66,7 @@ export async function createExtraService(input: ExtraCreateInput): Promise<Extra
     const row = await prisma.extraService.create({
       data: {
         slug,
-        name: { en: name },
+        name: { en: name, i18n: copy.nameI18n },
         description: descriptionJson,
         minPriceEur,
         maxPriceEur,
@@ -96,6 +102,8 @@ export async function createExtraService(input: ExtraCreateInput): Promise<Extra
       maxPriceEur,
       maxPeriodEur,
       checkoutSlot,
+      nameI18n: copy.nameI18n,
+      descriptionI18n: copy.descriptionI18n,
       createdAt: now,
       updatedAt: now,
     };
@@ -114,10 +122,22 @@ export async function updateExtraService(
     const idx = fileRows.findIndex((r) => r.id === id);
     if (idx < 0) return null;
     const current = fileRows[idx];
+    const nameText = input.name?.trim() ?? current.name;
+    const descText = input.description !== undefined ? input.description.trim() : current.description;
+    const textChanged = nameText !== current.name || descText !== (current.description || "");
+    const copy =
+      textChanged ||
+      missingExtraCopyLocales(nameText, current.nameI18n).length > 0 ||
+      missingExtraCopyLocales(descText, current.descriptionI18n).length > 0
+        ? await fillExtraCopy(nameText, descText, {
+            name: textChanged ? undefined : current.nameI18n,
+            description: textChanged ? undefined : current.descriptionI18n,
+          })
+        : { nameI18n: current.nameI18n || {}, descriptionI18n: current.descriptionI18n || {} };
     const next: StoredExtraService = {
       ...current,
-      name: input.name?.trim() ?? current.name,
-      description: input.description !== undefined ? input.description.trim() : current.description,
+      name: nameText,
+      description: descText,
       isActive: input.isActive ?? current.isActive,
       isTpl: input.isTpl ?? current.isTpl,
       sortOrder: input.sortOrder ?? current.sortOrder,
@@ -134,6 +154,8 @@ export async function updateExtraService(
         input.checkoutSlot !== undefined
           ? normalizeCheckoutSlot(input.checkoutSlot)
           : current.checkoutSlot,
+      nameI18n: copy.nameI18n,
+      descriptionI18n: copy.descriptionI18n,
       updatedAt: new Date().toISOString(),
     };
     if (next.maxPriceEur != null && next.maxPriceEur <= 0) next.defaultPriceEur = 0;
@@ -165,6 +187,20 @@ export async function updateExtraService(
       input.description !== undefined
         ? input.description.trim()
         : localizeExtraName(current.description, "");
+    const prevNameI18n = readExtraI18n(current.name);
+    const prevDescI18n = readExtraI18n(current.description);
+    const textChanged =
+      nextName !== localizeExtraName(current.name) ||
+      nextDescription !== localizeExtraName(current.description, "");
+    const copy =
+      textChanged ||
+      missingExtraCopyLocales(nextName, prevNameI18n).length > 0 ||
+      missingExtraCopyLocales(nextDescription, prevDescI18n).length > 0
+        ? await fillExtraCopy(nextName, nextDescription, {
+            name: textChanged ? undefined : prevNameI18n,
+            description: textChanged ? undefined : prevDescI18n,
+          })
+        : { nameI18n: prevNameI18n, descriptionI18n: prevDescI18n };
     const nextSlot =
       input.checkoutSlot !== undefined
         ? normalizeCheckoutSlot(input.checkoutSlot)
@@ -176,7 +212,7 @@ export async function updateExtraService(
           });
 
     const data: Record<string, unknown> = {};
-    if (input.name != null) data.name = { en: input.name.trim() };
+    if (input.name != null) data.name = { en: nextName, i18n: copy.nameI18n };
     const embeddedPeriod = extractStoredMaxPeriod(current.description);
     const nextPeriod =
       input.maxPeriodEur !== undefined
@@ -192,7 +228,10 @@ export async function updateExtraService(
       input.isTpl != null ||
       input.maxPeriodEur !== undefined
     ) {
-      data.description = descriptionWithCheckoutSlot(nextDescription, nextSlot, nextPeriod);
+      data.description = {
+        ...descriptionWithCheckoutSlot(nextDescription, nextSlot, nextPeriod),
+        i18n: copy.descriptionI18n,
+      };
     }
     if (input.isActive != null) data.isActive = input.isActive;
     if (input.isTpl != null) data.isTpl = input.isTpl;
@@ -365,12 +404,15 @@ export async function ensureExtrasExistInDb(catalog: ExtraServicePricing[]): Pro
         create: {
           id: service.id,
           slug: service.slug,
-          name: { en: service.name },
-          description: descriptionWithCheckoutSlot(
-            service.description || "",
-            service.checkoutSlot,
-            service.maxPeriodEur,
-          ),
+          name: { en: service.name, ...(service.nameI18n ? { i18n: service.nameI18n } : {}) },
+          description: {
+            ...descriptionWithCheckoutSlot(
+              service.description || "",
+              service.checkoutSlot,
+              service.maxPeriodEur,
+            ),
+            ...(service.descriptionI18n ? { i18n: service.descriptionI18n } : {}),
+          },
           isTpl: service.isTpl,
           isActive: service.isActive,
           sortOrder: service.sortOrder,
@@ -379,12 +421,15 @@ export async function ensureExtrasExistInDb(catalog: ExtraServicePricing[]): Pro
           maxPriceEur: service.maxPriceEur,
         },
         update: {
-          name: { en: service.name },
-          description: descriptionWithCheckoutSlot(
-            service.description || "",
-            service.checkoutSlot,
-            service.maxPeriodEur,
-          ),
+          name: { en: service.name, ...(service.nameI18n ? { i18n: service.nameI18n } : {}) },
+          description: {
+            ...descriptionWithCheckoutSlot(
+              service.description || "",
+              service.checkoutSlot,
+              service.maxPeriodEur,
+            ),
+            ...(service.descriptionI18n ? { i18n: service.descriptionI18n } : {}),
+          },
           isActive: service.isActive,
           sortOrder: service.sortOrder,
           defaultPriceEur: service.defaultPriceEur,

@@ -31,6 +31,7 @@ import { LegalDocumentModal } from "@/components/legal/legal-document-modal";
 import { PhoneCountryField } from "@/components/partner/phone-country-field";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { knownText } from "@/lib/i18n/known-record-text";
+import { localizedExtraCopy } from "@/lib/extras/localized-copy";
 import {
   formatDepositLabel,
   formatFranchiseLabel,
@@ -184,6 +185,10 @@ export function ReserveCheckout({
   const { data: session } = useSession();
   const { dictionary, formatPrice, locale } = usePreferences();
   const record = (value: string) => knownText(locale, value);
+  const extraName = (extra: { name: string; nameI18n?: Parameters<typeof localizedExtraCopy>[2] }) =>
+    localizedExtraCopy(locale, extra.name, extra.nameI18n);
+  const extraAbout = (extra: { description?: string; descriptionI18n?: Parameters<typeof localizedExtraCopy>[2] }) =>
+    localizedExtraCopy(locale, extra.description || "", extra.descriptionI18n);
   const t = getCheckoutCopy(locale);
 
   const [startDate] = useState(initialStart);
@@ -1318,7 +1323,7 @@ export function ReserveCheckout({
                                   locked || selected ? "text-[#0b1f4b]" : "text-amber-950",
                                 )}
                               >
-                                {record(extra.name)}
+                                {extraName(extra)}
                               </span>
                               {extra.description?.trim() ? (
                                 <ExtraDetailHint
@@ -1326,8 +1331,8 @@ export function ReserveCheckout({
                                   onOpenChange={(next) =>
                                     setExtraDetailId(next ? extra.id : null)
                                   }
-                                  title={record(extra.name)}
-                                  body={record(extra.description.trim())}
+                                  title={extraName(extra)}
+                                  body={extraAbout(extra)}
                                   label={t.detailsLink}
                                 />
                               ) : null}
@@ -1442,7 +1447,7 @@ export function ReserveCheckout({
                             />
                             <div className="flex min-w-0 flex-1 items-center gap-1 truncate">
                               <span className="truncate text-sm font-semibold text-slate-900">
-                                {record(extra.name)}
+                                {extraName(extra)}
                               </span>
                               {extra.description?.trim() ? (
                                 <ExtraDetailHint
@@ -1450,8 +1455,8 @@ export function ReserveCheckout({
                                   onOpenChange={(next) =>
                                     setExtraDetailId(next ? extra.id : null)
                                   }
-                                  title={record(extra.name)}
-                                  body={record(extra.description.trim())}
+                                  title={extraName(extra)}
+                                  body={extraAbout(extra)}
                                   label={t.detailsLink}
                                 />
                               ) : null}
@@ -2132,7 +2137,7 @@ function PriceSummaryCard({
     return (
       <LineItem
         key={extra.id}
-        label={knownText(locale, extra.name)}
+        label={localizedExtraCopy(locale, extra.name, extra.nameI18n)}
         value={formatPrice(line)}
         hint={
           free || capped

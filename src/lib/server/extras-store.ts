@@ -19,6 +19,7 @@ export {
   deleteExtraService,
   reorderExtraServices,
   ensureExtrasExistInDb,
+  ensureExtraCopyTranslations,
   hydrateListingExtras,
   applyPartnerExtraOfferModes,
   mergePartnerOfferedExtras,
