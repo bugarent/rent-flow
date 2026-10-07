@@ -1,9 +1,9 @@
 /**
  * Single source of truth for "is this listing shown to customers".
  *
- * A listing approved by the admin stays public while a later partner edit awaits
- * re-moderation (customers keep seeing the last approved version). New listings,
- * rejected listings and expired-insurance re-moderation stay hidden.
+ * Only admin-approved listings are public. Any partner edit sends the listing back
+ * to moderation (PENDING_REMODERATION, shown yellow) and hides it from search until
+ * the admin approves it again. New, rejected and expired-insurance listings stay hidden.
  */
 
 export const PARTNER_EDIT_REMODERATION_REASON = "Partner edited listing — awaiting re-moderation";
@@ -15,19 +15,12 @@ export type ListingVisibilityInput = {
 };
 
 export function isPubliclyVisibleListing(car: ListingVisibilityInput): boolean {
-  if (car.status === "APPROVED") return true;
-  return (
-    car.status === "PENDING_REMODERATION" &&
-    String(car.hiddenReason || "").trim() === PARTNER_EDIT_REMODERATION_REASON
-  );
+  return car.status === "APPROVED";
 }
 
 /** Prisma `where` fragment matching {@link isPubliclyVisibleListing}. */
 export const publicListingStatusWhere = {
-  OR: [
-    { status: "APPROVED" as const },
-    { status: "PENDING_REMODERATION" as const, hiddenReason: PARTNER_EDIT_REMODERATION_REASON },
-  ],
+  status: "APPROVED" as const,
 };
 
 /**

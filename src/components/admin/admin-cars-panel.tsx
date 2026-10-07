@@ -94,9 +94,9 @@ export function AdminCarsPanel({
     blockers: {
       status: uiText(
         locale,
-        "listing not approved",
-        "განცხადება არ არის დამტკიცებული",
-        "объявление не одобрено",
+        "not approved / awaiting moderation",
+        "არ არის დამტკიცებული / ელოდება მოდერაციას",
+        "не одобрено / ждёт модерации",
       ),
       partner: uiText(
         locale,
