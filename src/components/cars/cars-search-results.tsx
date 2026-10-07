@@ -1222,7 +1222,7 @@ export function CarsSearchResults({
         />
 
         {/* Filter row */}
-        <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex flex-wrap items-center gap-1.5 pb-0.5 sm:flex-nowrap sm:overflow-x-auto sm:[-ms-overflow-style:none] sm:[scrollbar-width:none] sm:[&::-webkit-scrollbar]:hidden">
           <div className="shrink-0 whitespace-nowrap rounded-md bg-[#1d6fe8] px-2 py-1 text-[11px] font-bold text-white shadow-sm">
             {c.carsAvailable.replace("{n}", String(filtered.length))}
           </div>
@@ -1290,6 +1290,7 @@ export function CarsSearchResults({
               }}
               icon={<Car className="h-3 w-3" />}
               label={cat.name}
+              className="max-sm:hidden"
             />
           ))}
 
@@ -1811,11 +1812,13 @@ function FilterPill({
   onClick,
   icon,
   label,
+  className,
 }: {
   active: boolean;
   onClick: () => void;
   icon: ReactNode;
   label: string;
+  className?: string;
 }) {
   return (
     <button
@@ -1826,6 +1829,7 @@ function FilterPill({
         active
           ? "border-[#1d6fe8] bg-[#1d6fe8] text-white"
           : "border-slate-200 bg-white text-slate-700 hover:border-[#1d6fe8]/40",
+        className,
       )}
     >
       {icon}

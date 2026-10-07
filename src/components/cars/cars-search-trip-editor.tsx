@@ -68,10 +68,10 @@ const fieldClass =
 
 /** Compact date input: kill browser left padding so full MM/DD/YYYY fits. */
 const dateFieldClass =
-  "min-h-[1.875rem] min-w-0 flex-1 rounded-md border border-sky-200/70 bg-[#f4f9fd] py-1 pl-0.5 pr-0 text-xs font-semibold text-slate-800 outline-none focus:border-[#1d6fe8] [color-scheme:light] [&::-webkit-calendar-picker-indicator]:ms-0 [&::-webkit-calendar-picker-indicator]:scale-90 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0 [&::-webkit-datetime-edit-text]:px-0.5 [&::-webkit-datetime-edit-month-field]:p-0 [&::-webkit-datetime-edit-day-field]:p-0 [&::-webkit-datetime-edit-year-field]:p-0";
+  "min-h-[1.875rem] w-full min-w-0 flex-1 rounded-md sm:w-auto border border-sky-200/70 bg-[#f4f9fd] py-1 pl-0.5 pr-0 text-xs font-semibold text-slate-800 outline-none focus:border-[#1d6fe8] [color-scheme:light] [&::-webkit-calendar-picker-indicator]:ms-0 [&::-webkit-calendar-picker-indicator]:scale-90 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0 [&::-webkit-datetime-edit-text]:px-0.5 [&::-webkit-datetime-edit-month-field]:p-0 [&::-webkit-datetime-edit-day-field]:p-0 [&::-webkit-datetime-edit-year-field]:p-0";
 
 const timeFieldClass =
-  "h-[1.875rem] w-[4.5rem] shrink-0 rounded-md border border-sky-200/70 bg-[#f4f9fd] px-1 text-xs font-semibold text-slate-800 outline-none focus:border-[#1d6fe8]";
+  "h-[1.875rem] w-full shrink-0 rounded-md sm:w-[4.5rem] border border-sky-200/70 bg-[#f4f9fd] px-1 text-xs font-semibold text-slate-800 outline-none focus:border-[#1d6fe8]";
 
 const locationInputClass =
   "min-h-7 w-full min-w-0 truncate bg-transparent text-xs font-semibold text-slate-800 caret-[#1d6fe8] outline-none placeholder:font-medium placeholder:text-slate-400";
@@ -392,11 +392,11 @@ export function CarsSearchTripEditor({
 
   return (
     <div className="space-y-2 rounded-xl border border-sky-200 bg-[#f3f8fc] px-2 py-2 shadow-sm">
-      <div className="flex flex-nowrap items-end gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="grid grid-cols-2 gap-1.5 pb-0.5 sm:flex sm:flex-nowrap sm:items-end sm:overflow-x-auto sm:[-ms-overflow-style:none] sm:[scrollbar-width:none] sm:[&::-webkit-scrollbar]:hidden">
         <ChipShell
           icon={<Car className="h-3 w-3" />}
           hint={dictionary.home.pickupLocation}
-          className="min-w-[12.5rem] flex-1 basis-0"
+          className="sm:min-w-[12.5rem] sm:flex-1 sm:basis-0"
         >
           <div className={locationBoxClass}>
             <LocationPicker
@@ -418,7 +418,7 @@ export function CarsSearchTripEditor({
         <ChipShell
           icon={<MapPin className="h-3 w-3" />}
           hint={dictionary.home.dropoffLocation}
-          className="min-w-[12.5rem] flex-1 basis-0"
+          className="sm:min-w-[12.5rem] sm:flex-1 sm:basis-0"
         >
           <div className={locationBoxClass}>
             <LocationPicker
@@ -441,9 +441,9 @@ export function CarsSearchTripEditor({
         <ChipShell
           icon={<CalendarDays className="h-3 w-3" />}
           hint={dictionary.home.pickupDateShort}
-          className="min-w-[12.5rem] flex-1 basis-0"
+          className="sm:min-w-[12.5rem] sm:flex-1 sm:basis-0"
         >
-          <div className="flex flex-nowrap items-center gap-1">
+          <div className="flex flex-col items-stretch gap-1 sm:flex-row sm:flex-nowrap sm:items-center">
             <input
               type="date"
               value={pickupDate}
@@ -482,9 +482,9 @@ export function CarsSearchTripEditor({
         <ChipShell
           icon={<CalendarDays className="h-3 w-3" />}
           hint={dictionary.home.dropoffDateShort}
-          className="min-w-[12.5rem] flex-1 basis-0"
+          className="sm:min-w-[12.5rem] sm:flex-1 sm:basis-0"
         >
-          <div className="flex flex-nowrap items-center gap-1">
+          <div className="flex flex-col items-stretch gap-1 sm:flex-row sm:flex-nowrap sm:items-center">
             <input
               type="date"
               value={dropoffDate}
@@ -511,7 +511,9 @@ export function CarsSearchTripEditor({
         </ChipShell>
 
         {filtersSlot ? (
-          <div className="flex shrink-0 items-center gap-1.5 self-end pb-0.5">{filtersSlot}</div>
+          <div className="col-span-2 flex items-center gap-1.5 [&>button]:w-full [&>button]:justify-center sm:shrink-0 sm:self-end sm:pb-0.5 sm:[&>button]:w-auto">
+            {filtersSlot}
+          </div>
         ) : null}
       </div>
 
