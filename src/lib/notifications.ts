@@ -6,7 +6,7 @@ import { sendPartnerMail } from "@/lib/mail";
 import { isValidEmail, normalizeLogin } from "@/lib/crypto";
 import { displayBookingCharges } from "@/lib/bookings/booking-money";
 import { parsePartnerMessengers } from "@/lib/partner";
-import { bookingBotMessage, bookingPartyMailText, reservationTelegramText, sendBookingNoticeToBot } from "@/lib/telegram/notify-booking-bot";
+import { bookingBotMessage, reservationTelegramText, sendBookingNoticeToBot } from "@/lib/telegram/notify-booking-bot";
 import { rentalDayCount } from "@/lib/cars/reserve-pricing";
 import { getPlatformSettings } from "@/lib/server/platform-settings-store";
 import {
@@ -134,87 +134,70 @@ async function deliverBookingNotice(input: {
 }) {
   const name = await siteName();
   const reference = formatBookingRef(input.booking.sequentialNumber);
-  const text = noticeText(input.event, input.booking, name, {
-    cancellationReason: input.cancellationReason,
-    refundEur: input.refundEur,
-  });
+  const days = rentalDayCount(input.booking.pickupAt.toISOString(), input.booking.dropoffAt.toISOString());
+  const text = [
+    noticeText(input.event, input.booking, name, {
+      cancellationReason: input.cancellationReason,
+      refundEur: input.refundEur,
+    }),
+    `ხანგრძლივობა: ${Math.max(1, days)} დღე`,
+  ].join("\n");
   const subject = noticeSubject(input.event, reference);
 
-  const emails = [...input.partnerEmails, input.booking.guestEmail]
-    .map((email) => email.trim())
-    .filter((email, index, all) => email && all.findIndex((item) => normalizeLogin(item) === normalizeLogin(email)) === index);
+  const recipients = [...input.partnerEmails, input.booking.guestEmail]
+    .map((email) => String(email || "").trim())
+    .filter(
+      (email, index, all) =>
+        isValidEmail(email) &&
+        all.findIndex((item) => normalizeLogin(item) === normalizeLogin(email)) === index,
+    );
 
-  if (input.event === "BOOKING_NEW") {
+  const sendEmails = async () => {
+    if (!recipients.length) {
+      console.warn(`[notify] ${input.event} ${reference}: no valid email recipients`);
+      return;
+    }
+    let from = "";
     try {
       const { readBookingMailFrom } = await import("@/lib/server/booking-mail-from");
-      const from = (await readBookingMailFrom()).trim();
-      if (isValidEmail(from)) {
-        const charges = displayBookingCharges({
-          totalPriceEur: input.booking.totalPriceEur,
-          depositPaidEur: input.booking.depositPaidEur,
-          balanceDueEur: input.booking.balanceDueEur,
-        });
-        const text = bookingPartyMailText({
-          carLabel: input.booking.carLabel,
-          pickupIata: input.booking.pickupIata,
-          dropoffIata: input.booking.dropoffIata,
-          pickupAddress: input.booking.pickupAddress,
-          dropoffAddress: input.booking.dropoffAddress,
-          pickupAt: input.booking.pickupAt,
-          dropoffAt: input.booking.dropoffAt,
-          totalPriceEur: charges.totalEur,
-          paidEur: charges.paidEur,
-          dueOnSiteEur: charges.dueAtPickupEur,
-          extras: input.booking.extras.map((extra) => extra.label),
-          days: rentalDayCount(input.booking.pickupAt.toISOString(), input.booking.dropoffAt.toISOString()),
-        });
-        const party = [...input.partnerEmails, input.booking.guestEmail]
-          .map((email) => email.trim())
-          .filter((email, index, all) => isValidEmail(email) && all.findIndex((item) => normalizeLogin(item) === normalizeLogin(email)) === index);
-        for (const to of party) {
-          await sendPartnerMail({
-            to,
-            from,
-            replyTo: from,
-            subject: "ახალი ჯავშანი",
-            text,
-            html: `<div style="font-family:sans-serif;line-height:1.5;white-space:pre-wrap">${text
-              .replace(/&/g, "&amp;")
-              .replace(/</g, "&lt;")
-              .replace(/>/g, "&gt;")}</div>`,
-            event: "BOOKING_NEW",
-            userId: input.userId,
-            payload: { bookingId: input.booking.id, from, role: "party" },
-          });
-        }
+      from = (await readBookingMailFrom()).trim();
+    } catch {
+      /* fall back to SMTP_FROM */
+    }
+    const html = `<div style="font-family:sans-serif;line-height:1.6;white-space:pre-wrap">${text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")}</div>`;
+    const results = await Promise.allSettled(
+      recipients.map((to) =>
+        sendPartnerMail({
+          to,
+          ...(isValidEmail(from) ? { from, replyTo: from } : {}),
+          subject,
+          text,
+          html,
+          event: input.event,
+          userId: input.userId,
+          payload: {
+            bookingId: input.booking.id,
+            reference,
+            role: normalizeLogin(to) === normalizeLogin(input.booking.guestEmail) ? "guest" : "partner",
+            ...(input.cancellationReason ? { cancellationReason: input.cancellationReason } : {}),
+            ...(input.refundEur != null ? { refundEur: input.refundEur } : {}),
+          },
+        }),
+      ),
+    );
+    results.forEach((result, i) => {
+      if (result.status === "rejected") {
+        console.error(`[notify] email to ${recipients[i]} failed`, result.reason);
+      } else if (!result.value.sent) {
+        console.error(`[notify] email to ${recipients[i]} was NOT sent (see [mail] log above)`);
       }
-    } catch (error) {
-      console.warn("[notify] booking party mail failed", error);
-    }
-  }
+    });
+  };
 
-  for (const to of emails) {
-    try {
-      await sendPartnerMail({
-        to,
-        subject,
-        text,
-        event: input.event,
-        userId: input.userId,
-        payload: {
-          bookingId: input.booking.id,
-          reference,
-          role: normalizeLogin(to) === normalizeLogin(input.booking.guestEmail) ? "guest" : "partner",
-          ...(input.cancellationReason ? { cancellationReason: input.cancellationReason } : {}),
-          ...(input.refundEur != null ? { refundEur: input.refundEur } : {}),
-        },
-      });
-    } catch (error) {
-      console.warn("[notify] email failed", error);
-    }
-  }
-
-  if (input.event === "BOOKING_NEW" || input.event === "BOOKING_EDITED" || input.event === "BOOKING_CANCELLED") {
+  const sendTelegram = async () => {
     try {
       const { getFxRates } = await import("@/lib/server/preferences");
       const rate = (await getFxRates()).eurUsd;
@@ -254,7 +237,38 @@ async function deliverBookingNotice(input: {
     } catch (error) {
       console.warn("[notify] booking telegram failed", error);
     }
+  };
+
+  await Promise.allSettled([sendEmails(), sendTelegram()]);
+}
+
+/** Partner mailbox(es): account email plus the email saved in company settings. */
+async function resolvePartnerEmails(input: {
+  partnerId?: string | null;
+  emails: Array<string | null | undefined>;
+}): Promise<string[]> {
+  const list = input.emails.map((e) => String(e || "").trim()).filter(Boolean);
+  const pid = String(input.partnerId || "").trim();
+  if (pid) {
+    try {
+      const { readCompanySettingsFile } = await import("@/lib/server/partner-company-settings-store");
+      const { parseCompanySettings } = await import("@/lib/partners/company-settings");
+      const ids = [pid, pid.replace(/^file-partner-/, "")].filter((id, i, all) => id && all.indexOf(id) === i);
+      for (const id of ids) {
+        const settings = await readCompanySettingsFile(id);
+        if (!settings) continue;
+        const company = parseCompanySettings(settings, { email: list[0] || undefined });
+        if (company.email) list.push(String(company.email).trim());
+        break;
+      }
+    } catch (error) {
+      console.warn("[notify] partner company email lookup failed", error);
+    }
   }
+  return list.filter(
+    (email, index, all) =>
+      isValidEmail(email) && all.findIndex((item) => normalizeLogin(item) === normalizeLogin(email)) === index,
+  );
 }
 
 export async function notifyBookingEvent(
@@ -274,9 +288,10 @@ export async function notifyBookingEvent(
   if (!booking) return;
 
   const partner = booking.car.partner;
-  const partnerEmails = [partner.email, partner.user?.email].filter(
-    (value, index, all): value is string => Boolean(value) && all.indexOf(value) === index,
-  );
+  const partnerEmails = await resolvePartnerEmails({
+    partnerId: partner.id,
+    emails: [partner.email, partner.user?.email],
+  });
   const chatIds = new Set<string>();
   const prismaChat = partner.telegramChatId?.trim();
   if (prismaChat) {
@@ -359,6 +374,7 @@ export async function notifyFileBookingEvent(
     let carLabel = booking.carId;
     let carPlate = "";
     let partnerEmail = "";
+    let dbPartnerId = "";
     const chatIds = new Set<string>();
     try {
       const car = await prisma.car.findUnique({
@@ -376,6 +392,7 @@ export async function notifyFileBookingEvent(
         carPlate = String(car.registrationNumber || "").trim();
       }
       partnerEmail = car?.partner?.email?.trim() || "";
+      dbPartnerId = car?.partner?.id || "";
       const partnerChat = car?.partner?.telegramChatId?.trim();
       if (partnerChat) chatIds.add(partnerChat);
       if (car?.partner) {
@@ -391,7 +408,7 @@ export async function notifyFileBookingEvent(
     }
     await deliverBookingNotice({
       event,
-      partnerEmails: partnerEmail ? [partnerEmail] : [],
+      partnerEmails: await resolvePartnerEmails({ partnerId: dbPartnerId, emails: [partnerEmail] }),
       partnerChatIds: [...chatIds],
       cancellationReason: opts?.cancellationReason,
       refundEur: opts?.refundEur,
@@ -465,7 +482,7 @@ export async function notifyFileBookingEvent(
 
   await deliverBookingNotice({
     event,
-    partnerEmails: partnerEmail ? [partnerEmail] : [],
+    partnerEmails: await resolvePartnerEmails({ partnerId: fileCar.partnerId, emails: [partnerEmail] }),
     partnerChatIds: [...chatIds],
     cancellationReason: opts?.cancellationReason,
     refundEur: opts?.refundEur,

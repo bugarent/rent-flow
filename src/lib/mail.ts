@@ -32,7 +32,40 @@ type SendMailInput = {
  * Partner emails: always logged to NotificationLog when DB is up.
  * If SMTP_* env vars are set, also attempts a real send via optional nodemailer.
  */
-export async function sendPartnerMail(input: SendMailInput): Promise<{ logged: true; sent: boolean }> {
+type Transporter = { sendMail: (opts: unknown) => Promise<unknown> };
+type NodemailerModule = {
+  createTransport?: (opts: unknown) => Transporter;
+  default?: { createTransport?: (opts: unknown) => Transporter };
+};
+
+/** Transport reused per SMTP config (one short-lived connection per message). */
+let cachedTransport: { key: string; transporter: Transporter } | null = null;
+
+async function getTransporter(host: string, port: number, user: string, pass: string): Promise<Transporter | null> {
+  const key = `${host}|${port}|${user}|${pass}`;
+  if (cachedTransport?.key === key) return cachedTransport.transporter;
+  // Literal specifier so the deploy file-tracer bundles nodemailer with the server function.
+  const nodemailer = (await import("nodemailer").catch((error: unknown) => {
+    console.error("[mail] nodemailer could not be loaded", error);
+    return null;
+  })) as unknown as NodemailerModule | null;
+  const createTransport = nodemailer?.createTransport || nodemailer?.default?.createTransport;
+  if (!createTransport) return null;
+  const transporter = createTransport({
+    host,
+    port,
+    secure: process.env.SMTP_SECURE === "true" || port === 465,
+    auth: { user, pass },
+    // Fail fast so a slow SMTP server never holds the booking request past the function limit.
+    connectionTimeout: 8_000,
+    greetingTimeout: 8_000,
+    socketTimeout: 12_000,
+  });
+  cachedTransport = { key, transporter };
+  return transporter;
+}
+
+async function logNotification(input: SendMailInput) {
   try {
     await prisma.notificationLog.create({
       data: {
@@ -50,43 +83,31 @@ export async function sendPartnerMail(input: SendMailInput): Promise<{ logged: t
   } catch (error) {
     console.warn(`[mail:${input.event}] notification log skipped`, error);
   }
+}
 
+async function deliverSmtp(input: SendMailInput): Promise<boolean> {
   const { readBookingMailConfig } = await import("@/lib/server/booking-mail-from");
   const stored = await readBookingMailConfig().catch(() => null);
-  const host = process.env.SMTP_HOST?.trim() || stored?.smtpHost || "";
-  const user = process.env.SMTP_USER?.trim() || stored?.smtpUser || "";
+  const host = process.env.SMTP_HOST?.trim() || stored?.smtpHost?.trim() || "";
+  const user = process.env.SMTP_USER?.trim() || stored?.smtpUser?.trim() || "";
   const pass = process.env.SMTP_PASS?.trim() || stored?.smtpPass || "";
-  const port = Number(process.env.SMTP_PORT || stored?.smtpPort || 587);
+  const rawPort = Number(process.env.SMTP_PORT || stored?.smtpPort || 587);
+  const port = Number.isInteger(rawPort) && rawPort > 0 ? rawPort : 587;
   if (!host || !user || !pass) {
-    console.info(`[mail:${input.event}] SMTP is not configured; to=${input.to} subject=${input.subject}`);
-    return { logged: true, sent: false };
+    console.error(`[mail:${input.event}] SMTP is not configured (host/user/password); email NOT sent to ${input.to}`);
+    return false;
   }
 
   try {
-    // Literal specifier so the deploy file-tracer bundles nodemailer with the server function.
-    const nodemailer = (await import("nodemailer").catch((error: unknown) => {
-      console.error(`[mail:${input.event}] nodemailer could not be loaded`, error);
-      return null;
-    })) as unknown as {
-      createTransport?: (opts: unknown) => { sendMail: (opts: unknown) => Promise<unknown> };
-      default?: {
-        createTransport?: (opts: unknown) => { sendMail: (opts: unknown) => Promise<unknown> };
-      };
-    } | null;
-    const createTransport = nodemailer?.createTransport || nodemailer?.default?.createTransport;
-    if (!createTransport) {
-      console.error(`[mail:${input.event}] SMTP configured but nodemailer is unavailable; email NOT sent to ${input.to}`);
-      return { logged: true, sent: false };
+    const transporter = await getTransporter(host, port, user, pass);
+    if (!transporter) {
+      console.error(`[mail:${input.event}] nodemailer is unavailable; email NOT sent to ${input.to}`);
+      return false;
     }
-    const transporter = createTransport({
-      host,
-      port: Number.isInteger(port) && port > 0 ? port : 587,
-      secure: process.env.SMTP_SECURE === "true" || port === 465,
-      auth: { user, pass },
-    });
-    const fromAddress = input.from?.trim() || process.env.SMTP_FROM || `${SITE_NAME} <noreply@${SITE_NAME}>`;
+    const fromAddress =
+      input.from?.trim() || process.env.SMTP_FROM?.trim() || stored?.fromEmail?.trim() || user;
     await transporter.sendMail({
-      from: fromAddress,
+      from: fromAddress.includes("<") ? fromAddress : { name: SITE_NAME, address: fromAddress },
       to: input.to,
       subject: input.subject,
       text: input.text,
@@ -94,11 +115,17 @@ export async function sendPartnerMail(input: SendMailInput): Promise<{ logged: t
       ...(input.replyTo ? { replyTo: input.replyTo } : {}),
       ...(input.attachments?.length ? { attachments: input.attachments } : {}),
     });
-    return { logged: true, sent: true };
+    return true;
   } catch (error) {
+    cachedTransport = null;
     console.error(`[mail:${input.event}] SMTP send to ${input.to} via ${host}:${port} failed:`, error);
-    return { logged: true, sent: false };
+    return false;
   }
+}
+
+export async function sendPartnerMail(input: SendMailInput): Promise<{ logged: true; sent: boolean }> {
+  const [, sent] = await Promise.all([logNotification(input), deliverSmtp(input)]);
+  return { logged: true, sent };
 }
 
 export function buildPartnerInviteUrl(origin: string, token: string) {
