@@ -23,13 +23,13 @@ import {
   fileCarToApiShape,
   getFileCar,
   isFileCarOwner,
-  isPublicFileCarStatus,
   updateFileCar,
 } from "@/lib/server/partner-cars-store";
 import {
   isValidRegistrationNumber,
   normalizeRegistrationNumber,
 } from "@/lib/cars/registration-number";
+import { hiddenReasonAfterPartnerEdit, isPubliclyVisibleListing } from "@/lib/cars/listing-visibility";
 import {
   normalizePartnerCategorySlug,
   resolveCategorySlugForCar,
@@ -126,7 +126,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const fileCar = await getFileCar(id);
     if (!fileCar) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const isOwner = isFileCarOwner(fileCar, partnerSession?.user);
-    const publicOk = isPublicFileCarStatus(fileCar.status);
+    const publicOk = isPubliclyVisibleListing(fileCar);
     if (!publicOk && !isAdmin && !isOwner) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
@@ -145,7 +145,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   const isOwner = Boolean(partnerSession?.user && car.partner?.userId === partnerSession.user.id);
-  const publicOk = car.status === "APPROVED";
+  const publicOk = isPubliclyVisibleListing(car);
   if (!publicOk && !isAdmin && !isOwner) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -316,12 +316,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       hiddenReason:
         nextStatus === "APPROVED"
           ? null
-          : fileCar.status === "REJECTED" && fileCar.hiddenReason
-            ? fileCar.hiddenReason
-            : fileBody.hiddenReason ??
-              (fileOwner && nextStatus === "PENDING_REMODERATION"
-                ? "Partner edited listing — awaiting re-moderation"
-                : fileCar.hiddenReason),
+          : fileAdmin && fileBody.hiddenReason !== undefined
+            ? fileBody.hiddenReason
+            : fileOwner
+              ? hiddenReasonAfterPartnerEdit({
+                  prevStatus: fileCar.status,
+                  prevReason: fileCar.hiddenReason,
+                  nextStatus,
+                })
+              : fileCar.hiddenReason,
       photos: Array.isArray(photos) ? photos : fileCar.photos,
       passportFrontUrl: fileBody.passportFrontUrl ?? fileCar.passportFrontUrl,
       passportBackUrl: fileBody.passportBackUrl ?? fileCar.passportBackUrl,
@@ -378,6 +381,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         const nextPhotos = Array.isArray(photos) ? photos.map(String) : saved.photos || [];
         await recordPartnerListingEditDiff({
           carId: id,
+          previousStatus: fileCar.status,
           before: beforeLive,
           afterLive: liveInputFromCarFields({
             title: saved.title,
@@ -576,14 +580,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             discountPercent: body.discountPercent != null ? Number(body.discountPercent) : undefined,
             ...(nextCategorySlug !== undefined ? { categorySlug: nextCategorySlug } : {}),
             status: nextStatus as "PENDING" | "PENDING_REMODERATION" | "DRAFT" | "APPROVED" | "REJECTED",
-            hiddenReason:
-              nextStatus === "APPROVED"
-                ? null
-                : car.status === "REJECTED" && car.hiddenReason
-                  ? car.hiddenReason
-                  : nextStatus === "PENDING_REMODERATION"
-                    ? "Partner edited listing — awaiting re-moderation"
-                    : car.hiddenReason,
+            hiddenReason: hiddenReasonAfterPartnerEdit({
+              prevStatus: String(car.status),
+              prevReason: car.hiddenReason,
+              nextStatus,
+            }),
           },
           include: {
             photos: true,
@@ -620,6 +621,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             : [];
         await recordPartnerListingEditDiff({
           carId: id,
+          previousStatus: String(car.status),
           before: beforeLive,
           afterLive: liveInputFromCarFields({
             title: updated.title,

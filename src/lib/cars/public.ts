@@ -1,3 +1,5 @@
+import { publicListingStatusWhere } from "@/lib/cars/listing-visibility";
+
 /**
  * Public car payload. CarPassport is a separate relation and MUST NOT be included.
  */
@@ -27,7 +29,7 @@ export const publicCarInclude = {
 };
 
 export const publicListingWhere = {
-  status: "APPROVED" as const,
+  ...publicListingStatusWhere,
   partner: { status: { in: ["APPROVED", "PENDING_REMODERATION"] as const } },
 };
 

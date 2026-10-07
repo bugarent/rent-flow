@@ -3,7 +3,12 @@ import "server-only";
 import { isCityLocationCode, normalizeLocationCode, parseCityLocationCode } from "@/lib/catalog/search-places";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import { listDeliveryLocations } from "@/lib/server/delivery-locations";
-import { isPublicFileCarStatus, listFileCars, type FileCarListing } from "@/lib/server/partner-cars-store";
+import { isPublicFileCar, listFileCars, type FileCarListing } from "@/lib/server/partner-cars-store";
+import {
+  overlayPublishedListing,
+  readPublishedSnapshotsMap,
+  type PublishedCarSnapshot,
+} from "@/lib/server/car-published-store";
 
 export type FileSearchCar = {
   id: string;
@@ -119,14 +124,19 @@ export function fileSearchCarMatchesPickup(car: FileSearchCar, pickup: string) {
 export async function loadPublicFileSearchCars(opts?: {
   pickup?: string | null;
 }): Promise<FileSearchCar[]> {
-  const [stored, locations] = await Promise.all([
+  const [stored, locations, snapshots] = await Promise.all([
     listFileCars(),
     listDeliveryLocations({ activeOnly: false }),
+    readPublishedSnapshotsMap().catch(() => new Map<string, PublishedCarSnapshot>()),
   ]);
   const byId = new Map(locations.map((loc) => [loc.id, loc]));
   const pickup = opts?.pickup?.trim() || "";
   return stored
-    .filter((car) => isPublicFileCarStatus(car.status))
-    .map((car) => toSearchCar(car, byId))
+    .filter((car) => isPublicFileCar(car))
+    .map((car) => {
+      const shaped = toSearchCar(car, byId);
+      if (car.status !== "PENDING_REMODERATION") return shaped;
+      return overlayPublishedListing({ ...shaped, status: car.status }, snapshots.get(car.id));
+    })
     .filter((car) => (pickup ? fileSearchCarMatchesPickup(car, pickup) : true));
 }

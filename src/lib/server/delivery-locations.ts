@@ -24,6 +24,7 @@ import { toNumber } from "@/lib/utils";
 import type { SearchAirportOption } from "@/components/search/airport-search";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import { createTtlCache } from "@/lib/server/ttl-cache";
+import { publicListingStatusWhere } from "@/lib/cars/listing-visibility";
 
 const DATA_DIR = dataRoot();
 const DATA_FILE = join(DATA_DIR, "delivery-locations.json");
@@ -783,7 +784,7 @@ async function codesOfferingCarPickup(locations: DeliveryLocationView[]): Promis
     const rows = await prisma.carDeliveryPrice.findMany({
       where: {
         car: {
-          status: "APPROVED",
+          ...publicListingStatusWhere,
           partner: { status: { in: ["APPROVED", "PENDING_REMODERATION"] } },
         },
       },
@@ -804,10 +805,10 @@ async function codesOfferingCarPickup(locations: DeliveryLocationView[]): Promis
   }
 
   try {
-    const { isPublicFileCarStatus, listFileCars } = await import("@/lib/server/partner-cars-store");
+    const { isPublicFileCar, listFileCars } = await import("@/lib/server/partner-cars-store");
     const cars = await listFileCars();
     for (const car of cars) {
-      if (!isPublicFileCarStatus(car.status)) continue;
+      if (!isPublicFileCar(car)) continue;
       for (const price of car.deliveryPrices || []) {
         const loc = byId.get(price.deliveryLocationId);
         add(loc?.iata);

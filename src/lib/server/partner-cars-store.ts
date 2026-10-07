@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { normalizeLogin } from "@/lib/crypto";
 import { normalizeRegistrationNumber } from "@/lib/cars/registration-number";
+import { isPubliclyVisibleListing } from "@/lib/cars/listing-visibility";
 import { bodyTypeFromCarDescription, countriesFromCarDescription } from "@/lib/cars/listing-meta";
 
 const DATA_DIR = dataRoot();
@@ -270,6 +271,11 @@ export async function mergeFileCarsIntoPartnerRows(
 
 export function isPublicFileCarStatus(status: string) {
   return status === "APPROVED";
+}
+
+/** Customer-visible file listing (approved, or approved + partner edit awaiting re-moderation). */
+export function isPublicFileCar(car: Pick<FileCarListing, "status" | "hiddenReason">) {
+  return isPubliclyVisibleListing(car);
 }
 
 export function isFileCarOwner(

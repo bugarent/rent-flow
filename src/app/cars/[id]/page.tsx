@@ -8,6 +8,7 @@ import { buildPageMetadata } from "@/lib/seo/metadata";
 import { buildBreadcrumbJsonLd, buildProductVehicleJsonLd } from "@/lib/seo/json-ld";
 import { carDetailSeo } from "@/lib/seo/pages";
 import { toNumber } from "@/lib/utils";
+import { isPubliclyVisibleListing } from "@/lib/cars/listing-visibility";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -28,6 +29,7 @@ const loadCarSeo = cache(async (id: string) => {
         description: true,
         dailyRateEur: true,
         status: true,
+        hiddenReason: true,
         photos: {
           orderBy: { sortOrder: "asc" },
           take: 1,
@@ -59,7 +61,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const { locale } = await readPreferences();
   const car = await loadCarSeo(id);
-  if (!car || car.status !== "APPROVED") {
+  if (!car || !isPubliclyVisibleListing(car)) {
     return buildPageMetadata({
       title: "Car rental | RentAirportCars",
       description: "Book airport car rental in Georgia — Kutaisi, Tbilisi and Batumi.",
@@ -100,7 +102,7 @@ export default async function CarBookingPage({ params, searchParams }: Props) {
   const url = absoluteUrl(path);
 
   const schemas =
-    car && car.status === "APPROVED"
+    car && isPubliclyVisibleListing(car)
       ? [
           buildBreadcrumbJsonLd([
             { name: "Home", path: "/" },

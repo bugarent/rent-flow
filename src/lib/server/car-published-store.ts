@@ -102,9 +102,10 @@ export async function readPublishedCarSnapshot(carId: string): Promise<Published
 export async function ensurePublishedCarSnapshot(
   carId: string,
   live: PublishedCarLiveInput,
+  opts?: { replace?: boolean },
 ): Promise<PublishedCarSnapshot> {
   const store = (await readJsonFile<SnapStoreFile>(SNAP_STORE)) as SnapStoreFile;
-  if (store[carId]) return store[carId];
+  if (store[carId] && !opts?.replace) return store[carId];
   const snap = buildSnapshot(live);
   store[carId] = snap;
   await writeJsonFile(SNAP_STORE, store);
@@ -163,6 +164,54 @@ export function nextListingStatusAfterPartnerEdit(status: string): string {
   if (shouldEnterListingRemoderation(status)) return "PENDING_REMODERATION";
   if (status === "DRAFT") return "PENDING";
   return status === "PENDING" ? "PENDING" : status;
+}
+
+export async function readPublishedSnapshotsMap(): Promise<Map<string, PublishedCarSnapshot>> {
+  const store = (await readJsonFile<SnapStoreFile>(SNAP_STORE)) as SnapStoreFile;
+  return new Map(Object.entries(store));
+}
+
+type OverlayableListing = {
+  status: string;
+  title: string;
+  description?: string | null;
+  dailyRateEur: unknown;
+  discountPercent?: unknown;
+  make?: string;
+  model?: string;
+  year?: number;
+  seats?: number;
+  doors?: number;
+  fuelType?: string;
+  transmission?: string;
+  photos?: Array<{ url: string }>;
+};
+
+/**
+ * While a partner edit awaits re-moderation, customers see the last admin-approved
+ * version of the listing (text, price, specs, photos).
+ */
+export function overlayPublishedListing<T extends OverlayableListing>(
+  car: T,
+  snapshot: PublishedCarSnapshot | null | undefined,
+): T {
+  if (car.status !== "PENDING_REMODERATION" || !snapshot) return car;
+  const photos = (snapshot.photoUrls || []).filter(Boolean);
+  return {
+    ...car,
+    title: snapshot.title || car.title,
+    description: snapshot.description || car.description,
+    dailyRateEur: (snapshot.dailyRateEur || car.dailyRateEur) as T["dailyRateEur"],
+    discountPercent: snapshot.discountPercent as T["discountPercent"],
+    ...(snapshot.make ? { make: snapshot.make } : {}),
+    ...(snapshot.model ? { model: snapshot.model } : {}),
+    ...(snapshot.year ? { year: snapshot.year } : {}),
+    ...(snapshot.seats ? { seats: snapshot.seats } : {}),
+    ...(snapshot.doors ? { doors: snapshot.doors } : {}),
+    ...(snapshot.fuelType ? { fuelType: snapshot.fuelType } : {}),
+    ...(snapshot.transmission ? { transmission: snapshot.transmission } : {}),
+    ...(photos.length && car.photos ? { photos: photos.map((url) => ({ url })) } : {}),
+  };
 }
 
 export function applyPublishedCarOverlay<

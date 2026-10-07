@@ -29,6 +29,7 @@ import {
   type SearchResultCar,
 } from "@/components/cars/cars-search-results";
 import { resolveEffectiveCategorySlug } from "@/lib/cars/listing-filter-match";
+import { publicListingStatusWhere } from "@/lib/cars/listing-visibility";
 import { listExtraServices } from "@/lib/server/extras-store";
 import { localizeExtraName } from "@/lib/extras/pricing";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
@@ -154,9 +155,12 @@ export default async function CarsPage({
   );
 
   const where: Prisma.CarWhereInput = {
-    status: "APPROVED",
+    ...publicListingStatusWhere,
     partner: { status: { in: ["APPROVED", "PENDING_REMODERATION"] } },
   };
+  const snapshotsPromise = import("@/lib/server/car-published-store")
+    .then((m) => m.readPublishedSnapshotsMap())
+    .catch(() => null);
 
   const pickupIata = pickup?.trim();
   if (pickupIata) {
@@ -215,6 +219,7 @@ export default async function CarsPage({
 
   type DbCar = {
     id: string;
+    status?: string;
     partnerId?: string;
     make: string;
     model: string;
@@ -275,6 +280,18 @@ export default async function CarsPage({
     })) as unknown as DbCar[];
   } catch {
     cars = [];
+  }
+
+  if (cars.some((car) => car.status === "PENDING_REMODERATION")) {
+    const snapshots = await snapshotsPromise;
+    if (snapshots) {
+      const { overlayPublishedListing } = await import("@/lib/server/car-published-store");
+      cars = cars.map((car) =>
+        car.status === "PENDING_REMODERATION"
+          ? overlayPublishedListing({ ...car, status: car.status }, snapshots.get(car.id))
+          : car,
+      );
+    }
   }
 
   try {

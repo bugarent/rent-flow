@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPartnerIdByWebsiteToken } from "@/lib/server/partner-integration-store";
-import { isPublicFileCarStatus, listFileCarsForPartner } from "@/lib/server/partner-cars-store";
+import { isPublicFileCar, listFileCarsForPartner } from "@/lib/server/partner-cars-store";
 import { takeRateLimit } from "@/lib/rate-limit";
 
 const cors = {
@@ -32,7 +32,7 @@ export async function GET(
   return NextResponse.json(
     {
       cars: cars
-        .filter((car) => isPublicFileCarStatus(car.status))
+        .filter((car) => isPublicFileCar(car))
         .map((car) => ({
           id: car.id,
           label: `${car.make} ${car.model}`.trim() || car.title,

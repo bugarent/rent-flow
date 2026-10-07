@@ -21,6 +21,27 @@ import { getFileCar } from "@/lib/server/partner-cars-store";
 import { resolveListingDiscountPercent } from "@/lib/server/partner-period-discounts-store";
 import { ensureFileCarInPrisma } from "@/lib/server/ensure-file-car-in-prisma";
 import { createFileBooking } from "@/lib/server/customer-bookings-store";
+import { isPubliclyVisibleListing } from "@/lib/cars/listing-visibility";
+
+/** Price from the last approved version while a partner edit awaits re-moderation. */
+async function approvedListingVersion<
+  T extends { status: string; title: string; description: string; dailyRateEur: unknown; discountPercent?: unknown },
+>(carId: string, car: T): Promise<T> {
+  if (car.status !== "PENDING_REMODERATION") return car;
+  try {
+    const { readPublishedCarSnapshot } = await import("@/lib/server/car-published-store");
+    const snapshot = await readPublishedCarSnapshot(carId);
+    if (!snapshot) return car;
+    return {
+      ...car,
+      description: snapshot.description || car.description,
+      dailyRateEur: (snapshot.dailyRateEur || car.dailyRateEur) as T["dailyRateEur"],
+      discountPercent: snapshot.discountPercent as T["discountPercent"],
+    };
+  } catch {
+    return car;
+  }
+}
 
 async function attachPlatformCharge(booking: {
   id: string;
@@ -453,9 +474,10 @@ export async function POST(req: Request) {
 
     if (!car) {
       const fileCar = await getFileCar(id);
-      if (!fileCar || fileCar.status !== "APPROVED") {
+      if (!fileCar || !isPubliclyVisibleListing(fileCar)) {
         return NextResponse.json({ error: "Car is not available" }, { status: 404 });
       }
+      const pricedFileCar = await approvedListingVersion(id, fileCar);
 
       try {
         const { carHasBookingConflict } = await import("@/lib/server/car-availability");
@@ -488,17 +510,17 @@ export async function POST(req: Request) {
       1,
       Math.ceil((dropoffAt.getTime() - pickupAt.getTime()) / (1000 * 60 * 60 * 24)),
     );
-    const details = parseCarDetails(fileCar.description);
+    const details = parseCarDetails(pricedFileCar.description);
     const discountPercent = await resolveListingDiscountPercent({
       carId: id,
       basePercent: toNumber(
-        (fileCar as { discountPercent?: number }).discountPercent,
+        (pricedFileCar as { discountPercent?: number }).discountPercent,
       ),
       pickupDate: pickupAt.toISOString().slice(0, 10),
       dropoffDate: dropoffAt.toISOString().slice(0, 10),
     });
     const daily = roundMoney(
-      resolveDailyRateEur(details, toNumber(fileCar.dailyRateEur), discountPercent, days),
+      resolveDailyRateEur(details, toNumber(pricedFileCar.dailyRateEur), discountPercent, days),
     );
         const { buildBookingExtraLines } = await import("@/lib/bookings/build-extra-lines");
         const { extraServiceNameById } = await import("@/lib/server/extras/names");
@@ -752,9 +774,10 @@ export async function POST(req: Request) {
       }
     }
 
-    if (!car || car.status !== "APPROVED") {
+    if (!car || !isPubliclyVisibleListing(car)) {
       return NextResponse.json({ error: "Car is not available" }, { status: 404 });
     }
+    const pricedCar = await approvedListingVersion(id, car);
 
     try {
       const { carHasBookingConflict } = await import("@/lib/server/car-availability");
@@ -813,15 +836,15 @@ export async function POST(req: Request) {
         : DEFAULT_DEPOSIT_PERCENT;
 
     const days = Math.max(1, Math.ceil((dropoffAt.getTime() - pickupAt.getTime()) / (1000 * 60 * 60 * 24)));
-    const details = parseCarDetails(car.description);
+    const details = parseCarDetails(pricedCar.description);
     const discountPercent = await resolveListingDiscountPercent({
       carId: id,
-      basePercent: toNumber(car.discountPercent),
+      basePercent: toNumber(pricedCar.discountPercent),
       pickupDate: pickupAt.toISOString().slice(0, 10),
       dropoffDate: dropoffAt.toISOString().slice(0, 10),
     });
     const daily = roundMoney(
-      resolveDailyRateEur(details, toNumber(car.dailyRateEur), discountPercent, days),
+      resolveDailyRateEur(details, toNumber(pricedCar.dailyRateEur), discountPercent, days),
     );
 
     const { customerExtraQuotes } = await import("@/lib/server/extras/hydrate");

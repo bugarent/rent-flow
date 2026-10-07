@@ -220,6 +220,21 @@ export function clearPublicCarCache(carId: string) {
   }
 }
 
+/** Customers see the last approved version while a partner edit awaits re-moderation. */
+async function withApprovedVersion<T extends object>(carId: string, payload: T): Promise<T> {
+  const status = String((payload as { status?: unknown }).status || "");
+  if (status !== "PENDING_REMODERATION") return payload;
+  try {
+    const { readPublishedCarSnapshot, overlayPublishedListing } = await import(
+      "@/lib/server/car-published-store"
+    );
+    const snapshot = await readPublishedCarSnapshot(carId);
+    return overlayPublishedListing(payload as unknown as Parameters<typeof overlayPublishedListing>[0], snapshot) as unknown as T;
+  } catch {
+    return payload;
+  }
+}
+
 async function buildPublicCarPayload(
   id: string,
   range: PublicCarRange,
@@ -235,14 +250,19 @@ async function buildPublicCarPayload(
   } catch (error) {
     if (!isDbOfflineError(error)) throw error;
   }
+  const { isPubliclyVisibleListing } = await import("@/lib/cars/listing-visibility");
   if (car) {
-    if (car.status !== "APPROVED") return null;
+    if (!isPubliclyVisibleListing(car as { status: string; hiddenReason?: string | null })) return null;
     const partner = car.partner as { id?: string } | null;
-    return enrichPublicCarPayload(car, { carId: id, partnerIdHint: partner?.id, ...range });
+    return enrichPublicCarPayload(await withApprovedVersion(id, car), {
+      carId: id,
+      partnerIdHint: partner?.id,
+      ...range,
+    });
   }
-  const { getFileCar, isPublicFileCarStatus } = await import("@/lib/server/partner-cars-store");
+  const { getFileCar, isPublicFileCar } = await import("@/lib/server/partner-cars-store");
   const fileCar = await getFileCar(id);
-  if (!fileCar || !isPublicFileCarStatus(fileCar.status)) return null;
+  if (!fileCar || !isPublicFileCar(fileCar)) return null;
   const { readCarInsuranceDoc } = await import("@/lib/server/car-insurance-store");
   const doc = await readCarInsuranceDoc(id);
   const shaped = await shapeFileCarForApi(
@@ -250,7 +270,7 @@ async function buildPublicCarPayload(
     doc?.insuranceUrl || null,
     doc?.insuranceExpiresAt || null,
   );
-  const enriched = await enrichPublicCarPayload(shaped, {
+  const enriched = await enrichPublicCarPayload(await withApprovedVersion(id, shaped), {
     carId: id,
     partnerIdHint: fileCar.partnerId,
     ...range,

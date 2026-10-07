@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPartnerIdByWebsiteToken } from "@/lib/server/partner-integration-store";
-import { isPublicFileCarStatus, listFileCarsForPartner } from "@/lib/server/partner-cars-store";
+import { isPublicFileCar, listFileCarsForPartner } from "@/lib/server/partner-cars-store";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false, nocache: true, noarchive: true },
@@ -17,7 +17,7 @@ export default async function EmbedFleetPage({
   const partnerId = await getPartnerIdByWebsiteToken(token);
   if (!partnerId) notFound();
   const cars = (await listFileCarsForPartner({ partnerId })).filter((car) =>
-    isPublicFileCarStatus(car.status),
+    isPublicFileCar(car),
   );
 
   return (

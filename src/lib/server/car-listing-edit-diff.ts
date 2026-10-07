@@ -51,8 +51,12 @@ export async function recordPartnerListingEditDiff(input: {
   before: PublishedCarLiveInput;
   afterLive: PublishedCarLiveInput;
   afterDetails?: CarDetailsBlob | null;
+  /** Status before this edit; an APPROVED listing's pre-edit data is the live approved version. */
+  previousStatus?: string;
 }): Promise<{ snapshot: PublishedCarSnapshot; changeCount: number }> {
-  const snapshot = await ensurePublishedCarSnapshot(input.carId, input.before);
+  const snapshot = await ensurePublishedCarSnapshot(input.carId, input.before, {
+    replace: input.previousStatus === "APPROVED",
+  });
   const details =
     input.afterDetails !== undefined
       ? input.afterDetails

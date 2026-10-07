@@ -37,6 +37,7 @@ import {
   type FileCarStatus,
 } from "@/lib/server/partner-cars-store";
 import { loadPublicFileSearchCars } from "@/lib/server/public-file-cars";
+import { publicListingStatusWhere } from "@/lib/cars/listing-visibility";
 
 async function resolvePartnerForListing(session: {
   user: { id: string; email?: string | null };
@@ -139,7 +140,7 @@ export async function GET(req: Request) {
   const endDate = searchParams.get("endDate")?.trim();
 
   const where: Prisma.CarWhereInput = {
-    status: "APPROVED",
+    ...publicListingStatusWhere,
     partner: { status: { in: ["APPROVED", "PENDING_REMODERATION"] } },
   };
 
