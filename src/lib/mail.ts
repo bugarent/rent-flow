@@ -63,8 +63,11 @@ export async function sendPartnerMail(input: SendMailInput): Promise<{ logged: t
   }
 
   try {
-    const modName = "nodemailer";
-    const nodemailer = (await import(/* webpackIgnore: true */ modName).catch(() => null)) as {
+    // Literal specifier so the deploy file-tracer bundles nodemailer with the server function.
+    const nodemailer = (await import("nodemailer").catch((error: unknown) => {
+      console.error(`[mail:${input.event}] nodemailer could not be loaded`, error);
+      return null;
+    })) as unknown as {
       createTransport?: (opts: unknown) => { sendMail: (opts: unknown) => Promise<unknown> };
       default?: {
         createTransport?: (opts: unknown) => { sendMail: (opts: unknown) => Promise<unknown> };
@@ -72,8 +75,7 @@ export async function sendPartnerMail(input: SendMailInput): Promise<{ logged: t
     } | null;
     const createTransport = nodemailer?.createTransport || nodemailer?.default?.createTransport;
     if (!createTransport) {
-      console.info(`[mail:${input.event}] SMTP configured but nodemailer not installed; logged only`);
-      console.info(input.text);
+      console.error(`[mail:${input.event}] SMTP configured but nodemailer is unavailable; email NOT sent to ${input.to}`);
       return { logged: true, sent: false };
     }
     const transporter = createTransport({
@@ -94,7 +96,7 @@ export async function sendPartnerMail(input: SendMailInput): Promise<{ logged: t
     });
     return { logged: true, sent: true };
   } catch (error) {
-    console.warn("[mail] SMTP send failed, notification was logged:", error);
+    console.error(`[mail:${input.event}] SMTP send to ${input.to} via ${host}:${port} failed:`, error);
     return { logged: true, sent: false };
   }
 }
