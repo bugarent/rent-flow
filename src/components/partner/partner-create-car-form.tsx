@@ -2777,7 +2777,20 @@ export function PartnerCreateCarForm({
         >
           <PartnerCarPhotoGallery
             photos={photos}
-            onChange={(next) => {
+            onChange={(incoming) => {
+              const next = [...incoming];
+              const coverRemoved = isStudioCoverUrl(String(photos[0] || "")) && !String(next[0] || "").trim();
+              if (coverRemoved) {
+                // The cover is built from a gallery photo; deleting it deletes that photo too.
+                const from = coverSourceRef.current || coverSource;
+                const at = from ? next.findIndex((url, index) => index > 0 && url === from) : -1;
+                if (at > 0) next[at] = "";
+              }
+              const sourceLeft = next.slice(1).some((url) => {
+                const value = String(url || "").trim();
+                return value && !value.startsWith("blob:") && !isStudioCoverUrl(value);
+              });
+              if (!sourceLeft && isStudioCoverUrl(String(next[0] || ""))) next[0] = "";
               setPhotos(next);
               if (!String(next[0] || "").trim()) {
                 coverSourceRef.current = "";
