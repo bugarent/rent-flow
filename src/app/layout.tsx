@@ -6,7 +6,7 @@ import "./globals.css";
 import { AppProviders } from "@/components/providers/app-providers";
 import { PublicShell } from "@/components/layout/public-shell";
 import { JsonLd } from "@/components/seo/json-ld";
-import { SITE_NAME } from "@/lib/brand";
+import { SEO_SITE_NAME } from "@/lib/brand";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getFxRates, readPreferences } from "@/lib/server/preferences";
 import { getPublicFooterContact } from "@/lib/server/footer-contact-store";
@@ -64,7 +64,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     ...base,
-    applicationName: SITE_NAME,
+    applicationName: SEO_SITE_NAME,
     icons: {
       icon: [{ url: "/logo.png", type: "image/png" }],
       apple: [{ url: "/logo.png", type: "image/png" }],

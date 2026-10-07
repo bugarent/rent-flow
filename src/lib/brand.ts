@@ -1,5 +1,7 @@
 export const SITE_NAME = "rentairportcars.com";
 export const SITE_DOMAIN = "rentairportcars.com";
+/** Brand name search engines show above the URL (WebSite name, og:site_name). */
+export const SEO_SITE_NAME = "RENT AIRPORT CARS";
 
 /** Public support email — used by contact modal / mailto when footer config is unavailable. */
 export const SUPPORT_EMAIL =

@@ -1,4 +1,4 @@
-import { SITE_NAME, SITE_DOMAIN, SUPPORT_EMAIL } from "@/lib/brand";
+import { SEO_SITE_NAME, SITE_NAME, SITE_DOMAIN, SUPPORT_EMAIL } from "@/lib/brand";
 import { SITE_URL, absoluteUrl } from "@/lib/seo/config";
 
 export type LocalBusinessContact = {
@@ -17,8 +17,8 @@ export function buildLocalBusinessJsonLd(contact?: LocalBusinessContact) {
     "@context": "https://schema.org",
     "@type": ["AutoRental", "LocalBusiness", "CarRental"],
     "@id": `${SITE_URL}/#organization`,
-    name: SITE_NAME,
-    alternateName: ["RentAirportCars", "Rent Airport Cars"],
+    name: SEO_SITE_NAME,
+    alternateName: ["Rent Airport Cars", "RentAirportCars", SITE_NAME],
     url: SITE_URL,
     logo: absoluteUrl("/logo.png"),
     image: absoluteUrl("/images/hero-tarmac.jpg"),
@@ -67,8 +67,8 @@ export function buildWebSiteJsonLd() {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "@id": `${SITE_URL}/#website`,
-    name: SITE_NAME,
-    alternateName: "RentAirportCars",
+    name: SEO_SITE_NAME,
+    alternateName: ["Rent Airport Cars", "RentAirportCars", SITE_NAME],
     url: SITE_URL,
     inLanguage: ["en", "ka", "ru"],
     publisher: { "@id": `${SITE_URL}/#organization` },

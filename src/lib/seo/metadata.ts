@@ -7,7 +7,7 @@ import {
   PRIMARY_KEYWORDS,
   SITE_URL,
 } from "@/lib/seo/config";
-import { SITE_NAME } from "@/lib/brand";
+import { SEO_SITE_NAME } from "@/lib/brand";
 
 export type PageSeoInput = {
   title: string;
@@ -50,7 +50,7 @@ export function buildPageMetadata({
     },
     openGraph: {
       type,
-      siteName: SITE_NAME,
+      siteName: SEO_SITE_NAME,
       locale: locale === "ka" ? "ka_GE" : locale === "ru" ? "ru_RU" : "en_US",
       title,
       description,
