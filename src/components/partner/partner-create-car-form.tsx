@@ -1226,18 +1226,22 @@ export function PartnerCreateCarForm({
   const [coverTick, setCoverTick] = useState(0);
   const [coverBusy, setCoverBusy] = useState(false);
   const studioReq = useRef(0);
-  const studioKeyRef = useRef("");
+  /** Gallery photo the current cover was built from (or the one present when the listing loaded). */
+  const coverSourceRef = useRef<string | null>(null);
+  const coverSource =
+    photos.slice(1).find((url) => {
+      const value = String(url || "").trim();
+      return value && !value.startsWith("blob:") && !isStudioCoverUrl(value);
+    }) || "";
+  const hasCover = Boolean(String(photos[0] || "").trim()) && !String(photos[0]).startsWith("blob:");
   useEffect(() => {
-    if (isAdminReview) return;
-    const identity = {
-      make: make.trim(),
-      model: model.trim(),
-      year: year.trim(),
-      color: color.trim(),
-    };
-    if (!identity.make || !identity.model || !identity.year || !identity.color) return;
-    const key = [identity.year, identity.make, identity.model, identity.color].join("|").toLowerCase();
-    if (studioKeyRef.current === key) return;
+    if (isAdminReview || booting || !coverSource) return;
+    if (coverSourceRef.current === null && hasCover) {
+      coverSourceRef.current = coverSource;
+      return;
+    }
+    if (coverSourceRef.current === coverSource && hasCover) return;
+    const identity = { make: make.trim(), model: model.trim(), year: year.trim(), color: color.trim() };
     const timer = window.setTimeout(() => {
       const req = ++studioReq.current;
       setCoverBusy(true);
@@ -1246,7 +1250,7 @@ export function PartnerCreateCarForm({
           const res = await fetch("/api/partners/studio-cover", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(identity),
+            body: JSON.stringify({ ...identity, photoUrl: coverSource }),
           });
           const data = (await res.json().catch(() => null)) as { url?: string } | null;
           if (req !== studioReq.current) return;
@@ -1254,7 +1258,7 @@ export function PartnerCreateCarForm({
             setError(cc.coverStyleFailed);
             return;
           }
-          studioKeyRef.current = key;
+          coverSourceRef.current = coverSource;
           setPhotos((prev) => placeStudioCover(prev, data.url!));
           setError((current) => (current === cc.coverStyleFailed ? "" : current));
         } catch {
@@ -1269,7 +1273,9 @@ export function PartnerCreateCarForm({
       studioReq.current += 1;
       setCoverBusy(false);
     };
-  }, [make, model, year, color, isAdminReview, cc.coverStyleFailed, coverTick]);
+    // make/model/year/color only enrich the prompt; the photo drives regeneration.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coverSource, hasCover, booting, isAdminReview, cc.coverStyleFailed, coverTick]);
 
   useEffect(() => {
     const nodes = SECTION_IDS.map((id) => document.getElementById(id)).filter(Boolean) as HTMLElement[];
@@ -2773,9 +2779,8 @@ export function PartnerCreateCarForm({
             photos={photos}
             onChange={(next) => {
               setPhotos(next);
-              const ready = Boolean(make.trim() && model.trim() && year.trim() && color.trim());
-              if (ready && !isStudioCoverUrl(next[0] || "")) {
-                studioKeyRef.current = "";
+              if (!String(next[0] || "").trim()) {
+                coverSourceRef.current = "";
                 setCoverTick((tick) => tick + 1);
               }
             }}

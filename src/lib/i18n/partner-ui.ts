@@ -490,7 +490,7 @@ export const partnerUiEn: PartnerUiPack = {
     uploading: "Uploading…",
     cover: "Cover",
     coverHint:
-      "As soon as make, model, year, and color are filled, a white studio catalog photo of that car is set as the cover. Gallery photos stay exactly as uploaded.",
+      "The cover is created automatically in studio style from your first uploaded photo. Gallery photos stay exactly as uploaded.",
     coverNeedIdentity: "Choose the make, model, year, and color before the cover photo.",
     coverStyleFailed: "The studio cover could not be created. Try again.",
     dragImage: "Drag the image or",
@@ -778,7 +778,7 @@ export const partnerUiKa: PartnerUiPack = {
     uploading: "იტვირთება…",
     cover: "ყდა",
     coverHint:
-      "მარკის, მოდელის, წლისა და ფერის შევსებისთანავე მთავარ ყდად დგება ამ მანქანის თეთრი სტუდიური სურათი. გალერეის ფოტოები რჩება ზუსტად ისე, როგორც ატვირთულია.",
+      "ყდის სურათი ავტომატურად იქმნება სტუდიურ სტილში თქვენი პირველი ატვირთული ფოტოდან. გალერეის ფოტოები რჩება ზუსტად ისე, როგორც ატვირთულია.",
     coverNeedIdentity: "ყდის სურათისთვის ჯერ აირჩიეთ მარკა, მოდელი, წელი და ფერი.",
     coverStyleFailed: "ყდის სტუდიური სურათი ვერ შეიქმნა. სცადეთ თავიდან.",
     dragImage: "გადაიტანეთ სურათი ან",
@@ -1067,7 +1067,7 @@ export const partnerUiRu: PartnerUiPack = {
     uploading: "Загрузка…",
     cover: "Обложка",
     coverHint:
-      "Как только указаны марка, модель, год и цвет, обложкой становится белое студийное фото этой машины. Фото галереи остаются как загружены.",
+      "Обложка создаётся автоматически в студийном стиле из первого загруженного фото. Фото галереи остаются как загружены.",
     coverNeedIdentity: "Перед обложкой выберите марку, модель, год и цвет.",
     coverStyleFailed: "Не удалось создать студийную обложку. Попробуйте ещё раз.",
     dragImage: "Перетащите изображение или",
