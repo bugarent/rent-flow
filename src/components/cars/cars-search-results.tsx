@@ -14,6 +14,7 @@ import {
   Shield,
   SlidersHorizontal,
   Star,
+  Truck,
   Users,
   Briefcase,
   Car,
@@ -32,6 +33,7 @@ import {
   countListingsForDeposit,
   countListingsForDrive,
   countListingsForExtra,
+  countListingsForFreeDelivery,
   countListingsForFuel,
   countListingsForRentPayment,
   countListingsForSeats,
@@ -108,6 +110,7 @@ type DraftFilters = {
   yearFrom: string;
   priceMin: string;
   priceMax: string;
+  freeDelivery: boolean;
 };
 
 const COPY: Record<
@@ -159,6 +162,7 @@ const COPY: Record<
     freeInsurance: string;
     freeDeliveryShort: string;
     freeDeliveryCity: string;
+    deliveryFilter: string;
     freeCancellation: string;
     minProtectionFree: string;
     carCategory: string;
@@ -240,6 +244,7 @@ const COPY: Record<
     freeInsurance: "Free insurance",
     freeDeliveryShort: "Free delivery",
     freeDeliveryCity: "within the city",
+    deliveryFilter: "Delivery",
     freeCancellation: "Free cancellation",
     minProtectionFree: "Min. protection free",
     carCategory: "Car category",
@@ -320,6 +325,7 @@ const COPY: Record<
     freeInsurance: "უფასო დაზღვევა",
     freeDeliveryShort: "უფასო მიწოდება",
     freeDeliveryCity: "ქალაქში",
+    deliveryFilter: "მიწოდება",
     freeCancellation: "უფასო გაუქმება",
     minProtectionFree: "მინ. დაცვა უფასოდ",
     carCategory: "მანქანის კატეგორია",
@@ -400,6 +406,7 @@ const COPY: Record<
     freeInsurance: "Бесплатная страховка",
     freeDeliveryShort: "Бесплатная доставка",
     freeDeliveryCity: "по городу",
+    deliveryFilter: "Доставка",
     freeCancellation: "Бесплатная отмена",
     minProtectionFree: "Мин. защита бесплатно",
     carCategory: "Категория автомобиля",
@@ -480,6 +487,7 @@ const COPY: Record<
     freeInsurance: "Assurance gratuite",
     freeDeliveryShort: "Livraison gratuite",
     freeDeliveryCity: "en ville",
+    deliveryFilter: "Livraison",
     freeCancellation: "Annulation gratuite",
     minProtectionFree: "Protection min. offerte",
     carCategory: "Catégorie de voiture",
@@ -560,6 +568,7 @@ const COPY: Record<
     freeInsurance: "Kostenlose Versicherung",
     freeDeliveryShort: "Kostenlose Lieferung",
     freeDeliveryCity: "in der Stadt",
+    deliveryFilter: "Lieferung",
     freeCancellation: "Kostenlose Stornierung",
     minProtectionFree: "Min. Schutz kostenlos",
     carCategory: "Fahrzeugkategorie",
@@ -640,6 +649,7 @@ const COPY: Record<
     freeInsurance: "Bezpłatne ubezpieczenie",
     freeDeliveryShort: "Bezpłatna dostawa",
     freeDeliveryCity: "w mieście",
+    deliveryFilter: "Dostawa",
     freeCancellation: "Bezpłatne anulowanie",
     minProtectionFree: "Min. ochrona gratis",
     carCategory: "Kategoria auta",
@@ -720,6 +730,7 @@ const COPY: Record<
     freeInsurance: "تأمين مجاني",
     freeDeliveryShort: "توصيل مجاني",
     freeDeliveryCity: "داخل المدينة",
+    deliveryFilter: "التوصيل",
     freeCancellation: "إلغاء مجاني",
     minProtectionFree: "حماية أساسية مجاناً",
     carCategory: "فئة السيارة",
@@ -803,6 +814,7 @@ function emptyDraft(): DraftFilters {
     yearFrom: "",
     priceMin: "",
     priceMax: "",
+    freeDelivery: false,
   };
 }
 
@@ -822,6 +834,7 @@ function cloneDraft(d: DraftFilters): DraftFilters {
     yearFrom: d.yearFrom,
     priceMin: d.priceMin,
     priceMax: d.priceMax,
+    freeDelivery: d.freeDelivery,
   };
 }
 
@@ -854,6 +867,7 @@ function toListingFilterState(
     yearFrom: draft.yearFrom || undefined,
     priceMin: draft.priceMin || undefined,
     priceMax: draft.priceMax || undefined,
+    freeDelivery: draft.freeDelivery,
     new2020: quick.has("new2020"),
     familySuv: false,
     awd: false,
@@ -1009,6 +1023,11 @@ export function CarsSearchResults({
     return map;
   }, [carsWithCategory, draftFilterState, categories, days]);
 
+  const freeDeliveryCount = useMemo(
+    () => countListingsForFreeDelivery(carsWithCategory, draftFilterState, categories, days),
+    [carsWithCategory, draftFilterState, categories, days],
+  );
+
   const rentPaymentCounts = useMemo(
     () => ({
       cash: countListingsForRentPayment(carsWithCategory, "cash", draftFilterState, categories, days),
@@ -1081,7 +1100,8 @@ export function CarsSearchResults({
     (applied.driverAge ? 1 : 0) +
     (applied.licenseYears ? 1 : 0) +
     (applied.yearFrom ? 1 : 0) +
-    (applied.priceMin || applied.priceMax ? 1 : 0);
+    (applied.priceMin || applied.priceMax ? 1 : 0) +
+    (applied.freeDelivery ? 1 : 0);
 
   const toggleQuick = (key: QuickFilter) => {
     setQuick((prev) => {
@@ -1275,6 +1295,14 @@ export function CarsSearchResults({
             icon={<Shield className="h-3 w-3" />}
             label={c.noDeposit}
           />
+          <FilterPill
+            active={applied.freeDelivery}
+            onClick={() =>
+              setApplied((prev) => ({ ...cloneDraft(prev), freeDelivery: !prev.freeDelivery }))
+            }
+            icon={<Truck className="h-3 w-3" />}
+            label={c.freeDelivery}
+          />
 
           {categories.map((cat) => (
             <FilterPill
@@ -1386,6 +1414,21 @@ export function CarsSearchResults({
                       })
                     )}
                   </div>
+                </FilterFrame>
+
+                <FilterFrame title={c.deliveryFilter}>
+                  <label className={cn(filterOptionClass, "sm:max-w-xs")}>
+                    <input
+                      type="checkbox"
+                      checked={draft.freeDelivery}
+                      onChange={() =>
+                        setDraft((prev) => ({ ...cloneDraft(prev), freeDelivery: !prev.freeDelivery }))
+                      }
+                      className="h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-[#1d6fe8]"
+                    />
+                    <FilterOptionText>{c.freeDelivery}</FilterOptionText>
+                    <FilterCount value={freeDeliveryCount} />
+                  </label>
                 </FilterFrame>
 
                 <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">

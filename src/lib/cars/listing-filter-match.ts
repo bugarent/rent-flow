@@ -77,6 +77,8 @@ export type ListingFilterState = {
   licenseYears?: string;
   /** Extra service ids the listing must offer (AND) */
   extraOptions?: Set<string> | string[];
+  /** Only listings whose pickup + return delivery costs nothing for this trip */
+  freeDelivery?: boolean;
   /** Quick chips that also map to listing fields */
   new2020?: boolean;
   familySuv?: boolean;
@@ -500,7 +502,7 @@ export function listingMatchesFilters(
     if (y > 0 && car.year < y) return false;
   }
 
-  const daily = listingDailyWithDeliveryEur({
+  const priced = listingDailyWithDeliveryEur({
     dailyRateEur: car.dailyRateEur,
     days,
     pickupDeliveryFeeEur: car.pickupDeliveryFeeEur,
@@ -508,7 +510,9 @@ export function listingMatchesFilters(
     deliveryFeeEur: car.deliveryFeeEur,
     details: parseCarDetails(car.description),
     discountPercent: car.discountPercent,
-  }).displayDailyEur;
+  });
+  if (filters.freeDelivery && priced.deliveryFeeEur > 0) return false;
+  const daily = priced.displayDailyEur;
   const min = filters.priceMin?.trim() ? Number(filters.priceMin) : null;
   const max = filters.priceMax?.trim() ? Number(filters.priceMax) : null;
   if (min != null && Number.isFinite(min) && daily < min) return false;
@@ -583,6 +587,15 @@ export function countListingsForDeposit<T extends FilterableListing>(
     categories,
     days,
   ).length;
+}
+
+export function countListingsForFreeDelivery<T extends FilterableListing>(
+  cars: T[],
+  filters: ListingFilterState,
+  categories: ListingFilterCategory[],
+  days: number,
+): number {
+  return filterListings(cars, { ...filters, freeDelivery: true }, categories, days).length;
 }
 
 export function countListingsForRentPayment<T extends FilterableListing>(
