@@ -4,8 +4,9 @@ import { useRef, useState } from "react";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { ResidenceCountrySelect } from "@/components/cars/residence-country-select";
 import { PhoneMessengerIcons } from "@/components/partner/phone-messenger-icons";
+import { DialCodeSelect } from "@/components/partner/phone-country-field";
 import { useSurfaceDictionary } from "@/components/providers/use-surface-dictionary";
-import { splitStoredPhone } from "@/lib/catalog/dial-codes";
+import { dialCodeForIso2, nationalDigits } from "@/lib/catalog/dial-codes";
 import { normalizeLocationCode, searchPlacesForCountry } from "@/lib/catalog/search-places";
 import { WORLD_COUNTRIES, worldCountryName } from "@/lib/catalog/world-countries";
 import { LOCALES, LOCALE_LABELS, type Locale } from "@/lib/i18n/config";
@@ -38,6 +39,7 @@ function copyFor(locale: string) {
       noCountries: "ოპერირების ქვეყანა არ არის მითითებული",
       primaryPhone: "ძირითადი მობილური ტელეფონის ნომერი",
       managerPhone: "მეორე ტელეფონი",
+      phoneCodeRequired: "ქვეყნის კოდი აუცილებელია. აირჩიეთ სიიდან და ნომერში მხოლოდ ციფრები ჩაწერეთ.",
       website: "ვებსაიტი",
       credentials: "შესვლის მონაცემები",
       login: "ლოგინი (ელ. ფოსტა)",
@@ -77,6 +79,7 @@ function copyFor(locale: string) {
       noCountries: "Страны операций не указаны",
       primaryPhone: "Основной мобильный",
       managerPhone: "Второй телефон",
+      phoneCodeRequired: "Код страны обязателен. Выберите его в списке и вводите только номер.",
       website: "Сайт",
       credentials: "Данные входа",
       login: "Логин (эл. почта)",
@@ -115,6 +118,7 @@ function copyFor(locale: string) {
     noCountries: "No operating countries set",
     primaryPhone: "Primary mobile phone",
     managerPhone: "Secondary phone",
+    phoneCodeRequired: "A country code is required. Choose it in the list and enter only the number.",
     website: "Website",
     credentials: "Login credentials",
     login: "Login (email)",
@@ -143,7 +147,14 @@ function emailOk(value: string) {
 }
 
 function phoneOk(value: string) {
-  return splitStoredPhone(value).national.length >= 8;
+  return nationalDigits(value).length >= 8;
+}
+
+function nationalOnly(iso2: string, raw: string) {
+  const digits = raw.replace(/\D/g, "");
+  const dial = dialCodeForIso2(iso2);
+  if (raw.trim().startsWith("+") && dial && digits.startsWith(dial)) return digits.slice(dial.length);
+  return digits.replace(/^0+/, "");
 }
 
 function websiteOk(value: string) {
@@ -179,6 +190,8 @@ export function PartnerApplicationForm({
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState(initialEmail);
   const [officeCountry, setOfficeCountry] = useState("");
+  const defaultIso2 =
+    initialCountry && /^[A-Za-z]{2}$/.test(initialCountry) ? initialCountry.toUpperCase() : "GE";
   const [applicantKind, setApplicantKind] = useState<"" | "COMPANY" | "PRIVATE">("");
   const [address, setAddress] = useState("");
   const [languages, setLanguages] = useState<string[]>(["en"]);
@@ -188,8 +201,10 @@ export function PartnerApplicationForm({
   const [locationCodes, setLocationCodes] = useState<string[]>([]);
   const [addCountry, setAddCountry] = useState("");
   const [primaryPhone, setPrimaryPhone] = useState("");
+  const [primaryIso2, setPrimaryIso2] = useState(defaultIso2);
   const [primaryMessengers, setPrimaryMessengers] = useState<PartnerSocialPlatform[]>([]);
   const [managerPhone, setManagerPhone] = useState("");
+  const [managerIso2, setManagerIso2] = useState(defaultIso2);
   const [managerMessengers, setManagerMessengers] = useState<PartnerSocialPlatform[]>([]);
   const [website, setWebsite] = useState("");
   const [loginEmail, setLoginEmail] = useState(initialEmail);
@@ -264,8 +279,6 @@ export function PartnerApplicationForm({
       return;
     }
     const login = email.trim();
-    const phoneSplit = splitStoredPhone(primaryPhone);
-    const managerSplit = splitStoredPhone(managerPhone);
     const idSeed = title.trim().replace(/\s+/g, "");
     const identificationNumber = (idSeed.length >= 5 ? idSeed : `${idSeed}00000`).slice(0, 40);
     setLoading(true);
@@ -280,10 +293,10 @@ export function PartnerApplicationForm({
           identificationNumber,
           email: login,
           contactEmail: email.trim(),
-          phone: phoneSplit.national || primaryPhone.trim(),
-          phoneCountryIso2: phoneSplit.iso2,
-          secondaryPhone: managerSplit.national,
-          secondaryPhoneCountryIso2: managerSplit.iso2,
+          phone: nationalDigits(primaryPhone),
+          phoneCountryIso2: primaryIso2,
+          secondaryPhone: nationalDigits(managerPhone),
+          secondaryPhoneCountryIso2: managerIso2,
           messengers: primaryMessengers,
           secondaryMessengers: managerMessengers,
           fleetSize: 1,
@@ -360,7 +373,11 @@ export function PartnerApplicationForm({
                       valueIso2={
                         WORLD_COUNTRIES.find((country) => country.name === officeCountry)?.iso2 || ""
                       }
-                      onChange={(_iso2, name) => setOfficeCountry(name)}
+                      onChange={(iso2, name) => {
+                        setOfficeCountry(name);
+                        if (!primaryPhone.trim()) setPrimaryIso2(iso2);
+                        if (!managerPhone.trim()) setManagerIso2(iso2);
+                      }}
                       locale={locale}
                       invalid={mark("officeCountry")}
                       placeholder={t.selectCountry}
@@ -540,21 +557,27 @@ export function PartnerApplicationForm({
 
                   <PhoneRow
                     label={t.primaryPhone}
+                    iso2={primaryIso2}
+                    onIso2Change={setPrimaryIso2}
                     value={primaryPhone}
-                    onChange={setPrimaryPhone}
+                    onChange={(value) => setPrimaryPhone(nationalOnly(primaryIso2, value))}
                     messengers={primaryMessengers}
                     onMessengers={setPrimaryMessengers}
                     messengerLabels={messengerLabels}
                     invalid={mark("primaryPhone")}
+                    hint={t.phoneCodeRequired}
                   />
                   <PhoneRow
                     label={t.managerPhone}
+                    iso2={managerIso2}
+                    onIso2Change={setManagerIso2}
                     value={managerPhone}
-                    onChange={setManagerPhone}
+                    onChange={(value) => setManagerPhone(nationalOnly(managerIso2, value))}
                     messengers={managerMessengers}
                     onMessengers={setManagerMessengers}
                     messengerLabels={messengerLabels}
                     invalid={mark("managerPhone")}
+                    hint={t.phoneCodeRequired}
                   />
                   <TextField label={t.website} value={website} onChange={setWebsite} invalid={mark("website")} />
                   <div
@@ -651,41 +674,55 @@ function TextField({
 
 function PhoneRow({
   label,
+  iso2,
+  onIso2Change,
   value,
   onChange,
   messengers,
   onMessengers,
   messengerLabels,
   invalid,
+  hint,
 }: {
   label: string;
+  iso2: string;
+  onIso2Change: (iso2: string) => void;
   value: string;
   onChange: (value: string) => void;
   messengers: PartnerSocialPlatform[];
   onMessengers: (next: PartnerSocialPlatform[]) => void;
   messengerLabels: Record<PartnerSocialPlatform, string>;
   invalid: boolean;
+  hint: string;
 }) {
   return (
     <div data-invalid={invalid ? "true" : undefined}>
       <p className={cn("mb-1.5 text-sm font-semibold", invalid ? "text-red-700" : "text-[#3a4553]")}>
         {label} <span className="text-[#e11d48]">*</span>
       </p>
-      <div
-        className={cn(
-          "flex flex-wrap items-center gap-2 rounded-md border bg-white px-3 py-2",
-          invalid ? "border-red-500 bg-red-50" : "border-[#c5ced8]",
-        )}
-      >
-        <input
-          className="min-h-11 min-w-0 flex-1 border-0 bg-transparent text-base outline-none"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          inputMode="tel"
-          aria-invalid={invalid || undefined}
-        />
-        <PhoneMessengerIcons selected={messengers} onChange={onMessengers} labels={messengerLabels} />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+        <DialCodeSelect iso2={iso2} label={label} onChange={onIso2Change} invalid={invalid} />
+        <div
+          className={cn(
+            "flex min-h-12 min-w-0 flex-1 flex-wrap items-center gap-2 rounded-xl border bg-white px-3 py-1.5",
+            invalid ? "border-red-500 bg-red-50" : "border-[#c5ced8]",
+          )}
+        >
+          <input
+            className="min-h-11 min-w-0 flex-1 border-0 bg-transparent text-base outline-none"
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            inputMode="tel"
+            autoComplete="tel-national"
+            aria-invalid={invalid || undefined}
+            placeholder="555123456"
+          />
+          <PhoneMessengerIcons selected={messengers} onChange={onMessengers} labels={messengerLabels} />
+        </div>
       </div>
+      <p className={cn("mt-1 text-sm leading-snug", invalid ? "font-semibold text-red-700" : "text-slate-500")}>
+        {hint}
+      </p>
     </div>
   );
 }

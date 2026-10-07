@@ -29,7 +29,7 @@ function matchesQuery(
   return false;
 }
 
-function DialCodeSelect({
+export function DialCodeSelect({
   iso2,
   label,
   onChange,
