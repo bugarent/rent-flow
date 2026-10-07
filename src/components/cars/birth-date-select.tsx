@@ -177,13 +177,20 @@ export function BirthDateSelect({
   onChange,
   locale,
   invalid = false,
+  disabled = false,
   className,
+  yearMin,
+  yearMax,
 }: {
   value: string;
   onChange: (isoDate: string) => void;
   locale: string;
   invalid?: boolean;
+  disabled?: boolean;
   className?: string;
+  /** Inclusive. Birth dates stay in the past; a validity date passes the current year through a future year. */
+  yearMin?: number;
+  yearMax?: number;
 }) {
   const labels = labelsFor(locale);
   const parsed = parseIso(value);
@@ -201,10 +208,18 @@ export function BirthDateSelect({
 
   const years = useMemo(() => {
     const now = new Date().getFullYear();
+    const min = yearMin ?? now - 100;
+    const max = yearMax ?? now - 16;
     const list: number[] = [];
-    for (let y = now - 16; y >= now - 100; y -= 1) list.push(y);
+    if (max >= now && yearMax != null) {
+      for (let y = min; y <= max; y += 1) list.push(y);
+    } else {
+      for (let y = max; y >= min; y -= 1) list.push(y);
+    }
+    const selected = Number(parsed.year);
+    if (selected && !list.includes(selected)) list.push(selected);
     return list;
-  }, []);
+  }, [parsed.year, yearMin, yearMax]);
 
   const maxDay = daysInMonth(Number(year) || 0, Number(month) || 0);
   const dayOptions = useMemo(
@@ -213,10 +228,10 @@ export function BirthDateSelect({
   );
 
   const selectClass = cn(
-    "w-full rounded-md border p-2.5 text-sm outline-none transition",
+    "min-h-11 w-full rounded-md border px-2 text-base outline-none transition disabled:cursor-not-allowed disabled:bg-slate-100",
     invalid
       ? "border-2 border-red-500 bg-red-50 ring-2 ring-red-200"
-      : "border-slate-300 focus:border-sky-400 focus:ring-2 focus:ring-sky-100",
+      : "border-slate-300 bg-white focus:border-sky-400 focus:ring-2 focus:ring-sky-100",
   );
 
   const commit = (nextDay: string, nextMonth: string, nextYear: string) => {
@@ -232,10 +247,11 @@ export function BirthDateSelect({
   return (
     <div className={cn("mt-1 grid grid-cols-3 gap-2", className)}>
       <label className="block min-w-0">
-        <span className="mb-1 block text-[11px] font-medium text-slate-500">{labels.day}</span>
+        <span className="mb-1 block text-xs font-medium text-slate-500">{labels.day}</span>
         <select
           className={selectClass}
           value={day}
+          disabled={disabled}
           aria-label={labels.day}
           onChange={(e) => commit(e.target.value, month, year)}
         >
@@ -248,10 +264,11 @@ export function BirthDateSelect({
         </select>
       </label>
       <label className="block min-w-0">
-        <span className="mb-1 block text-[11px] font-medium text-slate-500">{labels.month}</span>
+        <span className="mb-1 block text-xs font-medium text-slate-500">{labels.month}</span>
         <select
           className={selectClass}
           value={month}
+          disabled={disabled}
           aria-label={labels.month}
           onChange={(e) => commit(day, e.target.value, year)}
         >
@@ -264,10 +281,11 @@ export function BirthDateSelect({
         </select>
       </label>
       <label className="block min-w-0">
-        <span className="mb-1 block text-[11px] font-medium text-slate-500">{labels.year}</span>
+        <span className="mb-1 block text-xs font-medium text-slate-500">{labels.year}</span>
         <select
           className={selectClass}
           value={year}
+          disabled={disabled}
           aria-label={labels.year}
           onChange={(e) => commit(day, month, e.target.value)}
         >

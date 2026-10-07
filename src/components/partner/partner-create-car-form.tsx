@@ -78,6 +78,7 @@ import {
 } from "@/components/partner/partner-car-photo-gallery";
 import { PartnerImageLightbox } from "@/components/partner/partner-image-lightbox";
 import { DateInput } from "@/components/ui/date-input";
+import { BirthDateSelect } from "@/components/cars/birth-date-select";
 
 function mdToDateInput(md: string): string {
   const n = normalizeMd(md) || "01-01";
@@ -2973,17 +2974,19 @@ export function PartnerCreateCarForm({
                   <span className="ms-1 font-extrabold">· {insuranceExpiryReasonLabel(locale)}</span>
                 ) : null}
               </label>
-              <DateInput
-                type="date"
+              <BirthDateSelect
                 value={insuranceExpiresAt}
+                onChange={setInsuranceExpiresAt}
+                locale={locale}
                 disabled={isAdminReview}
-                onChange={(e) => setInsuranceExpiresAt(e.target.value)}
-                className={cn(
-                  "w-full max-w-xs rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-200",
-                  fieldInvalid("insurance-expires") || insuranceExpiredReview || isChanged("insuranceExpiresAt")
-                    ? "border-red-500 bg-red-50 ring-2 ring-red-200"
-                    : "border-slate-300",
-                )}
+                invalid={
+                  fieldInvalid("insurance-expires") ||
+                  insuranceExpiredReview ||
+                  isChanged("insuranceExpiresAt")
+                }
+                yearMin={new Date().getFullYear()}
+                yearMax={new Date().getFullYear() + 20}
+                className="mt-0 max-w-lg"
               />
               <p className="mt-1 text-[11px] leading-snug text-slate-500">{cc.insuranceExpiresAtHelp}</p>
             </div>
