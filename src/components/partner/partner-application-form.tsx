@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { ResidenceCountrySelect } from "@/components/cars/residence-country-select";
 import { PhoneMessengerIcons } from "@/components/partner/phone-messenger-icons";
@@ -35,6 +36,7 @@ function copyFor(locale: string) {
       add: "დამატება",
       remove: "წაშლა",
       selectPlace: "აირჩიეთ ლოკაცია",
+      locationsDone: "არჩევა",
       noPlaces: "ლოკაციები არ არის",
       noCountries: "ოპერირების ქვეყანა არ არის მითითებული",
       primaryPhone: "ძირითადი მობილური ტელეფონის ნომერი",
@@ -76,6 +78,7 @@ function copyFor(locale: string) {
       add: "Добавить",
       remove: "Удалить",
       selectPlace: "Выберите локацию",
+      locationsDone: "Готово",
       noPlaces: "Локации отсутствуют",
       noCountries: "Страны операций не указаны",
       primaryPhone: "Основной мобильный",
@@ -116,6 +119,7 @@ function copyFor(locale: string) {
     add: "Add",
     remove: "Remove",
     selectPlace: "Select location",
+    locationsDone: "Done",
     noPlaces: "No locations",
     noCountries: "No operating countries set",
     primaryPhone: "Primary mobile phone",
@@ -262,11 +266,6 @@ export function PartnerApplicationForm({
     const codes = new Set(placesForCountry(iso2).map((place) => place.code));
     setCountryIso2s((current) => current.filter((item) => item !== iso2));
     setLocationCodes((current) => current.filter((code) => !codes.has(code)));
-  };
-
-  const addPlace = (code: string) => {
-    if (!code || locationCodes.includes(code)) return;
-    setLocationCodes((current) => [...current, code]);
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -512,26 +511,21 @@ export function PartnerApplicationForm({
                                     {t.remove}
                                   </button>
                                 </div>
-                                <select
-                                  className={cn(
-                                    "mt-2 h-11 w-full rounded-md border bg-white px-3 text-base",
-                                    missing ? "border-red-500" : "border-[#c5ced8]",
-                                  )}
-                                  value=""
+                                <LocationMultiSelect
+                                  places={places}
+                                  selectedCodes={selected.map((place) => place.code)}
+                                  placeholder={places.length ? t.selectPlace : t.noPlaces}
+                                  doneLabel={t.locationsDone}
+                                  invalid={missing}
                                   disabled={places.length === 0}
-                                  onChange={(event) => {
-                                    if (event.target.value) addPlace(event.target.value);
+                                  onCommit={(codes) => {
+                                    const countryCodes = new Set(places.map((place) => place.code));
+                                    setLocationCodes((current) => [
+                                      ...current.filter((code) => !countryCodes.has(code)),
+                                      ...codes,
+                                    ]);
                                   }}
-                                >
-                                  <option value="">{places.length ? t.selectPlace : t.noPlaces}</option>
-                                  {places
-                                    .filter((place) => !locationCodes.includes(place.code))
-                                    .map((place) => (
-                                      <option key={place.code} value={place.code}>
-                                        {place.label}
-                                      </option>
-                                    ))}
-                                </select>
+                                />
                                 <ul className="mt-2 space-y-1">
                                   {selected.map((place) => (
                                     <li
@@ -670,6 +664,146 @@ export function PartnerApplicationForm({
           </form>
         )}
       </div>
+    </div>
+  );
+}
+
+function LocationMultiSelect({
+  places,
+  selectedCodes,
+  placeholder,
+  doneLabel,
+  invalid,
+  disabled,
+  onCommit,
+}: {
+  places: Array<{ code: string; label: string }>;
+  selectedCodes: string[];
+  placeholder: string;
+  doneLabel: string;
+  invalid?: boolean;
+  disabled?: boolean;
+  onCommit: (codes: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<string[]>(selectedCodes);
+  const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const placePanel = () => {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const width = Math.min(rect.width, window.innerWidth - 24);
+    const left = Math.min(Math.max(12, rect.left), window.innerWidth - width - 12);
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const maxHeight = Math.min(360, Math.max(220, spaceBelow > 220 ? spaceBelow - 12 : rect.top - 12));
+    const openUp = spaceBelow < 220 && rect.top > spaceBelow;
+    setPanelStyle({
+      position: "fixed",
+      left,
+      width,
+      maxHeight,
+      top: openUp ? undefined : rect.bottom + 6,
+      bottom: openUp ? window.innerHeight - rect.top + 6 : undefined,
+      zIndex: 100,
+    });
+  };
+
+  const openPanel = () => {
+    setDraft(selectedCodes);
+    placePanel();
+    setOpen(true);
+  };
+
+  const closePanel = () => {
+    onCommit(draft);
+    setOpen(false);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    placePanel();
+    const onLayout = () => placePanel();
+    window.addEventListener("resize", onLayout);
+    window.addEventListener("scroll", onLayout, true);
+    const onDoc = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (buttonRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      closePanel();
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => {
+      window.removeEventListener("resize", onLayout);
+      window.removeEventListener("scroll", onLayout, true);
+      document.removeEventListener("mousedown", onDoc);
+    };
+  }, [open, draft]);
+
+  const toggle = (code: string) => {
+    setDraft((current) => (current.includes(code) ? current.filter((item) => item !== code) : [...current, code]));
+  };
+
+  const panel =
+    open && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={panelRef}
+            style={panelStyle}
+            className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-900 shadow-xl"
+          >
+            <div className="min-h-0 flex-1 overflow-y-auto p-1">
+              {places.map((place) => {
+                const checked = draft.includes(place.code);
+                return (
+                  <label
+                    key={place.code}
+                    className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50"
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-5 w-5 shrink-0 accent-sky-600"
+                      checked={checked}
+                      onChange={() => toggle(place.code)}
+                    />
+                    <span className="min-w-0 break-words font-medium text-slate-800">{place.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="border-t border-slate-100 p-2">
+              <button
+                type="button"
+                className="min-h-11 w-full rounded-lg bg-[#1d6fe8] px-3 text-sm font-bold text-white"
+                onClick={closePanel}
+              >
+                {doneLabel}
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
+  return (
+    <div className="mt-2">
+      <button
+        ref={buttonRef}
+        type="button"
+        disabled={disabled}
+        aria-expanded={open}
+        onClick={() => (open ? closePanel() : openPanel())}
+        className={cn(
+          "flex h-11 w-full items-center justify-between rounded-md border bg-white px-3 text-start text-base disabled:opacity-60",
+          invalid ? "border-red-500" : "border-[#c5ced8]",
+        )}
+      >
+        <span className="truncate text-slate-700">{placeholder}</span>
+        <span className="text-xs text-slate-400" aria-hidden>
+          {open ? "▴" : "▾"}
+        </span>
+      </button>
+      {panel}
     </div>
   );
 }
