@@ -8,6 +8,14 @@ import { parseCarDetails } from "@/lib/cars/car-details";
 import { normalizeRegistrationNumber } from "@/lib/cars/registration-number";
 import { bodyTypeFromCarDescription, countriesFromCarDescription } from "@/lib/cars/listing-meta";
 import { formatPartnerCode } from "@/lib/ids";
+import { listingSearchBlockers, type SearchBlocker } from "@/lib/cars/listing-visibility";
+import { normalizeLocationCode } from "@/lib/catalog/search-places";
+import { listDeliveryLocations } from "@/lib/server/delivery-locations";
+import { listExpiredInsuranceCarIds } from "@/lib/server/car-insurance-store";
+
+function uniqueAirports(codes: string[]): string[] {
+  return [...new Set(codes.map((c) => c.trim().toUpperCase()).filter(Boolean))].sort();
+}
 
 export type AdminCarRow = {
   id: string;
@@ -30,6 +38,10 @@ export type AdminCarRow = {
   photoUrl: string;
   source: "file" | "db";
   updatedAt: string;
+  /** Pickup airports (IATA) where customers can find this listing. */
+  searchAirports: string[];
+  /** Reasons the listing is missing from customer search; empty when it is searchable. */
+  searchBlockers: SearchBlocker[];
 };
 
 type PartnerLookup = {
@@ -129,13 +141,28 @@ export async function loadAdminCarRows(): Promise<{
 }> {
   let dbOffline = false;
   const byId = new Map<string, AdminCarRow>();
-  const partnerLookup = await buildPartnerLookup();
+  const [partnerLookup, locations, expiredIds] = await Promise.all([
+    buildPartnerLookup(),
+    listDeliveryLocations({ activeOnly: false }).catch(() => []),
+    listExpiredInsuranceCarIds()
+      .then((ids) => new Set(ids))
+      .catch(() => new Set<string>()),
+  ]);
   if (partnerLookup.dbOffline) dbOffline = true;
+  const locationById = new Map(locations.map((loc) => [loc.id, loc]));
 
   try {
     const fileCars = await listFileCars();
     for (const c of fileCars) {
       const countries = countriesFromCarDescription(c.description);
+      const searchAirports = uniqueAirports(
+        (c.deliveryPrices || []).flatMap((row) => {
+          const loc = locationById.get(row.deliveryLocationId);
+          const iata = loc?.iata || normalizeLocationCode(row.deliveryLocationId) || "";
+          const active = loc ? loc.isActive !== false : Boolean(iata);
+          return active && iata ? [iata] : [];
+        }),
+      );
       const base = {
         id: c.id,
         listingCode: plateFromCar(c.registrationNumber, c.description),
@@ -155,6 +182,13 @@ export async function loadAdminCarRows(): Promise<{
         photoUrl: c.photos?.[0] || "",
         source: "file" as const,
         updatedAt: c.updatedAt,
+        searchAirports,
+        searchBlockers: listingSearchBlockers({
+          status: c.status,
+          hiddenReason: c.hiddenReason,
+          activeAirports: searchAirports,
+          insuranceExpired: expiredIds.has(c.id),
+        }),
       };
       byId.set(c.id, {
         ...base,
@@ -170,6 +204,11 @@ export async function loadAdminCarRows(): Promise<{
       orderBy: { updatedAt: "desc" },
       include: {
         photos: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
+        deliveryPrices: {
+          select: {
+            deliveryLocation: { select: { isActive: true, airport: { select: { iata: true } } } },
+          },
+        },
         partner: {
           select: {
             id: true,
@@ -177,6 +216,7 @@ export async function loadAdminCarRows(): Promise<{
             email: true,
             phone: true,
             sequentialNumber: true,
+            status: true,
           },
         },
       },
@@ -201,6 +241,13 @@ export async function loadAdminCarRows(): Promise<{
         continue;
       }
       const countries = countriesFromCarDescription(c.description);
+      const searchAirports = uniqueAirports(
+        c.deliveryPrices.flatMap((row) =>
+          row.deliveryLocation?.isActive && row.deliveryLocation.airport?.iata
+            ? [row.deliveryLocation.airport.iata]
+            : [],
+        ),
+      );
       const base = {
         id: c.id,
         listingCode: plateFromCar(c.registrationNumber, c.description),
@@ -220,6 +267,14 @@ export async function loadAdminCarRows(): Promise<{
         photoUrl: c.photos[0]?.url || "",
         source: "db" as const,
         updatedAt,
+        searchAirports,
+        searchBlockers: listingSearchBlockers({
+          status: String(c.status),
+          hiddenReason: c.hiddenReason,
+          partnerStatus: c.partner?.status ? String(c.partner.status) : null,
+          activeAirports: searchAirports,
+          insuranceExpired: expiredIds.has(c.id),
+        }),
       };
       byId.set(c.id, {
         ...base,

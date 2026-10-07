@@ -24,7 +24,7 @@ import { toNumber } from "@/lib/utils";
 import type { SearchAirportOption } from "@/components/search/airport-search";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import { createTtlCache } from "@/lib/server/ttl-cache";
-import { publicListingStatusWhere } from "@/lib/cars/listing-visibility";
+import { publicListingStatusWhere, publicPartnerWhere } from "@/lib/cars/listing-visibility";
 
 const DATA_DIR = dataRoot();
 const DATA_FILE = join(DATA_DIR, "delivery-locations.json");
@@ -785,7 +785,7 @@ async function codesOfferingCarPickup(locations: DeliveryLocationView[]): Promis
       where: {
         car: {
           ...publicListingStatusWhere,
-          partner: { status: { in: ["APPROVED", "PENDING_REMODERATION"] } },
+          partner: publicPartnerWhere,
         },
       },
       select: {

@@ -29,7 +29,7 @@ import {
   type SearchResultCar,
 } from "@/components/cars/cars-search-results";
 import { resolveEffectiveCategorySlug } from "@/lib/cars/listing-filter-match";
-import { publicListingStatusWhere } from "@/lib/cars/listing-visibility";
+import { publicListingStatusWhere, publicPartnerWhere } from "@/lib/cars/listing-visibility";
 import { listExtraServices } from "@/lib/server/extras-store";
 import { localizeExtraName } from "@/lib/extras/pricing";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
@@ -156,7 +156,7 @@ export default async function CarsPage({
 
   const where: Prisma.CarWhereInput = {
     ...publicListingStatusWhere,
-    partner: { status: { in: ["APPROVED", "PENDING_REMODERATION"] } },
+    partner: publicPartnerWhere,
   };
   const snapshotsPromise = import("@/lib/server/car-published-store")
     .then((m) => m.readPublishedSnapshotsMap())

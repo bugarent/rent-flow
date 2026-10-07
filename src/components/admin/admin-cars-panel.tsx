@@ -89,6 +89,29 @@ export function AdminCarsPanel({
       "ამ ძებნით მანქანა არ მოიძებნა.",
       "По этому запросу автомобилей нет.",
     ),
+    inSearch: uiText(locale, "In search", "ჩანს ძებნაში", "В поиске"),
+    notInSearch: uiText(locale, "Not in search", "არ ჩანს ძებნაში", "Нет в поиске"),
+    blockers: {
+      status: uiText(
+        locale,
+        "listing not approved",
+        "განცხადება არ არის დამტკიცებული",
+        "объявление не одобрено",
+      ),
+      partner: uiText(
+        locale,
+        "partner rejected or suspended",
+        "პარტნიორი უარყოფილია ან შეჩერებულია",
+        "партнёр отклонён или приостановлен",
+      ),
+      noDelivery: uiText(
+        locale,
+        "no active pickup airport",
+        "არ აქვს აქტიური აყვანის აეროპორტი",
+        "нет активного аэропорта выдачи",
+      ),
+      insurance: uiText(locale, "insurance expired", "დაზღვევა ვადაგასულია", "страховка истекла"),
+    },
     colPlate: uiText(locale, "Plate", "სახ. ნომერი", "Госномер"),
     colPartnerNumber: uiText(locale, "Partner number", "პარტნიორის ნომერი", "Номер партнёра"),
   };
@@ -271,6 +294,16 @@ export function AdminCarsPanel({
                   / {labels.perDay}
                 </span>
               </p>
+              {car.searchBlockers.length ? (
+                <p className="mt-0.5 break-words text-[11px] font-bold text-rose-700">
+                  {labels.notInSearch}:{" "}
+                  {car.searchBlockers.map((code) => labels.blockers[code]).join(", ")}
+                </p>
+              ) : (
+                <p className="mt-0.5 break-words text-[11px] font-bold text-emerald-700">
+                  {labels.inSearch}: {car.searchAirports.join(", ")}
+                </p>
+              )}
             </div>
 
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5 justify-self-end">
