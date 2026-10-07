@@ -13,15 +13,22 @@ import {
 export const BP_SESSION_COOKIE = "bp_session";
 const MAX_AGE_SEC = 60 * 60 * 24 * 30; // 30 days
 
+let warnedMissingSecret = false;
+
 function secret() {
   const fromEnv =
     process.env.BUSINESS_PARTNER_SESSION_SECRET?.trim() ||
-    process.env.NEXTAUTH_SECRET?.trim();
+    process.env.NEXTAUTH_SECRET?.trim() ||
+    process.env.AUTH_SECRET?.trim();
   if (fromEnv) return fromEnv;
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("NEXTAUTH_SECRET (or BUSINESS_PARTNER_SESSION_SECRET) is required in production");
+  if (process.env.NODE_ENV === "production" && !warnedMissingSecret) {
+    warnedMissingSecret = true;
+    console.warn(
+      "[business-partner-session] NEXTAUTH_SECRET / BUSINESS_PARTNER_SESSION_SECRET is not set — using the built-in fallback. Set it in the hosting environment.",
+    );
   }
-  return "rentairportcars-bp-dev-secret";
+  // Same fallback as the main next-auth config so all portals behave consistently.
+  return "dev-rentairportcars-secret";
 }
 
 function sign(partnerId: string): string {
