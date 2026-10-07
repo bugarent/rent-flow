@@ -43,8 +43,23 @@ export function asCardLocale(locale: string): Locale {
 const GEORGIAN_SCRIPT = /[\u10A0-\u10FF]/;
 
 /** Language the admin typed the base title/info in (Georgian script → ka, otherwise en). */
+export function airportCopySourceLocale(card: { title?: string; infoText?: string }): Locale {
+  return GEORGIAN_SCRIPT.test(`${card.title || ""} ${card.infoText || ""}`) ? "ka" : "en";
+}
+
 function sourceLocale(card: LocalizableAirportCard): Locale {
-  return GEORGIAN_SCRIPT.test(`${card.title} ${card.infoText || ""}`) ? "ka" : "en";
+  return airportCopySourceLocale(card);
+}
+
+/** Locales that still need a translated preface. The source language uses `infoText` itself. */
+export function missingAirportInfoLocales(card: LocalizableAirportCard): Locale[] {
+  const base = String(card.infoText || "").trim();
+  if (!base) return [];
+  const source = sourceLocale(card);
+  return LOCALES.filter((lang) => {
+    if (lang === source) return false;
+    return !card.translations?.[lang]?.infoText?.trim();
+  });
 }
 
 function autoTitle(locale: Locale, iata: string): string | null {

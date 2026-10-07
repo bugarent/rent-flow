@@ -24,9 +24,9 @@ export function AirportCardTranslationsFields({
     heading: uiText(adminLocale, "Translations", "თარგმანები", "Переводы"),
     hint: uiText(
       adminLocale,
-      "Empty fields use an automatic title for known airports and the main text above.",
-      "ცარიელი ველის შემთხვევაში ცნობილ აეროპორტებს ავტომატური სათაური ექნება, ტექსტი კი — ზემოთ მითითებული.",
-      "Пустые поля: для известных аэропортов — автоматический заголовок, текст — основной выше.",
+      "The preface is translated automatically into the visitor's language. Fill a language here only to replace that translation.",
+      "წინასიტყვაობა ავტომატურად ითარგმნება ვიზიტორის ენაზე. აქ ენა მხოლოდ მაშინ შეავსეთ, თუ თარგმანი უნდა შეცვალოთ.",
+      "Предисловие переводится на язык посетителя автоматически. Заполняйте язык здесь только чтобы заменить перевод.",
     ),
     language: uiText(adminLocale, "Language", "ენა", "Язык"),
     title: uiText(adminLocale, "Title in this language", "სათაური ამ ენაზე", "Заголовок на этом языке"),

@@ -8,8 +8,10 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
 import {
   cleanAirportTranslations,
+  missingAirportInfoLocales,
   type AirportCardTranslations,
 } from "@/lib/catalog/homepage-airport-i18n";
+import type { Locale } from "@/lib/i18n/config";
 
 export type StoredHomepageAirport = {
   id: string;
@@ -130,6 +132,98 @@ function toStored(row: Record<string, unknown>): StoredHomepageAirport {
   };
 }
 
+function mergeInfoTranslations(
+  current: AirportCardTranslations,
+  translated: Partial<Record<Locale, string>>,
+): AirportCardTranslations {
+  const next: AirportCardTranslations = { ...current };
+  for (const [code, text] of Object.entries(translated)) {
+    const infoText = String(text || "").trim();
+    if (!infoText) continue;
+    const lang = code as Locale;
+    next[lang] = { ...next[lang], infoText };
+  }
+  return cleanAirportTranslations(next);
+}
+
+function dropInfoTranslations(current: AirportCardTranslations): AirportCardTranslations {
+  const next: AirportCardTranslations = {};
+  for (const [code, row] of Object.entries(current)) {
+    const title = row?.title?.trim();
+    if (title) next[code as Locale] = { title };
+  }
+  return next;
+}
+
+const prefaceQueue = new Map<string, Promise<unknown>>();
+
+function enqueuePreface<T>(id: string, job: () => Promise<T>): Promise<T> {
+  const prev = prefaceQueue.get(id) ?? Promise.resolve();
+  const run = prev.then(job, job);
+  prefaceQueue.set(
+    id,
+    run.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return run;
+}
+
+async function persistInfoTranslations(id: string, translations: AirportCardTranslations) {
+  const rows = await readFileStore();
+  const index = rows.findIndex((row) => row.id === id);
+  if (index < 0) return null;
+  const updated: StoredHomepageAirport = {
+    ...rows[index],
+    translations: cleanAirportTranslations(translations),
+    updatedAt: new Date().toISOString(),
+  };
+  rows[index] = updated;
+  await writeFileStore(rows);
+  return updated;
+}
+
+async function fillPrefaceLocales(airport: StoredHomepageAirport, locales: Locale[]) {
+  if (!locales.length || !airport.infoText.trim()) return airport;
+  const { translateAirportPreface } = await import("@/lib/server/translate-airport-preface");
+  const chunkSize = 5;
+  let current = airport;
+  for (let i = 0; i < locales.length; i += chunkSize) {
+    const chunk = locales.slice(i, i + chunkSize);
+    const translated = await translateAirportPreface(current.infoText, chunk);
+    if (!Object.keys(translated).length) continue;
+    const saved = await persistInfoTranslations(current.id, mergeInfoTranslations(current.translations, translated));
+    if (saved) current = saved;
+  }
+  return current;
+}
+
+/** Store missing preface translations. The visitor's language is written first. */
+export async function ensureAirportPrefaceTranslations(
+  airport: StoredHomepageAirport,
+  preferLocale?: string,
+  opts?: { onlyPreferred?: boolean },
+): Promise<StoredHomepageAirport> {
+  const missing = missingAirportInfoLocales(airport);
+  if (!missing.length) return airport;
+  return enqueuePreface(airport.id, async () => {
+    const fresh = (await readFileStore()).find((row) => row.id === airport.id) ?? airport;
+    const stillMissing = missingAirportInfoLocales(fresh);
+    if (!stillMissing.length) return fresh;
+    const preferred = stillMissing.find((code) => code === preferLocale);
+    if (opts?.onlyPreferred) {
+      if (!preferred) return fresh;
+      const saved = await fillPrefaceLocales(fresh, [preferred]);
+      const rest = missingAirportInfoLocales(saved);
+      if (rest.length) void enqueuePreface(saved.id, () => fillPrefaceLocales(saved, rest));
+      return saved;
+    }
+    const ordered = preferred ? [preferred, ...stillMissing.filter((code) => code !== preferred)] : stillMissing;
+    return fillPrefaceLocales(fresh, ordered);
+  });
+}
+
 async function createInFileStore(input: {
   title: string;
   iata: string;
@@ -195,25 +289,27 @@ export async function createHomepageAirport(input: {
   };
 
   const db = getDbDelegate();
-  if (!db) return createInFileStore(payload);
-
-  try {
-    const max = await db.aggregate({ _max: { sortOrder: true } });
-    const row = await db.create({
-      data: {
-        title: payload.title,
-        iata: payload.iata,
-        imageUrl: payload.imageUrl,
-        sortOrder: (max._max.sortOrder ?? -1) + 1,
-      },
-    });
-    const stored = { ...toStored(row), infoText: payload.infoText, translations: payload.translations };
-    await publishFromDb(db, stored);
-    return stored;
-  } catch (error) {
-    console.warn("[homepage-airports] DB create failed, using file store:", error);
-    return createInFileStore(payload);
-  }
+  const created = await (async () => {
+    if (!db) return createInFileStore(payload);
+    try {
+      const max = await db.aggregate({ _max: { sortOrder: true } });
+      const row = await db.create({
+        data: {
+          title: payload.title,
+          iata: payload.iata,
+          imageUrl: payload.imageUrl,
+          sortOrder: (max._max.sortOrder ?? -1) + 1,
+        },
+      });
+      const stored = { ...toStored(row), infoText: payload.infoText, translations: payload.translations };
+      await publishFromDb(db, stored);
+      return stored;
+    } catch (error) {
+      console.warn("[homepage-airports] DB create failed, using file store:", error);
+      return createInFileStore(payload);
+    }
+  })();
+  return ensureAirportPrefaceTranslations(created);
 }
 
 export async function updateHomepageAirport(
@@ -247,30 +343,38 @@ export async function updateHomepageAirport(
     return updated;
   };
 
+  const previousInfo = (await readFileStore()).find((row) => row.id === id)?.infoText ?? "";
   const db = getDbDelegate();
-  if (!db) return applyFileUpdate();
-
-  try {
-    const row = await db.update({
-      where: { id },
-      data: {
-        title: input.title?.trim(),
-        iata: input.iata ? input.iata.trim().toUpperCase() : undefined,
-        imageUrl: input.imageUrl?.trim(),
-      },
-    });
-    const previous = (await readFileStore()).find((row) => row.id === id);
-    const stored = {
-      ...toStored(row),
-      infoText: input.infoText?.trim() ?? previous?.infoText ?? "",
-      translations: nextTranslations ?? previous?.translations ?? {},
-    };
-    await publishFromDb(db, stored);
-    return stored;
-  } catch (error) {
-    console.warn("[homepage-airports] DB update failed, using file store:", error);
-    return applyFileUpdate();
-  }
+  const updated = await (async () => {
+    if (!db) return applyFileUpdate();
+    try {
+      const row = await db.update({
+        where: { id },
+        data: {
+          title: input.title?.trim(),
+          iata: input.iata ? input.iata.trim().toUpperCase() : undefined,
+          imageUrl: input.imageUrl?.trim(),
+        },
+      });
+      const previous = (await readFileStore()).find((row) => row.id === id);
+      const stored = {
+        ...toStored(row),
+        infoText: input.infoText?.trim() ?? previous?.infoText ?? "",
+        translations: nextTranslations ?? previous?.translations ?? {},
+      };
+      await publishFromDb(db, stored);
+      return stored;
+    } catch (error) {
+      console.warn("[homepage-airports] DB update failed, using file store:", error);
+      return applyFileUpdate();
+    }
+  })();
+  const infoChanged =
+    input.infoText !== undefined && input.infoText.trim() !== previousInfo.trim();
+  const base = infoChanged
+    ? (await persistInfoTranslations(updated.id, dropInfoTranslations(updated.translations))) ?? updated
+    : updated;
+  return ensureAirportPrefaceTranslations(base);
 }
 
 export async function deleteHomepageAirport(id: string): Promise<void> {

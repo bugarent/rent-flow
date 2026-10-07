@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { localizedAirportInfo, localizedAirportTitle } from "@/lib/catalog/homepage-airport-i18n";
-import { listHomepageAirports } from "@/lib/server/homepage-airports-store";
+import {
+  ensureAirportPrefaceTranslations,
+  listHomepageAirports,
+} from "@/lib/server/homepage-airports-store";
 import { readPreferences } from "@/lib/server/preferences";
 
 export const dynamic = "force-dynamic";
@@ -37,10 +40,11 @@ export default async function AirportInfoPage({
   params: Promise<{ iata: string }>;
 }) {
   const { iata } = await params;
-  const airport = await findAirport(iata);
-  if (!airport) notFound();
+  const found = await findAirport(iata);
+  if (!found) notFound();
 
   const { locale } = await readPreferences();
+  const airport = await ensureAirportPrefaceTranslations(found, locale, { onlyPreferred: true });
   const title = localizedAirportTitle(airport, locale);
   const text = localizedAirportInfo(airport, locale);
 
