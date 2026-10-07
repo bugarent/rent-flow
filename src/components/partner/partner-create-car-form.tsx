@@ -210,7 +210,7 @@ const HEADER_BORDER_ALERT = "#b91c1c";
 const HEADER_TEXT_ALERT = "#7f1d1d";
 const ACCENT_GREEN = "#28a745";
 
-const CONTENT_MAX = "calc(100% - 7cm)";
+const CONTENT_MAX = "lg:max-w-[calc(100%-7cm)]";
 
 const inputClass =
   "w-full rounded-md border border-[#c5ced8] bg-white px-2.5 py-1.5 text-xs text-[#1f2937] outline-none transition placeholder:text-[#9aa3af] focus:border-[#5b4a8a] focus:ring-1 focus:ring-[#5b4a8a]/20";
@@ -1925,8 +1925,10 @@ export function PartnerCreateCarForm({
           </div>
         ) : null}
         <nav
-          className="mx-auto flex w-full gap-0.5 overflow-x-auto px-2 py-0.5 text-[11px] font-semibold sm:px-4 lg:px-6"
-          style={{ maxWidth: CONTENT_MAX }}
+          className={cn(
+            "mx-auto flex w-full gap-0.5 overflow-x-auto px-2 py-0.5 text-[11px] font-semibold sm:px-4 lg:px-6",
+            CONTENT_MAX,
+          )}
           aria-label={dictionary.calendar.addCar}
         >
           {SECTION_IDS.map((id) => (
@@ -1961,8 +1963,8 @@ export function PartnerCreateCarForm({
         className={cn(
           "relative z-10 mx-auto w-full flex-1 px-2 py-2 sm:px-3",
           isAdminReview ? "pb-44 pointer-events-none select-none [&_a]:pointer-events-auto" : "pb-28",
+          CONTENT_MAX,
         )}
-        style={{ maxWidth: CONTENT_MAX }}
       >
         <div
           className={cn(
@@ -3048,7 +3050,7 @@ export function PartnerCreateCarForm({
 
       <footer
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 border-t px-4 py-2 backdrop-blur-md sm:px-6 lg:px-8",
+          "fixed inset-x-0 bottom-0 z-50 border-t px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:px-6 lg:px-8",
           isAdminReview && "pointer-events-auto",
         )}
         style={{
@@ -3057,7 +3059,7 @@ export function PartnerCreateCarForm({
           color: awaitingAdminModeration ? HEADER_TEXT_ALERT : HEADER_TEXT,
         }}
       >
-        <div className="mx-auto w-full" style={{ maxWidth: CONTENT_MAX }}>
+        <div className={cn("mx-auto w-full", CONTENT_MAX)}>
           {error ? (
             <div className="mb-2 rounded-md bg-red-500/95 px-3 py-2 text-sm font-semibold text-white">{error}</div>
           ) : null}
@@ -3072,19 +3074,19 @@ export function PartnerCreateCarForm({
                 value={adminNote}
                 onChange={(e) => setAdminNote(e.target.value)}
                 rows={2}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 sm:text-sm"
                 placeholder={
                   locale === "ka"
                     ? "კომენტარი პარტნიორისთვის (უარყოფისას სავალდებულო)…"
                     : "Comment for partner (required when rejecting)…"
                 }
               />
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
                 <button
                   type="button"
                   disabled={adminBusy}
                   onClick={() => void runAdminAction("APPROVED")}
-                  className="rounded-md bg-green-600 px-4 py-1.5 text-xs font-extrabold text-white disabled:opacity-60"
+                  className="inline-flex min-h-10 items-center justify-center rounded-md bg-green-600 px-3 py-1.5 text-xs font-extrabold text-white disabled:opacity-60 sm:px-4"
                 >
                   {locale === "ka" ? "თანხმობა" : "Approve"}
                 </button>
@@ -3092,13 +3094,13 @@ export function PartnerCreateCarForm({
                   type="button"
                   disabled={adminBusy}
                   onClick={() => setRejectModalOpen(true)}
-                  className="rounded-md bg-amber-500 px-4 py-1.5 text-xs font-extrabold text-white disabled:opacity-60"
+                  className="inline-flex min-h-10 items-center justify-center rounded-md bg-amber-500 px-3 py-1.5 text-xs font-extrabold text-white disabled:opacity-60 sm:px-4"
                 >
                   {locale === "ka" ? "უარყოფა" : "Reject"}
                 </button>
                 <Link
                   href={adminReview.backHref}
-                  className="rounded-md border border-slate-300 bg-white px-4 py-1.5 text-xs font-bold text-slate-700"
+                  className="inline-flex min-h-10 items-center justify-center min-w-0 break-words rounded-md border border-slate-300 bg-white px-3 py-1.5 text-center text-xs font-bold text-slate-700 sm:px-4"
                 >
                   {adminReview.backLabel}
                 </Link>
