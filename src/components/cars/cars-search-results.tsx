@@ -7,7 +7,6 @@ import { carsSearchHeading } from "@/components/cars/cars-search-heading";
 import { SEARCH_EXTRA } from "@/components/cars/cars-search-locale-copy";
 import type { SearchAirportOption } from "@/components/search/airport-search";
 import {
-  Calendar,
   Check,
   Leaf,
   Search,
@@ -119,7 +118,6 @@ const COPY: Record<
   {
     carsAvailable: string;
     searchPlaceholder: string;
-    allYears: string;
     newCars: string;
     familySuv: string;
     noDeposit: string;
@@ -201,7 +199,6 @@ const COPY: Record<
   en: {
     carsAvailable: "{n} cars available",
     searchPlaceholder: "All brands",
-    allYears: "All years",
     newCars: "New cars {year}+",
     familySuv: "Family SUVs",
     noDeposit: "No deposit",
@@ -282,7 +279,6 @@ const COPY: Record<
   ka: {
     carsAvailable: "{n} მანქანები ხელმისაწვდომია",
     searchPlaceholder: "ყველა მარკა",
-    allYears: "ყველა წელი",
     newCars: "ახალი მანქანები {year}+",
     familySuv: "საოჯახო SUV-ები",
     noDeposit: "დეპოზიტის გარეშე",
@@ -363,7 +359,6 @@ const COPY: Record<
   ru: {
     carsAvailable: "{n} авто доступно",
     searchPlaceholder: "Все марки",
-    allYears: "Все годы",
     newCars: "Новые {year}+",
     familySuv: "Семейные SUV",
     noDeposit: "Без депозита",
@@ -444,7 +439,6 @@ const COPY: Record<
   fr: {
     carsAvailable: "{n} voitures disponibles",
     searchPlaceholder: "Toutes les marques",
-    allYears: "Toutes les années",
     newCars: "Voitures neuves {year}+",
     familySuv: "SUV familiaux",
     noDeposit: "Sans caution",
@@ -525,7 +519,6 @@ const COPY: Record<
   de: {
     carsAvailable: "{n} Autos verfügbar",
     searchPlaceholder: "Alle Marken",
-    allYears: "Alle Jahre",
     newCars: "Neue Autos {year}+",
     familySuv: "Familien-SUVs",
     noDeposit: "Ohne Kaution",
@@ -606,7 +599,6 @@ const COPY: Record<
   pl: {
     carsAvailable: "{n} dostępnych aut",
     searchPlaceholder: "Wszystkie marki",
-    allYears: "Wszystkie lata",
     newCars: "Nowe auta {year}+",
     familySuv: "Rodzinne SUV-y",
     noDeposit: "Bez depozytu",
@@ -687,7 +679,6 @@ const COPY: Record<
   ar: {
     carsAvailable: "{n} سيارات متاحة",
     searchPlaceholder: "جميع العلامات",
-    allYears: "جميع السنوات",
     newCars: "سيارات جديدة {year}+",
     familySuv: "SUV عائلية",
     noDeposit: "بدون تأمين",
@@ -1281,18 +1272,6 @@ export function CarsSearchResults({
             </span>
           </label>
 
-          <FilterPill
-            active={!quick.has("new2020")}
-            onClick={() =>
-              setQuick((prev) => {
-                const next = new Set(prev);
-                next.delete("new2020");
-                return next;
-              })
-            }
-            icon={<Calendar className="h-3 w-3" />}
-            label={c.allYears}
-          />
           <FilterPill
             active={quick.has("new2020")}
             onClick={() => toggleQuick("new2020")}
