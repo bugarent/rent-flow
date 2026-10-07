@@ -1,0 +1,20 @@
+---
+description: After every code or content change, make the running site show it immediately
+alwaysApply: true
+---
+
+# Instant site updates
+
+Writing a file is not done until the running site shows that change. Finish in the same turn.
+
+## Before you finish
+
+1. Confirm the dev server compiled the edit (terminal or `.next/dev/logs/next-development.log`). A syntax error means the page is still the old version — fix it before saying the change is done.
+2. Open the affected route in the browser and confirm the new behavior. Hard-refresh if the document looks stale.
+3. When layout or UI changed, check the same screen at phone width (~390px).
+4. `next start` serves the last production build. Source edits do not appear there until a new build and restart. Use `next dev` for live edits. Do not rebuild or restart production unless the user asked to deploy.
+
+## Saves that change public content
+
+- On write, store the new value in the in-memory cache (`cache.set`) and call `revalidatePublishedContent()` so the next request is the new content.
+- Do not put a long `Cache-Control` max-age on HTML or on JSON the public site must refresh. Use `no-store` for those responses.
