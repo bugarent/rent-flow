@@ -490,7 +490,7 @@ export const partnerUiEn: PartnerUiPack = {
     uploading: "Uploading…",
     cover: "Cover",
     coverHint:
-      "The cover is created automatically in studio style from your first uploaded photo. Gallery photos stay exactly as uploaded.",
+      "The photo in the first slot is the cover. Drag photos to change the order.",
     coverNeedIdentity: "Choose the make, model, year, and color before the cover photo.",
     coverStyleFailed: "The studio cover could not be created. Try again.",
     dragImage: "Drag the image or",
@@ -778,7 +778,7 @@ export const partnerUiKa: PartnerUiPack = {
     uploading: "იტვირთება…",
     cover: "ყდა",
     coverHint:
-      "ყდის სურათი ავტომატურად იქმნება სტუდიურ სტილში თქვენი პირველი ატვირთული ფოტოდან. გალერეის ფოტოები რჩება ზუსტად ისე, როგორც ატვირთულია.",
+      "პირველ უჯრაში ატვირთული ფოტო არის ყდის სურათი. რიგის შესაცვლელად გადაათრიეთ ფოტოები.",
     coverNeedIdentity: "ყდის სურათისთვის ჯერ აირჩიეთ მარკა, მოდელი, წელი და ფერი.",
     coverStyleFailed: "ყდის სტუდიური სურათი ვერ შეიქმნა. სცადეთ თავიდან.",
     dragImage: "გადაიტანეთ სურათი ან",
@@ -1067,7 +1067,7 @@ export const partnerUiRu: PartnerUiPack = {
     uploading: "Загрузка…",
     cover: "Обложка",
     coverHint:
-      "Обложка создаётся автоматически в студийном стиле из первого загруженного фото. Фото галереи остаются как загружены.",
+      "Фото в первой ячейке — это обложка. Перетащите фото, чтобы изменить порядок.",
     coverNeedIdentity: "Перед обложкой выберите марку, модель, год и цвет.",
     coverStyleFailed: "Не удалось создать студийную обложку. Попробуйте ещё раз.",
     dragImage: "Перетащите изображение или",

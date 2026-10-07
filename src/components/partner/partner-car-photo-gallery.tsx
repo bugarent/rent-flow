@@ -133,41 +133,43 @@ export function PartnerCarPhotoGallery({
 
   const handleFilesAt = async (index: number, files: FileList | null) => {
     if (!files?.length) return;
-    const placeAt = index === 0 ? 1 : index;
-    const picked = Array.from(files).slice(0, SLOT_COUNT - placeAt);
+    // First file goes into the clicked slot, extra files into the next empty slots.
+    const current = padSlots(photosRef.current);
+    const targets = [index];
+    for (let at = 0; at < SLOT_COUNT && targets.length < files.length; at += 1) {
+      if (at !== index && !current[at]) targets.push(at);
+    }
+    const picked = Array.from(files).slice(0, targets.length);
     if (!picked.length) return;
     const localUrls = picked.map((file) => URL.createObjectURL(file));
     const optimistic = padSlots(photosRef.current);
     localUrls.forEach((localUrl, i) => {
-      const at = placeAt + i;
-      if (at > 0 && at < SLOT_COUNT) optimistic[at] = localUrl;
+      optimistic[targets[i]] = localUrl;
     });
     commitSlots(optimistic);
+
+    const clearBlobs = () => {
+      const next = padSlots(photosRef.current);
+      localUrls.forEach((_, i) => {
+        if (next[targets[i]]?.startsWith("blob:")) next[targets[i]] = "";
+      });
+      commitSlots(next);
+    };
 
     try {
       const result = await onUploadFiles(picked, index);
       const urls = result.urls;
-      const next = padSlots(photosRef.current);
-      if (urls.length || result.coverUrl) {
-        urls.forEach((url, i) => {
-          const at = placeAt + i;
-          if (at > 0 && at < SLOT_COUNT) next[at] = normalizePhotoUrl(url) || next[at];
-        });
-        if (result.coverUrl) next[0] = normalizePhotoUrl(result.coverUrl) || next[0];
-      } else {
-        localUrls.forEach((_, i) => {
-          const at = placeAt + i;
-          if (at > 0 && at < SLOT_COUNT && next[at]?.startsWith("blob:")) next[at] = "";
-        });
+      if (!urls.length) {
+        clearBlobs();
+        return;
       }
-      commitSlots(next);
-    } catch {
       const next = padSlots(photosRef.current);
-      localUrls.forEach((_, i) => {
-        const at = placeAt + i;
-        if (at > 0 && at < SLOT_COUNT && next[at]?.startsWith("blob:")) next[at] = "";
+      urls.forEach((url, i) => {
+        if (i < targets.length) next[targets[i]] = normalizePhotoUrl(url) || next[targets[i]];
       });
       commitSlots(next);
+    } catch {
+      clearBlobs();
     } finally {
       window.setTimeout(() => {
         localUrls.forEach((u) => URL.revokeObjectURL(u));
@@ -321,10 +323,14 @@ export function PartnerCarPhotoGallery({
   );
 }
 
+function isSavedPhotoUrl(url: string) {
+  return Boolean(url) && !url.startsWith("blob:");
+}
+
 export function filledPhotoCount(photos: string[]) {
-  return padSlots(photos).filter(Boolean).length;
+  return padSlots(photos).filter(isSavedPhotoUrl).length;
 }
 
 export function photosForSave(photos: string[]) {
-  return padSlots(photos).filter(Boolean);
+  return padSlots(photos).filter(isSavedPhotoUrl);
 }

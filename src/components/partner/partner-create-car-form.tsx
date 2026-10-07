@@ -352,19 +352,10 @@ async function uploadFile(file: File, options?: { original?: boolean }): Promise
   return { url: String(data.url), styled: Boolean(data.styled) };
 }
 
-function placeStudioCover(photos: string[], url: string) {
-  const next = Array.from({ length: MIN_PUBLIC_PHOTOS }, (_, index) => String(photos[index] || "").trim());
-  const current = next[0];
-  if (current && current !== url && !isStudioCoverUrl(current)) {
-    const empty = next.findIndex((slot, index) => index > 0 && !slot);
-    if (empty > 0) next[empty] = current;
-    else {
-      for (let index = next.length - 1; index > 1; index -= 1) next[index] = next[index - 1] || "";
-      next[1] = current;
-    }
-  }
-  next[0] = url;
-  return next;
+/** Form slots for saved photos; old auto-generated studio covers are dropped so the first real photo is the cover. */
+function photoSlotsFromSaved(urls: string[]) {
+  const own = urls.map((url) => String(url || "").trim()).filter((url) => url && !isStudioCoverUrl(url));
+  return Array.from({ length: MIN_PUBLIC_PHOTOS }, (_, index) => own[index] || "");
 }
 
 const NO_DELIVERY_CATALOG: DeliveryLocationView[] = [];
@@ -641,7 +632,7 @@ export function PartnerCreateCarForm({
           setEbd(Boolean(details?.ebd));
           setEsp(Boolean(details?.esp));
           setMusic(Array.isArray(details?.music) ? details.music.map(String) : []);
-          setPhotos(Array.from({ length: MIN_PUBLIC_PHOTOS }, (_, i) => photoUrls[i] || ""));
+          setPhotos(photoSlotsFromSaved(photoUrls));
           setPassportFront(String(car.passport?.frontUrl || ""));
           setPassportBack(String(car.passport?.backUrl || ""));
           setInsuranceUrl(String(car.insuranceUrl || car.passport?.insuranceUrl || ""));
@@ -1017,9 +1008,7 @@ export function PartnerCreateCarForm({
           setEsp(Boolean(details?.esp));
           setMusic(Array.isArray(details?.music) ? details.music.map(String) : []);
 
-          setPhotos(
-            Array.from({ length: MIN_PUBLIC_PHOTOS }, (_, i) => photoUrls[i] || ""),
-          );
+          setPhotos(photoSlotsFromSaved(photoUrls));
           setPassportFront(String(car.passport?.frontUrl || ""));
           setPassportBack(String(car.passport?.backUrl || ""));
           setInsuranceUrl(String(car.insuranceUrl || car.passport?.insuranceUrl || ""));
@@ -1222,62 +1211,6 @@ export function PartnerCreateCarForm({
       cancelled = true;
     };
   }, [carId, cc.errUpdateFailed, initialDeliveryCatalog, isAdminReview]);
-
-  const [coverTick, setCoverTick] = useState(0);
-  const [coverBusy, setCoverBusy] = useState(false);
-  const studioReq = useRef(0);
-  /** Gallery photo the current cover was built from (or the one present when the listing loaded). */
-  const coverSourceRef = useRef<string | null>(null);
-  /** True after the partner deletes the cover; cleared by the next new photo upload. */
-  const coverDismissedRef = useRef(false);
-  const coverSource =
-    photos.slice(1).find((url) => {
-      const value = String(url || "").trim();
-      return value && !value.startsWith("blob:") && !isStudioCoverUrl(value);
-    }) || "";
-  const hasCover = Boolean(String(photos[0] || "").trim()) && !String(photos[0]).startsWith("blob:");
-  useEffect(() => {
-    if (isAdminReview || booting || !coverSource || coverDismissedRef.current) return;
-    if (coverSourceRef.current === null && hasCover) {
-      coverSourceRef.current = coverSource;
-      return;
-    }
-    if (coverSourceRef.current === coverSource && hasCover) return;
-    const identity = { make: make.trim(), model: model.trim(), year: year.trim(), color: color.trim() };
-    const timer = window.setTimeout(() => {
-      const req = ++studioReq.current;
-      setCoverBusy(true);
-      void (async () => {
-        try {
-          const res = await fetch("/api/partners/studio-cover", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...identity, photoUrl: coverSource }),
-          });
-          const data = (await res.json().catch(() => null)) as { url?: string } | null;
-          if (req !== studioReq.current) return;
-          if (!res.ok || !data?.url) {
-            setError(cc.coverStyleFailed);
-            return;
-          }
-          coverSourceRef.current = coverSource;
-          setPhotos((prev) => placeStudioCover(prev, data.url!));
-          setError((current) => (current === cc.coverStyleFailed ? "" : current));
-        } catch {
-          if (req === studioReq.current) setError(cc.coverStyleFailed);
-        } finally {
-          if (req === studioReq.current) setCoverBusy(false);
-        }
-      })();
-    }, 400);
-    return () => {
-      window.clearTimeout(timer);
-      studioReq.current += 1;
-      setCoverBusy(false);
-    };
-    // make/model/year/color only enrich the prompt; the photo drives regeneration.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coverSource, hasCover, booting, isAdminReview, cc.coverStyleFailed, coverTick]);
 
   useEffect(() => {
     const nodes = SECTION_IDS.map((id) => document.getElementById(id)).filter(Boolean) as HTMLElement[];
@@ -2779,27 +2712,8 @@ export function PartnerCreateCarForm({
         >
           <PartnerCarPhotoGallery
             photos={photos}
-            onChange={(incoming) => {
-              const next = [...incoming];
-              const before = new Set(photos.map((url) => String(url || "").trim()).filter(Boolean));
-              const newUpload = next.some((url, index) => {
-                const value = String(url || "").trim();
-                return index > 0 && value && !value.startsWith("blob:") && !before.has(value);
-              });
-              if (newUpload) coverDismissedRef.current = false;
-              else if (String(photos[0] || "").trim() && !String(next[0] || "").trim()) {
-                // Partner deleted the cover: keep it empty until a new photo is uploaded.
-                coverDismissedRef.current = true;
-              }
-              const sourceLeft = next.slice(1).some((url) => {
-                const value = String(url || "").trim();
-                return value && !value.startsWith("blob:") && !isStudioCoverUrl(value);
-              });
-              if (!sourceLeft && isStudioCoverUrl(String(next[0] || ""))) next[0] = "";
-              setPhotos(next);
-              if (newUpload) setCoverTick((tick) => tick + 1);
-            }}
-            uploading={uploading || coverBusy}
+            onChange={setPhotos}
+            uploading={uploading}
             onUploadFiles={onGalleryFiles}
             invalid={fieldInvalid("photos")}
             accentColor={ACCENT_GREEN}
@@ -3133,7 +3047,7 @@ export function PartnerCreateCarForm({
               <>
                 <button
                   type="button"
-                  disabled={loading || uploading || coverBusy || booting || deleting}
+                  disabled={loading || uploading || booting || deleting}
                   onClick={() => void save("update")}
                   className="inline-flex items-center gap-1.5 rounded-md px-4 py-1.5 text-xs font-bold text-white shadow-sm disabled:opacity-60"
                   style={{ backgroundColor: ACCENT_GREEN }}
@@ -3143,7 +3057,7 @@ export function PartnerCreateCarForm({
                 </button>
                 <button
                   type="button"
-                  disabled={loading || uploading || coverBusy || booting || deleting}
+                  disabled={loading || uploading || booting || deleting}
                   onClick={() => void deleteListing()}
                   className="inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-white px-4 py-1.5 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-60"
                 >
@@ -3155,7 +3069,7 @@ export function PartnerCreateCarForm({
               <>
                 <button
                   type="button"
-                  disabled={loading || uploading || coverBusy}
+                  disabled={loading || uploading}
                   onClick={() => void save("sales")}
                   className="inline-flex items-center gap-1.5 rounded-md px-4 py-1.5 text-xs font-bold text-white shadow-sm disabled:opacity-60"
                   style={{ backgroundColor: ACCENT_GREEN }}
@@ -3165,7 +3079,7 @@ export function PartnerCreateCarForm({
                 </button>
                 <button
                   type="button"
-                  disabled={loading || uploading || coverBusy}
+                  disabled={loading || uploading}
                   onClick={() => void save("internal")}
                   className="inline-flex items-center gap-1.5 rounded-md border bg-white/70 px-4 py-1.5 text-xs font-bold hover:bg-white disabled:opacity-60"
                   style={{ borderColor: HEADER_BORDER, color: HEADER_TEXT }}
