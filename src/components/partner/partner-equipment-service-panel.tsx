@@ -19,11 +19,7 @@ import {
   PartnerExtraCarPicker,
   type PartnerExtraCarOption,
 } from "@/components/partner/partner-extra-car-picker";
-import {
-  MobileDataCard,
-  MobileDataRow,
-  ResponsiveDataList,
-} from "@/components/ui/responsive-data-list";
+import { ResponsiveDataList } from "@/components/ui/responsive-data-list";
 import { cn, formatAmountNumber } from "@/lib/utils";
 
 type OfferMode = "on" | "forbidden" | "off";
@@ -103,6 +99,7 @@ function uiCopy(locale: string) {
       on: "ჩართული",
       forbidden: "აკრძალულია",
       off: "გამორთული",
+      done: "მზადაა",
       name: "დასახელება",
       description: "აღწერა",
       delete: "წაშლა",
@@ -156,6 +153,7 @@ function uiCopy(locale: string) {
       on: "Включено",
       forbidden: "Запрещено",
       off: "Выключено",
+      done: "Готово",
       name: "Название",
       description: "Описание",
       delete: "Удалить",
@@ -207,6 +205,7 @@ function uiCopy(locale: string) {
     on: "On",
     forbidden: "Forbidden",
     off: "Off",
+    done: "Done",
     name: "Name",
     description: "Description",
     delete: "Delete",
@@ -290,6 +289,7 @@ export function PartnerEquipmentServicePanel({
   const [savedFlash, setSavedFlash] = useState(false);
   const [error, setError] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [openServiceId, setOpenServiceId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
@@ -1222,11 +1222,6 @@ export function PartnerEquipmentServicePanel({
                       dailyNum <= 0;
                     const priceCell =
                       row.mode === "off" ? "—" : dailyIsZero ? "€0" : `€${formatAmountNumber(dailyNum)}`;
-                    const periodCell = (raw: string) => {
-                      if (row.mode !== "on" || dailyIsZero) return "—";
-                      const n = optionalPeriodMoney(raw);
-                      return n == null ? "—" : `€${formatAmountNumber(n)}`;
-                    };
                     const adminDailyMin = row.adminMinDaily;
                     const adminDailyMax = row.adminMaxDaily;
                     const adminPeriodMax = periodFree
@@ -1257,109 +1252,198 @@ export function PartnerEquipmentServicePanel({
                           : adminPeriodMax != null && adminPeriodMax > 0
                             ? t.adminCap.replace("{n}", formatAmountNumber(adminPeriodMax))
                             : t.adminNoCap;
-                    const carsLabel = carSummary(row.carIds, cars, t.carsCount);
-                    const colon = carsLabel.indexOf(":");
+                    const open = openServiceId === row.service.id;
+                    const maxCap = row.adminMaxDaily;
+                    const dailyLocked = mandatory || periodFree || (maxCap != null && maxCap <= 0);
+                    const periodLocked = mandatory || periodFree || dailyIsZero;
+                    const canEditPrices = !mandatory;
+                    const applyMode = (mode: OfferMode) => {
+                      setRow(row.service.id, {
+                        mode,
+                        priceEur: mode === "forbidden" ? "0" : row.priceEur,
+                        ...(mode === "forbidden" ? { minPeriodEur: "", maxPeriodEur: "" } : {}),
+                        carIds:
+                          mode !== "off" && row.carIds.length === 0
+                            ? cars.map((car) => car.id)
+                            : row.carIds,
+                      });
+                    };
                     return (
-                      <MobileDataCard
+                      <article
                         key={row.service.id}
-                        className={mandatoryAny ? "border-l-4 border-l-emerald-500 bg-emerald-50" : undefined}
+                        className={cn(
+                          "rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm",
+                          mandatoryAny && "border-l-4 border-l-emerald-500 bg-emerald-50",
+                        )}
                       >
-                        <MobileDataRow label={t.colService}>
-                          <div className="text-end">
-                            <p className="font-bold text-[#0b1f4b]">{localizedExtraCopy(locale, row.service.name, row.service.nameI18n)}</p>
-                            {row.service.description ? (
-                              <p className="mt-0.5 line-clamp-2 text-xs font-medium text-slate-500">
-                                {localizedExtraCopy(locale, row.service.description, row.service.descriptionI18n)}
-                              </p>
-                            ) : null}
-                            {mandatoryAny ? (
-                              <span
+                        <button
+                          type="button"
+                          disabled={!canEditPrices}
+                          onClick={() => setOpenServiceId(open ? null : row.service.id)}
+                          className="flex min-h-11 w-full items-center gap-2 text-start disabled:cursor-default"
+                          aria-expanded={canEditPrices ? open : undefined}
+                        >
+                          <span className="min-w-0 flex-1 truncate text-sm font-bold text-[#0b1f4b]">
+                            {localizedExtraCopy(locale, row.service.name, row.service.nameI18n)}
+                          </span>
+                          <span className="shrink-0 text-xs font-bold text-slate-500">{priceCell}</span>
+                        </button>
+                        {mandatoryAny ? (
+                          <span
+                            title={t.mandatoryLockedTitle}
+                            className="mb-1 inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white"
+                          >
+                            <Lock className="h-3 w-3" />
+                            {t.mandatoryBadge}
+                          </span>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-1.5 pb-0.5">
+                            {(
+                              [
+                                ["on", t.on, "green"],
+                                ["forbidden", t.forbidden, "red"],
+                                ["off", t.off, "slate"],
+                              ] as const
+                            ).map(([mode, label, tone]) => (
+                              <button
+                                key={mode}
+                                type="button"
+                                onClick={() => applyMode(mode)}
                                 className={cn(
-                                  "mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold",
-                                  mandatory || dailyIsZero
-                                    ? "bg-emerald-50 text-emerald-700"
-                                    : "bg-sky-50 text-sky-700",
+                                  "min-h-11 rounded-md border px-1 text-[11px] font-bold leading-tight",
+                                  tone === "green" &&
+                                    (row.mode === mode
+                                      ? "border-[#28a745] bg-[#28a745] text-white"
+                                      : "border-emerald-200 bg-white text-emerald-700"),
+                                  tone === "red" &&
+                                    (row.mode === mode
+                                      ? "border-red-500 bg-red-600 text-white"
+                                      : "border-red-200 bg-white text-red-600"),
+                                  tone === "slate" &&
+                                    (row.mode === mode
+                                      ? "border-slate-600 bg-slate-600 text-white"
+                                      : "border-slate-200 bg-white text-slate-600"),
                                 )}
                               >
-                                {mandatory || dailyIsZero ? t.mandatoryFree : t.mandatoryPriced}
-                              </span>
-                            ) : row.mode === "forbidden" ? (
-                              <span className="mt-1 inline-block rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
-                                {t.forbidden}
-                              </span>
-                            ) : row.mode === "off" ? (
-                              <span className="mt-1 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
-                                {t.off}
-                              </span>
-                            ) : null}
+                                {label}
+                              </button>
+                            ))}
                           </div>
-                        </MobileDataRow>
-                        <MobileDataRow label={t.colPrice}>
-                          <div className="text-end">
-                            <div>{priceCell}</div>
-                            {dailyCapHint ? (
-                              <p className="mt-0.5 text-[10px] font-medium leading-tight text-amber-800/90">
-                                {dailyCapHint}
-                              </p>
-                            ) : null}
-                          </div>
-                        </MobileDataRow>
-                        <MobileDataRow label={t.colMin}>
-                          <div className="text-end">
-                            <div>{row.mode === "off" ? "—" : periodCell(row.minPeriodEur)}</div>
+                        )}
+                        {open && canEditPrices ? (
+                          <div className="mt-2 space-y-2 border-t border-slate-100 pt-2">
+                            <label className="block">
+                              <span className="mb-1 block text-xs font-semibold text-slate-500">{t.colPrice}</span>
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                min={row.adminMinDaily ?? 0}
+                                max={maxCap != null && maxCap > 0 ? maxCap : undefined}
+                                step="0.01"
+                                disabled={dailyLocked || row.mode !== "on"}
+                                value={dailyLocked ? "0" : row.priceEur}
+                                onChange={(e) => {
+                                  const result = clampDailyInput(
+                                    e.target.value,
+                                    row.adminMinDaily,
+                                    row.adminMaxDaily,
+                                  );
+                                  const dailyZero = Number(result.value) <= 0;
+                                  setRow(row.service.id, {
+                                    priceEur: result.value,
+                                    ...(dailyZero ? { minPeriodEur: "", maxPeriodEur: "" } : {}),
+                                  });
+                                }}
+                                className="min-h-11 w-full rounded-md border border-slate-200 px-3 text-base font-bold text-[#0b1f4b] disabled:bg-slate-50"
+                              />
+                              {dailyCapHint ? (
+                                <p className="mt-1 text-[11px] font-medium text-amber-800">{dailyCapHint}</p>
+                              ) : null}
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <label className="block min-w-0">
+                                <span className="mb-1 block text-xs font-semibold text-slate-500">{t.colMin}</span>
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  min={0}
+                                  step="0.01"
+                                  disabled={periodLocked || row.mode !== "on"}
+                                  value={periodLocked ? "" : row.minPeriodEur}
+                                  placeholder="—"
+                                  onChange={(e) => {
+                                    const result = clampPeriodInput(e.target.value, adminPeriodMax);
+                                    setRow(row.service.id, { minPeriodEur: result.value });
+                                  }}
+                                  className="min-h-11 w-full rounded-md border border-slate-200 px-3 text-base font-bold text-[#0b1f4b] disabled:bg-slate-50"
+                                />
+                              </label>
+                              <label className="block min-w-0">
+                                <span className="mb-1 block text-xs font-semibold text-slate-500">{t.colMax}</span>
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  min={0}
+                                  max={adminPeriodMax ?? undefined}
+                                  step="0.01"
+                                  disabled={periodLocked || row.mode !== "on"}
+                                  value={periodLocked ? "" : row.maxPeriodEur}
+                                  placeholder="—"
+                                  onChange={(e) => {
+                                    const result = clampPeriodInput(e.target.value, adminPeriodMax);
+                                    setRow(row.service.id, { maxPeriodEur: result.value });
+                                  }}
+                                  className="min-h-11 w-full rounded-md border border-slate-200 px-3 text-base font-bold text-[#0b1f4b] disabled:bg-slate-50"
+                                />
+                              </label>
+                            </div>
                             {periodCapHint ? (
-                              <p className="mt-0.5 text-[10px] font-medium leading-tight text-amber-800/90">
-                                {periodCapHint}
-                              </p>
+                              <p className="text-[11px] font-medium text-amber-800">{periodCapHint}</p>
                             ) : null}
-                          </div>
-                        </MobileDataRow>
-                        <MobileDataRow label={t.colMax}>
-                          <div className="text-end">
-                            <div>{row.mode === "off" ? "—" : periodCell(row.maxPeriodEur)}</div>
-                            {periodCapHint ? (
-                              <p className="mt-0.5 text-[10px] font-medium leading-tight text-amber-800/90">
-                                {periodCapHint}
-                              </p>
-                            ) : null}
-                          </div>
-                        </MobileDataRow>
-                        <MobileDataRow label={t.colCars}>
-                          <span className="text-xs leading-snug">
-                            {colon >= 0 ? (
-                              <>
-                                <span className="font-semibold text-[#0b1f4b]">
-                                  {carsLabel.slice(0, colon + 1)}
-                                </span>
-                                {carsLabel.slice(colon + 1)}
-                              </>
-                            ) : (
-                              carsLabel
-                            )}
-                          </span>
-                        </MobileDataRow>
-                        <div className="flex flex-col gap-2 pt-2">
-                          {mandatoryAny ? (
-                            <span
-                              title={t.mandatoryLockedTitle}
-                              className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-3 text-sm font-extrabold text-white"
-                            >
-                              <Lock className="h-4 w-4" />
-                              {t.mandatoryBadge}
-                            </span>
-                          ) : null}
-                          {!mandatoryAny || !mandatory ? (
+                            <div>
+                              <div className="mb-1.5 flex items-center justify-between gap-2">
+                                <p className="text-xs font-semibold text-slate-500">{t.colCars}</p>
+                                <div className="flex items-center gap-3 text-xs font-semibold">
+                                  <button
+                                    type="button"
+                                    className="min-h-11 text-[#1d6fe8]"
+                                    disabled={row.mode === "off"}
+                                    onClick={() =>
+                                      setRow(row.service.id, { carIds: cars.map((car) => car.id) })
+                                    }
+                                  >
+                                    {t.selectAll}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="min-h-11 text-slate-500"
+                                    disabled={row.mode === "off"}
+                                    onClick={() => setRow(row.service.id, { carIds: [] })}
+                                  >
+                                    {t.reset}
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="max-h-48 overflow-y-auto">
+                                <PartnerExtraCarPicker
+                                  cars={cars}
+                                  selectedIds={row.carIds}
+                                  onChange={(ids) => setRow(row.service.id, { carIds: ids })}
+                                  locale={locale}
+                                  disabled={row.mode === "off"}
+                                />
+                              </div>
+                            </div>
                             <button
                               type="button"
-                              onClick={() => setEditingId(row.service.id)}
-                              className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-md border border-[#1d6fe8]/30 bg-[#1d6fe8]/5 px-3 text-sm font-bold text-[#1d6fe8]"
+                              onClick={() => setOpenServiceId(null)}
+                              className="min-h-11 w-full rounded-md bg-[#3d2a6d] text-sm font-bold text-white"
                             >
-                              <Pencil className="h-3.5 w-3.5" />
-                              {mandatoryAny ? t.setPrice : t.edit}
+                              {t.done}
                             </button>
-                          ) : null}
-                        </div>
-                      </MobileDataCard>
+                          </div>
+                        ) : null}
+                      </article>
                     );
                   })}
                 </>
