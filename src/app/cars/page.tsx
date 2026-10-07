@@ -23,13 +23,19 @@ import {
   computeTripDeliveryFees,
   mergeDeliveryPrefsIntoRows,
 } from "@/lib/delivery/trip-fees";
-import { meetsBookingLeadTime } from "@/lib/delivery/booking-lead";
+import { meetsBookingLeadTime, resolveBookingLeadMinutes } from "@/lib/delivery/booking-lead";
+import { SearchTracePanel, type SearchTraceRow } from "@/components/cars/search-trace-panel";
 import {
   CarsSearchResults,
   type SearchResultCar,
 } from "@/components/cars/cars-search-results";
 import { resolveEffectiveCategorySlug } from "@/lib/cars/listing-filter-match";
-import { publicListingStatusWhere, publicPartnerWhere } from "@/lib/cars/listing-visibility";
+import {
+  isPubliclyVisibleListing,
+  partnerAllowsPublicListings,
+  publicListingStatusWhere,
+  publicPartnerWhere,
+} from "@/lib/cars/listing-visibility";
 import { listExtraServices } from "@/lib/server/extras-store";
 import { localizeExtraName } from "@/lib/extras/pricing";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
@@ -105,6 +111,46 @@ async function loadUnavailableCarIds(startDate?: string, endDate?: string): Prom
   }
 }
 
+async function isAdminViewer(): Promise<boolean> {
+  try {
+    const { getAdminSession } = await import("@/lib/auth/sessions");
+    const session = await getAdminSession();
+    return session?.user?.role === "ADMIN";
+  } catch {
+    return false;
+  }
+}
+
+/** Admin trace only: which availability source blocks each car for the searched dates. */
+async function explainUnavailable(startDate?: string, endDate?: string): Promise<Map<string, string>> {
+  const reasons = new Map<string, string[]>();
+  if (!startDate) return new Map();
+  const from = new Date(startDate);
+  const to = endDate ? new Date(endDate) : new Date(from.getTime() + 24 * 60 * 60 * 1000);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return new Map();
+  const add = (ids: Set<string>, label: string) => {
+    for (const id of ids) reasons.set(id, [...(reasons.get(id) || []), label]);
+  };
+  try {
+    const [{ carIdsBookedInRange }, { carIdsBlockedInRange }, { carIdsBlockedByChannels }] = await Promise.all([
+      import("@/lib/server/car-availability"),
+      import("@/lib/server/car-calendar-blocks-store"),
+      import("@/lib/server/channel-sync"),
+    ]);
+    const [booked, blocked, channels] = await Promise.all([
+      carIdsBookedInRange(from, to).catch(() => new Set<string>()),
+      carIdsBlockedInRange(from, to).catch(() => new Set<string>()),
+      carIdsBlockedByChannels(from, to).catch(() => new Set<string>()),
+    ]);
+    add(booked, "booking");
+    add(blocked, "partner calendar block");
+    add(channels, "external channel");
+  } catch {
+    /* trace is best-effort */
+  }
+  return new Map([...reasons].map(([id, list]) => [id, list.join(" + ")]));
+}
+
 function resolveDriverRequirement(
   details: ReturnType<typeof parseCarDetails>,
   key: "minDriverAge" | "minLicenseYears",
@@ -128,15 +174,34 @@ export default async function CarsPage({
     country?: string;
     pickupAddress?: string;
     dropoffAddress?: string;
+    debug?: string;
   }>;
 }) {
   // Expired-insurance cars are filtered out below; the status write itself does not block the page.
   scheduleInsuranceRemoderation();
 
   const [
-    { startDate, endDate, pickup, dropoff, category, country, pickupAddress, dropoffAddress },
+    { startDate, endDate, pickup, dropoff, category, country, pickupAddress, dropoffAddress, debug },
     { locale },
   ] = await Promise.all([searchParams, readPreferences()]);
+  const traceEnabled = debug === "1" && (await isAdminViewer());
+  const trace: SearchTraceRow[] = [];
+  const carLabel = (car: { make: string; model: string; title?: string }) =>
+    car.title?.trim() || `${car.make} ${car.model}`.trim();
+  /** Filter that records each removed car (only when the admin trace is on). */
+  function keepCars<C extends { id: string; make: string; model: string; title?: string }>(
+    list: C[],
+    keep: (car: C) => boolean | string,
+  ): C[] {
+    return list.filter((car) => {
+      const verdict = keep(car);
+      if (verdict === true) return true;
+      if (traceEnabled) {
+        trace.push({ id: car.id, label: carLabel(car), reason: typeof verdict === "string" ? verdict : "filtered" });
+      }
+      return false;
+    });
+  }
   const dictionary = getDictionary(locale);
   const pickupCode = pickup?.trim();
   // Country-wide browse only applies until a concrete pickup is chosen.
@@ -282,6 +347,26 @@ export default async function CarsPage({
     cars = [];
   }
 
+  if (traceEnabled) {
+    try {
+      const returned = new Set(cars.map((car) => car.id));
+      const others = await prisma.car.findMany({
+        where: { id: { notIn: [...returned] }, status: { in: ["APPROVED", "PENDING_REMODERATION"] } },
+        select: { id: true, make: true, model: true, title: true, status: true, hiddenReason: true, partner: { select: { status: true } } },
+      });
+      for (const car of others) {
+        const reason = !isPubliclyVisibleListing({ status: String(car.status), hiddenReason: car.hiddenReason })
+          ? `status ${car.status} (${car.hiddenReason || "no reason"})`
+          : !partnerAllowsPublicListings(String(car.partner?.status || ""))
+            ? `partner ${car.partner?.status}`
+            : `no active delivery at ${pickupIata || "selected place"}`;
+        trace.push({ id: car.id, label: carLabel(car), reason: `database query: ${reason}` });
+      }
+    } catch {
+      /* trace is best-effort */
+    }
+  }
+
   if (cars.some((car) => car.status === "PENDING_REMODERATION")) {
     const snapshots = await snapshotsPromise;
     if (snapshots) {
@@ -352,7 +437,7 @@ export default async function CarsPage({
   const discountFrom = startDate || new Date().toISOString();
   const discountTo = endDate || startDate || discountFrom;
   const [deliveryPrefsMap, extraPrefsMap, periodMap, unavailable, expiredIds] = await Promise.all([
-    readPartnerDeliveryPrefsMap(aliasIds.length ? [...partnerIds, "local-partner"] : partnerIds).catch(
+    readPartnerDeliveryPrefsMap([...extraPrefIds]).catch(
       () => new Map<string, import("@/lib/server/partner-delivery-prefs-store").PartnerDeliveryPref[]>(),
     ),
     readPartnerExtraPrefsMap([...extraPrefIds]).catch(() => new Map<string, PartnerExtraPref[]>()),
@@ -365,14 +450,15 @@ export default async function CarsPage({
   ]);
 
   const prefsByPartner = new Map(deliveryPrefsMap);
-  if (aliasIds.length) {
-    const local = deliveryPrefsMap.get("local-partner") || [];
-    for (const id of aliasIds) {
-      if (!(prefsByPartner.get(id) || []).length) prefsByPartner.set(id, local);
-    }
+  // `file-partner-<id>` cars use the Delivery-page prefs saved under that partner's own id.
+  for (const id of aliasIds) {
+    if ((prefsByPartner.get(id) || []).length) continue;
+    prefsByPartner.set(id, deliveryPrefsMap.get(id.replace(/^file-partner-/, "")) || []);
   }
   const extrasPrefsByPartner = new Map<string, PartnerExtraPref[]>(extraPrefsMap);
-  if (expiredIds.size) cars = cars.filter((car) => !expiredIds.has(car.id));
+  if (expiredIds.size) {
+    cars = keepCars(cars, (car) => !expiredIds.has(car.id) || "insurance expired");
+  }
 
   cars = cars.map((car) => {
     const pid = car.partnerId || car.partner?.id || "";
@@ -403,16 +489,19 @@ export default async function CarsPage({
           return loc.airport.iata?.toUpperCase() === code;
         });
       };
-      cars = cars.filter((car) => {
+      cars = keepCars(cars, (car) => {
         const rows = car.deliveryPrices ?? [];
         const pickupMatching = placeMatches(rows, pickupIata);
-        if (!pickupMatching.length) return false;
+        if (!pickupMatching.length) return `no active delivery at ${pickupIata}`;
         if (!pickupMatching.some((row) => meetsBookingLeadTime(row.travelTimeMinutes, minutesUntilPickup))) {
-          return false;
+          const required = Math.min(
+            ...pickupMatching.map((row) => resolveBookingLeadMinutes(toNumber(row.travelTimeMinutes, 0))),
+          );
+          return `lead time: needs ${required} min before pickup, only ${minutesUntilPickup} min left`;
         }
         // One-way return must also be offered when dropoff differs from pickup.
         if (dropoffCode && dropoffCode.toUpperCase() !== pickupIata.toUpperCase()) {
-          if (!placeMatches(rows, dropoffCode).length) return false;
+          if (!placeMatches(rows, dropoffCode).length) return `no return at ${dropoffCode}`;
         }
         return true;
       });
@@ -420,16 +509,28 @@ export default async function CarsPage({
   }
 
   if (countryIso2) {
-    cars = cars.filter((car) =>
-      (car.deliveryPrices ?? []).some(
-        (row) =>
-          row.deliveryLocation?.isActive &&
-          row.deliveryLocation.airport?.city?.country?.iso2?.toUpperCase() === countryIso2,
-      ),
+    cars = keepCars(
+      cars,
+      (car) =>
+        (car.deliveryPrices ?? []).some(
+          (row) =>
+            row.deliveryLocation?.isActive &&
+            row.deliveryLocation.airport?.city?.country?.iso2?.toUpperCase() === countryIso2,
+        ) || `no active delivery in ${countryIso2}`,
     );
   }
 
-  if (unavailable.size) cars = cars.filter((car) => !unavailable.has(car.id));
+  if (unavailable.size) {
+    const unavailableReasons = traceEnabled
+      ? await explainUnavailable(startDate, endDate)
+      : new Map<string, string>();
+    cars = keepCars(
+      cars,
+      (car) =>
+        !unavailable.has(car.id) ||
+        `dates unavailable (${unavailableReasons.get(car.id) || "booking / calendar block / channel"})`,
+    );
+  }
   const periodByCar = periodMap;
 
   const rentalDays = startDate && endDate ? rentalDayCount(startDate, endDate) : 1;
@@ -549,7 +650,9 @@ export default async function CarsPage({
 
   // Same slug as the card badge: partner-assigned category first, then admin model mapping.
   const categorySlug = category?.trim() || "";
-  if (categorySlug) results = results.filter((car) => car.categorySlug === categorySlug);
+  if (categorySlug) {
+    results = keepCars(results, (car) => car.categorySlug === categorySlug || `category ≠ ${categorySlug}`);
+  }
 
   results.sort((a, b) => {
     const da = listingDailyWithDeliveryEur({
@@ -609,8 +712,14 @@ export default async function CarsPage({
       ? dictionary.common.noCarsCategory
       : dictionary.common.noCars;
 
+  if (traceEnabled) {
+    console.info("[cars search trace]", { pickup: pickupIata, startDate, endDate, excluded: trace });
+  }
+
   return (
-    <CarsSearchResults
+    <>
+      {traceEnabled ? <SearchTracePanel rows={trace} /> : null}
+      <CarsSearchResults
       cars={results}
       categories={filterCategories}
       extrasCatalog={filterExtras}
@@ -626,6 +735,7 @@ export default async function CarsPage({
       country={countryIso2}
       emptyMessage={emptyMessage}
       siteDiscountPercent={siteDiscountPercent}
-    />
+      />
+    </>
   );
 }

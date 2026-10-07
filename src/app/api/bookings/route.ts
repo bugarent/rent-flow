@@ -586,7 +586,6 @@ export async function POST(req: Request) {
             String(fileCar.partnerId || "").startsWith("file-partner-")
               ? String(fileCar.partnerId).slice("file-partner-".length)
               : "",
-            "local-partner",
           ].filter((k, i, arr) => Boolean(k) && arr.indexOf(k) === i);
           let prefs: Awaited<ReturnType<typeof readPartnerDeliveryPrefs>> = [];
           for (const key of partnerKeys) {

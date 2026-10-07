@@ -111,7 +111,6 @@ export async function buildMergedDeliveryRows(input: {
         input.partnerId.startsWith("file-partner-")
           ? input.partnerId.slice("file-partner-".length)
           : "",
-        "local-partner",
       ].filter((k, i, arr) => Boolean(k) && arr.indexOf(k) === i) as string[];
 
       let prefs: Awaited<ReturnType<typeof readPartnerDeliveryPrefs>> = [];

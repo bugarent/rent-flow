@@ -32,7 +32,7 @@ async function deliveryRows(partnerId: string, rows: unknown) {
     const { mergeDeliveryPrefsIntoRows } = await import("@/lib/delivery/trip-fees");
     let prefs = await readPartnerDeliveryPrefs(partnerId);
     if (!prefs.length && partnerId.startsWith("file-partner-")) {
-      prefs = await readPartnerDeliveryPrefs("local-partner");
+      prefs = await readPartnerDeliveryPrefs(partnerId.slice("file-partner-".length));
     }
     if (!prefs.length) return undefined;
     return mergeDeliveryPrefsIntoRows(rows as Array<Record<string, unknown>>, prefs);
