@@ -10,7 +10,7 @@ export function RouteLoadingSpinner({
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-none fixed inset-0 z-[9999] flex items-center justify-center bg-white/35 backdrop-blur-[1px]"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-white/45 backdrop-blur-[1px]"
     >
       <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-slate-200">
         <span

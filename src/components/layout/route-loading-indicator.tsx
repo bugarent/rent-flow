@@ -5,7 +5,7 @@ import { usePathname, useSearchParams, type useRouter } from "next/navigation";
 import { RouteLoadingSpinner } from "@/components/layout/route-loading-spinner";
 import { estimateRouteMs, recordRouteMs } from "@/lib/navigation/route-timing-store";
 
-const SHOW_DELAY_MS = 120;
+const MIN_VISIBLE_MS = 450;
 const MAX_VISIBLE_MS = 15000;
 const MIN_COUNTDOWN_MS = 1000;
 const PATCHED = Symbol.for("rentairportcars.route-loading");
@@ -72,43 +72,48 @@ export function RouteLoadingIndicator() {
   const searchParams = useSearchParams();
   const [visible, setVisible] = useState(false);
   const [seconds, setSeconds] = useState<number | null>(null);
-  const showTimer = useRef<number | null>(null);
   const hideTimer = useRef<number | null>(null);
   const tickTimer = useRef<number | null>(null);
   const pendingRef = useRef<PendingNavigation | null>(null);
+  const visibleSince = useRef<number | null>(null);
   const startRef = useRef<(href: string) => void>(() => {});
   const stopRef = useRef<(arrived: boolean) => void>(() => {});
 
   useEffect(() => {
     const clearTimers = () => {
-      if (showTimer.current) window.clearTimeout(showTimer.current);
       if (hideTimer.current) window.clearTimeout(hideTimer.current);
       if (tickTimer.current) window.clearInterval(tickTimer.current);
-      showTimer.current = null;
       hideTimer.current = null;
       tickTimer.current = null;
     };
+    const hideNow = () => {
+      visibleSince.current = null;
+      setVisible(false);
+      setSeconds(null);
+    };
     stopRef.current = (arrived) => {
       const pending = pendingRef.current;
+      const since = visibleSince.current;
       pendingRef.current = null;
       if (arrived && pending) {
         recordRouteMs(window.location.href, performance.now() - pending.startedAt);
       }
       clearTimers();
-      setVisible(false);
-      setSeconds(null);
+      if (!pending && since == null) return;
+      const wait = since == null ? 0 : Math.max(0, MIN_VISIBLE_MS - (performance.now() - since));
+      if (wait === 0) hideNow();
+      else hideTimer.current = window.setTimeout(hideNow, wait);
     };
     startRef.current = (href) => {
       clearTimers();
       const pending = { startedAt: performance.now(), estimateMs: estimateRouteMs(href) };
       pendingRef.current = pending;
-      showTimer.current = window.setTimeout(() => {
-        setSeconds(secondsLeft(pending));
-        setVisible(true);
-        if (pending.estimateMs !== null && pending.estimateMs >= MIN_COUNTDOWN_MS) {
-          tickTimer.current = window.setInterval(() => setSeconds(secondsLeft(pending)), 200);
-        }
-      }, SHOW_DELAY_MS);
+      visibleSince.current = performance.now();
+      setSeconds(secondsLeft(pending));
+      setVisible(true);
+      if (pending.estimateMs !== null && pending.estimateMs >= MIN_COUNTDOWN_MS) {
+        tickTimer.current = window.setInterval(() => setSeconds(secondsLeft(pending)), 200);
+      }
       hideTimer.current = window.setTimeout(() => stopRef.current(false), MAX_VISIBLE_MS);
     };
     return clearTimers;
@@ -127,6 +132,7 @@ export function RouteLoadingIndicator() {
 
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
+      announceRouterNavigations();
       if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
         return;
       }
