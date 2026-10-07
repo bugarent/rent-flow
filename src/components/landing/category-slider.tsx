@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { knownText } from "@/lib/i18n/known-record-text";
+import { displayImageUrl } from "@/lib/media/display-image";
 import { defaultSearchDateRange } from "@/lib/catalog/default-search-dates";
 import { useHomeCountry } from "@/lib/catalog/home-country-store";
 
@@ -36,11 +37,14 @@ function CategoryCard({
       <div className="h-36 bg-slate-100">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={category.imageUrl}
+          src={displayImageUrl(category.imageUrl, 480)}
           alt=""
+          width={480}
+          height={270}
           className="h-full w-full object-cover"
           loading="lazy"
           decoding="async"
+          fetchPriority="low"
         />
       </div>
       <div className="p-4">
@@ -141,13 +145,27 @@ export function CategorySlider({ categories }: { categories: Category[] }) {
     };
   }, [alignToPeek, applyPeekStart, canLoop]);
 
+  const [motionReady, setMotionReady] = useState(false);
   useEffect(() => {
-    if (!canLoop || paused) return;
+    let timeoutId = 0;
+    const start = () => {
+      timeoutId = window.setTimeout(() => setMotionReady(true), 12000);
+    };
+    if (document.readyState === "complete") start();
+    else window.addEventListener("load", start, { once: true });
+    return () => {
+      window.removeEventListener("load", start);
+      window.clearTimeout(timeoutId);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!canLoop || paused || !motionReady) return;
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     if (media.matches) return;
     const id = window.setInterval(() => scrollByCard(1), AUTO_MS);
     return () => window.clearInterval(id);
-  }, [canLoop, paused, scrollByCard]);
+  }, [canLoop, paused, scrollByCard, motionReady]);
 
   if (categories.length === 0) return null;
 

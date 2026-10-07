@@ -72,7 +72,7 @@ function FieldShell({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-11 items-center gap-2 rounded-lg border border-white/45 bg-white/25 px-2.5 py-1.5 text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)] backdrop-blur-md sm:min-h-8 sm:py-1">
+    <div className="flex min-h-11 items-center gap-2 rounded-lg border border-white/45 bg-white px-2.5 py-1.5 text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)] sm:min-h-8 sm:py-1">
       <span className="shrink-0 text-[#1A3B5D]/80">{icon}</span>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
@@ -832,12 +832,12 @@ export function AirportSearch({
 
   const fieldClass =
     "w-full min-w-0 bg-transparent text-sm font-medium text-slate-800 outline-none [appearance:auto]";
-  const labelClass = "mb-0.5 block text-left text-[11px] font-semibold leading-none text-white/85";
+  const labelClass = "mb-0.5 block text-left text-[11px] font-semibold leading-none text-white";
 
   return (
     <form
       onSubmit={submit}
-      className="box-border w-full min-w-0 max-w-full overflow-x-clip rounded-2xl border border-white/12 bg-[#0b1f4b]/72 px-3 py-1.5 text-white shadow-xl backdrop-blur-md sm:px-3.5 sm:py-2"
+      className="box-border w-full min-w-0 max-w-full overflow-x-clip rounded-2xl border border-white/12 bg-[#0b1f4b] px-3 py-1.5 text-white shadow-xl sm:px-3.5 sm:py-2"
     >
       <ul className="mb-1.5 grid grid-cols-2 gap-1 sm:mb-2 sm:grid-cols-3 sm:gap-1.5">
         {(
@@ -851,7 +851,7 @@ export function AirportSearch({
             key={item.label}
             className={index === 2 ? "col-span-2 justify-self-center sm:col-span-1 sm:justify-self-stretch" : ""}
           >
-            <span className="inline-flex h-7 w-full min-w-0 items-center justify-center gap-1.5 rounded-full border border-white/50 bg-white/55 px-2.5 text-[11px] font-semibold tracking-wide text-[#0b1f4b] shadow-[0_1px_2px_rgba(15,23,42,0.12)] sm:h-8 sm:px-3 sm:text-[12px]">
+            <span className="inline-flex h-7 w-full min-w-0 items-center justify-center gap-1.5 rounded-full border border-white/70 bg-white px-2.5 text-[11px] font-semibold tracking-wide text-[#0b1f4b] shadow-[0_1px_2px_rgba(15,23,42,0.12)] sm:h-8 sm:px-3 sm:text-[12px]">
               <item.icon className="h-3.5 w-3.5 shrink-0 text-emerald-700" aria-hidden />
               <span className="truncate">{item.label}</span>
             </span>
@@ -866,11 +866,11 @@ export function AirportSearch({
 
       {countries.length > 0 ? (
         <div className="mb-1.5 flex flex-col gap-1 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,50%)_minmax(0,1fr)] sm:items-center sm:gap-x-2">
-          <span className="text-left text-[11px] font-semibold leading-none text-white/85 sm:justify-self-start sm:whitespace-nowrap">
+          <span className="text-left text-[11px] font-semibold leading-none text-white sm:justify-self-start sm:whitespace-nowrap">
             {dictionary.home.searchCountry}
           </span>
           <div className="min-w-0 w-full">
-            <div className="min-h-11 rounded-lg border border-white/45 bg-white/25 px-2.5 py-1.5 text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)] backdrop-blur-md sm:min-h-8 sm:py-1">
+            <div className="min-h-11 rounded-lg border border-white/45 bg-white px-2.5 py-1.5 text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)] sm:min-h-8 sm:py-1">
               <CountryPicker
                 countries={countries}
                 value={countryIso2}

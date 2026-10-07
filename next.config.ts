@@ -28,6 +28,7 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: ["@prisma/client", "prisma", "sharp", "nodemailer"],
   images: {
+    formats: ["image/avif", "image/webp"],
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
     ],

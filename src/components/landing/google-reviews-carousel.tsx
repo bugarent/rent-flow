@@ -5,7 +5,7 @@ import { BadgeCheck, ChevronLeft, ChevronRight, Info } from "lucide-react";
 import type { GoogleReviewItem, PublicHomepageGoogleReviews } from "@/lib/catalog/homepage-google-reviews";
 import { usePreferences } from "@/components/providers/preferences-context";
 
-const AVATAR_COLORS = ["#e67e22", "#34495e", "#16a085", "#8e44ad", "#c0392b", "#2980b9"];
+const AVATAR_COLORS = ["#9a3412", "#1e293b", "#0f766e", "#6b21a8", "#991b1b", "#1d4ed8"];
 
 // Brand colours fail text-contrast checks, so the wordmark is an image with alt text.
 const GOOGLE_WORDMARK_SRC = `data:image/svg+xml,${encodeURIComponent(
@@ -53,8 +53,12 @@ function Stars({ rating, size = "md" }: { rating: number; size?: "sm" | "md" }) 
   const cls = size === "sm" ? "text-[15px] leading-none tracking-[1px]" : "text-[18px] leading-none tracking-[1px]";
   return (
     <p className={cls} aria-label={`${rating} star rating`}>
-      <span className="text-[#F8BB06]">{"★".repeat(full)}</span>
-      <span className="text-slate-200">{"★".repeat(5 - full)}</span>
+      <span className="text-[#a16207]" aria-hidden>
+        {"★".repeat(full)}
+      </span>
+      <span className="text-slate-500" aria-hidden>
+        {"★".repeat(5 - full)}
+      </span>
     </p>
   );
 }

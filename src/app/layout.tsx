@@ -23,12 +23,15 @@ import { getPageSeo } from "@/lib/seo/pages";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  // The homepage LCP is the hero photo. A preloaded body font competes with it on slow mobile.
+  preload: false,
 });
 
 const inter = Inter({
   variable: "--font-brand",
   subsets: ["latin"],
   weight: ["600"],
+  preload: false,
 });
 
 const geistMono = Geist_Mono({
@@ -94,11 +97,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${notoGeorgian.variable} ${notoArabic.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-slate-50 text-slate-900">
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){var sel='#nl-badge-frame,iframe[title="Powered by Netlify"],script[src*=".netlify/scripts/hud"]';function hide(root){if(root&&root.nodeType===1&&root.matches&&root.matches(sel))root.remove();var scope=root&&root.querySelectorAll?root:document;scope.querySelectorAll(sel).forEach(function(el){el.remove();});}hide(document);var st=document.createElement('style');st.textContent=sel+'{display:none!important}';document.head.appendChild(st);var mo=new MutationObserver(function(records){records.forEach(function(record){record.addedNodes.forEach(function(node){if(node.nodeType===1&&node.matches&&node.matches(sel))node.remove();});});});mo.observe(document.documentElement,{childList:true,subtree:true});setTimeout(function(){mo.disconnect();},8000);})();`,
-          }}
-        />
+        <style>{`#nl-badge-frame,iframe[title="Powered by Netlify"],script[src*=".netlify/scripts/hud"]{display:none!important}`}</style>
         <JsonLd
           data={[
             buildWebSiteJsonLd(),

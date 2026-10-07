@@ -8,6 +8,7 @@ import type { PopularAirportsLayout } from "@/lib/catalog/popular-airports-layou
 import { usePreferences } from "@/components/providers/preferences-context";
 import { airportCarsLabel } from "@/lib/i18n/airport-cars-label";
 import { localizedAirportTitle } from "@/lib/catalog/homepage-airport-i18n";
+import { displayImageUrl } from "@/lib/media/display-image";
 
 const AUTO_MS = 4000;
 const SLIDE_MS = 650;
@@ -31,11 +32,14 @@ function AirportCard({
       <div className="h-40 bg-slate-200 sm:h-44">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={airport.image}
+          src={displayImageUrl(airport.image, 640)}
           alt=""
+          width={640}
+          height={360}
           className="h-full w-full object-cover"
           loading="lazy"
           decoding="async"
+          fetchPriority="low"
         />
       </div>
       <div className="flex flex-1 flex-col p-4 sm:p-5">
@@ -143,13 +147,27 @@ export function PopularAirports({
     };
   }, [alignToCard, applyStart, canLoop]);
 
+  const [motionReady, setMotionReady] = useState(false);
   useEffect(() => {
-    if (!canLoop || paused) return;
+    let timeoutId = 0;
+    const start = () => {
+      timeoutId = window.setTimeout(() => setMotionReady(true), 12000);
+    };
+    if (document.readyState === "complete") start();
+    else window.addEventListener("load", start, { once: true });
+    return () => {
+      window.removeEventListener("load", start);
+      window.clearTimeout(timeoutId);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!canLoop || paused || !motionReady) return;
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     if (media.matches) return;
     const id = window.setInterval(() => scrollByCard(1), AUTO_MS);
     return () => window.clearInterval(id);
-  }, [canLoop, paused, scrollByCard]);
+  }, [canLoop, paused, scrollByCard, motionReady]);
 
   const arrowClass =
     "flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0b1f4b] shadow-sm transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1d6fe8]";

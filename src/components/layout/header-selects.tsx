@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 
 /** Soft glass chip — separated without a loud white/blue fill. */
 export const headerChipClass =
-  "inline-flex h-11 min-h-11 shrink-0 items-center gap-2 rounded-md border border-white/50 bg-white/25 px-4 text-sm font-semibold leading-none text-[#1A3B5D] shadow-[0_1px_2px_rgba(15,23,42,0.08)] backdrop-blur-md hover:bg-white/40 sm:h-11 sm:gap-2.5 sm:px-5 sm:text-[15px]";
+  "inline-flex h-11 min-h-11 shrink-0 items-center gap-2 rounded-md border border-white/70 bg-white/90 px-4 text-sm font-semibold leading-none text-[#0b1f4b] shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:bg-white sm:h-11 sm:gap-2.5 sm:px-5 sm:text-[15px]";
 
 const CURRENCY_FLAG_ISO2: Record<Currency, string> = {
   EUR: "EU",

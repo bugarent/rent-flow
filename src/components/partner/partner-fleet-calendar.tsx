@@ -48,9 +48,6 @@ type BookingBar = FleetBookingDetail;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ROW_H = 52;
-const HEADER_H = 56;
-const SIDEBAR_W_DESKTOP = 168;
-const SIDEBAR_W_MOBILE = 108;
 const MONTH_LONG_PRESS_MS = 420;
 const MONTH_SWIPE_PX = 56;
 
@@ -133,10 +130,10 @@ function weekdayShort(d: Date, locale: string) {
   });
 }
 
-function monthNames(locale: string) {
+function monthNames(locale: string, format: "long" | "short" = "long") {
   const loc = uiLocaleTag(locale);
   return Array.from({ length: 12 }, (_, i) =>
-    new Date(2026, i, 1).toLocaleDateString(loc, { month: "long" }),
+    new Date(2026, i, 1).toLocaleDateString(loc, { month: format }),
   );
 }
 
@@ -172,7 +169,7 @@ function isToday(d: Date) {
 
 function dayCellClass(d: Date) {
   return cn(
-    "box-border h-full min-w-0 flex-1 border-e border-b border-slate-200",
+    "box-border h-full w-11 flex-none border-e border-b border-slate-200 md:w-auto md:min-w-0 md:flex-1",
     isWeekBoundaryDay(d) ? "bg-slate-100" : "bg-white",
   );
 }
@@ -191,7 +188,6 @@ export function PartnerFleetCalendar() {
   const gridRef = useRef<HTMLDivElement>(null);
   const { locale, dictionary } = usePartnerLocale();
   const t = dictionary.calendar;
-  const [sidebarW, setSidebarW] = useState(SIDEBAR_W_DESKTOP);
   const [query, setQuery] = useState("");
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -259,14 +255,6 @@ export function PartnerFleetCalendar() {
     s.armed = false;
     s.committed = false;
     setMonthSwipeArmed(false);
-  }, []);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 767px)");
-    const apply = () => setSidebarW(mq.matches ? SIDEBAR_W_MOBILE : SIDEBAR_W_DESKTOP);
-    apply();
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
   }, []);
 
   const shiftMonth = useCallback((delta: number) => {
@@ -344,6 +332,7 @@ export function PartnerFleetCalendar() {
   const rangeToMs = rangeTo.getTime();
   const days = useMemo(() => eachDay(new Date(rangeFromMs), dayCount), [rangeFromMs, dayCount]);
   const months = useMemo(() => monthNames(locale), [locale]);
+  const monthsShort = useMemo(() => monthNames(locale, "short"), [locale]);
   const yearOptions = useMemo(() => {
     const y = new Date().getFullYear();
     return Array.from({ length: 12 }, (_, i) => y - 2 + i);
@@ -738,7 +727,13 @@ export function PartnerFleetCalendar() {
       body.scrollTop = 0;
       if (gridRef.current) {
         gridRef.current.scrollTop = 0;
-        gridRef.current.scrollLeft = 0;
+        const mobile = window.matchMedia("(max-width: 767px)").matches;
+        if (!mobile) {
+          gridRef.current.scrollLeft = 0;
+        } else {
+          const todayIndex = days.findIndex((d) => isToday(d));
+          gridRef.current.scrollLeft = todayIndex > 0 ? todayIndex * 44 : 0;
+        }
       }
     };
     pinToTop();
@@ -758,24 +753,32 @@ export function PartnerFleetCalendar() {
           <p className="m-4 shrink-0 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>
         ) : null}
 
-        <div ref={gridRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-auto">
-          {/* Sticky header */}
-          <div
-            className="sticky top-0 z-20 flex border-b-2 border-slate-300 bg-white"
-            style={{ height: HEADER_H }}
-          >
-            <div
-              className="sticky start-0 z-30 flex shrink-0 flex-col border-e-2 border-slate-300 bg-white"
-              style={{ width: sidebarW, height: HEADER_H }}
-            >
-              <div className="flex h-8 items-center gap-1 border-b border-[#cfd8e3] bg-[#d9e2e8] px-1.5">
+        <div ref={gridRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-auto overscroll-x-contain">
+          {/* Sticky header. On a phone each day keeps its own width and the month scrolls sideways. */}
+          <div className="sticky top-0 z-20 flex h-20 w-max border-b-2 border-slate-300 bg-white md:h-14 md:w-full">
+            <div className="sticky start-0 z-30 flex h-full w-36 shrink-0 flex-col border-e-2 border-slate-300 bg-white md:w-[168px]">
+              <div className="flex h-11 items-center gap-0.5 border-b border-[#cfd8e3] bg-[#d9e2e8] px-1 md:h-8">
                 <select
                   aria-label="Month"
                   value={month.getMonth()}
                   onChange={(e) =>
                     setMonth(new Date(month.getFullYear(), Number(e.target.value), 1))
                   }
-                  className="min-w-0 flex-1 truncate rounded border-0 bg-transparent py-0.5 text-[11px] font-extrabold text-[#1e1b4b] outline-none"
+                  className="min-h-11 min-w-0 flex-1 truncate rounded border-0 bg-transparent text-base font-bold text-[#1e1b4b] outline-none md:hidden"
+                >
+                  {monthsShort.map((name, i) => (
+                    <option key={name} value={i}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Month"
+                  value={month.getMonth()}
+                  onChange={(e) =>
+                    setMonth(new Date(month.getFullYear(), Number(e.target.value), 1))
+                  }
+                  className="hidden min-w-0 flex-1 truncate rounded border-0 bg-transparent py-0.5 text-[11px] font-extrabold text-[#1e1b4b] outline-none md:block"
                 >
                   {months.map((name, i) => (
                     <option key={name} value={i}>
@@ -789,7 +792,7 @@ export function PartnerFleetCalendar() {
                   onChange={(e) =>
                     setMonth(new Date(Number(e.target.value), month.getMonth(), 1))
                   }
-                  className="w-[4.25rem] shrink-0 rounded border-0 bg-transparent py-0.5 text-[11px] font-extrabold text-[#1e1b4b] outline-none"
+                  className="h-11 w-16 shrink-0 rounded border-0 bg-transparent text-base font-bold text-[#1e1b4b] outline-none md:h-auto md:w-[4.25rem] md:text-[11px] md:font-extrabold"
                 >
                   {yearOptions.map((y) => (
                     <option key={y} value={y}>
@@ -798,37 +801,37 @@ export function PartnerFleetCalendar() {
                   ))}
                 </select>
               </div>
-              <div className="flex flex-1 items-center justify-between gap-1 px-1.5">
-                <p className="truncate text-[11px] font-bold text-slate-800">
+              <div className="flex min-h-0 flex-1 items-center justify-between gap-1 px-1.5">
+                <p className="truncate text-xs font-bold text-slate-800 md:text-[11px]">
                   {t.allCars} ({cars.length})
                 </p>
                 <Link
                   href={`${PARTNER_BASE}/cars/new`}
-                  className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600 md:h-6 md:w-6"
                   title={t.addCar}
                 >
-                  <Plus className="h-3.5 w-3.5" />
+                  <Plus className="h-4 w-4 md:h-3.5 md:w-3.5" />
                 </Link>
               </div>
             </div>
 
             <div
               className={cn(
-                "flex min-w-0 flex-1 flex-col select-none",
+                "flex h-full w-max shrink-0 select-none flex-col md:w-auto md:min-w-0 md:flex-1",
                 monthSwipeArmed && "cursor-grabbing",
               )}
-              style={{ height: HEADER_H, touchAction: monthSwipeArmed ? "none" : undefined }}
+              style={{ touchAction: monthSwipeArmed ? "none" : undefined }}
               onPointerDown={onMonthSwipePointerDown}
               onPointerMove={onMonthSwipePointerMove}
               onPointerUp={onMonthSwipePointerEnd}
               onPointerCancel={onMonthSwipePointerEnd}
             >
-              <div className="flex min-w-0 flex-1">
+              <div className="flex h-full min-w-0">
                 {days.map((d) => (
                   <div
                     key={`d-${d.toISOString()}`}
                     className={cn(
-                      "box-border flex min-w-0 flex-1 flex-col items-center justify-center border-e border-b border-slate-200",
+                      "box-border flex h-full w-11 flex-none flex-col items-center justify-center overflow-hidden border-e border-b border-slate-200 md:w-auto md:min-w-0 md:flex-1",
                       isToday(d)
                         ? "bg-sky-100 ring-2 ring-inset ring-sky-500"
                         : isWeekBoundaryDay(d)
@@ -838,10 +841,10 @@ export function PartnerFleetCalendar() {
                     )}
                     title={yyyyMmDd(d)}
                   >
-                    <span className="text-[11px] font-bold leading-none text-slate-700">
+                    <span className="text-sm font-bold leading-none text-slate-800 md:text-[11px]">
                       {d.getDate()}
                     </span>
-                    <span className="mt-0.5 text-[9px] leading-none text-slate-500">
+                    <span className="mt-0.5 max-w-full truncate px-0.5 text-xs font-medium leading-none text-slate-600 md:text-[9px]">
                       {weekdayShort(d, locale)}
                     </span>
                   </div>
@@ -861,19 +864,18 @@ export function PartnerFleetCalendar() {
               <div
                 key={car.id}
                 className={cn(
-                  "flex border-b-2",
+                  "flex w-max border-b-2 md:w-full",
                   attention ? "border-amber-300 bg-amber-100/80" : "border-slate-200",
                 )}
                 style={{ height: ROW_H }}
               >
                 <div
                   className={cn(
-                    "sticky start-0 z-10 flex shrink-0 items-center gap-1.5 border-e-2 px-1.5",
+                    "sticky start-0 z-10 flex h-full w-36 shrink-0 items-center gap-1 border-e-2 px-1.5 md:w-[168px] md:gap-1.5",
                     attention
                       ? "border-amber-300 bg-amber-200/90"
                       : "border-slate-300 bg-white",
                   )}
-                  style={{ width: sidebarW, height: ROW_H }}
                 >
                   <button
                     type="button"
@@ -915,7 +917,7 @@ export function PartnerFleetCalendar() {
                     type="button"
                     title={blockCopy.title}
                     onClick={() => openBlockModal(car.id)}
-                    className="shrink-0 rounded border border-sky-300 bg-sky-50 px-1 py-0.5 text-[10px] font-bold text-sky-800 hover:bg-sky-100"
+                    className="inline-flex h-9 min-w-9 shrink-0 items-center justify-center rounded border border-sky-300 bg-sky-50 px-1.5 text-sm font-bold text-sky-800 hover:bg-sky-100"
                   >
                     +
                   </button>
@@ -923,11 +925,14 @@ export function PartnerFleetCalendar() {
 
                 <div
                   className={cn(
-                    "relative min-w-0 flex-1 select-none",
+                    "relative h-full w-[calc(var(--days)*2.75rem)] flex-none select-none md:w-auto md:min-w-0 md:flex-1",
                     attention && "bg-amber-50/90",
                     monthSwipeArmed && "cursor-grabbing",
                   )}
-                  style={{ height: ROW_H, touchAction: monthSwipeArmed ? "none" : undefined }}
+                  style={{
+                    ["--days" as string]: days.length,
+                    touchAction: monthSwipeArmed ? "none" : undefined,
+                  }}
                   onPointerDown={onMonthSwipePointerDown}
                   onPointerMove={onMonthSwipePointerMove}
                   onPointerUp={onMonthSwipePointerEnd}
@@ -952,7 +957,7 @@ export function PartnerFleetCalendar() {
                         className={cn(
                           attention
                             ? cn(
-                                "box-border h-full min-w-0 flex-1 border-e border-b border-amber-200/80",
+                                "box-border h-full w-11 flex-none border-e border-b border-amber-200/80 md:w-auto md:min-w-0 md:flex-1",
                                 isWeekBoundaryDay(d) ? "bg-amber-200/50" : "bg-amber-100/40",
                               )
                             : dayCellClass(d),
@@ -1071,9 +1076,12 @@ export function PartnerFleetCalendar() {
           })}
 
           {!loading && cars.length === 0 ? (
-            <div className="p-10 text-center text-sm text-slate-500">
+            <div className="sticky start-0 w-full bg-white px-4 py-12 text-center text-sm text-slate-600">
               <p>{t.noCars}</p>
-              <Link href={`${PARTNER_BASE}/cars/new`} className="mt-3 inline-block font-semibold text-sky-700">
+              <Link
+                href={`${PARTNER_BASE}/cars/new`}
+                className="mt-3 inline-flex min-h-11 items-center font-semibold text-sky-700"
+              >
                 {t.addCar}
               </Link>
             </div>

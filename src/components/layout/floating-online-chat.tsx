@@ -37,7 +37,10 @@ export function FloatingOnlineChat({
   };
 
   return (
-    <div className="pointer-events-none fixed bottom-[5.25rem] end-3 z-[60] flex flex-col items-end gap-3 md:bottom-6 md:end-4">
+    <aside
+      className="pointer-events-none fixed bottom-[5.25rem] end-3 z-[60] flex flex-col items-end gap-3 md:bottom-6 md:end-4"
+      aria-label={label}
+    >
       {mounted && open ? (
         <div className="pointer-events-auto w-[min(100vw-2rem,24rem)] shadow-[0_24px_60px_rgba(11,31,75,0.28)]">
           <LiveChatPanel onClose={() => setOpen(false)} />
@@ -56,6 +59,6 @@ export function FloatingOnlineChat({
           {label}
         </span>
       </button>
-    </div>
+    </aside>
   );
 }

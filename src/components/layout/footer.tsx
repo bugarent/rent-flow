@@ -30,7 +30,7 @@ function FooterPaymentIcons() {
       <span className={chip} title="PayPal">
         <span className="text-[10px] font-extrabold leading-none tracking-tight">
           <span className="text-[#003087]">Pay</span>
-          <span className="text-[#009CDE]">Pal</span>
+          <span className="text-[#0070BA]">Pal</span>
         </span>
       </span>
       <span className={chip} title="Visa">
@@ -119,10 +119,10 @@ export function Footer({ contact }: { contact?: FooterContactConfig | null }) {
       <footer className="mt-auto overflow-x-clip bg-[#071536] pb-24 text-white md:pb-8">
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-4 py-12 md:grid-cols-3">
           <div className="min-w-0">
-            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-white/90">
+            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-white">
               {dictionary.common.aboutUs}
             </h3>
-            <ul className="space-y-0.5 text-sm text-white/70">
+            <ul className="space-y-0.5 text-sm text-white/95">
               <li>
                 <Link href="/about" className={footerLinkClass}>
                   {dictionary.common.about}
@@ -144,10 +144,10 @@ export function Footer({ contact }: { contact?: FooterContactConfig | null }) {
             </ul>
           </div>
           <div className="min-w-0">
-            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-white/90">
+            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-white">
               {dictionary.common.contactHeading}
             </h3>
-            <ul className="space-y-0.5 text-sm text-white/70">
+            <ul className="space-y-0.5 text-sm text-white/95">
               <li>
                 <ContactCta
                   className={footerLinkClass}
@@ -168,10 +168,10 @@ export function Footer({ contact }: { contact?: FooterContactConfig | null }) {
             </ul>
           </div>
           <div className="min-w-0">
-            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-white/90">
+            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-white">
               {dictionary.common.terms}
             </h3>
-            <ul className="space-y-0.5 text-sm text-white/70">
+            <ul className="space-y-0.5 text-sm text-white/95">
               <li>
                 <Link href="/terms" className={footerLinkClass}>
                   {dictionary.common.terms}
@@ -230,7 +230,7 @@ export function Footer({ contact }: { contact?: FooterContactConfig | null }) {
         ) : null}
 
         <div className="border-t border-white/10">
-          <div className="mx-auto flex max-w-6xl flex-col flex-wrap items-center justify-center gap-x-4 gap-y-3 px-4 py-5 text-xs text-white/60 sm:flex-row">
+          <div className="mx-auto flex max-w-6xl flex-col flex-wrap items-center justify-center gap-x-4 gap-y-3 px-4 py-5 text-xs text-white/90 sm:flex-row">
             <p className="min-w-0 max-w-full text-center break-words">
               © {copyrightYear} {SITE_NAME}. {dictionary.common.allRights}
             </p>

@@ -53,6 +53,20 @@ export default async function Home() {
 
   return (
     <div className="flex w-full min-w-0 flex-col overflow-x-clip">
+      <link
+        rel="preload"
+        as="image"
+        href="/images/hero-tarmac-sm.webp"
+        media="(max-width: 828px)"
+        fetchPriority="high"
+      />
+      <link
+        rel="preload"
+        as="image"
+        href="/images/hero-tarmac.webp"
+        media="(min-width: 829px)"
+        fetchPriority="high"
+      />
       <HomeHeroWithIndividualBooking
         airports={options}
         channels={bookingChannels}

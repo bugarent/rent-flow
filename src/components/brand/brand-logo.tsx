@@ -55,8 +55,8 @@ export function BrandLogo({
         className={`whitespace-nowrap font-[family-name:var(--font-brand)] font-semibold leading-none tracking-[-0.03em] ${word}`}
       >
         <span className="text-[color:var(--brand-navy)]">Rent</span>
-        <span className="text-[color:var(--brand-orange)]">airport</span>
-        <span className="text-[color:var(--brand-slate)]">cars.com</span>
+        <span className="text-[#9a3412]">airport</span>
+        <span className="text-[#14629a]">cars.com</span>
       </span>
     </span>
   );
