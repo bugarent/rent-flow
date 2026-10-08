@@ -28,6 +28,9 @@ export type PartnerExtraPref = {
 
 type StoreFile = Record<string, PartnerExtraPref[]>;
 
+/** Last successful read. A timed-out copy must not look like "no services enabled". */
+let lastGoodStore: StoreFile | null = null;
+
 function optionalStoredPeriod(value: unknown): number | null {
   if (value == null || value === "") return null;
   const n = Number(value);
@@ -62,14 +65,18 @@ async function readStore(): Promise<StoreFile> {
   try {
     const raw = await readFile(STORE, "utf8");
     const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object") return {};
-    return parsed as StoreFile;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return lastGoodStore ?? {};
+    }
+    lastGoodStore = parsed as StoreFile;
+    return lastGoodStore;
   } catch {
-    return {};
+    return lastGoodStore ?? {};
   }
 }
 
 async function writeStore(data: StoreFile) {
+  lastGoodStore = data;
   await mkdir(dataRoot(), { recursive: true });
   await writeFile(STORE, JSON.stringify(data, null, 2), "utf8");
 }

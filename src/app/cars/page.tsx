@@ -6,7 +6,7 @@ import { toNumber } from "@/lib/utils";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { isCityLocationCode, parseCityLocationCode } from "@/lib/catalog/search-places";
 import { loadPublicFileSearchCars } from "@/lib/server/public-file-cars";
-import { parseCarDetails } from "@/lib/cars/car-details";
+import { filterExtrasByCarOffers, parseCarDetails } from "@/lib/cars/car-details";
 import { listingDailyWithDeliveryEur, rentalDayCount } from "@/lib/cars/reserve-pricing";
 import { clampSiteDiscountPercent } from "@/lib/pricing/booking-discount";
 import {
@@ -608,14 +608,17 @@ export default async function CarsPage({
       }
       break;
     }
-    const extraServiceIds = [
-      ...new Set([
-        ...(car.extras || [])
-          .map((row) => String(row.extraServiceId || "").trim())
-          .filter(Boolean),
-        ...offeredFromPrefs,
-      ]),
-    ];
+    const extraServiceIds = filterExtrasByCarOffers(
+      [
+        ...new Set([
+          ...(car.extras || [])
+            .map((row) => String(row.extraServiceId || "").trim())
+            .filter(Boolean),
+          ...offeredFromPrefs,
+        ]),
+      ].map((extraServiceId) => ({ extraServiceId })),
+      car.description,
+    ).map((row) => row.extraServiceId);
     return {
       id: car.id,
       make: car.make,

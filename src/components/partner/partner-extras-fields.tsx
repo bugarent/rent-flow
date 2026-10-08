@@ -3,9 +3,11 @@
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
 import {
   clampPartnerDailyPrice,
+  isMandatoryExtra,
   isMandatoryFreeExtra,
   isMandatoryPricedExtra,
 } from "@/lib/extras/pricing";
+import { findCarExtraOffer, type CarExtraOffer } from "@/lib/cars/car-details";
 import { formatAmountNumber } from "@/lib/utils";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { knownText } from "@/lib/i18n/known-record-text";
@@ -70,6 +72,84 @@ export function buildExtraSelections(
       forbidden: false,
       priceEur: String(price),
     };
+  });
+}
+
+export type CarFormExtraPref = {
+  service?: { id?: string; slug?: string };
+  enabled?: boolean;
+  forbidden?: boolean;
+  priceEur?: number;
+};
+
+/** Cabinet rows matched by id or slug. An empty list is not a trusted "everything off". */
+export function indexExtraPrefs(items: CarFormExtraPref[]) {
+  const byId = new Map<string, CarFormExtraPref>();
+  const bySlug = new Map<string, CarFormExtraPref>();
+  for (const item of items) {
+    const id = String(item.service?.id || "").trim();
+    const slug = String(item.service?.slug || "").trim();
+    if (id) byId.set(id, item);
+    if (slug) bySlug.set(slug, item);
+  }
+  return {
+    trusted: items.length > 0,
+    forService(service: { id: string; slug?: string }) {
+      return byId.get(service.id) || (service.slug ? bySlug.get(service.slug) : undefined);
+    },
+  };
+}
+
+export function catalogIdsForCarExtras(
+  catalog: ExtraServicePricing[],
+  rows: Array<{ extraServiceId?: string; extraService?: { id?: string; slug?: string } | null }>,
+): Set<string> {
+  const bySlug = new Map(catalog.filter((service) => service.slug).map((service) => [service.slug, service.id]));
+  const ids = new Set<string>();
+  for (const row of rows) {
+    const id = String(row.extraServiceId || row.extraService?.id || "").trim();
+    const slug = String(row.extraService?.slug || "").trim();
+    if (id && catalog.some((service) => service.id === id)) ids.add(id);
+    else if (slug && bySlug.has(slug)) ids.add(String(bySlug.get(slug)));
+  }
+  return ids;
+}
+
+export function catalogIdsForOffers(catalog: ExtraServicePricing[], offers: CarExtraOffer[]): Set<string> {
+  const ids = new Set<string>();
+  for (const service of catalog) {
+    if (findCarExtraOffer(offers, service)) ids.add(service.id);
+  }
+  return ids;
+}
+
+/**
+ * Services that stay on the car form.
+ * A failed prefs response keeps the list already on screen instead of collapsing it.
+ */
+export function extrasVisibleOnCarForm(
+  catalog: ExtraServicePricing[],
+  opts: {
+    prefs: CarFormExtraPref[];
+    fallback?: ExtraServicePricing[];
+    carExtraIds?: Set<string>;
+    offerIds?: Set<string>;
+  },
+): ExtraServicePricing[] {
+  const prefs = indexExtraPrefs(opts.prefs);
+  const fallbackIds = new Set((opts.fallback || []).map((service) => service.id));
+  const fallbackSlugs = new Set(
+    (opts.fallback || []).map((service) => service.slug).filter(Boolean),
+  );
+  return catalog.filter((service) => {
+    if (isMandatoryExtra(service)) return true;
+    const pref = prefs.forService(service);
+    // Cabinet choice wins: off stays off the car form even if this car used the service before.
+    if (prefs.trusted && pref) return Boolean(pref.enabled || pref.forbidden);
+    if (prefs.trusted) return false;
+    if (opts.carExtraIds?.has(service.id)) return true;
+    if (opts.offerIds?.has(service.id)) return true;
+    return fallbackIds.has(service.id) || (service.slug ? fallbackSlugs.has(service.slug) : false);
   });
 }
 

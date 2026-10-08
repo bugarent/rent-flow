@@ -97,9 +97,9 @@ function uiCopy(locale: string) {
       reset: "გაუქმება",
       free: "უფასო",
       status: "სტატუსი",
-      on: "ჩართული",
+      on: "ჩართულია",
       forbidden: "აკრძალულია",
-      off: "გამორთული",
+      off: "გამორთულია",
       done: "მზადაა",
       insuranceGroup: "დაზღვევა",
       name: "დასახელება",
@@ -235,6 +235,54 @@ function uiCopy(locale: string) {
     mandatoryPricedHint:
       "Mandatory by admin — this service is always on. 0 = free for the customer, or set a price up to the limit.",
   };
+}
+
+function OfferModeButtons({
+  active,
+  onPick,
+  labels,
+  layout,
+}: {
+  active: OfferMode;
+  onPick: (mode: OfferMode) => void;
+  labels: { on: string; forbidden: string; off: string };
+  layout: "grid" | "inline";
+}) {
+  return (
+    <div className={layout === "grid" ? "grid grid-cols-3 gap-1" : "flex max-w-full flex-wrap justify-end gap-1"}>
+      {(
+        [
+          ["on", labels.on, "green"],
+          ["forbidden", labels.forbidden, "red"],
+          ["off", labels.off, "slate"],
+        ] as const
+      ).map(([mode, label, tone]) => (
+        <button
+          key={mode}
+          type="button"
+          onClick={() => onPick(mode)}
+          className={cn(
+            "inline-flex items-center justify-center rounded-md border font-bold leading-tight",
+            layout === "grid" ? "min-h-10 px-1 text-[11px]" : "min-h-10 px-2 text-[11px]",
+            tone === "green" &&
+              (active === mode
+                ? "border-emerald-600 bg-emerald-600 text-white"
+                : "border-emerald-200 bg-white text-emerald-800"),
+            tone === "red" &&
+              (active === mode
+                ? "border-red-600 bg-red-600 text-white"
+                : "border-red-200 bg-white text-red-700"),
+            tone === "slate" &&
+              (active === mode
+                ? "border-slate-600 bg-slate-600 text-white"
+                : "border-slate-200 bg-white text-slate-600"),
+          )}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function carSummary(
@@ -402,6 +450,7 @@ export function PartnerEquipmentServicePanel({
 
   const editingRow = editingId ? rows.find((r) => r.service.id === editingId) : null;
   const rowsRef = useRef(rows);
+  const saveChainRef = useRef(Promise.resolve());
   useLayoutEffect(() => {
     rowsRef.current = rows;
   });
@@ -457,29 +506,60 @@ export function PartnerEquipmentServicePanel({
     setRows((prev) => prev.map((row) => (row.service.id === id ? { ...row, ...patch } : row)));
   };
 
+  const persistCurrentRows = () => {
+    const run = saveChainRef.current.then(async () => {
+      setSaving(true);
+      setError("");
+      setSavedFlash(false);
+      try {
+        const res = await fetch("/api/partners/extras-prefs", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prefs: buildPrefsPayload() }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Save failed");
+        setSavedFlash(true);
+        window.setTimeout(() => setSavedFlash(false), 2000);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Save failed");
+      } finally {
+        setSaving(false);
+      }
+    });
+    saveChainRef.current = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  };
+
+  const applyOfferMode = (row: RowState, mode: OfferMode) => {
+    if (row.mode === mode) return;
+    if (mode === "on" && periodsConflict(row.minPeriodEur, row.maxPeriodEur)) {
+      setError(t.boundsError);
+      return;
+    }
+    const patch: Partial<RowState> = {
+      mode,
+      priceEur: mode === "forbidden" ? "0" : row.priceEur,
+      ...(mode === "forbidden" ? { minPeriodEur: "", maxPeriodEur: "" } : {}),
+      carIds: mode !== "off" && row.carIds.length === 0 ? cars.map((car) => car.id) : row.carIds,
+    };
+    const next = rowsRef.current.map((item) =>
+      item.service.id === row.service.id ? { ...item, ...patch } : item,
+    );
+    rowsRef.current = next;
+    setRows(next);
+    void persistCurrentRows();
+  };
+
   const saveAll = async () => {
     if (rowsRef.current.some((row) => row.mode === "on" && periodsConflict(row.minPeriodEur, row.maxPeriodEur))) {
       setError(t.boundsError);
       return;
     }
-    setSaving(true);
-    setError("");
-    setSavedFlash(false);
-    try {
-      const res = await fetch("/api/partners/extras-prefs", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prefs: buildPrefsPayload() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Save failed");
-      setSavedFlash(true);
-      window.setTimeout(() => setSavedFlash(false), 2000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setSaving(false);
-    }
+    await persistCurrentRows();
   };
 
   const startCreate = () => {
@@ -896,18 +976,8 @@ export function PartnerEquipmentServicePanel({
                                   setDraftMin("");
                                   setDraftMax("");
                                 }
-                              } else {
-                                setRow(editingRow!.service.id, {
-                                  mode,
-                                  priceEur: mode === "forbidden" ? "0" : editingRow!.priceEur,
-                                  ...(mode === "forbidden"
-                                    ? { minPeriodEur: "", maxPeriodEur: "" }
-                                    : {}),
-                                  carIds:
-                                    mode !== "off" && editingRow!.carIds.length === 0
-                                      ? cars.map((c) => c.id)
-                                      : editingRow!.carIds,
-                                });
+                              } else if (editingRow) {
+                                applyOfferMode(editingRow, mode);
                               }
                             }}
                             className={cn(
@@ -1049,7 +1119,7 @@ export function PartnerEquipmentServicePanel({
             {t.empty}
           </p>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm max-md:overflow-visible max-md:border-0 max-md:bg-transparent max-md:shadow-none">
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm max-md:overflow-visible max-md:border-0 max-md:bg-transparent max-md:shadow-none">
             <ResponsiveDataList
               desktop={
                 <table className="min-w-full text-left text-sm">
@@ -1211,14 +1281,22 @@ export function PartnerEquipmentServicePanel({
                                 ) : null}
                               </div>
                             ) : (
-                              <button
-                                type="button"
-                                onClick={() => setEditingId(row.service.id)}
-                                className="inline-flex items-center gap-1 text-sm font-bold text-[#1d6fe8] hover:underline"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                                {t.edit}
-                              </button>
+                              <div className="flex min-w-0 flex-col items-end gap-1.5">
+                                <OfferModeButtons
+                                  active={row.mode}
+                                  labels={{ on: t.on, forbidden: t.forbidden, off: t.off }}
+                                  layout="inline"
+                                  onPick={(mode) => applyOfferMode(row, mode)}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingId(row.service.id)}
+                                  className="inline-flex min-h-10 items-center gap-1 text-sm font-bold text-[#1d6fe8] hover:underline"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                  {t.edit}
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -1281,17 +1359,6 @@ export function PartnerEquipmentServicePanel({
                     const dailyLocked = mandatory || periodFree || (maxCap != null && maxCap <= 0);
                     const periodLocked = mandatory || periodFree || dailyIsZero;
                     const canEditPrices = !mandatory;
-                    const applyMode = (mode: OfferMode) => {
-                      setRow(row.service.id, {
-                        mode,
-                        priceEur: mode === "forbidden" ? "0" : row.priceEur,
-                        ...(mode === "forbidden" ? { minPeriodEur: "", maxPeriodEur: "" } : {}),
-                        carIds:
-                          mode !== "off" && row.carIds.length === 0
-                            ? cars.map((car) => car.id)
-                            : row.carIds,
-                      });
-                    };
                     const showExtrasHeading =
                       phoneInsuranceRows.length > 0 &&
                       phoneServiceRows[0]?.service.id === row.service.id;
@@ -1337,38 +1404,12 @@ export function PartnerEquipmentServicePanel({
                             {t.mandatoryBadge}
                           </span>
                         ) : (
-                          <div className="grid grid-cols-3 gap-1">
-                            {(
-                              [
-                                ["on", t.on, "green"],
-                                ["forbidden", t.forbidden, "red"],
-                                ["off", t.off, "slate"],
-                              ] as const
-                            ).map(([mode, label, tone]) => (
-                              <button
-                                key={mode}
-                                type="button"
-                                onClick={() => applyMode(mode)}
-                                className={cn(
-                                  "min-h-10 rounded-md border px-1 text-[11px] font-bold leading-tight",
-                                  tone === "green" &&
-                                    (row.mode === mode
-                                      ? "border-emerald-200 bg-emerald-100 text-emerald-800"
-                                      : "border-slate-200 bg-white text-slate-500"),
-                                  tone === "red" &&
-                                    (row.mode === mode
-                                      ? "border-red-200 bg-red-50 text-red-700"
-                                      : "border-slate-200 bg-white text-slate-500"),
-                                  tone === "slate" &&
-                                    (row.mode === mode
-                                      ? "border-slate-300 bg-slate-100 text-slate-700"
-                                      : "border-slate-200 bg-white text-slate-500"),
-                                )}
-                              >
-                                {label}
-                              </button>
-                            ))}
-                          </div>
+                          <OfferModeButtons
+                            active={row.mode}
+                            labels={{ on: t.on, forbidden: t.forbidden, off: t.off }}
+                            layout="grid"
+                            onPick={(mode) => applyOfferMode(row, mode)}
+                          />
                         )}
                         {open && canEditPrices ? (
                           <div className="mt-1 space-y-1.5 border-t border-slate-100 pt-1.5">

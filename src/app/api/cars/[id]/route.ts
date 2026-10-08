@@ -108,12 +108,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     }
   }
 
-  async function enrichPublicCar<T extends object>(payload: T, partnerIdHint?: string) {
+  async function enrichPublicCar<T extends object>(
+    payload: T,
+    partnerIdHint?: string,
+    keepStoredExtras?: boolean,
+  ) {
     return enrichPublicCarPayload(payload, {
       carId: id,
       partnerIdHint,
       rangeFrom,
       rangeTo,
+      // The edit form reads stored rows. The checkout overlay adds and removes
+      // services as cabinet prefs load, so the same listing flickered.
+      keepStoredExtras,
     });
   }
 
@@ -144,7 +151,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       insuranceDoc?.insuranceUrl || null,
       insuranceDoc?.insuranceExpiresAt || null,
     );
-    const payload = await enrichPublicCar(shaped, fileCar.partnerId);
+    const payload = await enrichPublicCar(shaped, fileCar.partnerId, isAdmin || isOwner);
     if (!isAdmin && !isOwner) {
       const { passport: _passport, insuranceUrl: _insurance, ...publicPayload } = payload;
       return NextResponse.json(publicPayload);
@@ -188,6 +195,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             rejectionNotice: rejection,
           },
           car.partner?.id,
+          true,
         ),
       ),
     );
@@ -202,6 +210,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           rejectionNotice: rejection,
         },
         car.partner?.id,
+        true,
       ),
     ),
   );

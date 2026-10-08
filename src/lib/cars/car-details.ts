@@ -30,11 +30,42 @@ export type CarDetailsBlob = {
 
 export type CarExtraOffer = {
   extraServiceId: string;
+  /** Catalog slug so a file id and a database id for the same service stay the same choice. */
+  slug?: string;
   name?: string;
   enabled?: boolean;
   forbidden?: boolean;
   priceEur?: number | string;
 };
+
+function offerPlainName(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (value && typeof value === "object" && "en" in value) {
+    return String((value as { en?: unknown }).en || "").trim();
+  }
+  return "";
+}
+
+/** Match a saved per-car choice to a catalog row even when the service id changed. */
+export function findCarExtraOffer(
+  offers: CarExtraOffer[],
+  service: { id?: string; slug?: string; name?: unknown },
+): CarExtraOffer | undefined {
+  const id = String(service.id || "").trim();
+  if (id) {
+    const byId = offers.find((offer) => offer.extraServiceId === id);
+    if (byId) return byId;
+  }
+  const slug = String(service.slug || "").trim();
+  if (slug) {
+    const bySlug = offers.find((offer) => String(offer.slug || "") === slug);
+    if (bySlug) return bySlug;
+  }
+  const name = offerPlainName(service.name);
+  if (!name) return undefined;
+  const byName = offers.filter((offer) => offerPlainName(offer.name) === name);
+  return byName.length === 1 ? byName[0] : undefined;
+}
 
 export function readExtraOffers(details: CarDetailsBlob | null | undefined): CarExtraOffer[] {
   const raw = details && Array.isArray(details.extraOffers) ? details.extraOffers : [];
@@ -102,17 +133,25 @@ export function extrasModerationChange(
 }
 
 export function filterExtrasByCarOffers<
-  T extends { extraServiceId: string; forbidden?: boolean; priceEur?: unknown },
+  T extends {
+    extraServiceId: string;
+    forbidden?: boolean;
+    priceEur?: unknown;
+    extraService?: { slug?: string; name?: unknown } | null;
+  },
 >(
   extras: T[],
   description: string | null | undefined,
 ): T[] {
   const offers = readExtraOffers(parseCarDetails(description));
   if (!offers.length) return extras;
-  const byId = new Map(offers.map((offer) => [offer.extraServiceId, offer]));
   const next: T[] = [];
   for (const row of extras) {
-    const offer = byId.get(row.extraServiceId);
+    const offer = findCarExtraOffer(offers, {
+      id: row.extraServiceId,
+      slug: row.extraService?.slug,
+      name: row.extraService?.name,
+    });
     if (!offer) {
       next.push(row);
       continue;

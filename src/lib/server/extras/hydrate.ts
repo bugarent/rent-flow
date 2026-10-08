@@ -15,8 +15,52 @@ import {
   localizeExtraName,
 } from "@/lib/extras/pricing";
 import { readExtraI18n } from "@/lib/extras/localized-copy";
+import { createTtlCache } from "@/lib/server/ttl-cache";
 import { listExtraServices } from "./list";
 import type { HydratedListingExtra } from "./types";
+
+const slugIndexCache = createTtlCache<Map<string, string>>(15_000);
+
+/** File id and database id of the same extra share a slug. */
+async function extraSlugById(): Promise<Map<string, string>> {
+  const hit = slugIndexCache.get();
+  if (hit) return hit;
+  try {
+    const { readFileStore } = await import("./file-store");
+    const [catalog, fileRows] = await Promise.all([
+      listExtraServices({ activeOnly: false }),
+      readFileStore().catch(() => []),
+    ]);
+    const slugById = new Map<string, string>();
+    for (const row of fileRows) {
+      if (row.id && row.slug) slugById.set(row.id, row.slug);
+    }
+    for (const row of catalog) {
+      if (row.id && row.slug) slugById.set(row.id, row.slug);
+    }
+    slugIndexCache.set(slugById);
+    return slugById;
+  } catch {
+    return slugIndexCache.peek() ?? new Map();
+  }
+}
+
+function prefLookup<T extends { extraServiceId: string }>(prefs: T[], slugById: Map<string, string>) {
+  const byId = new Map(prefs.map((pref) => [pref.extraServiceId, pref]));
+  const bySlug = new Map<string, T>();
+  for (const pref of prefs) {
+    const slug = slugById.get(pref.extraServiceId);
+    if (slug && !bySlug.has(slug)) bySlug.set(slug, pref);
+  }
+  return {
+    forRow(extraServiceId: string, slug?: string | null) {
+      const direct = byId.get(extraServiceId);
+      if (direct) return direct;
+      const resolved = String(slug || slugById.get(extraServiceId) || "").trim();
+      return resolved ? bySlug.get(resolved) : undefined;
+    },
+  };
+}
 
 function copyBags(service: { name?: unknown; description?: unknown; nameI18n?: Record<string, string>; descriptionI18n?: Record<string, string> } | null | undefined) {
   return {
@@ -182,11 +226,11 @@ export async function applyPartnerExtraOfferModes(
     }
     if (!prefs.length) return extras;
 
-    const byId = new Map(prefs.map((p) => [p.extraServiceId, p]));
+    const lookup = prefLookup(prefs, await extraSlugById());
     const next: HydratedListingExtra[] = [];
     for (const row of extras) {
       const svc = row.extraService;
-      const pref = byId.get(row.extraServiceId);
+      const pref = lookup.forRow(row.extraServiceId, svc?.slug);
       const mandatoryPriced = Boolean(svc && isMandatoryPricedExtra(svc));
       if (svc && !mandatoryPriced && (svc.isTpl || isMandatoryExtra(svc))) {
         next.push({
@@ -292,16 +336,25 @@ export async function mergePartnerOfferedExtras(
     }
     if (!prefs.length) return extras;
 
+    const slugById = await extraSlugById();
     const present = new Set(extras.map((e) => e.extraServiceId));
+    const presentSlugs = new Set(
+      extras
+        .map((row) => row.extraService?.slug || slugById.get(row.extraServiceId) || "")
+        .filter(Boolean),
+    );
     const catalog = await listExtraServices({ activeOnly: true });
     const customs = await listPartnerCustomExtrasAsPricing(resolvedPartnerId, { activeOnly: true });
-    const byId = new Map([...catalog, ...customs].map((s) => [s.id, s]));
+    const services = [...catalog, ...customs];
+    const byId = new Map(services.map((s) => [s.id, s]));
+    const bySlug = new Map(services.filter((s) => s.slug).map((s) => [s.slug, s]));
 
     const merged = [...extras];
     for (const pref of prefs) {
       if (!partnerExtraPrefAppliesToCar(pref, carId)) continue;
-      if (present.has(pref.extraServiceId)) continue;
-      const service = byId.get(pref.extraServiceId);
+      const slug = slugById.get(pref.extraServiceId) || "";
+      if (present.has(pref.extraServiceId) || (slug && presentSlugs.has(slug))) continue;
+      const service = byId.get(pref.extraServiceId) || (slug ? bySlug.get(slug) : undefined);
       if (!service) continue;
       const mandatoryPriced = isMandatoryPricedExtra(service);
       if (!mandatoryPriced && (service.isTpl || isMandatoryExtra(service))) continue;
@@ -333,6 +386,7 @@ export async function mergePartnerOfferedExtras(
         },
       });
       present.add(service.id);
+      if (service.slug) presentSlugs.add(service.slug);
     }
     return sortHydratedExtras(merged);
   } catch {

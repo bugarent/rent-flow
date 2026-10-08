@@ -109,7 +109,7 @@ async function clientLanguages(partnerId: string): Promise<string[]> {
  */
 export async function enrichPublicCarPayload<T extends object>(
   payload: T,
-  input: PublicCarRange & { carId: string; partnerIdHint?: string },
+  input: PublicCarRange & { carId: string; partnerIdHint?: string; keepStoredExtras?: boolean },
 ): Promise<T & { rentPaymentMethods: string[]; contractUrl: string; partnerClientLanguages: string[] }> {
   const fields = payload as PartnerRef & {
     id?: string;
@@ -128,7 +128,9 @@ export async function enrichPublicCarPayload<T extends object>(
     await Promise.all([
       periodDiscount(input.carId, fields.discountPercent, input),
       deliveryRows(partnerId, fields.deliveryPrices),
-      hydratedExtras(partnerId, carId, fields.extras),
+      input.keepStoredExtras
+        ? Promise.resolve(undefined)
+        : hydratedExtras(partnerId, carId, fields.extras),
       companyPayments(partnerId),
       clientLanguages(partnerId),
     ]);

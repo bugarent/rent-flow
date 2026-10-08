@@ -13,6 +13,10 @@ import { isProtectionInsuranceSlot } from "@/lib/extras/checkout-slot";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import {
   buildExtraSelections,
+  catalogIdsForCarExtras,
+  catalogIdsForOffers,
+  extrasVisibleOnCarForm,
+  indexExtraPrefs,
   type PartnerExtraSelection,
 } from "@/components/partner/partner-extras-fields";
 import {
@@ -26,7 +30,7 @@ import {
   type PickupPlaceRow,
 } from "@/components/partner/partner-pickup-dropoff-section";
 import { isSyntheticDeliveryId } from "@/lib/delivery/pricing";
-import { parseCarDetails, readExtraOffers } from "@/lib/cars/car-details";
+import { findCarExtraOffer, parseCarDetails, readExtraOffers } from "@/lib/cars/car-details";
 import { diffCarAgainstPublished, fieldChangesMapFromRecord } from "@/lib/cars/car-published-diff";
 import {
   insuranceExpiryReasonLabel,
@@ -521,6 +525,12 @@ export function PartnerCreateCarForm({
   }
 
   const insuranceRef = useRef<HTMLInputElement>(null);
+  const extrasFallbackRef = useRef(initialExtrasCatalog);
+  if (extrasCatalog.length > 0) extrasFallbackRef.current = extrasCatalog;
+  const initialDeliveryRef = useRef(initialDeliveryCatalog);
+  initialDeliveryRef.current = initialDeliveryCatalog;
+  const errUpdateFailedRef = useRef(cc.errUpdateFailed);
+  errUpdateFailedRef.current = cc.errUpdateFailed;
   const passportFrontRef = useRef<HTMLInputElement>(null);
   const passportBackRef = useRef<HTMLInputElement>(null);
 
@@ -562,7 +572,7 @@ export function PartnerCreateCarForm({
           const extras = extrasRes?.ok ? await extrasRes.json().catch(() => []) : [];
           const car = await carRes.json().catch(() => ({}));
           if (!carRes.ok) {
-            throw new Error(typeof car.error === "string" ? car.error : cc.errUpdateFailed);
+            throw new Error(typeof car.error === "string" ? car.error : errUpdateFailedRef.current);
           }
 
           const details = parseCarDetails(car.description);
@@ -677,12 +687,12 @@ export function PartnerCreateCarForm({
 
           const carExtras = Array.isArray(car.extras) ? car.extras : [];
           if (Array.isArray(extras) && extras.length) {
-            const carExtraIds = new Set(
-              carExtras.map((e: { extraServiceId: string }) => e.extraServiceId),
-            );
+            const offers = readExtraOffers(details);
+            const carExtraIds = catalogIdsForCarExtras(extras, carExtras);
+            const offerIds = catalogIdsForOffers(extras, offers);
             const filtered = extras.filter(
               (service: ExtraServicePricing) =>
-                isMandatoryExtra(service) || carExtraIds.has(service.id),
+                isMandatoryExtra(service) || carExtraIds.has(service.id) || offerIds.has(service.id),
             );
             setExtrasCatalog(filtered);
             setExtraSelections(
@@ -700,8 +710,11 @@ export function PartnerCreateCarForm({
                   };
                 }),
               ).map((row) => {
-                const offer = readExtraOffers(details).find(
-                  (item) => item.extraServiceId === row.extraServiceId,
+                const offer = findCarExtraOffer(
+                  offers,
+                  filtered.find((service) => service.id === row.extraServiceId) || {
+                    id: row.extraServiceId,
+                  },
                 );
                 if (offer) {
                   const forbidden = Boolean(offer.forbidden);
@@ -859,48 +872,39 @@ export function PartnerCreateCarForm({
           }
         }
 
-        if (extrasRes.ok && Array.isArray(extras)) {
-          type PrefItem = {
-            service?: { id?: string };
-            enabled?: boolean;
-            forbidden?: boolean;
-            priceEur?: number;
-          };
-          const prefItems: PrefItem[] = Array.isArray(prefsData?.items) ? prefsData.items : [];
-          const prefById = new Map<string, PrefItem>(
-            prefItems.map((item) => [String(item.service?.id || ""), item]),
-          );
-          const hasPrefs = prefItems.length > 0;
-          const filtered = extras.filter((service: ExtraServicePricing) => {
-            if (isMandatoryExtra(service)) return true;
-            if (!hasPrefs) return false;
-            const pref = prefById.get(service.id);
-            return Boolean(pref?.enabled || pref?.forbidden);
+        if (!carId && extrasRes.ok && Array.isArray(extras) && extras.length) {
+          const prefItems = Array.isArray(prefsData?.items) ? prefsData.items : [];
+          const prefs = indexExtraPrefs(prefItems);
+          const filtered = extrasVisibleOnCarForm(extras, {
+            prefs: prefItems,
+            fallback: extrasFallbackRef.current,
           });
-          const existingPrices = filtered.map((service: ExtraServicePricing) => {
-            const pref = prefById.get(service.id);
-            const price =
-              pref?.forbidden
-                ? 0
-                : pref?.priceEur != null
-                  ? Number(pref.priceEur)
-                  : Number(service.defaultPriceEur ?? service.minPriceEur ?? 0);
-            return {
-              extraServiceId: service.id,
-              priceEur: price,
-              forbidden: Boolean(pref?.forbidden),
-            };
-          });
-          setExtrasCatalog(filtered);
-          setExtraSelections(
-            buildExtraSelections(filtered, existingPrices).map((row) => ({
-              ...row,
-              priceEur:
-                row.forbidden || !row.priceEur || row.priceEur === "0"
-                  ? row.priceEur
-                  : eurToPartnerAmount(row.priceEur, nextCurrency, nextRates),
-            })),
-          );
+          if (!cancelled && (prefs.trusted || filtered.length > 0)) {
+            const existingPrices = filtered.map((service: ExtraServicePricing) => {
+              const pref = prefs.forService(service);
+              const price =
+                pref?.forbidden
+                  ? 0
+                  : pref?.priceEur != null
+                    ? Number(pref.priceEur)
+                    : Number(service.defaultPriceEur ?? service.minPriceEur ?? 0);
+              return {
+                extraServiceId: service.id,
+                priceEur: price,
+                forbidden: Boolean(pref?.forbidden),
+              };
+            });
+            setExtrasCatalog(filtered);
+            setExtraSelections(
+              buildExtraSelections(filtered, existingPrices).map((row) => ({
+                ...row,
+                priceEur:
+                  row.forbidden || !row.priceEur || row.priceEur === "0"
+                    ? row.priceEur
+                    : eurToPartnerAmount(row.priceEur, nextCurrency, nextRates),
+              })),
+            );
+          }
         }
         if (meRes.ok && Array.isArray(me.deliveryCatalog) && me.deliveryCatalog.length) {
           const delivery = (me.deliveryCatalog as DeliveryLocationView[]).map((loc) => {
@@ -947,7 +951,7 @@ export function PartnerCreateCarForm({
         if (carId) {
           const carRes = await fetch(`/api/cars/${carId}`, { cache: "no-store" });
           const car = await carRes.json();
-          if (!carRes.ok) throw new Error(typeof car.error === "string" ? car.error : cc.errUpdateFailed);
+          if (!carRes.ok) throw new Error(typeof car.error === "string" ? car.error : errUpdateFailedRef.current);
           if (cancelled) return;
 
           const details = parseCarDetails(car.description);
@@ -1086,76 +1090,69 @@ export function PartnerCreateCarForm({
           }
 
           const carExtras = Array.isArray(car.extras) ? car.extras : [];
-          if (extrasRes.ok && Array.isArray(extras)) {
-            type PrefItem = {
-              service?: { id?: string };
-              enabled?: boolean;
-              forbidden?: boolean;
-              priceEur?: number;
-            };
-            const prefItems: PrefItem[] = Array.isArray(prefsData?.items) ? prefsData.items : [];
-            const prefById = new Map<string, PrefItem>(
-              prefItems.map((item) => [String(item.service?.id || ""), item]),
-            );
-            const hasPrefs = prefItems.length > 0;
-            const carExtraIds = new Set(carExtras.map((e: { extraServiceId: string }) => e.extraServiceId));
-            const filtered = extras.filter((service: ExtraServicePricing) => {
-              if (isMandatoryExtra(service)) return true;
-              if (carExtraIds.has(service.id)) return true;
-              if (!hasPrefs) return false;
-              const pref = prefById.get(service.id);
-              return Boolean(pref?.enabled || pref?.forbidden);
+          if (extrasRes.ok && Array.isArray(extras) && extras.length) {
+            const prefItems = Array.isArray(prefsData?.items) ? prefsData.items : [];
+            const prefs = indexExtraPrefs(prefItems);
+            const offers = readExtraOffers(details);
+            const carExtraIds = catalogIdsForCarExtras(extras, carExtras);
+            const offerIds = catalogIdsForOffers(extras, offers);
+            const filtered = extrasVisibleOnCarForm(extras, {
+              prefs: prefItems,
+              fallback: extrasFallbackRef.current,
+              carExtraIds,
+              offerIds,
             });
-            const existingPrices = filtered.map((service: ExtraServicePricing) => {
-              const fromCar = carExtras.find(
-                (e: { extraServiceId: string; priceEur?: number; forbidden?: boolean }) =>
-                  e.extraServiceId === service.id,
-              );
-              const pref = prefById.get(service.id);
-              const forbidden = Boolean(fromCar?.forbidden || pref?.forbidden);
-              const price = forbidden
-                ? 0
-                : fromCar?.priceEur != null
-                  ? Number(fromCar.priceEur)
-                  : pref?.priceEur != null
-                    ? Number(pref.priceEur)
-                    : Number(service.defaultPriceEur ?? service.minPriceEur ?? 0);
-              return { extraServiceId: service.id, priceEur: price, forbidden };
-            });
-            setExtrasCatalog(filtered);
-            setExtraSelections(
-              buildExtraSelections(filtered, existingPrices).map((row) => {
-                const service = filtered.find((s) => s.id === row.extraServiceId);
-                const offer = readExtraOffers(details).find(
-                  (item) => item.extraServiceId === row.extraServiceId,
+            if (!cancelled && (prefs.trusted || filtered.length > 0 || extrasFallbackRef.current.length === 0)) {
+              const existingPrices = filtered.map((service: ExtraServicePricing) => {
+                const fromCar = carExtras.find(
+                  (e: { extraServiceId: string; extraService?: { slug?: string } | null; priceEur?: number; forbidden?: boolean }) =>
+                    e.extraServiceId === service.id ||
+                    (Boolean(service.slug) && e.extraService?.slug === service.slug),
                 );
-                const forbidden = offer ? Boolean(offer.forbidden) : Boolean(row.forbidden);
-                const enabled = offer
-                  ? !forbidden && offer.enabled !== false
-                  : (service ? isMandatoryExtra(service) : false) ||
-                    Boolean(row.forbidden) ||
-                    carExtraIds.has(row.extraServiceId);
-                const eurPrice =
-                  offer && offer.priceEur != null && String(offer.priceEur) !== ""
-                    ? String(offer.priceEur)
-                    : row.priceEur;
-                return {
-                  ...row,
-                  forbidden,
-                  enabled,
-                  priceEur:
-                    forbidden || !eurPrice || eurPrice === "0"
-                      ? eurPrice || "0"
-                      : eurToPartnerAmount(eurPrice, nextCurrency, nextRates),
-                };
-              }),
-            );
+                const pref = prefs.forService(service);
+                const forbidden = Boolean(fromCar?.forbidden || pref?.forbidden);
+                const price = forbidden
+                  ? 0
+                  : fromCar?.priceEur != null
+                    ? Number(fromCar.priceEur)
+                    : pref?.priceEur != null
+                      ? Number(pref.priceEur)
+                      : Number(service.defaultPriceEur ?? service.minPriceEur ?? 0);
+                return { extraServiceId: service.id, priceEur: price, forbidden };
+              });
+              setExtrasCatalog(filtered);
+              setExtraSelections(
+                buildExtraSelections(filtered, existingPrices).map((row) => {
+                  const service = filtered.find((s) => s.id === row.extraServiceId);
+                  const offer = service ? findCarExtraOffer(offers, service) : undefined;
+                  const forbidden = offer ? Boolean(offer.forbidden) : Boolean(row.forbidden);
+                  const enabled = offer
+                    ? !forbidden && offer.enabled !== false
+                    : (service ? isMandatoryExtra(service) : false) ||
+                      Boolean(row.forbidden) ||
+                      carExtraIds.has(row.extraServiceId);
+                  const eurPrice =
+                    offer && offer.priceEur != null && String(offer.priceEur) !== ""
+                      ? String(offer.priceEur)
+                      : row.priceEur;
+                  return {
+                    ...row,
+                    forbidden,
+                    enabled,
+                    priceEur:
+                      forbidden || !eurPrice || eurPrice === "0"
+                        ? eurPrice || "0"
+                        : eurToPartnerAmount(eurPrice, nextCurrency, nextRates),
+                  };
+                }),
+              );
+            }
           }
 
           let deliveryList =
             meRes.ok && Array.isArray(me.deliveryCatalog) && me.deliveryCatalog.length
               ? (me.deliveryCatalog as DeliveryLocationView[])
-              : initialDeliveryCatalog;
+              : initialDeliveryRef.current;
           if (isAdminReview && !deliveryList.length) {
             try {
               const adminDelRes = await fetch("/api/admin/delivery", { cache: "no-store" });
@@ -1245,7 +1242,7 @@ export function PartnerCreateCarForm({
         }
       } catch (err) {
         if (!cancelled && carId) {
-          setError(err instanceof Error ? err.message : cc.errUpdateFailed);
+          setError(err instanceof Error ? err.message : errUpdateFailedRef.current);
         }
       } finally {
         // Always clear boot UI — partner APIs can hang when DB is offline; admin path must not stick.
@@ -1259,7 +1256,7 @@ export function PartnerCreateCarForm({
     return () => {
       cancelled = true;
     };
-  }, [carId, cc.errUpdateFailed, initialDeliveryCatalog, isAdminReview]);
+  }, [carId, isAdminReview]);
 
   useEffect(() => {
     const nodes = SECTION_IDS.map((id) => document.getElementById(id)).filter(Boolean) as HTMLElement[];
@@ -1664,6 +1661,7 @@ export function PartnerCreateCarForm({
           const enabled = mandatory || (!forbidden && Boolean(row.enabled));
           return {
             extraServiceId: row.extraServiceId,
+            slug: service?.slug || undefined,
             name: service?.name || row.extraServiceId,
             enabled,
             forbidden,
