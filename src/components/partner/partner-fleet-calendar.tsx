@@ -167,7 +167,7 @@ function isToday(d: Date) {
 
 function dayCellClass(d: Date) {
   return cn(
-    "box-border h-full w-11 flex-none border-e border-b border-slate-200 md:w-auto md:min-w-0 md:flex-1",
+    "box-border h-full w-7 flex-none border-e border-b border-slate-200 md:w-auto md:min-w-0 md:flex-1",
     isWeekBoundaryDay(d) ? "bg-slate-100" : "bg-white",
   );
 }
@@ -775,15 +775,13 @@ export function PartnerFleetCalendar() {
           {/* Sticky header. On a phone each day keeps its own width and the month scrolls sideways. */}
           <div
             className={cn(
-              "sticky top-0 z-20 flex w-max border-b-2 border-slate-300 bg-white md:h-14 md:w-full",
-              carsColumnNarrow ? "h-14" : "h-20",
+              "sticky top-0 z-20 flex h-10 w-max border-b-2 border-slate-300 bg-white md:h-14 md:w-full",
             )}
           >
             <div className={cn("sticky start-0 z-30 flex h-full shrink-0 flex-col border-e-2 border-slate-300 bg-white", carColumnWidth)}>
               <div
                 className={cn(
-                  "flex items-center gap-0.5 border-b border-[#cfd8e3] bg-[#d9e2e8] px-1 md:h-8",
-                  carsColumnNarrow ? "h-7" : "h-11",
+                  "flex h-5 items-center gap-0.5 border-b border-[#cfd8e3] bg-[#d9e2e8] px-1 md:h-8",
                 )}
               >
                 <select
@@ -793,8 +791,7 @@ export function PartnerFleetCalendar() {
                     setMonth(new Date(month.getFullYear(), Number(e.target.value), 1))
                   }
                   className={cn(
-                    "min-w-0 flex-1 truncate rounded border-0 bg-transparent font-bold text-[#1e1b4b] outline-none md:hidden",
-                    carsColumnNarrow ? "h-7 text-[11px]" : "min-h-11 text-base",
+                    "h-5 min-w-0 flex-1 truncate rounded border-0 bg-transparent text-[10px] font-bold text-[#1e1b4b] outline-none md:hidden",
                   )}
                 >
                   {monthsShort.map((name, i) => (
@@ -824,10 +821,8 @@ export function PartnerFleetCalendar() {
                     setMonth(new Date(Number(e.target.value), month.getMonth(), 1))
                   }
                   className={cn(
-                    "h-11 shrink-0 rounded border-0 bg-transparent font-bold text-[#1e1b4b] outline-none",
-                    carsColumnNarrow
-                      ? "w-10 px-0 text-xs md:h-auto md:w-12 md:text-[10px]"
-                      : "w-16 text-base md:h-auto md:w-[4.25rem] md:text-[11px] md:font-extrabold",
+                    "h-5 w-9 shrink-0 rounded border-0 bg-transparent px-0 text-[10px] font-bold text-[#1e1b4b] outline-none md:h-auto md:text-[11px] md:font-extrabold",
+                    carsColumnNarrow ? "md:w-12 md:text-[10px]" : "md:w-[4.25rem]",
                   )}
                 >
                   {yearOptions.map((y) => (
@@ -844,12 +839,11 @@ export function PartnerFleetCalendar() {
                 <Link
                   href={`${PARTNER_BASE}/cars/new`}
                   className={cn(
-                    "inline-flex shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600",
-                    carsColumnNarrow ? "h-6 w-6" : "h-9 w-9 md:h-6 md:w-6",
+                    "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600 md:h-6 md:w-6",
                   )}
                   title={t.addCar}
                 >
-                  <Plus className="h-4 w-4 md:h-3.5 md:w-3.5" />
+                  <Plus className="h-3 w-3 md:h-3.5 md:w-3.5" />
                 </Link>
                 <button
                   type="button"
@@ -884,7 +878,7 @@ export function PartnerFleetCalendar() {
                   <div
                     key={`d-${d.toISOString()}`}
                     className={cn(
-                      "box-border flex h-full w-11 flex-none flex-col items-center justify-center overflow-hidden border-e border-b border-slate-200 md:w-auto md:min-w-0 md:flex-1",
+                      "box-border flex h-full w-7 flex-none flex-col items-center justify-center overflow-hidden border-e border-b border-slate-200 md:w-auto md:min-w-0 md:flex-1",
                       isToday(d)
                         ? "bg-sky-100 ring-2 ring-inset ring-sky-500"
                         : isWeekBoundaryDay(d)
@@ -894,10 +888,10 @@ export function PartnerFleetCalendar() {
                     )}
                     title={yyyyMmDd(d)}
                   >
-                    <span className="text-sm font-bold leading-none text-slate-800 md:text-[11px]">
+                    <span className="text-[11px] font-bold leading-none text-slate-800">
                       {d.getDate()}
                     </span>
-                    <span className="mt-0.5 max-w-full truncate px-0.5 text-xs font-medium leading-none text-slate-600 md:text-[9px]">
+                    <span className="mt-0.5 hidden max-w-full truncate px-0.5 text-[9px] font-medium leading-none text-slate-600 md:inline">
                       {weekdayShort(d, locale)}
                     </span>
                   </div>
@@ -917,8 +911,7 @@ export function PartnerFleetCalendar() {
               <div
                 key={car.id}
                 className={cn(
-                  "flex w-max border-b-2 md:h-[52px] md:w-full",
-                  carsColumnNarrow ? "h-10" : "h-[52px]",
+                  "flex h-7 w-max border-b-2 md:h-[52px] md:w-full",
                   attention ? "border-amber-300 bg-amber-100/80" : "border-slate-200",
                 )}
               >
@@ -945,7 +938,7 @@ export function PartnerFleetCalendar() {
                   >
                     <span
                       className={cn(
-                        "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-[10px] font-extrabold text-white",
+                        "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[9px] font-extrabold text-white md:h-6 md:w-6 md:text-[10px]",
                         carWindowClass(car.status),
                       )}
                     >
@@ -972,8 +965,7 @@ export function PartnerFleetCalendar() {
                     title={blockCopy.title}
                     onClick={() => openBlockModal(car.id)}
                     className={cn(
-                      "inline-flex h-9 min-w-9 shrink-0 items-center justify-center rounded border border-sky-300 bg-sky-50 px-1.5 text-sm font-bold text-sky-800 hover:bg-sky-100",
-                      carsColumnNarrow && "h-8 min-w-8 px-0 text-xs",
+                      "inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded border border-sky-300 bg-sky-50 px-0 text-[11px] font-bold text-sky-800 hover:bg-sky-100 md:h-9 md:min-w-9 md:px-1.5 md:text-sm",
                     )}
                   >
                     +
@@ -982,7 +974,7 @@ export function PartnerFleetCalendar() {
 
                 <div
                   className={cn(
-                    "relative h-full w-[calc(var(--days)*2.75rem)] flex-none select-none md:w-auto md:min-w-0 md:flex-1",
+                    "relative h-full w-[calc(var(--days)*1.75rem)] flex-none select-none md:w-auto md:min-w-0 md:flex-1",
                     attention && "bg-amber-50/90",
                     monthSwipeArmed && "cursor-grabbing",
                   )}
@@ -1014,7 +1006,7 @@ export function PartnerFleetCalendar() {
                         className={cn(
                           attention
                             ? cn(
-                                "box-border h-full w-11 flex-none border-e border-b border-amber-200/80 md:w-auto md:min-w-0 md:flex-1",
+                                "box-border h-full w-7 flex-none border-e border-b border-amber-200/80 md:w-auto md:min-w-0 md:flex-1",
                                 isWeekBoundaryDay(d) ? "bg-amber-200/50" : "bg-amber-100/40",
                               )
                             : dayCellClass(d),
@@ -1029,7 +1021,7 @@ export function PartnerFleetCalendar() {
                   </div>
 
                   {isInsuranceExpiryReason(car.hiddenReason) ? (
-                    <div className="pointer-events-none absolute inset-x-1 top-1/2 z-[1] flex h-7 -translate-y-1/2 items-center overflow-hidden rounded-md bg-amber-400 px-2 text-[11px] font-extrabold text-amber-950 shadow-sm ring-1 ring-amber-700/25">
+                    <div className="pointer-events-none absolute inset-x-0.5 top-1/2 z-[1] flex h-5 -translate-y-1/2 items-center overflow-hidden rounded bg-amber-400 px-1 text-[9px] font-extrabold text-amber-950 shadow-sm ring-1 ring-amber-700/25 md:inset-x-1 md:h-7 md:px-2 md:text-[11px]">
                       <span className="truncate">{insuranceExpiryReasonLabel(locale)}</span>
                     </div>
                   ) : null}
@@ -1098,8 +1090,7 @@ export function PartnerFleetCalendar() {
                           }
                         }}
                         className={cn(
-                          "absolute top-1 z-[2] h-8 overflow-hidden rounded-md border px-1 py-0.5 text-left text-[9px] font-semibold leading-tight shadow-sm select-none md:top-1.5 md:h-10",
-                          !carsColumnNarrow && "h-10",
+                          "absolute top-0.5 z-[2] h-5 overflow-hidden rounded border px-0.5 py-0 text-left text-[8px] font-semibold leading-tight shadow-sm select-none md:top-1.5 md:h-10 md:rounded-md md:px-1 md:py-0.5 md:text-[9px]",
                           statusBarClass(b),
                           (selectedId === b.id || viewingInfo?.id === b.id) &&
                             "ring-2 ring-[#1e1b4b]",
