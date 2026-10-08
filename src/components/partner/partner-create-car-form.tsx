@@ -62,6 +62,7 @@ import {
   partnerAmountToEur,
   partnerCurrencySymbol,
   eurToPartnerAmount,
+  rebasePartnerAmount,
 } from "@/lib/partners/pricing-currency";
 import { DEFAULT_FX_RATES, type FxRates } from "@/lib/fx";
 import {
@@ -106,6 +107,19 @@ function partnerMoney(
   const n = Number(amount);
   if (!Number.isFinite(n)) return "";
   return eurToPartnerAmount(n, currency, rates);
+}
+
+/** Keep an in-progress amount when the header currency changes. Blank stays blank. */
+function rebaseMoneyField(
+  amount: string,
+  from: PartnerPricingCurrency,
+  to: PartnerPricingCurrency,
+  rates: FxRates,
+): string {
+  const trimmed = String(amount ?? "").trim();
+  if (trimmed === "" || trimmed === "." || trimmed === "-") return amount;
+  if (from === to) return amount;
+  return rebasePartnerAmount(trimmed, from, to, rates);
 }
 
 function formatExtrasChange(raw: string, locale: string): string {
@@ -524,6 +538,39 @@ export function PartnerCreateCarForm({
     setFxRates(moneyCtx.fxRates);
   }
 
+  const displayCurrencyRef = useRef(pricingCurrency);
+  const displayRatesRef = useRef(fxRates);
+  displayCurrencyRef.current = moneyCtx?.pricingCurrency ?? pricingCurrency;
+  displayRatesRef.current = moneyCtx?.fxRates ?? fxRates;
+
+  const headerCurrency = moneyCtx?.pricingCurrency;
+  if (moneyCtx && headerCurrency && headerCurrency !== pricingCurrency) {
+    const from = pricingCurrency;
+    const to = headerCurrency;
+    const rates = moneyCtx.fxRates;
+    setPricingCurrency(to);
+    setDeposit((value) => rebaseMoneyField(value, from, to, rates));
+    setTariffPrices((rows) => rows.map((value) => rebaseMoneyField(value, from, to, rates)));
+    setExtraSelections((rows) =>
+      rows.map((row) => ({ ...row, priceEur: rebaseMoneyField(row.priceEur, from, to, rates) })),
+    );
+    setDeliverySelections((rows) =>
+      rows.map((row) => ({ ...row, priceEur: rebaseMoneyField(row.priceEur, from, to, rates) })),
+    );
+    setPickupPlaces((rows) =>
+      rows.map((row) => ({ ...row, priceEur: rebaseMoneyField(row.priceEur, from, to, rates) })),
+    );
+    setSeasonRates((rows) =>
+      rows.map((row) => ({
+        ...row,
+        d1_3: rebaseMoneyField(row.d1_3, from, to, rates),
+        d4_5: rebaseMoneyField(row.d4_5, from, to, rates),
+        d6_30: rebaseMoneyField(row.d6_30, from, to, rates),
+        d31: rebaseMoneyField(row.d31, from, to, rates),
+      })),
+    );
+  }
+
   const insuranceRef = useRef<HTMLInputElement>(null);
   const extrasFallbackRef = useRef(initialExtrasCatalog);
   if (extrasCatalog.length > 0) extrasFallbackRef.current = extrasCatalog;
@@ -854,23 +901,18 @@ export function PartnerCreateCarForm({
           );
         }
 
-        let nextCurrency: PartnerPricingCurrency = DEFAULT_PARTNER_PRICING_CURRENCY;
-        let nextRates: FxRates = DEFAULT_FX_RATES;
-        if (meRes.ok) {
-          if (me.pricingCurrency === "USD" || me.pricingCurrency === "EUR" || me.pricingCurrency === "GEL") {
-            nextCurrency = me.pricingCurrency;
-            setPricingCurrency(nextCurrency);
-          }
-          if (me.fxRates && typeof me.fxRates === "object") {
-            nextRates = {
-              eurUsd: Number(me.fxRates.eurUsd) || DEFAULT_FX_RATES.eurUsd,
-              eurGbp: Number(me.fxRates.eurGbp) || DEFAULT_FX_RATES.eurGbp,
-              eurGel: Number(me.fxRates.eurGel) || DEFAULT_FX_RATES.eurGel,
-              eurRub: Number(me.fxRates.eurRub) || DEFAULT_FX_RATES.eurRub,
-            };
-            setFxRates(nextRates);
-          }
+        let nextCurrency: PartnerPricingCurrency = displayCurrencyRef.current;
+        let nextRates: FxRates = displayRatesRef.current;
+        if (meRes.ok && me.fxRates && typeof me.fxRates === "object" && !moneyCtx) {
+          nextRates = {
+            eurUsd: Number(me.fxRates.eurUsd) || DEFAULT_FX_RATES.eurUsd,
+            eurGbp: Number(me.fxRates.eurGbp) || DEFAULT_FX_RATES.eurGbp,
+            eurGel: Number(me.fxRates.eurGel) || DEFAULT_FX_RATES.eurGel,
+            eurRub: Number(me.fxRates.eurRub) || DEFAULT_FX_RATES.eurRub,
+          };
         }
+        setPricingCurrency(nextCurrency);
+        setFxRates(nextRates);
 
         if (!carId && extrasRes.ok && Array.isArray(extras) && extras.length) {
           const prefItems = Array.isArray(prefsData?.items) ? prefsData.items : [];

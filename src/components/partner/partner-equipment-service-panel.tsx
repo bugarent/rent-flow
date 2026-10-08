@@ -14,6 +14,9 @@ import {
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
 import { isProtectionInsuranceSlot } from "@/lib/extras/checkout-slot";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
+import { usePartnerMoney } from "@/components/providers/partner-money-context";
+import { PartnerEurMoneyInput } from "@/components/partner/partner-eur-money-input";
+import { partnerCurrencySymbol } from "@/lib/partners/pricing-currency";
 import { knownText } from "@/lib/i18n/known-record-text";
 import { localizedExtraCopy } from "@/lib/extras/localized-copy";
 import {
@@ -306,6 +309,16 @@ export function PartnerEquipmentServicePanel({
   catalog: ExtraServicePricing[];
 }) {
   const { locale } = usePartnerLocale();
+  const { fromEur, pricingCurrency } = usePartnerMoney();
+  const symbol = partnerCurrencySymbol(pricingCurrency);
+  const showMoney = (eur: number) => `${symbol}${formatAmountNumber(fromEur(eur))}`;
+  const fillMoney = (template: string, values: Record<string, number>) => {
+    let text = template.replaceAll("€", symbol);
+    for (const [key, amount] of Object.entries(values)) {
+      text = text.replaceAll(`{${key}}`, formatAmountNumber(fromEur(amount)));
+    }
+    return text;
+  };
   const t = useMemo(() => {
     const copy = uiCopy(locale);
     if (locale === "en" || locale === "ka" || locale === "ru") return copy;
@@ -764,7 +777,7 @@ export function PartnerEquipmentServicePanel({
             </p>
           ) : periodFree && !creating ? (
             <p className="mb-3 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">
-              {t.periodFreeHint}
+              {t.periodFreeHint.replaceAll("€", symbol)}
             </p>
           ) : dailyLocked && !creating ? (
             <p className="mb-3 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">
@@ -804,28 +817,22 @@ export function PartnerEquipmentServicePanel({
                 <div className="mt-4 space-y-3">
                   <label className="relative block">
                     <span className="mb-1 block text-xs font-semibold text-slate-500">{t.colPrice}</span>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
-                        €
-                      </span>
-                      <input
-                        type="number"
-                        min={editingRow?.adminMinDaily ?? 0}
-                        max={maxCap != null && maxCap > 0 ? maxCap : undefined}
-                        step="0.01"
+                    <PartnerEurMoneyInput
+                        eurValue={dailyLocked ? "0" : priceValue}
                         disabled={dailyLocked || modeValue !== "on"}
-                        value={dailyLocked ? "0" : priceValue}
-                        onChange={(e) => {
+                        className="w-full rounded-md border border-slate-200 py-2.5 pr-9 font-bold text-[#0b1f4b] disabled:bg-slate-50 disabled:opacity-60"
+                        onEurChange={(eur) => {
                           const result = clampDailyInput(
-                            e.target.value,
+                            eur,
                             editingRow?.adminMinDaily ?? null,
                             editingRow?.adminMaxDaily ?? null,
                           );
                           if (result.capped && result.max != null) {
                             setPriceCapNotice(
-                              t.dailyRangeNotice
-                                .replaceAll("{min}", formatAmountNumber(result.min ?? 0))
-                                .replaceAll("{max}", formatAmountNumber(result.max)),
+                              fillMoney(t.dailyRangeNotice, {
+                                min: result.min ?? 0,
+                                max: result.max,
+                              }),
                             );
                           }
                           const dailyZero = Number(result.value) <= 0;
@@ -842,9 +849,8 @@ export function PartnerEquipmentServicePanel({
                             });
                           }
                         }}
-                        className="w-full rounded-md border border-slate-200 py-2.5 pl-8 pr-9 text-sm font-bold text-[#0b1f4b] disabled:bg-slate-50 disabled:opacity-60"
-                      />
-                      {!dailyLocked && modeValue === "on" ? (
+                        trailing={
+                      !dailyLocked && modeValue === "on" ? (
                         <button
                           type="button"
                           className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
@@ -875,81 +881,61 @@ export function PartnerEquipmentServicePanel({
                           <X className="h-4 w-4" />
                         </button>
                       ) : null}
-                    </div>
+                    />
                     <p className="mt-1.5 text-[11px] text-slate-500">{t.dailyHint}</p>
                     {maxCap != null && maxCap > 0 ? (
                       <p className="mt-1 text-[11px] font-semibold text-amber-800">
-                        {t.dailyRangeNotice
-                          .replaceAll("{min}", formatAmountNumber(editingRow?.adminMinDaily ?? 0))
-                          .replaceAll("{max}", formatAmountNumber(maxCap))}
+                        {fillMoney(t.dailyRangeNotice, {
+                          min: editingRow?.adminMinDaily ?? 0,
+                          max: maxCap,
+                        })}
                       </p>
                     ) : maxCap != null && maxCap <= 0 ? (
                       <p className="mt-1 text-[11px] font-semibold text-emerald-800">{t.freeLocked}</p>
                     ) : Number(priceValue) <= 0 && modeValue === "on" && !dailyLocked ? (
-                      <p className="mt-1 text-[11px] font-semibold text-slate-600">{t.dailyZeroHint}</p>
+                      <p className="mt-1 text-[11px] font-semibold text-slate-600">{t.dailyZeroHint.replaceAll("€", symbol)}</p>
                     ) : null}
                   </label>
 
                   <label className="block">
                     <span className="mb-1 block text-xs font-semibold text-slate-500">{t.colMin}</span>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
-                        €
-                      </span>
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        disabled={periodLocked || modeValue !== "on"}
-                        value={periodLocked ? "" : minValue}
-                        placeholder="—"
-                        onChange={(e) => {
-                          const result = clampPeriodInput(e.target.value, creating ? null : adminPeriodMax);
-                          if (result.capped && result.max != null) {
-                            setPriceCapNotice(
-                              t.maxPeriodCapNotice.replaceAll("{n}", formatAmountNumber(result.max)),
-                            );
-                          }
-                          if (creating) setDraftMin(result.value);
-                          else setRow(editingRow!.service.id, { minPeriodEur: result.value });
-                        }}
-                        className="w-full rounded-md border border-slate-200 py-2.5 pl-8 pr-3 text-sm font-bold text-[#0b1f4b] disabled:bg-slate-50 disabled:opacity-60"
-                      />
-                    </div>
+                    <PartnerEurMoneyInput
+                      eurValue={periodLocked ? "" : minValue}
+                      disabled={periodLocked || modeValue !== "on"}
+                      placeholder="—"
+                      className="w-full rounded-md border border-slate-200 py-2.5 pr-3 font-bold text-[#0b1f4b] disabled:bg-slate-50 disabled:opacity-60"
+                      onEurChange={(eur) => {
+                        const result = clampPeriodInput(eur, creating ? null : adminPeriodMax);
+                        if (result.capped && result.max != null) {
+                          setPriceCapNotice(fillMoney(t.maxPeriodCapNotice, { n: result.max }));
+                        }
+                        if (creating) setDraftMin(result.value);
+                        else setRow(editingRow!.service.id, { minPeriodEur: result.value });
+                      }}
+                    />
                     <p className="mt-1.5 text-[11px] text-slate-500">{t.minHint}</p>
                   </label>
 
                   <label className="block">
                     <span className="mb-1 block text-xs font-semibold text-slate-500">{t.colMax}</span>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
-                        €
-                      </span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={adminPeriodMax ?? undefined}
-                        step="0.01"
-                        disabled={periodLocked || modeValue !== "on"}
-                        value={periodLocked ? "" : maxValue}
-                        placeholder="—"
-                        onChange={(e) => {
-                          const result = clampPeriodInput(e.target.value, creating ? null : adminPeriodMax);
-                          if (result.capped && result.max != null) {
-                            setPriceCapNotice(
-                              t.maxPeriodCapNotice.replaceAll("{n}", formatAmountNumber(result.max)),
-                            );
-                          }
-                          if (creating) setDraftMax(result.value);
-                          else setRow(editingRow!.service.id, { maxPeriodEur: result.value });
-                        }}
-                        className="w-full rounded-md border border-slate-200 py-2.5 pl-8 pr-3 text-sm font-bold text-[#0b1f4b] disabled:bg-slate-50 disabled:opacity-60"
-                      />
-                    </div>
+                    <PartnerEurMoneyInput
+                      eurValue={periodLocked ? "" : maxValue}
+                      disabled={periodLocked || modeValue !== "on"}
+                      placeholder="—"
+                      className="w-full rounded-md border border-slate-200 py-2.5 pr-3 font-bold text-[#0b1f4b] disabled:bg-slate-50 disabled:opacity-60"
+                      onEurChange={(eur) => {
+                        const result = clampPeriodInput(eur, creating ? null : adminPeriodMax);
+                        if (result.capped && result.max != null) {
+                          setPriceCapNotice(fillMoney(t.maxPeriodCapNotice, { n: result.max }));
+                        }
+                        if (creating) setDraftMax(result.value);
+                        else setRow(editingRow!.service.id, { maxPeriodEur: result.value });
+                      }}
+                    />
                     <p className="mt-1.5 text-[11px] text-slate-500">{t.maxHint}</p>
                     {adminPeriodMax != null && adminPeriodMax > 0 ? (
                       <p className="mt-1 text-[11px] font-semibold text-amber-800">
-                        {t.maxPeriodCapNotice.replaceAll("{n}", formatAmountNumber(adminPeriodMax))}
+                        {fillMoney(t.maxPeriodCapNotice, { n: adminPeriodMax })}
                       </p>
                     ) : null}
                   </label>
@@ -1107,7 +1093,7 @@ export function PartnerEquipmentServicePanel({
       <div className="bg-[#3d2a6d] px-4 py-4 text-white">
         <div className="mx-auto max-w-6xl">
           <h1 className="text-lg font-extrabold sm:text-xl">{t.breadcrumb}</h1>
-          <p className="mt-1 text-xs text-white/75">{t.help}</p>
+          <p className="mt-1 text-xs text-white/75">{t.help.replaceAll("€", symbol)}</p>
         </div>
       </div>
 
@@ -1145,11 +1131,11 @@ export function PartnerEquipmentServicePanel({
                         !Number.isFinite(dailyNum) ||
                         dailyNum <= 0;
                       const priceCell =
-                        row.mode === "off" ? "—" : dailyIsZero ? "€0" : `€${formatAmountNumber(dailyNum)}`;
+                        row.mode === "off" ? "—" : showMoney(dailyIsZero ? 0 : dailyNum);
                       const periodCell = (raw: string) => {
                         if (row.mode !== "on" || dailyIsZero) return "—";
                         const n = optionalPeriodMoney(raw);
-                        return n == null ? "—" : `€${formatAmountNumber(n)}`;
+                        return n == null ? "—" : showMoney(n);
                       };
                       const adminDailyMin = row.adminMinDaily;
                       const adminDailyMax = row.adminMaxDaily;
@@ -1161,25 +1147,24 @@ export function PartnerEquipmentServicePanel({
                           ? null
                           : adminDailyMax != null && adminDailyMax > 0
                             ? adminDailyMin != null && adminDailyMin > 0
-                              ? t.adminDailyCap
-                                  .replace("{min}", formatAmountNumber(adminDailyMin))
-                                  .replace("{max}", formatAmountNumber(adminDailyMax))
-                              : t.adminDailyMaxOnly.replace(
-                                  "{n}",
-                                  formatAmountNumber(adminDailyMax),
-                                )
+                              ? fillMoney(t.adminDailyCap, {
+                                  min: adminDailyMin,
+                                  max: adminDailyMax,
+                                })
+                              : fillMoney(t.adminDailyMaxOnly, { n: adminDailyMax })
                             : adminDailyMin != null && adminDailyMin > 0
                               ? t.adminDailyCap
-                                  .replace("{min}", formatAmountNumber(adminDailyMin))
+                                  .replaceAll("€", symbol)
+                                  .replace("{min}", formatAmountNumber(fromEur(adminDailyMin)))
                                   .replace("{max}", "…")
                               : t.adminNoCap;
                       const periodCapHint =
                         row.mode === "off" || mandatory
                           ? null
                           : periodFree
-                            ? t.adminCap.replace("{n}", "0")
+                            ? t.adminCap.replaceAll("€", symbol).replace("{n}", "0")
                             : adminPeriodMax != null && adminPeriodMax > 0
-                              ? t.adminCap.replace("{n}", formatAmountNumber(adminPeriodMax))
+                              ? fillMoney(t.adminCap, { n: adminPeriodMax })
                               : t.adminNoCap;
                       const carsLabel = carSummary(row.carIds, cars, t.carsCount);
                       const colon = carsLabel.indexOf(":");
@@ -1323,7 +1308,7 @@ export function PartnerEquipmentServicePanel({
                       !Number.isFinite(dailyNum) ||
                       dailyNum <= 0;
                     const priceCell =
-                      row.mode === "off" ? "—" : dailyIsZero ? "€0" : `€${formatAmountNumber(dailyNum)}`;
+                      row.mode === "off" ? "—" : showMoney(dailyIsZero ? 0 : dailyNum);
                     const adminDailyMin = row.adminMinDaily;
                     const adminDailyMax = row.adminMaxDaily;
                     const adminPeriodMax = periodFree
@@ -1334,25 +1319,24 @@ export function PartnerEquipmentServicePanel({
                         ? null
                         : adminDailyMax != null && adminDailyMax > 0
                           ? adminDailyMin != null && adminDailyMin > 0
-                            ? t.adminDailyCap
-                                .replace("{min}", formatAmountNumber(adminDailyMin))
-                                .replace("{max}", formatAmountNumber(adminDailyMax))
-                            : t.adminDailyMaxOnly.replace(
-                                "{n}",
-                                formatAmountNumber(adminDailyMax),
-                              )
+                            ? fillMoney(t.adminDailyCap, {
+                                min: adminDailyMin,
+                                max: adminDailyMax,
+                              })
+                            : fillMoney(t.adminDailyMaxOnly, { n: adminDailyMax })
                           : adminDailyMin != null && adminDailyMin > 0
                             ? t.adminDailyCap
-                                .replace("{min}", formatAmountNumber(adminDailyMin))
+                                .replaceAll("€", symbol)
+                                .replace("{min}", formatAmountNumber(fromEur(adminDailyMin)))
                                 .replace("{max}", "…")
                             : t.adminNoCap;
                     const periodCapHint =
                       row.mode === "off" || mandatory
                         ? null
                         : periodFree
-                          ? t.adminCap.replace("{n}", "0")
+                          ? t.adminCap.replaceAll("€", symbol).replace("{n}", "0")
                           : adminPeriodMax != null && adminPeriodMax > 0
-                            ? t.adminCap.replace("{n}", formatAmountNumber(adminPeriodMax))
+                            ? fillMoney(t.adminCap, { n: adminPeriodMax })
                             : t.adminNoCap;
                     const open = openServiceId === row.service.id;
                     const maxCap = row.adminMaxDaily;
@@ -1418,17 +1402,13 @@ export function PartnerEquipmentServicePanel({
                                 <span className="mb-0.5 block truncate text-[10px] font-semibold text-slate-500">
                                   {t.colPrice}
                                 </span>
-                                <input
-                                  type="number"
-                                  inputMode="decimal"
-                                  min={row.adminMinDaily ?? 0}
-                                  max={maxCap != null && maxCap > 0 ? maxCap : undefined}
-                                  step="0.01"
+                                <PartnerEurMoneyInput
+                                  eurValue={dailyLocked ? "0" : row.priceEur}
                                   disabled={dailyLocked || row.mode !== "on"}
-                                  value={dailyLocked ? "0" : row.priceEur}
-                                  onChange={(e) => {
+                                  className="min-h-10 w-full rounded-md border border-slate-200 bg-white font-bold text-[#0b1f4b] disabled:bg-slate-50"
+                                  onEurChange={(eur) => {
                                     const result = clampDailyInput(
-                                      e.target.value,
+                                      eur,
                                       row.adminMinDaily,
                                       row.adminMaxDaily,
                                     );
@@ -1438,46 +1418,36 @@ export function PartnerEquipmentServicePanel({
                                       ...(dailyZero ? { minPeriodEur: "", maxPeriodEur: "" } : {}),
                                     });
                                   }}
-                                  className="min-h-10 w-full rounded-md border border-slate-200 bg-white px-2 text-base font-bold text-[#0b1f4b] disabled:bg-slate-50"
                                 />
                               </label>
                               <label className="block min-w-0">
                                 <span className="mb-0.5 block truncate text-[10px] font-semibold text-slate-500">
                                   {t.colMin}
                                 </span>
-                                <input
-                                  type="number"
-                                  inputMode="decimal"
-                                  min={0}
-                                  step="0.01"
+                                <PartnerEurMoneyInput
+                                  eurValue={periodLocked ? "" : row.minPeriodEur}
                                   disabled={periodLocked || row.mode !== "on"}
-                                  value={periodLocked ? "" : row.minPeriodEur}
                                   placeholder="—"
-                                  onChange={(e) => {
-                                    const result = clampPeriodInput(e.target.value, adminPeriodMax);
+                                  className="min-h-10 w-full rounded-md border border-slate-200 bg-white font-bold text-[#0b1f4b] disabled:bg-slate-50"
+                                  onEurChange={(eur) => {
+                                    const result = clampPeriodInput(eur, adminPeriodMax);
                                     setRow(row.service.id, { minPeriodEur: result.value });
                                   }}
-                                  className="min-h-10 w-full rounded-md border border-slate-200 bg-white px-2 text-base font-bold text-[#0b1f4b] disabled:bg-slate-50"
                                 />
                               </label>
                               <label className="block min-w-0">
                                 <span className="mb-0.5 block truncate text-[10px] font-semibold text-slate-500">
                                   {t.colMax}
                                 </span>
-                                <input
-                                  type="number"
-                                  inputMode="decimal"
-                                  min={0}
-                                  max={adminPeriodMax ?? undefined}
-                                  step="0.01"
+                                <PartnerEurMoneyInput
+                                  eurValue={periodLocked ? "" : row.maxPeriodEur}
                                   disabled={periodLocked || row.mode !== "on"}
-                                  value={periodLocked ? "" : row.maxPeriodEur}
                                   placeholder="—"
-                                  onChange={(e) => {
-                                    const result = clampPeriodInput(e.target.value, adminPeriodMax);
+                                  className="min-h-10 w-full rounded-md border border-slate-200 bg-white font-bold text-[#0b1f4b] disabled:bg-slate-50"
+                                  onEurChange={(eur) => {
+                                    const result = clampPeriodInput(eur, adminPeriodMax);
                                     setRow(row.service.id, { maxPeriodEur: result.value });
                                   }}
-                                  className="min-h-10 w-full rounded-md border border-slate-200 bg-white px-2 text-base font-bold text-[#0b1f4b] disabled:bg-slate-50"
                                 />
                               </label>
                             </div>

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
-import { usePartnerMoney } from "@/components/providers/partner-money-context";
 import {
   MobileDataCard,
   MobileDataRow,
@@ -11,7 +10,7 @@ import {
 } from "@/components/ui/responsive-data-list";
 import { PARTNER_BASE } from "@/lib/routes";
 import { capFreeAfterDays, type DeliveryLocationView } from "@/lib/delivery/pricing";
-import { partnerCurrencySymbol } from "@/lib/partners/pricing-currency";
+import { PartnerEurMoneyInput } from "@/components/partner/partner-eur-money-input";
 import { cn } from "@/lib/utils";
 
 type RowState = {
@@ -117,7 +116,6 @@ function placeLabel(loc: DeliveryLocationView, locale: string) {
 
 export function PartnerDeliveryPanel() {
   const { locale } = usePartnerLocale();
-  const { pricingCurrency } = usePartnerMoney();
   const t = useMemo(() => copyFor(locale), [locale]);
 
   const [rows, setRows] = useState<RowState[]>([]);
@@ -127,8 +125,6 @@ export function PartnerDeliveryPanel() {
   const [savedFlash, setSavedFlash] = useState(false);
   const [error, setError] = useState("");
   const [capNotice, setCapNotice] = useState("");
-
-  const symbol = partnerCurrencySymbol(pricingCurrency);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -333,18 +329,12 @@ export function PartnerDeliveryPanel() {
                             </label>
                           </td>
                           <td className="px-3 py-2.5 align-middle">
-                            <div className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1">
-                              <span className="text-xs font-semibold text-slate-500">{symbol}</span>
-                              <input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                disabled={!row.enabled}
-                                value={row.priceEur}
-                                onChange={(e) => updateRow(row.location.id, { priceEur: e.target.value })}
-                                className="w-20 border-0 bg-transparent text-sm font-bold text-slate-900 outline-none disabled:opacity-50"
-                              />
-                            </div>
+                            <PartnerEurMoneyInput
+                              eurValue={row.priceEur}
+                              disabled={!row.enabled}
+                              onEurChange={(eur) => updateRow(row.location.id, { priceEur: eur })}
+                              className="w-24 rounded-md border border-slate-200 bg-white py-1 font-bold text-slate-900 disabled:opacity-50"
+                            />
                           </td>
                           <td className="px-3 py-2.5 align-middle">
                             <input
@@ -410,18 +400,12 @@ export function PartnerDeliveryPanel() {
                           </label>
                         </MobileDataRow>
                         <MobileDataRow label={t.oneWay}>
-                          <div className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1">
-                            <span className="text-xs font-semibold text-slate-500">{symbol}</span>
-                            <input
-                              type="number"
-                              min={0}
-                              step="0.01"
-                              disabled={!row.enabled}
-                              value={row.priceEur}
-                              onChange={(e) => updateRow(row.location.id, { priceEur: e.target.value })}
-                              className="w-20 border-0 bg-transparent text-end text-sm font-bold text-slate-900 outline-none disabled:opacity-50"
-                            />
-                          </div>
+                          <PartnerEurMoneyInput
+                            eurValue={row.priceEur}
+                            disabled={!row.enabled}
+                            onEurChange={(eur) => updateRow(row.location.id, { priceEur: eur })}
+                            className="w-28 rounded-md border border-slate-200 bg-white py-1 text-end font-bold text-slate-900 disabled:opacity-50"
+                          />
                         </MobileDataRow>
                         <MobileDataRow label={t.freeAfter}>
                           <input
