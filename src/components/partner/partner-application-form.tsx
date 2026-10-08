@@ -331,16 +331,16 @@ export function PartnerApplicationForm({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4"
+      className="fixed inset-0 z-[230] flex items-end justify-center bg-black/45 sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
       onClick={onClose}
     >
       <div
-        className="max-h-[90dvh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-[#f4f7fb] text-slate-900 shadow-2xl"
+        className="flex h-[100dvh] max-h-[100dvh] w-full max-w-5xl flex-col overflow-hidden rounded-none bg-[#f4f7fb] text-slate-900 shadow-2xl sm:h-auto sm:max-h-[90dvh] sm:rounded-2xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between border-b bg-white px-4 py-3 sm:px-5">
+        <div className="flex shrink-0 items-start justify-between border-b bg-white px-4 py-3 sm:px-5">
           <h2 className="min-w-0 flex-1 break-words text-lg font-extrabold text-[#0b1f4b] sm:text-xl">{t.title}</h2>
           <button type="button" className="min-h-10 shrink-0 px-2 text-sm font-semibold text-slate-500" onClick={onClose}>
             {t.close}
@@ -355,7 +355,13 @@ export function PartnerApplicationForm({
             </button>
           </div>
         ) : (
-          <form ref={formRef} onSubmit={submit} noValidate className="p-3 sm:p-5">
+          <form
+            ref={formRef}
+            onSubmit={submit}
+            noValidate
+            className="flex min-h-0 flex-1 flex-col overflow-hidden"
+          >
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5">
             {error ? <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
             <div className="rounded-xl border border-slate-200 bg-[#eef3f8] p-3 sm:p-4">
               <div className="grid gap-6 lg:grid-cols-2">
@@ -651,19 +657,22 @@ export function PartnerApplicationForm({
                 </div>
               </div>
             </div>
+            </div>
+            <div className="shrink-0 border-t border-slate-200 bg-white px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
             <button
               type="submit"
               disabled={loading}
-              className="mt-4 min-h-11 w-full rounded-xl bg-[#22c55e] py-3 text-base font-bold text-white hover:bg-[#16a34a] disabled:bg-slate-400"
+              className="min-h-11 w-full rounded-xl bg-[#22c55e] py-3 text-base font-bold text-white hover:bg-[#16a34a] disabled:bg-slate-400"
             >
               {loading ? t.submitting : t.submit}
             </button>
-            <p className="mt-3 text-center text-sm text-slate-600">
+            <p className="mt-2 mb-1 text-center text-sm text-slate-600">
               {t.loginPrompt}{" "}
               <a href={PARTNER_LOGIN} className="font-semibold text-sky-700 hover:underline" onClick={onClose}>
                 {t.loginLink}
               </a>
             </p>
+            </div>
           </form>
         )}
       </div>
@@ -709,7 +718,7 @@ function LocationMultiSelect({
       maxHeight,
       top: openUp ? undefined : rect.bottom + 6,
       bottom: openUp ? window.innerHeight - rect.top + 6 : undefined,
-      zIndex: 100,
+      zIndex: 260,
     });
   };
 
