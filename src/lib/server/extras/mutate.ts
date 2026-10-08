@@ -442,3 +442,44 @@ export async function ensureExtrasExistInDb(catalog: ExtraServicePricing[]): Pro
     }
   }
 }
+
+/** Keep only extra ids that exist on ExtraService so a file-catalog id cannot abort the car save. */
+export async function extrasRowsForCarFk<T extends { extraServiceId: string }>(
+  rows: T[],
+  catalog: ExtraServicePricing[],
+): Promise<T[]> {
+  if (!rows.length) return [];
+  try {
+    const ids = [...new Set(rows.map((row) => row.extraServiceId))];
+    const found = await prisma.extraService.findMany({
+      where: { id: { in: ids } },
+      select: { id: true },
+    });
+    const ok = new Set(found.map((row) => row.id));
+    const missing = catalog.filter((service) => !ok.has(service.id) && ids.includes(service.id));
+    const slugToId = new Map<string, string>();
+    if (missing.length) {
+      const bySlug = await prisma.extraService.findMany({
+        where: { slug: { in: missing.map((service) => service.slug) } },
+        select: { id: true, slug: true },
+      });
+      for (const row of bySlug) slugToId.set(row.slug, row.id);
+    }
+    const seen = new Set<string>();
+    const out: T[] = [];
+    for (const row of rows) {
+      let id = row.extraServiceId;
+      if (!ok.has(id)) {
+        const service = catalog.find((item) => item.id === id);
+        id = service ? slugToId.get(service.slug) || "" : "";
+      }
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      out.push({ ...row, extraServiceId: id });
+    }
+    return out;
+  } catch (error) {
+    console.warn("[extras] extrasRowsForCarFk", error);
+    return rows;
+  }
+}

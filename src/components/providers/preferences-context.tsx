@@ -17,6 +17,7 @@ import {
 import { applyDocumentLocale, persistPref, resolveClientPref } from "@/lib/i18n/pref-storage";
 import { isAdminPath, isBusinessPartnerPath, isPartnerPath } from "@/lib/routes";
 import { getDictionary, type Dictionary } from "@/lib/i18n/dictionaries";
+import { PARTNER_LOCALE_COOKIE, PARTNER_LOCALE_STORAGE } from "@/lib/i18n/partner-config";
 import { DEFAULT_FX_RATES, type FxRates } from "@/lib/fx";
 import { formatMoney } from "@/lib/utils";
 
@@ -121,6 +122,7 @@ export function PreferencesProvider({
     (next: Locale) => {
       setLocaleState(next);
       persistPref(LOCALE_COOKIE, LOCALE_STORAGE, next);
+      persistPref(PARTNER_LOCALE_COOKIE, PARTNER_LOCALE_STORAGE, next);
       router.refresh();
     },
     [router],

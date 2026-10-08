@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { listingHiddenReasonLabel } from "@/lib/cars/listing-visibility";
 import { PARTNER_BASE } from "@/lib/routes";
 import { formatMoney, toNumber } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -13,6 +14,7 @@ export function PartnerFleetCarCard({
   editLabel,
   ackLabel,
   rejectionTitle,
+  locale = "en",
 }: {
   car: {
     id: string;
@@ -29,11 +31,12 @@ export function PartnerFleetCarCard({
   editLabel: string;
   ackLabel: string;
   rejectionTitle: string;
+  locale?: string;
 }) {
   const router = useRouter();
   const [acking, setAcking] = useState(false);
   const unread = Boolean(car.rejectionUnread);
-  const note = (car.hiddenReason || "").trim();
+  const note = listingHiddenReasonLabel(locale, car.hiddenReason);
   const awaiting =
     car.status === "REJECTED" ||
     car.status === "PENDING" ||

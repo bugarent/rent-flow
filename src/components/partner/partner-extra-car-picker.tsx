@@ -33,12 +33,15 @@ export function PartnerExtraCarPicker({
   onChange,
   locale,
   disabled,
+  compact = false,
 }: {
   cars: PartnerExtraCarOption[];
   selectedIds: string[];
   onChange: (ids: string[]) => void;
   locale: string;
   disabled?: boolean;
+  /** Flat on/off list with no inner scroll. Used inside the phone service dropdown. */
+  compact?: boolean;
 }) {
   const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
 
@@ -71,13 +74,38 @@ export function PartnerExtraCarPicker({
 
   if (!cars.length) {
     return (
-      <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-xs text-slate-500">
+      <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
         {locale === "ka"
           ? "ჯერ ატვირთეთ მანქანის განცხადება — აქ გამოჩნდება სია."
           : locale === "ru"
             ? "Сначала загрузите объявления авто — здесь появится список."
             : "Upload car listings first — they will appear here."}
       </p>
+    );
+  }
+
+  if (compact) {
+    return (
+      <ul className={cn("flex flex-col", disabled && "pointer-events-none opacity-55")}>
+        {cars.map((car) => {
+          const checked = selected.has(car.id);
+          return (
+            <li key={car.id} className="border-b border-slate-100 last:border-0">
+              <label className="flex min-h-10 cursor-pointer items-center gap-2 py-1">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggle(car.id)}
+                  className="h-4 w-4 shrink-0 accent-[#28a745]"
+                />
+                <span className="min-w-0 flex-1 text-sm font-medium leading-snug text-slate-800">
+                  {carLabel(car)}
+                </span>
+              </label>
+            </li>
+          );
+        })}
+      </ul>
     );
   }
 
@@ -111,7 +139,7 @@ export function PartnerExtraCarPicker({
         </p>
       </div>
 
-      <div className="max-h-[calc(14rem+10cm)] space-y-2.5 overflow-y-auto overscroll-contain pr-0.5">
+      <div className="space-y-2.5">
         {groups.map(([group, groupCars]) => {
           return (
             <section key={group}>

@@ -9,6 +9,7 @@ import { isStudioCoverUrl } from "@/lib/cars/studio-cover-url";
 import { PARTNER_BASE } from "@/lib/routes";
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
 import { isMandatoryExtra, isMandatoryFreeExtra } from "@/lib/extras/pricing";
+import { isProtectionInsuranceSlot } from "@/lib/extras/checkout-slot";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import {
   buildExtraSelections,
@@ -388,6 +389,7 @@ export function PartnerCreateCarForm({
   const sectionLabel = (id: CreateCarSectionId) => cc.sections[SECTION_COPY_KEY[id]];
   const [activeSection, setActiveSection] = useState<string>("main-info");
   const [error, setError] = useState("");
+  const [saveNotice, setSaveNotice] = useState("");
   const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [booting, setBooting] = useState(isEdit);
@@ -1421,6 +1423,7 @@ export function PartnerCreateCarForm({
 
   const save = async (mode: "sales" | "internal" | "update") => {
     setError("");
+    setSaveNotice("");
     setInvalidFields(new Set());
     const forSale = mode === "sales" || mode === "update";
     const fields: string[] = [];
@@ -1705,14 +1708,26 @@ export function PartnerCreateCarForm({
           showError(apiErr, "main-info");
         } else if (code === "DB_OFFLINE" || /database unavailable/i.test(apiErr)) {
           showError(common.dbOffline);
+        } else if (code === "DELIVERY_FK") {
+          showError(`${cc.errUpdateFailed}. ${cc.errUpdateDelivery}`, "pickup-dropoff", ["pickup"]);
+        } else if (code === "EXTRA_FK" || code === "FK") {
+          showError(`${cc.errUpdateFailed}. ${cc.errUpdateExtra}`, "extras");
+        } else if (code === "INVALID_FIELD") {
+          showError(`${cc.errUpdateFailed}. ${cc.errUpdateInvalid}`);
+        } else if (code === "DUPLICATE") {
+          showError(`${cc.errUpdateFailed}. ${cc.errUpdateDuplicate}`);
+        } else if (code === "NOT_FOUND") {
+          showError(`${cc.errUpdateFailed}. ${cc.errUpdateMissing}`);
         } else {
-          showError(
-            apiErr === "Failed to create car listing" || apiErr === "Failed to update listing"
-              ? isEdit
-                ? cc.errUpdateFailed
-                : cc.errCreateFailed
-              : apiErr,
-          );
+          const headline = isEdit ? cc.errUpdateFailed : cc.errCreateFailed;
+          const specific =
+            apiErr &&
+            apiErr !== "Failed to create car listing" &&
+            apiErr !== "Failed to update listing" &&
+            apiErr !== headline
+              ? apiErr
+              : "";
+          showError(specific ? `${headline}. ${specific}` : headline);
         }
         setLoading(false);
         return;
@@ -1723,8 +1738,19 @@ export function PartnerCreateCarForm({
         setLoading(false);
         return;
       }
-      router.push(PARTNER_BASE);
-      router.refresh();
+      const notice =
+        data.updateNotice === "REMODERATION"
+          ? cc.savedUpdateRemoderation
+          : data.updateNotice === "PENDING"
+            ? cc.savedUpdatePending
+            : isEdit
+              ? cc.savedUpdate
+              : cc.savedUpdatePending;
+      setSaveNotice(notice);
+      window.setTimeout(() => {
+        router.push(PARTNER_BASE);
+        router.refresh();
+      }, 1600);
     } catch (err) {
       showError(err instanceof Error ? err.message : isEdit ? cc.errUpdateFailed : cc.errCreateFailed);
       setLoading(false);
@@ -1922,6 +1948,9 @@ export function PartnerCreateCarForm({
           )}
         >
         {error ? <div className="rounded-lg bg-red-50 p-3 text-sm font-medium text-red-700">{error}</div> : null}
+        {saveNotice ? (
+          <div className="rounded-lg bg-emerald-50 p-3 text-sm font-medium text-emerald-800">{saveNotice}</div>
+        ) : null}
         {awaitingAdminModeration ? (
           <div className="rounded-lg border border-red-600 bg-red-100 px-4 py-3 text-sm font-extrabold text-red-950">
             {insuranceExpiredReview
@@ -2391,7 +2420,7 @@ export function PartnerCreateCarForm({
           ) : null}
         </SectionCard>
 
-        <SectionCard id="insurance" title={cc.sections.insurance}>
+        <SectionCard id="insurance" title={knownText(locale, cc.sections.insurance)}>
           <div className="mb-1 grid gap-2 sm:grid-cols-2">
             <Field label={`${cc.deposit}`} invalid={fieldInvalid("deposit")}>
               <MoneyInput
@@ -2446,23 +2475,29 @@ export function PartnerCreateCarForm({
           </label>
         </SectionCard>
 
-        <SectionCard id="extras" title={cc.sections.extras}>
+        <SectionCard id="extras" title={knownText(locale, cc.sections.extras)}>
           {extrasCatalog.length === 0 ? (
             <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-500">
               {cc.extrasEmpty}
             </p>
           ) : (
-            <div className="flex flex-col gap-2 md:grid md:grid-cols-2 md:gap-1.5">
-              {[...extrasCatalog]
+            <>
+            {(() => {
+              const sorted = [...extrasCatalog]
                 .filter((service) => service.isActive !== false)
-                .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
-                .map((service) => {
+                .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+              const insuranceServices = sorted.filter((service) =>
+                isProtectionInsuranceSlot(service.checkoutSlot),
+              );
+              const otherServices = sorted.filter(
+                (service) => !isProtectionInsuranceSlot(service.checkoutSlot),
+              );
+              const offerCard = (service: ExtraServicePricing, variant: "insurance" | "light" | "desktop") => {
                 const row = extraSelections.find((s) => s.extraServiceId === service.id);
                 const mandatory = isMandatoryExtra(service);
                 const forbidden = !mandatory && Boolean(row?.forbidden);
                 const enabled = mandatory || (!forbidden && Boolean(row?.enabled));
                 const off = !mandatory && !forbidden && !Boolean(row?.enabled);
-                const carActive = mandatory || (enabled && !forbidden);
                 const priceNum = Number(row?.priceEur);
                 const isFree =
                   isMandatoryFreeExtra(service) ||
@@ -2483,11 +2518,106 @@ export function PartnerCreateCarForm({
                     ),
                   );
                 };
-                return (
-                  <div key={service.id} className={cn(!carActive && "hidden md:contents")}>
-                  <div
+                const price = (
+                  <span className={variant === "desktop" ? "md:whitespace-nowrap md:text-[10px]" : "shrink-0 text-xs"}>
+                    {variant !== "light" ? `${knownText(locale, cc.extrasPricePerDay)}: ` : null}
+                    {forbidden || off ? (
+                      <span className="font-bold text-slate-400">—</span>
+                    ) : isFree ? (
+                      <span className="font-bold text-emerald-800">{knownText(locale, cc.free)}</span>
+                    ) : (
+                      <span className="font-bold text-[#0b1f4b]">
+                        {Number(row?.priceEur || 0).toFixed(2)}
+                        {moneySymbol}
+                      </span>
+                    )}
+                  </span>
+                );
+                const buttons = mandatory ? (
+                  <span
                     className={cn(
-                      "flex flex-col gap-2 rounded-lg border px-3 py-2.5 shadow-sm md:grid md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-x-2 md:rounded md:px-2 md:py-1 md:text-xs",
+                      "inline-flex items-center justify-center rounded border font-bold uppercase tracking-wide",
+                      variant === "light"
+                        ? "min-h-10 border-emerald-200 bg-emerald-50 px-2 text-[11px] text-emerald-800"
+                        : "min-h-11 border-emerald-500 bg-emerald-600 px-3 text-xs text-white md:min-h-0 md:px-1 md:py-0.5 md:text-[8px]",
+                    )}
+                  >
+                    {knownText(locale, cc.mandatory)}
+                  </span>
+                ) : (
+                  <div className={cn(variant === "desktop" ? "flex flex-wrap items-center gap-2 md:justify-end md:gap-1" : "grid grid-cols-3 gap-1")}>
+                    {(
+                      [
+                        ["on", knownText(locale, cc.enabled), enabled && !forbidden],
+                        ["forbidden", knownText(locale, cc.forbidden), forbidden],
+                        ["off", knownText(locale, cc.disabled), off],
+                      ] as const
+                    ).map(([mode, label, active]) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setOffer(mode === "on" ? "on" : mode === "forbidden" ? "forbidden" : "off")}
+                        className={cn(
+                          "inline-flex items-center justify-center rounded border font-bold leading-tight",
+                          variant === "desktop"
+                            ? "min-h-11 px-3 text-xs uppercase tracking-wide md:min-h-0 md:px-1 md:py-0.5 md:text-[8px]"
+                            : "min-h-10 px-1 text-[11px]",
+                          variant === "light"
+                            ? active
+                              ? mode === "on"
+                                ? "border-emerald-200 bg-emerald-100 text-emerald-800"
+                                : mode === "forbidden"
+                                  ? "border-red-200 bg-red-50 text-red-700"
+                                  : "border-slate-300 bg-slate-100 text-slate-700"
+                              : "border-slate-200 bg-white text-slate-500"
+                            : active
+                              ? mode === "on"
+                                ? "border-[#28a745] bg-[#28a745] text-white"
+                                : mode === "forbidden"
+                                  ? "border-red-500 bg-red-600 text-white"
+                                  : "border-slate-600 bg-slate-600 text-white"
+                              : mode === "on"
+                                ? "border-emerald-200 text-emerald-700"
+                                : mode === "forbidden"
+                                  ? "border-red-200 text-red-600"
+                                  : "border-slate-200 text-slate-600",
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                );
+                if (variant === "light") {
+                  return (
+                    <div
+                      key={service.id}
+                      className={cn(
+                        "rounded-md border px-2 py-1",
+                        forbidden
+                          ? "border-red-300 bg-red-50"
+                          : "border-slate-200 bg-[#f8fafc]",
+                      )}
+                    >
+                      <div className="flex items-center gap-2 py-0.5">
+                        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-700">
+                          {extraLabel(service)}
+                        </p>
+                        {price}
+                      </div>
+                      {mandatory ? (
+                        <p className="text-[10px] font-bold text-emerald-700">{knownText(locale, cc.mandatory)}</p>
+                      ) : (
+                        buttons
+                      )}
+                    </div>
+                  );
+                }
+                return (
+                  <div
+                    key={service.id}
+                    className={cn(
+                      "flex flex-col gap-2 rounded-lg border px-3 py-2.5 shadow-sm md:grid md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-x-2 md:rounded md:px-2 md:py-1 md:text-xs md:shadow-none",
                       forbidden
                         ? "border-red-400 bg-red-50/70 ring-1 ring-red-200"
                         : enabled
@@ -2501,74 +2631,47 @@ export function PartnerCreateCarForm({
                       </p>
                       {mandatory ? (
                         <p className="text-xs font-bold leading-tight text-emerald-800 md:truncate md:text-[9px]">
-                          {cc.mandatory}
+                          {knownText(locale, cc.mandatory)}
                         </p>
                       ) : null}
-                      <p className="mt-0.5 text-xs font-semibold text-slate-600 md:whitespace-nowrap md:text-[10px]">
-                        {cc.extrasPricePerDay}:{" "}
-                        {forbidden || off ? (
-                          <span className="font-bold text-slate-400">—</span>
-                        ) : isFree ? (
-                          <span className="font-bold text-emerald-800">{cc.free}</span>
-                        ) : (
-                          <span className="font-bold text-[#0b1f4b]">
-                            {Number(row?.priceEur || 0).toFixed(2)}
-                            {moneySymbol}
-                          </span>
-                        )}
-                      </p>
+                      <p className="mt-0.5 text-xs font-semibold text-slate-600">{price}</p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 md:justify-end md:gap-1">
-                      {mandatory ? (
-                        <span className="inline-flex min-h-11 items-center rounded border border-emerald-500 bg-emerald-600 px-3 text-xs font-bold uppercase tracking-wide text-white md:min-h-0 md:px-1 md:py-0.5 md:text-[8px]">
-                          {cc.mandatory}
-                        </span>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setOffer("on")}
-                            className={cn(
-                              "inline-flex min-h-11 items-center rounded border px-3 text-xs font-bold uppercase tracking-wide md:min-h-0 md:px-1 md:py-0.5 md:text-[8px]",
-                              enabled && !forbidden
-                                ? "border-[#28a745] bg-[#28a745] text-white"
-                                : "border-emerald-200 text-emerald-700 hover:bg-emerald-50",
-                            )}
-                          >
-                            {cc.enabled}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setOffer("forbidden")}
-                            className={cn(
-                              "inline-flex min-h-11 items-center rounded border px-3 text-xs font-bold uppercase tracking-wide md:min-h-0 md:px-1 md:py-0.5 md:text-[8px]",
-                              forbidden
-                                ? "border-red-500 bg-red-600 text-white"
-                                : "border-red-200 text-red-600 hover:bg-red-50",
-                            )}
-                          >
-                            {cc.forbidden}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setOffer("off")}
-                            className={cn(
-                              "inline-flex min-h-11 items-center rounded border px-3 text-xs font-bold uppercase tracking-wide md:min-h-0 md:px-1 md:py-0.5 md:text-[8px]",
-                              off
-                                ? "border-slate-600 bg-slate-600 text-white"
-                                : "border-slate-200 text-slate-600 hover:bg-slate-50",
-                            )}
-                          >
-                            {cc.disabled}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
+                    {buttons}
                   </div>
                 );
-              })}
-            </div>
+              };
+              const activeOthers = otherServices.filter((service) => {
+                const row = extraSelections.find((s) => s.extraServiceId === service.id);
+                const mandatory = isMandatoryExtra(service);
+                const forbidden = !mandatory && Boolean(row?.forbidden);
+                const enabled = mandatory || (!forbidden && Boolean(row?.enabled));
+                // Off stays hidden on the phone. Forbidden stays visible and marked,
+                // the same as on the computer car form.
+                return mandatory || forbidden || enabled;
+              });
+              return (
+                <>
+                  <div className="flex flex-col gap-1 md:hidden">
+                    {insuranceServices.length > 0 ? (
+                      <p className="px-0.5 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                        {knownText(locale, cc.sections.insurance)}
+                      </p>
+                    ) : null}
+                    {insuranceServices.map((service) => offerCard(service, "insurance"))}
+                    {insuranceServices.length > 0 && activeOthers.length > 0 ? (
+                      <p className="px-0.5 pt-1 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                        {knownText(locale, cc.sections.extras)}
+                      </p>
+                    ) : null}
+                    {activeOthers.map((service) => offerCard(service, "light"))}
+                  </div>
+                  <div className="hidden md:grid md:grid-cols-2 md:gap-1.5">
+                    {sorted.map((service) => offerCard(service, "desktop"))}
+                  </div>
+                </>
+              );
+            })()}
+            </>
           )}
         </SectionCard>
 
@@ -3012,6 +3115,9 @@ export function PartnerCreateCarForm({
         <div className={cn("mx-auto w-full", CONTENT_MAX)}>
           {error ? (
             <div className="mb-2 rounded-md bg-red-500/95 px-3 py-2 text-sm font-semibold text-white">{error}</div>
+          ) : null}
+          {saveNotice ? (
+            <div className="mb-2 rounded-md bg-emerald-600/95 px-3 py-2 text-sm font-semibold text-white">{saveNotice}</div>
           ) : null}
           {adminMessage ? (
             <div className="mb-2 rounded-md bg-emerald-600/95 px-3 py-2 text-sm font-semibold text-white">

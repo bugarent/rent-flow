@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
@@ -47,8 +47,6 @@ type CarRow = {
 type BookingBar = FleetBookingDetail;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const ROW_H = 52;
-const MONTH_LONG_PRESS_MS = 420;
 const MONTH_SWIPE_PX = 56;
 
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
@@ -191,6 +189,10 @@ export function PartnerFleetCalendar() {
   const [query, setQuery] = useState("");
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [carsColumnNarrow, setCarsColumnNarrow] = useState(false);
+
+  useLayoutEffect(() => {
+    if (window.matchMedia("(max-width: 767px)").matches) setCarsColumnNarrow(true);
+  }, []);
   const [debouncedQ, setDebouncedQ] = useState("");
   const [cars, setCars] = useState<CarRow[]>([]);
   const [bookings, setBookings] = useState<BookingBar[]>([]);
@@ -236,92 +238,94 @@ export function PartnerFleetCalendar() {
     pointerId: number | null;
     startX: number;
     startY: number;
-    timer: ReturnType<typeof setTimeout> | null;
-    armed: boolean;
+    axis: "x" | "y" | null;
+    scrollStart: number;
     committed: boolean;
   }>({
     pointerId: null,
     startX: 0,
     startY: 0,
-    timer: null,
-    armed: false,
+    axis: null,
+    scrollStart: 0,
     committed: false,
   });
 
   const clearMonthSwipe = useCallback(() => {
     const s = monthSwipeRef.current;
-    if (s.timer) clearTimeout(s.timer);
-    s.timer = null;
     s.pointerId = null;
-    s.armed = false;
+    s.axis = null;
     s.committed = false;
     setMonthSwipeArmed(false);
   }, []);
 
   const shiftMonth = useCallback((delta: number) => {
     setMonth((m) => startOfMonth(new Date(m.getFullYear(), m.getMonth() + delta, 1)));
+    window.setTimeout(() => {
+      const scroller = gridRef.current;
+      if (!scroller) return;
+      scroller.scrollLeft = delta > 0 ? 0 : scroller.scrollWidth;
+    }, 40);
   }, []);
 
-  const onMonthSwipePointerDown = useCallback(
-    (e: React.PointerEvent<HTMLElement>) => {
-      if (e.button !== 0 && e.pointerType !== "touch") return;
-      const s = monthSwipeRef.current;
-      if (s.timer) clearTimeout(s.timer);
-      s.pointerId = e.pointerId;
-      s.startX = e.clientX;
-      s.startY = e.clientY;
-      s.armed = false;
-      s.committed = false;
-      setMonthSwipeArmed(false);
-      s.timer = setTimeout(() => {
-        if (monthSwipeRef.current.pointerId !== e.pointerId) return;
-        monthSwipeRef.current.armed = true;
-        setMonthSwipeArmed(true);
-        try {
-          e.currentTarget.setPointerCapture(e.pointerId);
-        } catch {
-          /* ignore */
-        }
-      }, MONTH_LONG_PRESS_MS);
-    },
-    [],
-  );
+  const onMonthSwipePointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const s = monthSwipeRef.current;
+    s.pointerId = e.pointerId;
+    s.startX = e.clientX;
+    s.startY = e.clientY;
+    s.axis = null;
+    s.scrollStart = gridRef.current?.scrollLeft ?? 0;
+    s.committed = false;
+    setMonthSwipeArmed(false);
+  }, []);
 
   const onMonthSwipePointerMove = useCallback(
     (e: React.PointerEvent<HTMLElement>) => {
       const s = monthSwipeRef.current;
-      if (s.pointerId !== e.pointerId) return;
+      if (s.pointerId !== e.pointerId || s.committed) return;
       const dx = e.clientX - s.startX;
       const dy = e.clientY - s.startY;
-      if (!s.armed) {
-        if (Math.abs(dx) > 14 || Math.abs(dy) > 14) {
-          if (s.timer) clearTimeout(s.timer);
-          s.timer = null;
+      if (!s.axis) {
+        if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
+        s.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+        if (s.axis === "x") {
+          setMonthSwipeArmed(true);
+          suppressCellClickRef.current = true;
         }
+      }
+      if (s.axis !== "x") return;
+      const scroller = gridRef.current;
+      const canScroll = !!scroller && scroller.scrollWidth > scroller.clientWidth + 8;
+      if (canScroll && scroller) {
+        scroller.scrollLeft = s.scrollStart - dx;
+        e.preventDefault();
         return;
       }
-      if (s.committed) return;
       if (Math.abs(dx) < MONTH_SWIPE_PX) return;
-      if (Math.abs(dx) < Math.abs(dy)) return;
       s.committed = true;
       suppressCellClickRef.current = true;
       shiftMonth(dx < 0 ? 1 : -1);
-      clearMonthSwipe();
-      try {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
-      }
     },
-    [clearMonthSwipe, shiftMonth],
+    [shiftMonth],
   );
 
   const onMonthSwipePointerEnd = useCallback(
     (e: React.PointerEvent<HTMLElement>) => {
-      if (monthSwipeRef.current.pointerId !== e.pointerId) return;
+      const s = monthSwipeRef.current;
+      if (s.pointerId !== e.pointerId) return;
+      const dx = e.clientX - s.startX;
+      const scroller = gridRef.current;
+      const canScroll = !!scroller && scroller.scrollWidth > scroller.clientWidth + 8;
+      if (s.axis === "x" && !s.committed && canScroll && scroller) {
+        const atStart = scroller.scrollLeft <= 4;
+        const atEnd = scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 4;
+        if (dx < -MONTH_SWIPE_PX && atEnd) shiftMonth(1);
+        else if (dx > MONTH_SWIPE_PX && atStart) shiftMonth(-1);
+      }
+      if (s.axis === "x") suppressCellClickRef.current = true;
       clearMonthSwipe();
     },
-    [clearMonthSwipe],
+    [clearMonthSwipe, shiftMonth],
   );
 
   useEffect(() => () => clearMonthSwipe(), [clearMonthSwipe]);
@@ -762,23 +766,36 @@ export function PartnerFleetCalendar() {
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#f4f6f9]">
-      <div className="relative m-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[#d5dde6] bg-white shadow-[0_1px_2px_rgba(26,0,64,0.04)] sm:m-3">
+      <div className="relative m-1 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[#d5dde6] bg-white shadow-[0_1px_2px_rgba(26,0,64,0.04)] sm:m-3">
         {error ? (
           <p className="m-4 shrink-0 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>
         ) : null}
 
-        <div ref={gridRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-auto overscroll-x-contain">
+        <div ref={gridRef} className="min-h-0 flex-1 touch-pan-y overflow-y-auto overflow-x-auto overscroll-x-contain">
           {/* Sticky header. On a phone each day keeps its own width and the month scrolls sideways. */}
-          <div className="sticky top-0 z-20 flex h-20 w-max border-b-2 border-slate-300 bg-white md:h-14 md:w-full">
+          <div
+            className={cn(
+              "sticky top-0 z-20 flex w-max border-b-2 border-slate-300 bg-white md:h-14 md:w-full",
+              carsColumnNarrow ? "h-14" : "h-20",
+            )}
+          >
             <div className={cn("sticky start-0 z-30 flex h-full shrink-0 flex-col border-e-2 border-slate-300 bg-white", carColumnWidth)}>
-              <div className="flex h-11 items-center gap-0.5 border-b border-[#cfd8e3] bg-[#d9e2e8] px-1 md:h-8">
+              <div
+                className={cn(
+                  "flex items-center gap-0.5 border-b border-[#cfd8e3] bg-[#d9e2e8] px-1 md:h-8",
+                  carsColumnNarrow ? "h-7" : "h-11",
+                )}
+              >
                 <select
                   aria-label="Month"
                   value={month.getMonth()}
                   onChange={(e) =>
                     setMonth(new Date(month.getFullYear(), Number(e.target.value), 1))
                   }
-                  className="min-h-11 min-w-0 flex-1 truncate rounded border-0 bg-transparent text-base font-bold text-[#1e1b4b] outline-none md:hidden"
+                  className={cn(
+                    "min-w-0 flex-1 truncate rounded border-0 bg-transparent font-bold text-[#1e1b4b] outline-none md:hidden",
+                    carsColumnNarrow ? "h-7 text-[11px]" : "min-h-11 text-base",
+                  )}
                 >
                   {monthsShort.map((name, i) => (
                     <option key={name} value={i}>
@@ -826,7 +843,10 @@ export function PartnerFleetCalendar() {
                 </p>
                 <Link
                   href={`${PARTNER_BASE}/cars/new`}
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600 md:h-6 md:w-6"
+                  className={cn(
+                    "inline-flex shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600",
+                    carsColumnNarrow ? "h-6 w-6" : "h-9 w-9 md:h-6 md:w-6",
+                  )}
                   title={t.addCar}
                 >
                   <Plus className="h-4 w-4 md:h-3.5 md:w-3.5" />
@@ -897,10 +917,10 @@ export function PartnerFleetCalendar() {
               <div
                 key={car.id}
                 className={cn(
-                  "flex w-max border-b-2 md:w-full",
+                  "flex w-max border-b-2 md:h-[52px] md:w-full",
+                  carsColumnNarrow ? "h-10" : "h-[52px]",
                   attention ? "border-amber-300 bg-amber-100/80" : "border-slate-200",
                 )}
-                style={{ height: ROW_H }}
               >
                 <div
                   className={cn(
@@ -1078,7 +1098,8 @@ export function PartnerFleetCalendar() {
                           }
                         }}
                         className={cn(
-                          "absolute top-1.5 z-[2] overflow-hidden rounded-md border px-1 py-0.5 text-left text-[9px] font-semibold leading-tight shadow-sm select-none",
+                          "absolute top-1 z-[2] h-8 overflow-hidden rounded-md border px-1 py-0.5 text-left text-[9px] font-semibold leading-tight shadow-sm select-none md:top-1.5 md:h-10",
+                          !carsColumnNarrow && "h-10",
                           statusBarClass(b),
                           (selectedId === b.id || viewingInfo?.id === b.id) &&
                             "ring-2 ring-[#1e1b4b]",
@@ -1087,7 +1108,6 @@ export function PartnerFleetCalendar() {
                         style={{
                           left: `${leftPct}%`,
                           width: `${widthPct}%`,
-                          height: ROW_H - 12,
                           touchAction: monthSwipeArmed ? "none" : undefined,
                         }}
                       >

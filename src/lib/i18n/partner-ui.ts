@@ -186,6 +186,14 @@ export type PartnerCreateCarCopy = {
   saveInternal: string;
   update: string;
   errUpdateFailed: string;
+  errUpdateDelivery: string;
+  errUpdateExtra: string;
+  errUpdateInvalid: string;
+  errUpdateDuplicate: string;
+  errUpdateMissing: string;
+  savedUpdate: string;
+  savedUpdatePending: string;
+  savedUpdateRemoderation: string;
   selectBrand: string;
   selectModel: string;
   selectModelFirst: string;
@@ -460,6 +468,15 @@ export const partnerUiEn: PartnerUiPack = {
     saveInternal: "Save for internal use",
     update: "Update",
     errUpdateFailed: "Failed to update car",
+    errUpdateDelivery: "A selected city or airport is not stored in the database, so the listing was not saved.",
+    errUpdateExtra: "An additional service is missing from the catalog, so the listing was not saved.",
+    errUpdateInvalid: "One of the fields has an invalid value, so the listing was not saved.",
+    errUpdateDuplicate: "A duplicate value blocked the save.",
+    errUpdateMissing: "This listing no longer exists.",
+    savedUpdate: "The listing was updated.",
+    savedUpdatePending: "The listing was updated and is waiting for moderation.",
+    savedUpdateRemoderation:
+      "The listing was updated and sent back to moderation. It stays hidden in search until an admin approves it.",
     selectBrand: "Select brand",
     selectModel: "Select model",
     selectModelFirst: "Select brand first",
@@ -748,6 +765,15 @@ export const partnerUiKa: PartnerUiPack = {
     saveInternal: "შენახვა შიდა გამოყენებისთვის",
     update: "განახლება",
     errUpdateFailed: "მანქანის განახლება ვერ მოხერხდა",
+    errUpdateDelivery: "არჩეული ქალაქი ან აეროპორტი ბაზაში არ ინახება, ამიტომ განცხადება არ შეინახა.",
+    errUpdateExtra: "დამატებითი მომსახურეობა კატალოგში არ არის, ამიტომ განცხადება არ შეინახა.",
+    errUpdateInvalid: "ერთ-ერთ ველს არასწორი მნიშვნელობა აქვს, ამიტომ განცხადება არ შეინახა.",
+    errUpdateDuplicate: "განმეორებულმა მნიშვნელობამ შენახვა შეაჩერა.",
+    errUpdateMissing: "ეს განცხადება აღარ არსებობს.",
+    savedUpdate: "განცხადება განახლდა.",
+    savedUpdatePending: "განცხადება განახლდა და მოდერაციას ელოდება.",
+    savedUpdateRemoderation:
+      "განცხადება განახლდა და ხელახალ მოდერაციაზე გაიგზავნა. ძიებაში გამოჩნდება ადმინის დამტკიცების შემდეგ.",
     selectBrand: "აირჩიეთ ბრენდი",
     selectModel: "აირჩიეთ მოდელი",
     selectModelFirst: "ჯერ აირჩიეთ ბრენდი",
@@ -1037,6 +1063,15 @@ export const partnerUiRu: PartnerUiPack = {
     saveInternal: "Сохранить для внутреннего использования",
     update: "Обновить",
     errUpdateFailed: "Не удалось обновить авто",
+    errUpdateDelivery: "Выбранный город или аэропорт не записан в базе, поэтому объявление не сохранилось.",
+    errUpdateExtra: "Дополнительная услуга отсутствует в каталоге, поэтому объявление не сохранилось.",
+    errUpdateInvalid: "В одном из полей недопустимое значение, поэтому объявление не сохранилось.",
+    errUpdateDuplicate: "Повторяющееся значение остановило сохранение.",
+    errUpdateMissing: "Этого объявления больше нет.",
+    savedUpdate: "Объявление обновлено.",
+    savedUpdatePending: "Объявление обновлено и ожидает модерации.",
+    savedUpdateRemoderation:
+      "Объявление обновлено и отправлено на повторную модерацию. В поиске появится после одобрения администратором.",
     selectBrand: "Выберите бренд",
     selectModel: "Выберите модель",
     selectModelFirst: "Сначала выберите бренд",

@@ -8,7 +8,7 @@ import {
   type PartnerExtraInput,
 } from "@/lib/extras/pricing";
 import { resolvePartnerDeliveryPrices } from "@/lib/delivery/pricing";
-import { listPartnerScopedDeliveryLocations } from "@/lib/server/delivery-locations";
+import { listPartnerScopedDeliveryLocations, persistableCarDeliveryRows } from "@/lib/server/delivery-locations";
 import { persistCarInsuranceDocument } from "@/lib/server/car-passport-docs";
 import {
   normalizeInsuranceExpiresAt,
@@ -16,7 +16,7 @@ import {
   readCarInsuranceDoc,
   readCarInsuranceUrl,
 } from "@/lib/server/car-insurance-store";
-import { ensureExtrasExistInDb, listExtraServices } from "@/lib/server/extras-store";
+import { ensureExtrasExistInDb, extrasRowsForCarFk, listExtraServices } from "@/lib/server/extras-store";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import {
   deleteFileCar,
@@ -29,6 +29,7 @@ import {
   isValidRegistrationNumber,
   normalizeRegistrationNumber,
 } from "@/lib/cars/registration-number";
+import { explainListingUpdateError } from "@/lib/cars/listing-update-error";
 import { hiddenReasonAfterPartnerEdit, isPubliclyVisibleListing } from "@/lib/cars/listing-visibility";
 import {
   normalizePartnerCategorySlug,
@@ -59,7 +60,7 @@ async function resolveCarExtras(rawExtras: unknown) {
     const normalized = normalizePartnerExtraPrice(service, input);
     if (normalized) rows.push(normalized);
   }
-  return rows;
+  return extrasRowsForCarFk(rows, catalog);
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -487,14 +488,49 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           );
         }
         const resolved = resolvePartnerDeliveryPrices(deliveryCatalog, body.deliveryPrices);
-        deliveryRows = resolved.rows;
         deliveryAdjustments = resolved.adjustments;
-        if (!deliveryRows.length) {
+        if (!resolved.rows.length) {
           return NextResponse.json(
-            { error: "Enable Delivery for at least one of your operating airports." },
+            {
+              error: "Enable Delivery for at least one of your operating airports.",
+              code: "NO_DELIVERY",
+            },
             { status: 400 },
           );
         }
+        const persistable = await persistableCarDeliveryRows(resolved.rows, deliveryCatalog);
+        // null = database check failed; leave the car's existing delivery rows in place.
+        // An empty list means every selected place is file-only (cities). Those stay in
+        // the listing description and must not abort the rest of the update.
+        deliveryRows = persistable;
+      }
+
+      if (body.year != null && !Number.isInteger(Number(body.year))) {
+        return NextResponse.json(
+          { error: "Year is not a valid number, so the listing was not saved.", code: "INVALID_FIELD" },
+          { status: 400 },
+        );
+      }
+      if (body.transmission != null && !["AUTOMATIC", "MANUAL"].includes(String(body.transmission))) {
+        return NextResponse.json(
+          { error: "Transmission is not a valid value, so the listing was not saved.", code: "INVALID_FIELD" },
+          { status: 400 },
+        );
+      }
+      if (
+        body.fuelType != null &&
+        !["PETROL", "DIESEL", "HYBRID", "ELECTRIC", "LPG"].includes(String(body.fuelType))
+      ) {
+        return NextResponse.json(
+          { error: "Fuel type is not a valid value, so the listing was not saved.", code: "INVALID_FIELD" },
+          { status: 400 },
+        );
+      }
+      if (body.dailyRateEur != null && !Number.isFinite(Number(body.dailyRateEur))) {
+        return NextResponse.json(
+          { error: "Daily price is not a valid number, so the listing was not saved.", code: "INVALID_FIELD" },
+          { status: 400 },
+        );
       }
 
       const nextMake = body.make != null ? String(body.make) : car.make;
@@ -580,7 +616,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             dailyRateEur: body.dailyRateEur != null ? Number(body.dailyRateEur) : undefined,
             discountPercent: body.discountPercent != null ? Number(body.discountPercent) : undefined,
             ...(nextCategorySlug !== undefined ? { categorySlug: nextCategorySlug } : {}),
-            status: nextStatus as "PENDING" | "PENDING_REMODERATION" | "DRAFT" | "APPROVED" | "REJECTED",
+            status: nextStatus as
+              | "PENDING"
+              | "PENDING_REMODERATION"
+              | "DRAFT"
+              | "APPROVED"
+              | "REJECTED"
+              | "HIDDEN",
             hiddenReason: hiddenReasonAfterPartnerEdit({
               prevStatus: String(car.status),
               prevReason: car.hiddenReason,
@@ -653,15 +695,26 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         console.error("[cars PATCH] recordPartnerListingEditDiff", error);
       }
       const insuranceAfter = await readCarInsuranceDoc(id);
+      const updateNotice =
+        nextStatus === "PENDING_REMODERATION"
+          ? "REMODERATION"
+          : nextStatus === "PENDING"
+            ? "PENDING"
+            : "SAVED";
       return NextResponse.json({
         ...updated,
         deliveryAdjustments,
         insuranceUrl: insuranceAfter?.insuranceUrl || null,
         insuranceExpiresAt: insuranceAfter?.insuranceExpiresAt || null,
+        updateNotice,
       });
     } catch (error) {
       console.error("[cars PATCH owner]", error);
-      return NextResponse.json({ error: "Failed to update listing" }, { status: 500 });
+      const explained = explainListingUpdateError(error);
+      return NextResponse.json(
+        { error: explained.message, code: explained.code },
+        { status: explained.status },
+      );
     }
   }
 

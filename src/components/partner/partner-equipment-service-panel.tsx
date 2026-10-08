@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Lock, Pencil, Plus, X } from "lucide-react";
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
 import {
@@ -12,6 +12,7 @@ import {
   optionalPeriodMoney,
 } from "@/lib/extras/pricing";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
+import { isProtectionInsuranceSlot } from "@/lib/extras/checkout-slot";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { knownText } from "@/lib/i18n/known-record-text";
 import { localizedExtraCopy } from "@/lib/extras/localized-copy";
@@ -100,6 +101,7 @@ function uiCopy(locale: string) {
       forbidden: "აკრძალულია",
       off: "გამორთული",
       done: "მზადაა",
+      insuranceGroup: "დაზღვევა",
       name: "დასახელება",
       description: "აღწერა",
       delete: "წაშლა",
@@ -154,6 +156,7 @@ function uiCopy(locale: string) {
       forbidden: "Запрещено",
       off: "Выключено",
       done: "Готово",
+      insuranceGroup: "Страховка",
       name: "Название",
       description: "Описание",
       delete: "Удалить",
@@ -206,6 +209,7 @@ function uiCopy(locale: string) {
     forbidden: "Forbidden",
     off: "Off",
     done: "Done",
+    insuranceGroup: "Insurance",
     name: "Name",
     description: "Description",
     delete: "Delete",
@@ -254,7 +258,16 @@ export function PartnerEquipmentServicePanel({
   catalog: ExtraServicePricing[];
 }) {
   const { locale } = usePartnerLocale();
-  const t = useMemo(() => uiCopy(locale), [locale]);
+  const t = useMemo(() => {
+    const copy = uiCopy(locale);
+    if (locale === "en" || locale === "ka" || locale === "ru") return copy;
+    const next = { ...copy };
+    for (const key of Object.keys(next) as (keyof typeof next)[]) {
+      const value = next[key];
+      if (typeof value === "string") next[key] = knownText(locale, value);
+    }
+    return next;
+  }, [locale]);
 
   const [cars, setCars] = useState<PartnerExtraCarOption[]>([]);
   const [rows, setRows] = useState<RowState[]>(() =>
@@ -1011,6 +1024,12 @@ export function PartnerEquipmentServicePanel({
   const orderedRows = [...rows].sort(
     (a, b) => a.service.sortOrder - b.service.sortOrder || a.service.name.localeCompare(b.service.name),
   );
+  const phoneInsuranceRows = orderedRows.filter((row) =>
+    isProtectionInsuranceSlot(row.service.checkoutSlot),
+  );
+  const phoneServiceRows = orderedRows.filter(
+    (row) => !isProtectionInsuranceSlot(row.service.checkoutSlot),
+  );
 
   /* —— List table view —— */
   return (
@@ -1022,7 +1041,7 @@ export function PartnerEquipmentServicePanel({
         </div>
       </div>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 pb-28">
         {error ? <p className="mb-3 text-sm font-medium text-red-600">{error}</p> : null}
 
         {rows.length === 0 ? (
@@ -1030,7 +1049,7 @@ export function PartnerEquipmentServicePanel({
             {t.empty}
           </p>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm max-md:border-0 max-md:bg-transparent max-md:shadow-none">
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm max-md:overflow-visible max-md:border-0 max-md:bg-transparent max-md:shadow-none">
             <ResponsiveDataList
               desktop={
                 <table className="min-w-full text-left text-sm">
@@ -1209,8 +1228,13 @@ export function PartnerEquipmentServicePanel({
                 </table>
               }
               mobile={
-                <>
-                  {orderedRows.map((row) => {
+                <div className="space-y-1.5">
+                  {phoneInsuranceRows.length > 0 ? (
+                    <p className="px-0.5 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                      {t.insuranceGroup}
+                    </p>
+                  ) : null}
+                  {[...phoneInsuranceRows, ...phoneServiceRows].map((row) => {
                     const mandatory = isMandatoryFreeExtra(row.service);
                     const mandatoryAny = isMandatoryExtra(row.service);
                     const periodFree = isPeriodForcedFreeExtra(row.service);
@@ -1268,36 +1292,52 @@ export function PartnerEquipmentServicePanel({
                             : row.carIds,
                       });
                     };
+                    const showExtrasHeading =
+                      phoneInsuranceRows.length > 0 &&
+                      phoneServiceRows[0]?.service.id === row.service.id;
                     return (
+                      <Fragment key={row.service.id}>
+                      {showExtrasHeading ? (
+                        <p className="px-0.5 pt-1 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                          {t.breadcrumb}
+                        </p>
+                      ) : null}
                       <article
-                        key={row.service.id}
-                        className={cn(
-                          "rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm",
-                          mandatoryAny && "border-l-4 border-l-emerald-500 bg-emerald-50",
-                        )}
+                        id={`extra-offer-${row.service.id}`}
+                        className="scroll-mt-20 scroll-mb-28 rounded-lg border border-slate-200/80 bg-[#f8fafc] px-2 py-1"
                       >
                         <button
                           type="button"
                           disabled={!canEditPrices}
-                          onClick={() => setOpenServiceId(open ? null : row.service.id)}
-                          className="flex min-h-11 w-full items-center gap-2 text-start disabled:cursor-default"
+                          onClick={() => {
+                            const next = open ? null : row.service.id;
+                            setOpenServiceId(next);
+                            if (!next) return;
+                            window.setTimeout(() => {
+                              document.getElementById(`extra-offer-${row.service.id}`)?.scrollIntoView({
+                                block: "start",
+                                behavior: "smooth",
+                              });
+                            }, 40);
+                          }}
+                          className="flex min-h-8 w-full items-center gap-2 py-0.5 text-start disabled:cursor-default"
                           aria-expanded={canEditPrices ? open : undefined}
                         >
-                          <span className="min-w-0 flex-1 truncate text-sm font-bold text-[#0b1f4b]">
+                          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-700">
                             {localizedExtraCopy(locale, row.service.name, row.service.nameI18n)}
                           </span>
-                          <span className="shrink-0 text-xs font-bold text-slate-500">{priceCell}</span>
+                          <span className="shrink-0 text-xs font-semibold text-slate-400">{priceCell}</span>
                         </button>
                         {mandatoryAny ? (
                           <span
                             title={t.mandatoryLockedTitle}
-                            className="mb-1 inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white"
+                            className="mb-0.5 inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700"
                           >
                             <Lock className="h-3 w-3" />
                             {t.mandatoryBadge}
                           </span>
                         ) : (
-                          <div className="grid grid-cols-3 gap-1.5 pb-0.5">
+                          <div className="grid grid-cols-3 gap-1">
                             {(
                               [
                                 ["on", t.on, "green"],
@@ -1310,19 +1350,19 @@ export function PartnerEquipmentServicePanel({
                                 type="button"
                                 onClick={() => applyMode(mode)}
                                 className={cn(
-                                  "min-h-11 rounded-md border px-1 text-[11px] font-bold leading-tight",
+                                  "min-h-10 rounded-md border px-1 text-[11px] font-bold leading-tight",
                                   tone === "green" &&
                                     (row.mode === mode
-                                      ? "border-[#28a745] bg-[#28a745] text-white"
-                                      : "border-emerald-200 bg-white text-emerald-700"),
+                                      ? "border-emerald-200 bg-emerald-100 text-emerald-800"
+                                      : "border-slate-200 bg-white text-slate-500"),
                                   tone === "red" &&
                                     (row.mode === mode
-                                      ? "border-red-500 bg-red-600 text-white"
-                                      : "border-red-200 bg-white text-red-600"),
+                                      ? "border-red-200 bg-red-50 text-red-700"
+                                      : "border-slate-200 bg-white text-slate-500"),
                                   tone === "slate" &&
                                     (row.mode === mode
-                                      ? "border-slate-600 bg-slate-600 text-white"
-                                      : "border-slate-200 bg-white text-slate-600"),
+                                      ? "border-slate-300 bg-slate-100 text-slate-700"
+                                      : "border-slate-200 bg-white text-slate-500"),
                                 )}
                               >
                                 {label}
@@ -1331,38 +1371,39 @@ export function PartnerEquipmentServicePanel({
                           </div>
                         )}
                         {open && canEditPrices ? (
-                          <div className="mt-2 space-y-2 border-t border-slate-100 pt-2">
-                            <label className="block">
-                              <span className="mb-1 block text-xs font-semibold text-slate-500">{t.colPrice}</span>
-                              <input
-                                type="number"
-                                inputMode="decimal"
-                                min={row.adminMinDaily ?? 0}
-                                max={maxCap != null && maxCap > 0 ? maxCap : undefined}
-                                step="0.01"
-                                disabled={dailyLocked || row.mode !== "on"}
-                                value={dailyLocked ? "0" : row.priceEur}
-                                onChange={(e) => {
-                                  const result = clampDailyInput(
-                                    e.target.value,
-                                    row.adminMinDaily,
-                                    row.adminMaxDaily,
-                                  );
-                                  const dailyZero = Number(result.value) <= 0;
-                                  setRow(row.service.id, {
-                                    priceEur: result.value,
-                                    ...(dailyZero ? { minPeriodEur: "", maxPeriodEur: "" } : {}),
-                                  });
-                                }}
-                                className="min-h-11 w-full rounded-md border border-slate-200 px-3 text-base font-bold text-[#0b1f4b] disabled:bg-slate-50"
-                              />
-                              {dailyCapHint ? (
-                                <p className="mt-1 text-[11px] font-medium text-amber-800">{dailyCapHint}</p>
-                              ) : null}
-                            </label>
-                            <div className="grid grid-cols-2 gap-2">
+                          <div className="mt-1 space-y-1.5 border-t border-slate-100 pt-1.5">
+                            <div className="grid grid-cols-3 gap-1.5">
                               <label className="block min-w-0">
-                                <span className="mb-1 block text-xs font-semibold text-slate-500">{t.colMin}</span>
+                                <span className="mb-0.5 block truncate text-[10px] font-semibold text-slate-500">
+                                  {t.colPrice}
+                                </span>
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  min={row.adminMinDaily ?? 0}
+                                  max={maxCap != null && maxCap > 0 ? maxCap : undefined}
+                                  step="0.01"
+                                  disabled={dailyLocked || row.mode !== "on"}
+                                  value={dailyLocked ? "0" : row.priceEur}
+                                  onChange={(e) => {
+                                    const result = clampDailyInput(
+                                      e.target.value,
+                                      row.adminMinDaily,
+                                      row.adminMaxDaily,
+                                    );
+                                    const dailyZero = Number(result.value) <= 0;
+                                    setRow(row.service.id, {
+                                      priceEur: result.value,
+                                      ...(dailyZero ? { minPeriodEur: "", maxPeriodEur: "" } : {}),
+                                    });
+                                  }}
+                                  className="min-h-10 w-full rounded-md border border-slate-200 bg-white px-2 text-base font-bold text-[#0b1f4b] disabled:bg-slate-50"
+                                />
+                              </label>
+                              <label className="block min-w-0">
+                                <span className="mb-0.5 block truncate text-[10px] font-semibold text-slate-500">
+                                  {t.colMin}
+                                </span>
                                 <input
                                   type="number"
                                   inputMode="decimal"
@@ -1375,11 +1416,13 @@ export function PartnerEquipmentServicePanel({
                                     const result = clampPeriodInput(e.target.value, adminPeriodMax);
                                     setRow(row.service.id, { minPeriodEur: result.value });
                                   }}
-                                  className="min-h-11 w-full rounded-md border border-slate-200 px-3 text-base font-bold text-[#0b1f4b] disabled:bg-slate-50"
+                                  className="min-h-10 w-full rounded-md border border-slate-200 bg-white px-2 text-base font-bold text-[#0b1f4b] disabled:bg-slate-50"
                                 />
                               </label>
                               <label className="block min-w-0">
-                                <span className="mb-1 block text-xs font-semibold text-slate-500">{t.colMax}</span>
+                                <span className="mb-0.5 block truncate text-[10px] font-semibold text-slate-500">
+                                  {t.colMax}
+                                </span>
                                 <input
                                   type="number"
                                   inputMode="decimal"
@@ -1393,60 +1436,60 @@ export function PartnerEquipmentServicePanel({
                                     const result = clampPeriodInput(e.target.value, adminPeriodMax);
                                     setRow(row.service.id, { maxPeriodEur: result.value });
                                   }}
-                                  className="min-h-11 w-full rounded-md border border-slate-200 px-3 text-base font-bold text-[#0b1f4b] disabled:bg-slate-50"
+                                  className="min-h-10 w-full rounded-md border border-slate-200 bg-white px-2 text-base font-bold text-[#0b1f4b] disabled:bg-slate-50"
                                 />
                               </label>
                             </div>
-                            {periodCapHint ? (
-                              <p className="text-[11px] font-medium text-amber-800">{periodCapHint}</p>
+                            {dailyCapHint || periodCapHint ? (
+                              <p className="text-[10px] font-medium leading-tight text-amber-800">
+                                {[dailyCapHint, periodCapHint].filter(Boolean).join(" · ")}
+                              </p>
                             ) : null}
-                            <div>
-                              <div className="mb-1.5 flex items-center justify-between gap-2">
-                                <p className="text-xs font-semibold text-slate-500">{t.colCars}</p>
-                                <div className="flex items-center gap-3 text-xs font-semibold">
-                                  <button
-                                    type="button"
-                                    className="min-h-11 text-[#1d6fe8]"
-                                    disabled={row.mode === "off"}
-                                    onClick={() =>
-                                      setRow(row.service.id, { carIds: cars.map((car) => car.id) })
-                                    }
-                                  >
-                                    {t.selectAll}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="min-h-11 text-slate-500"
-                                    disabled={row.mode === "off"}
-                                    onClick={() => setRow(row.service.id, { carIds: [] })}
-                                  >
-                                    {t.reset}
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="max-h-48 overflow-y-auto">
-                                <PartnerExtraCarPicker
-                                  cars={cars}
-                                  selectedIds={row.carIds}
-                                  onChange={(ids) => setRow(row.service.id, { carIds: ids })}
-                                  locale={locale}
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[11px] font-semibold text-slate-500">{t.colCars}</p>
+                              <div className="flex items-center gap-3 text-[11px] font-semibold">
+                                <button
+                                  type="button"
+                                  className="min-h-10 text-[#1d6fe8]"
                                   disabled={row.mode === "off"}
-                                />
+                                  onClick={() =>
+                                    setRow(row.service.id, { carIds: cars.map((car) => car.id) })
+                                  }
+                                >
+                                  {t.selectAll}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="min-h-10 text-slate-500"
+                                  disabled={row.mode === "off"}
+                                  onClick={() => setRow(row.service.id, { carIds: [] })}
+                                >
+                                  {t.reset}
+                                </button>
                               </div>
                             </div>
+                            <PartnerExtraCarPicker
+                              cars={cars}
+                              selectedIds={row.carIds}
+                              onChange={(ids) => setRow(row.service.id, { carIds: ids })}
+                              locale={locale}
+                              disabled={row.mode === "off"}
+                              compact
+                            />
                             <button
                               type="button"
                               onClick={() => setOpenServiceId(null)}
-                              className="min-h-11 w-full rounded-md bg-[#3d2a6d] text-sm font-bold text-white"
+                              className="min-h-10 w-full rounded-md bg-slate-200 text-sm font-bold text-slate-700"
                             >
                               {t.done}
                             </button>
                           </div>
                         ) : null}
                       </article>
+                      </Fragment>
                     );
                   })}
-                </>
+                </div>
               }
             />
           </div>

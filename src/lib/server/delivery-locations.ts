@@ -19,6 +19,7 @@ import {
   localizeJsonName,
   normalizeMaxFreeAfterDays,
   type DeliveryLocationView,
+  type ResolvedDeliveryRow,
 } from "@/lib/delivery/pricing";
 import { toNumber } from "@/lib/utils";
 import type { SearchAirportOption } from "@/components/search/airport-search";
@@ -769,6 +770,63 @@ export async function listPartnerScopedDeliveryLocations(
   }
 
   return [...result.values()].sort((a, b) => a.sortOrder - b.sortOrder || a.iata.localeCompare(b.iata));
+}
+
+/**
+ * Car delivery prices require a DeliveryLocation row. City places and other
+ * file-only catalog ids are kept on the listing description, not in that table.
+ * Returns null when the database could not be checked (caller should leave
+ * existing prices untouched).
+ */
+export async function persistableCarDeliveryRows(
+  rows: ResolvedDeliveryRow[],
+  catalog: DeliveryLocationView[],
+): Promise<ResolvedDeliveryRow[] | null> {
+  if (!rows.length) return [];
+  try {
+    const ids = [...new Set(rows.map((row) => row.deliveryLocationId))];
+    const existing = await prisma.deliveryLocation.findMany({
+      where: { id: { in: ids } },
+      select: { id: true },
+    });
+    const ok = new Set(existing.map((row) => row.id));
+    const iataToId = new Map<string, string>();
+    const missingIatas = [
+      ...new Set(
+        rows
+          .filter((row) => !ok.has(row.deliveryLocationId))
+          .map((row) => catalog.find((loc) => loc.id === row.deliveryLocationId)?.iata || "")
+          .map((iata) => iata.trim().toUpperCase())
+          .filter((iata) => iata && !isCityLocationCode(iata)),
+      ),
+    ];
+    if (missingIatas.length) {
+      const byIata = await prisma.deliveryLocation.findMany({
+        where: { airport: { iata: { in: missingIatas } } },
+        select: { id: true, airport: { select: { iata: true } } },
+      });
+      for (const row of byIata) {
+        const iata = row.airport?.iata?.trim().toUpperCase();
+        if (iata) iataToId.set(iata, row.id);
+      }
+    }
+    const seen = new Set<string>();
+    const mapped: ResolvedDeliveryRow[] = [];
+    for (const row of rows) {
+      let id = row.deliveryLocationId;
+      if (!ok.has(id)) {
+        const iata = catalog.find((loc) => loc.id === id)?.iata?.trim().toUpperCase() || "";
+        id = iata && !isCityLocationCode(iata) ? iataToId.get(iata) || "" : "";
+      }
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      mapped.push({ ...row, deliveryLocationId: id });
+    }
+    return mapped;
+  } catch (error) {
+    console.warn("[delivery-locations] persistableCarDeliveryRows", error);
+    return null;
+  }
 }
 
 /** Location codes where an approved car can actually be picked up. */

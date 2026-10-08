@@ -13,8 +13,8 @@ import {
   type PartnerExtraInput,
 } from "@/lib/extras/pricing";
 import { resolvePartnerDeliveryPrices } from "@/lib/delivery/pricing";
-import { listPartnerScopedDeliveryLocations } from "@/lib/server/delivery-locations";
-import { ensureExtrasExistInDb, listExtraServices } from "@/lib/server/extras-store";
+import { listPartnerScopedDeliveryLocations, persistableCarDeliveryRows } from "@/lib/server/delivery-locations";
+import { ensureExtrasExistInDb, extrasRowsForCarFk, listExtraServices } from "@/lib/server/extras-store";
 import { isCityLocationCode, parseCityLocationCode } from "@/lib/catalog/search-places";
 import {
   isValidRegistrationNumber,
@@ -344,7 +344,7 @@ async function resolveCarExtras(rawExtras: unknown) {
     if (normalized) rows.push(normalized);
   }
 
-  return rows;
+  return extrasRowsForCarFk(rows, catalog);
 }
 
 function deliveryRowsFromBody(raw: unknown): FileCarDeliveryPrice[] {
@@ -534,68 +534,19 @@ export async function POST(req: Request) {
             rows: [] as typeof deliveryRows,
             adjustments: [] as typeof deliveryAdjustments,
           };
-      deliveryRows = resolved.rows;
       deliveryAdjustments = resolved.adjustments;
+      const persistable = await persistableCarDeliveryRows(resolved.rows, deliveryCatalog);
+      deliveryRows = persistable ?? [];
 
-      // Keep only delivery locations that exist in DB (file/catalog ids may not have FK rows yet).
-      if (deliveryRows.length) {
-        try {
-          const { activatePartnerApprovedDeliveryLocations } = await import(
-            "@/lib/server/delivery-locations"
-          );
-          await activatePartnerApprovedDeliveryLocations(
-            deliveryRows.map((r) => r.deliveryLocationId),
-          );
-        } catch {
-          /* best-effort activation */
-        }
-        const existing = await prisma.deliveryLocation.findMany({
-          where: { id: { in: deliveryRows.map((r) => r.deliveryLocationId) } },
-          select: { id: true },
-        });
-        const ok = new Set(existing.map((r) => r.id));
-        if (ok.size < deliveryRows.length) {
-          const iataMatches = deliveryCatalog.filter(
-            (c) => c.iata && deliveryRows.some((r) => r.deliveryLocationId === c.id),
-          );
-          const byIata = iataMatches.length
-            ? await prisma.deliveryLocation.findMany({
-                where: {
-                  OR: iataMatches.map((c) => ({ airport: { iata: c.iata } })),
-                },
-                select: { id: true, airport: { select: { iata: true } } },
-              })
-            : [];
-          const iataToId = new Map(
-            byIata.flatMap((r) => (r.airport?.iata ? [[r.airport.iata.toUpperCase(), r.id] as const] : [])),
-          );
-          deliveryRows = deliveryRows
-            .map((r) => {
-              if (ok.has(r.deliveryLocationId)) return r;
-              const loc = deliveryCatalog.find((c) => c.id === r.deliveryLocationId);
-              const mapped = loc?.iata ? iataToId.get(loc.iata.toUpperCase()) : undefined;
-              return mapped ? { ...r, deliveryLocationId: mapped } : null;
-            })
-            .filter(Boolean) as typeof deliveryRows;
-        } else {
-          deliveryRows = deliveryRows.filter((r) => ok.has(r.deliveryLocationId));
-        }
-      }
-
-      if (forSale && !deliveryRows.length) {
-        const fromBody = deliveryRowsFromBody(deliveryPrices);
-        if (fromBody.length) {
-          deliveryRows = fromBody;
-        } else {
-          return NextResponse.json(
-            {
-              error:
-                "Enable Delivery for at least one of your operating airports (locations must be active in admin catalog).",
-              code: "NO_DELIVERY",
-            },
-            { status: 400 },
-          );
-        }
+      if (forSale && !deliveryRows.length && !resolved.rows.length) {
+        return NextResponse.json(
+          {
+            error:
+              "Enable Delivery for at least one of your operating airports (locations must be active in admin catalog).",
+            code: "NO_DELIVERY",
+          },
+          { status: 400 },
+        );
       }
 
       const car = await prisma.car.create({
@@ -684,6 +635,7 @@ export async function POST(req: Request) {
           deliveryAdjustments,
           insuranceUrl: normalizeInsuranceUrl(insuranceUrl),
           insuranceExpiresAt: normalizeInsuranceExpiresAt(insuranceExpiresAt),
+          updateNotice: listingStatus === "DRAFT" ? "SAVED" : "PENDING",
         },
         { status: 201 },
       );
@@ -762,6 +714,7 @@ export async function POST(req: Request) {
             normalizeInsuranceExpiresAt(insuranceExpiresAt),
           ),
           deliveryAdjustments: [],
+          updateNotice: listingStatus === "DRAFT" ? "SAVED" : "PENDING",
         },
         { status: 201 },
       );

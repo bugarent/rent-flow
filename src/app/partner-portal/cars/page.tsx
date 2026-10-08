@@ -110,6 +110,7 @@ export default async function PartnerCarsPage() {
               editLabel={t.edit}
               ackLabel={copy.ack}
               rejectionTitle={copy.rejectionTitle}
+              locale={locale}
             />
           );
         })}

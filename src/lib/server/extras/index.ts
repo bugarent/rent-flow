@@ -17,6 +17,7 @@ export {
   deleteExtraService,
   reorderExtraServices,
   ensureExtrasExistInDb,
+  extrasRowsForCarFk,
 } from "./mutate";
 
 export {

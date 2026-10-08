@@ -19,6 +19,7 @@ export {
   deleteExtraService,
   reorderExtraServices,
   ensureExtrasExistInDb,
+  extrasRowsForCarFk,
   ensureExtraCopyTranslations,
   hydrateListingExtras,
   applyPartnerExtraOfferModes,

@@ -11,6 +11,7 @@ import {
 } from "@/lib/i18n/partner-config";
 import { applyDocumentLocale, persistPref, resolveClientPref } from "@/lib/i18n/pref-storage";
 import { getPartnerDictionary, type PartnerDictionary } from "@/lib/i18n/partner-dictionaries";
+import { LOCALE_COOKIE, LOCALE_STORAGE, isLocale } from "@/lib/i18n/config";
 
 type PartnerLocaleContextValue = {
   locale: PartnerLocale;
@@ -38,13 +39,23 @@ export function PartnerLocaleProvider({
       setLocaleState(initialLocale || DEFAULT_PARTNER_LOCALE);
       return;
     }
-    const next = resolveClientPref(
+    const shared = resolveClientPref(
+      LOCALE_COOKIE,
+      LOCALE_STORAGE,
+      (v) => isLocale(v),
+      "",
+    );
+    const stored = resolveClientPref(
       PARTNER_LOCALE_COOKIE,
       PARTNER_LOCALE_STORAGE,
       (v) => isPartnerLocale(v),
       initialLocale || DEFAULT_PARTNER_LOCALE,
     ) as PartnerLocale;
+    const next = (isPartnerLocale(shared) ? shared : stored) as PartnerLocale;
     setLocaleState(next);
+    if (next !== stored) {
+      persistPref(PARTNER_LOCALE_COOKIE, PARTNER_LOCALE_STORAGE, next);
+    }
   }, [initialLocale, lockToInitial]);
 
   useEffect(() => {
@@ -55,13 +66,20 @@ export function PartnerLocaleProvider({
   useEffect(() => {
     if (lockToInitial) return;
     const onStorage = (e: StorageEvent) => {
-      if (e.key === PARTNER_LOCALE_STORAGE && e.newValue && isPartnerLocale(e.newValue)) {
+      if (
+        (e.key === PARTNER_LOCALE_STORAGE || e.key === LOCALE_STORAGE) &&
+        e.newValue &&
+        isPartnerLocale(e.newValue)
+      ) {
         setLocaleState(e.newValue);
       }
     };
     const onPref = (e: Event) => {
       const detail = (e as CustomEvent<{ key: string; value: string }>).detail;
-      if (detail?.key === PARTNER_LOCALE_STORAGE && isPartnerLocale(detail.value)) {
+      if (
+        (detail?.key === PARTNER_LOCALE_STORAGE || detail?.key === LOCALE_STORAGE) &&
+        isPartnerLocale(detail.value)
+      ) {
         setLocaleState(detail.value);
       }
     };
@@ -77,6 +95,7 @@ export function PartnerLocaleProvider({
     (next: PartnerLocale) => {
       setLocaleState(next);
       persistPref(PARTNER_LOCALE_COOKIE, PARTNER_LOCALE_STORAGE, next);
+      persistPref(LOCALE_COOKIE, LOCALE_STORAGE, next);
       router.refresh();
     },
     [router],

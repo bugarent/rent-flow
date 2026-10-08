@@ -9,6 +9,22 @@
 export const PARTNER_EDIT_REMODERATION_REASON = "Partner edited listing — awaiting re-moderation";
 export const REJECTED_EDIT_REMODERATION_REASON = "Partner edited rejected listing — awaiting re-moderation";
 
+/** Partner-facing sentence for a stored listing reason. Unknown notes stay as written. */
+export function listingHiddenReasonLabel(locale: string, reason: string | null | undefined): string {
+  const text = String(reason || "").trim();
+  if (!text) return "";
+  if (text === PARTNER_EDIT_REMODERATION_REASON || text === REJECTED_EDIT_REMODERATION_REASON) {
+    if (locale === "ka") {
+      return "განცხადება განახლდა და ხელახალ მოდერაციაზე გაიგზავნა. ძიებაში გამოჩნდება ადმინის დამტკიცების შემდეგ.";
+    }
+    if (locale === "ru") {
+      return "Объявление обновлено и отправлено на повторную модерацию. В поиске появится после одобрения администратором.";
+    }
+    return "The listing was updated and sent back to moderation. It stays hidden in search until an admin approves it.";
+  }
+  return text;
+}
+
 export type ListingVisibilityInput = {
   status: string;
   hiddenReason?: string | null;
