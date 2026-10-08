@@ -1397,7 +1397,7 @@ export function PartnerEquipmentServicePanel({
                         )}
                         {open && canEditPrices ? (
                           <div className="mt-1 space-y-1.5 border-t border-slate-100 pt-1.5">
-                            <div className="grid grid-cols-3 gap-1.5">
+                            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
                               <label className="block min-w-0">
                                 <span className="mb-0.5 block truncate text-[10px] font-semibold text-slate-500">
                                   {t.colPrice}

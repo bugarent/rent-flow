@@ -78,18 +78,18 @@ export default async function PartnerCarsPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-8">
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-3xl font-extrabold text-white drop-shadow-sm">{t.title}</h1>
-        <div className="flex gap-3">
+      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="min-w-0 text-2xl font-extrabold text-white drop-shadow-sm sm:text-3xl">{t.title}</h1>
+        <div className="flex flex-wrap gap-3">
           <Link
             href={`${PARTNER_BASE}/bookings`}
-            className="rounded-lg border border-white/40 bg-white/90 px-4 py-2.5 font-semibold backdrop-blur-sm"
+            className="inline-flex min-h-10 items-center rounded-lg border border-white/40 bg-white/90 px-4 py-2.5 font-semibold backdrop-blur-sm"
           >
             {t.bookings}
           </Link>
           <Link
             href={`${PARTNER_BASE}/cars/new`}
-            className="rounded-lg bg-sky-600 px-6 py-2.5 font-bold text-white hover:bg-sky-500"
+            className="inline-flex min-h-10 items-center rounded-lg bg-sky-600 px-6 py-2.5 font-bold text-white hover:bg-sky-500"
           >
             {t.addCar}
           </Link>

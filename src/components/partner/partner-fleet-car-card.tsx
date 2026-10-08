@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { usePartnerMoney } from "@/components/providers/partner-money-context";
 import { listingHiddenReasonLabel } from "@/lib/cars/listing-visibility";
 import { PARTNER_BASE } from "@/lib/routes";
-import { formatMoney, toNumber } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { toNumber, cn } from "@/lib/utils";
 
 export function PartnerFleetCarCard({
   car,
@@ -34,6 +34,7 @@ export function PartnerFleetCarCard({
   locale?: string;
 }) {
   const router = useRouter();
+  const { formatEur } = usePartnerMoney();
   const [acking, setAcking] = useState(false);
   const unread = Boolean(car.rejectionUnread);
   const note = listingHiddenReasonLabel(locale, car.hiddenReason);
@@ -94,7 +95,7 @@ export function PartnerFleetCarCard({
 
       <div className="mt-4 flex items-center justify-between border-t pt-4">
         <span className="font-bold text-sky-600">
-          {formatMoney(toNumber(car.dailyRateEur), "EUR")}
+          {formatEur(toNumber(car.dailyRateEur))}
           {perDay}
         </span>
         <div className="flex items-center gap-2">

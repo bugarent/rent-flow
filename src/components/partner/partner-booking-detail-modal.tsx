@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { MessageCircle, X } from "lucide-react";
 import { socialLabel } from "@/components/bookings/booking-info-modal/helpers";
 import { parsePartnerMessengers } from "@/lib/partner";
+import { usePartnerMoney } from "@/components/providers/partner-money-context";
 import { cn } from "@/lib/utils";
 import { clampPickupSelection, earliestPickupIsoDate, isPickupSlotAllowed } from "@/lib/bookings/lead-time";
 import { DateInput } from "@/components/ui/date-input";
@@ -70,11 +71,6 @@ function splitIso(iso: string) {
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = d.getMinutes() < 30 ? "00" : "30";
   return { date: `${y}-${mo}-${day}`, time: `${hh}:${mm}` };
-}
-
-function money(n: number | undefined) {
-  const v = Number(n) || 0;
-  return `€${v.toFixed(2)}`;
 }
 
 function copyFor(locale: string) {
@@ -202,6 +198,8 @@ export function PartnerBookingDetailModal({
   readOnly?: boolean;
 }) {
   const t = copyFor(locale);
+  const { formatEur } = usePartnerMoney();
+  const money = (n: number | undefined) => formatEur(Number(n) || 0);
   const isBlock = booking.kind === "block" || booking.status === "BLOCKED";
   const [editing, setEditing] = useState(false);
   const [messagesOpen, setMessagesOpen] = useState(false);
