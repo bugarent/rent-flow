@@ -1616,24 +1616,24 @@ export function PartnerCreateCarForm({
         music,
       };
       const description = `<!--car-details:${JSON.stringify(details)}-->`;
-      const extras = extraSelections
-        .filter((row) => {
-          const service = extrasCatalog.find((s) => s.id === row.extraServiceId);
-          if (service && isMandatoryExtra(service)) return true;
-          if (row.forbidden) return true;
-          return Boolean(row.enabled);
-        })
-        .map((row) => {
-          const service = extrasCatalog.find((s) => s.id === row.extraServiceId);
-          const mandatoryFree = service ? isMandatoryFreeExtra(service) : false;
-          const forbidden = !(service && isMandatoryExtra(service)) && Boolean(row.forbidden);
-          return {
-            extraServiceId: row.extraServiceId,
-            enabled: true,
-            forbidden,
-            priceEur: mandatoryFree || forbidden ? 0 : row.priceEur === "" ? null : toEur(row.priceEur),
-          };
-        });
+      const extras = extraSelections.map((row) => {
+        const service = extrasCatalog.find((s) => s.id === row.extraServiceId);
+        const mandatory = Boolean(service && isMandatoryExtra(service));
+        const mandatoryFree = service ? isMandatoryFreeExtra(service) : false;
+        const forbidden = !mandatory && Boolean(row.forbidden);
+        const enabled = mandatory || (!forbidden && Boolean(row.enabled));
+        return {
+          extraServiceId: row.extraServiceId,
+          enabled,
+          forbidden,
+          priceEur:
+            mandatoryFree || forbidden || !enabled
+              ? 0
+              : row.priceEur === ""
+                ? null
+                : toEur(row.priceEur),
+        };
+      });
       const deliveryPrices = (
         pickupPayload.length
           ? pickupPayload.map((p) => ({
@@ -2596,7 +2596,9 @@ export function PartnerCreateCarForm({
                         "rounded-md border px-2 py-1",
                         forbidden
                           ? "border-red-300 bg-red-50"
-                          : "border-slate-200 bg-[#f8fafc]",
+                          : off
+                            ? "border-slate-300 bg-slate-100"
+                            : "border-slate-200 bg-[#f8fafc]",
                       )}
                     >
                       <div className="flex items-center gap-2 py-0.5">
@@ -2640,15 +2642,6 @@ export function PartnerCreateCarForm({
                   </div>
                 );
               };
-              const activeOthers = otherServices.filter((service) => {
-                const row = extraSelections.find((s) => s.extraServiceId === service.id);
-                const mandatory = isMandatoryExtra(service);
-                const forbidden = !mandatory && Boolean(row?.forbidden);
-                const enabled = mandatory || (!forbidden && Boolean(row?.enabled));
-                // Off stays hidden on the phone. Forbidden stays visible and marked,
-                // the same as on the computer car form.
-                return mandatory || forbidden || enabled;
-              });
               return (
                 <>
                   <div className="flex flex-col gap-1 md:hidden">
@@ -2658,12 +2651,12 @@ export function PartnerCreateCarForm({
                       </p>
                     ) : null}
                     {insuranceServices.map((service) => offerCard(service, "insurance"))}
-                    {insuranceServices.length > 0 && activeOthers.length > 0 ? (
+                    {insuranceServices.length > 0 && otherServices.length > 0 ? (
                       <p className="px-0.5 pt-1 text-xs font-extrabold uppercase tracking-wide text-slate-500">
                         {knownText(locale, cc.sections.extras)}
                       </p>
                     ) : null}
-                    {activeOthers.map((service) => offerCard(service, "light"))}
+                    {otherServices.map((service) => offerCard(service, "light"))}
                   </div>
                   <div className="hidden md:grid md:grid-cols-2 md:gap-1.5">
                     {sorted.map((service) => offerCard(service, "desktop"))}

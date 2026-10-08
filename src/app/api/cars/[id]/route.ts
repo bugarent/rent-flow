@@ -4,6 +4,7 @@ import { getAdminSession, getPartnerSession } from "@/lib/auth/sessions";
 import { prisma } from "@/lib/prisma";
 import { MIN_PUBLIC_PHOTOS } from "@/lib/brand";
 import {
+  isMandatoryExtra,
   normalizePartnerExtraPrice,
   type PartnerExtraInput,
 } from "@/lib/extras/pricing";
@@ -51,13 +52,18 @@ async function resolveCarExtras(rawExtras: unknown) {
 
   const rows: Array<{ extraServiceId: string; priceEur: number; forbidden?: boolean }> = [];
   for (const service of catalog) {
-    const input = inputById.get(service.id) ?? {
-      extraServiceId: service.id,
-      enabled: service.mode !== "toggle",
-      priceEur: service.defaultPriceEur,
-    };
-    // Mandatory extras are always attached: free ones at €0, priced ones clamped to the admin range.
-    const normalized = normalizePartnerExtraPrice(service, input);
+    const input = inputById.get(service.id);
+    // The car form sends every service the partner activated in the cabinet.
+    // Omitted or explicitly off services stay off the listing. Mandatory ones stay on.
+    if (!input && !isMandatoryExtra(service)) continue;
+    const normalized = normalizePartnerExtraPrice(
+      service,
+      input ?? {
+        extraServiceId: service.id,
+        enabled: true,
+        priceEur: service.defaultPriceEur,
+      },
+    );
     if (normalized) rows.push(normalized);
   }
   return extrasRowsForCarFk(rows, catalog);
