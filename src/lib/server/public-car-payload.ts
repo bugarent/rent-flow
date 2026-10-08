@@ -1,5 +1,7 @@
 import "server-only";
 
+import { filterExtrasByCarOffers } from "@/lib/cars/car-details";
+
 type PartnerRef = { partnerId?: string; partner?: { id?: string } };
 
 export type PublicCarRange = { rangeFrom: string; rangeTo: string };
@@ -114,6 +116,7 @@ export async function enrichPublicCarPayload<T extends object>(
     discountPercent?: unknown;
     deliveryPrices?: unknown;
     extras?: unknown;
+    description?: unknown;
     partner?: { id?: string } | null;
   };
   const partnerId = partnerIdOf(
@@ -121,7 +124,7 @@ export async function enrichPublicCarPayload<T extends object>(
     input.partnerIdHint,
   );
   const carId = String(fields.id || input.carId).trim();
-  const [discountPercent, deliveryPrices, extras, payments, partnerClientLanguages] =
+  const [discountPercent, deliveryPrices, hydrated, payments, partnerClientLanguages] =
     await Promise.all([
       periodDiscount(input.carId, fields.discountPercent, input),
       deliveryRows(partnerId, fields.deliveryPrices),
@@ -129,6 +132,9 @@ export async function enrichPublicCarPayload<T extends object>(
       companyPayments(partnerId),
       clientLanguages(partnerId),
     ]);
+  const extras = Array.isArray(hydrated)
+    ? filterExtrasByCarOffers(hydrated, String(fields.description || ""))
+    : hydrated;
   return {
     ...payload,
     ...(discountPercent !== undefined ? { discountPercent } : {}),

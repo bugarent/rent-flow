@@ -26,7 +26,7 @@ import {
   type PickupPlaceRow,
 } from "@/components/partner/partner-pickup-dropoff-section";
 import { isSyntheticDeliveryId } from "@/lib/delivery/pricing";
-import { parseCarDetails } from "@/lib/cars/car-details";
+import { parseCarDetails, readExtraOffers } from "@/lib/cars/car-details";
 import { diffCarAgainstPublished, fieldChangesMapFromRecord } from "@/lib/cars/car-published-diff";
 import {
   insuranceExpiryReasonLabel,
@@ -102,6 +102,21 @@ function partnerMoney(
   const n = Number(amount);
   if (!Number.isFinite(n)) return "";
   return eurToPartnerAmount(n, currency, rates);
+}
+
+function formatExtrasChange(raw: string, locale: string): string {
+  return raw
+    .split("; ")
+    .filter(Boolean)
+    .map((part) => {
+      const bits = part.split("\t");
+      if (bits.length < 3) return part;
+      const [name, from, to] = bits;
+      const word = (mode: string) =>
+        knownText(locale, mode === "forbidden" ? "Forbidden" : mode === "off" ? "Off" : "Enabled");
+      return `${name}: ${word(from)} → ${word(to)}`;
+    })
+    .join("; ");
 }
 
 function ratesToPartner(
@@ -684,13 +699,30 @@ export function PartnerCreateCarForm({
                     forbidden: Boolean(fromCar?.forbidden),
                   };
                 }),
-              ).map((row) => ({
-                ...row,
-                enabled:
-                  Boolean(row.forbidden) ||
-                  carExtraIds.has(row.extraServiceId) ||
-                  Boolean(filtered.find((s) => s.id === row.extraServiceId && isMandatoryExtra(s))),
-              })),
+              ).map((row) => {
+                const offer = readExtraOffers(details).find(
+                  (item) => item.extraServiceId === row.extraServiceId,
+                );
+                if (offer) {
+                  const forbidden = Boolean(offer.forbidden);
+                  return {
+                    ...row,
+                    forbidden,
+                    enabled: !forbidden && offer.enabled !== false,
+                    priceEur:
+                      offer.priceEur != null && String(offer.priceEur) !== ""
+                        ? String(offer.priceEur)
+                        : row.priceEur,
+                  };
+                }
+                return {
+                  ...row,
+                  enabled:
+                    Boolean(row.forbidden) ||
+                    carExtraIds.has(row.extraServiceId) ||
+                    Boolean(filtered.find((s) => s.id === row.extraServiceId && isMandatoryExtra(s))),
+                };
+              }),
             );
           }
 
@@ -1094,16 +1126,27 @@ export function PartnerCreateCarForm({
             setExtraSelections(
               buildExtraSelections(filtered, existingPrices).map((row) => {
                 const service = filtered.find((s) => s.id === row.extraServiceId);
+                const offer = readExtraOffers(details).find(
+                  (item) => item.extraServiceId === row.extraServiceId,
+                );
+                const forbidden = offer ? Boolean(offer.forbidden) : Boolean(row.forbidden);
+                const enabled = offer
+                  ? !forbidden && offer.enabled !== false
+                  : (service ? isMandatoryExtra(service) : false) ||
+                    Boolean(row.forbidden) ||
+                    carExtraIds.has(row.extraServiceId);
+                const eurPrice =
+                  offer && offer.priceEur != null && String(offer.priceEur) !== ""
+                    ? String(offer.priceEur)
+                    : row.priceEur;
                 return {
                   ...row,
-                  enabled:
-                    (service ? isMandatoryExtra(service) : false) ||
-                    Boolean(row.forbidden) ||
-                    carExtraIds.has(row.extraServiceId),
+                  forbidden,
+                  enabled,
                   priceEur:
-                    row.forbidden || !row.priceEur || row.priceEur === "0"
-                      ? row.priceEur
-                      : eurToPartnerAmount(row.priceEur, nextCurrency, nextRates),
+                    forbidden || !eurPrice || eurPrice === "0"
+                      ? eurPrice || "0"
+                      : eurToPartnerAmount(eurPrice, nextCurrency, nextRates),
                 };
               }),
             );
@@ -1614,6 +1657,19 @@ export function PartnerCreateCarForm({
         ebd,
         esp,
         music,
+        extraOffers: extraSelections.map((row) => {
+          const service = extrasCatalog.find((item) => item.id === row.extraServiceId);
+          const mandatory = Boolean(service && isMandatoryExtra(service));
+          const forbidden = !mandatory && Boolean(row.forbidden);
+          const enabled = mandatory || (!forbidden && Boolean(row.enabled));
+          return {
+            extraServiceId: row.extraServiceId,
+            name: service?.name || row.extraServiceId,
+            enabled,
+            forbidden,
+            priceEur: enabled && !forbidden ? toEur(row.priceEur) : 0,
+          };
+        }),
       };
       const description = `<!--car-details:${JSON.stringify(details)}-->`;
       const extras = extraSelections.map((row) => {
@@ -1978,6 +2034,11 @@ export function PartnerCreateCarForm({
                     : locale === "ru"
                       ? "Объявление отправлено на модерацию."
                       : "This listing was sent for moderation."}
+            {isChanged("extras") && changePrev("extras") ? (
+              <p className="mt-2 whitespace-pre-wrap text-sm font-semibold">
+                {formatExtrasChange(changePrev("extras") || "", locale)}
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -2475,7 +2536,11 @@ export function PartnerCreateCarForm({
           </label>
         </SectionCard>
 
-        <SectionCard id="extras" title={knownText(locale, cc.sections.extras)}>
+        <SectionCard
+          id="extras"
+          title={knownText(locale, cc.sections.extras)}
+          changed={isChanged("extras")}
+        >
           {extrasCatalog.length === 0 ? (
             <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-500">
               {cc.extrasEmpty}

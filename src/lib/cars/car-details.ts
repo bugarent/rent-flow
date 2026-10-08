@@ -28,6 +28,105 @@ export type CarDetailsBlob = {
   [key: string]: unknown;
 };
 
+export type CarExtraOffer = {
+  extraServiceId: string;
+  name?: string;
+  enabled?: boolean;
+  forbidden?: boolean;
+  priceEur?: number | string;
+};
+
+export function readExtraOffers(details: CarDetailsBlob | null | undefined): CarExtraOffer[] {
+  const raw = details && Array.isArray(details.extraOffers) ? details.extraOffers : [];
+  return raw.filter(
+    (offer): offer is CarExtraOffer =>
+      Boolean(offer) && typeof offer === "object" && typeof (offer as CarExtraOffer).extraServiceId === "string",
+  );
+}
+
+export function extraOfferMode(offer: { enabled?: boolean; forbidden?: boolean } | undefined): "on" | "off" | "forbidden" {
+  if (!offer) return "on";
+  if (offer.forbidden) return "forbidden";
+  if (offer.enabled === false) return "off";
+  return "on";
+}
+
+/** Compact admin reason: `Name<TAB>from<TAB>to` lines joined by `; `. */
+export function extrasModerationChange(
+  beforeDescription: string | null | undefined,
+  beforeExtras: Array<{
+    extraServiceId?: string;
+    forbidden?: boolean;
+    extraService?: { name?: unknown };
+  }>,
+  afterDescription: string | null | undefined,
+): string | null {
+  const beforeDetails = parseCarDetails(beforeDescription);
+  const savedBefore = readExtraOffers(beforeDetails);
+  const previous: CarExtraOffer[] = savedBefore.length
+    ? savedBefore
+    : beforeExtras.flatMap((row) => {
+        const id = String(row.extraServiceId || "").trim();
+        if (!id) return [];
+        const rawName = row.extraService?.name;
+        const name =
+          typeof rawName === "string"
+            ? rawName
+            : rawName && typeof rawName === "object" && "en" in rawName
+              ? String((rawName as { en?: unknown }).en || "")
+              : "";
+        return [
+          {
+            extraServiceId: id,
+            name,
+            enabled: !row.forbidden,
+            forbidden: Boolean(row.forbidden),
+          },
+        ];
+      });
+  const next = readExtraOffers(parseCarDetails(afterDescription));
+  if (!next.length && !previous.length) return null;
+  const prevById = new Map(previous.map((offer) => [offer.extraServiceId, offer]));
+  const nextById = new Map(next.map((offer) => [offer.extraServiceId, offer]));
+  const lines: string[] = [];
+  for (const id of new Set([...prevById.keys(), ...nextById.keys()])) {
+    const fromOffer = prevById.get(id);
+    const toOffer = nextById.get(id);
+    const from = extraOfferMode(fromOffer);
+    const to = extraOfferMode(toOffer);
+    if (from === to) continue;
+    const name = String(toOffer?.name || fromOffer?.name || id).replace(/[\t;]/g, " ");
+    lines.push(`${name}\t${from}\t${to}`);
+  }
+  return lines.length ? lines.join("; ") : null;
+}
+
+export function filterExtrasByCarOffers<
+  T extends { extraServiceId: string; forbidden?: boolean; priceEur?: unknown },
+>(
+  extras: T[],
+  description: string | null | undefined,
+): T[] {
+  const offers = readExtraOffers(parseCarDetails(description));
+  if (!offers.length) return extras;
+  const byId = new Map(offers.map((offer) => [offer.extraServiceId, offer]));
+  const next: T[] = [];
+  for (const row of extras) {
+    const offer = byId.get(row.extraServiceId);
+    if (!offer) {
+      next.push(row);
+      continue;
+    }
+    if (offer.forbidden) {
+      next.push({ ...row, forbidden: true, priceEur: 0 });
+      continue;
+    }
+    if (offer.enabled === false) continue;
+    next.push({ ...row, forbidden: false });
+  }
+  return next;
+}
+
 export function parseCarDetails(description: string | null | undefined): CarDetailsBlob | null {
   if (!description) return null;
   const m = /<!--car-details:([\s\S]*?)-->/.exec(description);

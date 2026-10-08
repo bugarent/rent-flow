@@ -53,6 +53,8 @@ export async function recordPartnerListingEditDiff(input: {
   afterDetails?: CarDetailsBlob | null;
   /** Status before this edit; an APPROVED listing's pre-edit data is the live approved version. */
   previousStatus?: string;
+  /** `Name<TAB>from<TAB>to` lines when additional services were turned off or forbidden. */
+  extrasChange?: string | null;
 }): Promise<{ snapshot: PublishedCarSnapshot; changeCount: number }> {
   const snapshot = await ensurePublishedCarSnapshot(input.carId, input.before, {
     replace: input.previousStatus === "APPROVED",
@@ -81,6 +83,7 @@ export async function recordPartnerListingEditDiff(input: {
     details,
     snapshot,
   });
+  if (input.extrasChange) changes.set("extras", { previous: input.extrasChange });
   await writeCarFieldChanges(input.carId, changes);
   return { snapshot, changeCount: changes.size };
 }

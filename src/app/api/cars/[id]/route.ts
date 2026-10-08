@@ -30,6 +30,7 @@ import {
   isValidRegistrationNumber,
   normalizeRegistrationNumber,
 } from "@/lib/cars/registration-number";
+import { extrasModerationChange } from "@/lib/cars/car-details";
 import { explainListingUpdateError } from "@/lib/cars/listing-update-error";
 import { hiddenReasonAfterPartnerEdit, isPubliclyVisibleListing } from "@/lib/cars/listing-visibility";
 import {
@@ -213,11 +214,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const { id } = await params;
   clearPublicCarCache(id);
-  let car: Prisma.CarGetPayload<{ include: { partner: true; photos: true; passport: true } }> | null = null;
+  let car: Prisma.CarGetPayload<{
+    include: { partner: true; photos: true; passport: true; extras: { include: { extraService: true } } };
+  }> | null = null;
   try {
     car = await prisma.car.findUnique({
       where: { id },
-      include: { partner: true, photos: true, passport: true },
+      include: { partner: true, photos: true, passport: true, extras: { include: { extraService: true } } },
     });
   } catch (error) {
     if (!isDbOfflineError(error)) throw error;
@@ -407,6 +410,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             passportBackUrl: saved.passportBackUrl || "",
             insuranceUrl: insuranceUrl || "",
           }),
+          extrasChange: extrasModerationChange(
+            fileCar.description,
+            Array.isArray(fileCar.extras) ? fileCar.extras : [],
+            saved.description,
+          ),
         });
       } catch (error) {
         console.error("[cars PATCH file] recordPartnerListingEditDiff", error);
@@ -696,6 +704,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                 : car.passport?.backUrl || "",
             insuranceUrl: insuranceUrl || "",
           }),
+          extrasChange: extrasModerationChange(
+            String(car.description || ""),
+            Array.isArray(car.extras) ? car.extras : [],
+            String(updated.description || ""),
+          ),
         });
       } catch (error) {
         console.error("[cars PATCH] recordPartnerListingEditDiff", error);
