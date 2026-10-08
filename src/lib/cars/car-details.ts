@@ -67,6 +67,40 @@ export function findCarExtraOffer(
   return byName.length === 1 ? byName[0] : undefined;
 }
 
+/** Write cabinet daily prices into the saved per-car offer list. Other details stay as they are. */
+export function descriptionWithCabinetPrices(
+  description: string | null | undefined,
+  prices: Array<{ extraServiceId: string; slug?: string; name?: string; priceEur: number }>,
+): string | null | undefined {
+  if (!description || !prices.length) return description;
+  const details = parseCarDetails(description);
+  const offers = readExtraOffers(details);
+  if (!details || !offers.length) return description;
+  let changed = false;
+  const extraOffers = offers.map((offer) => {
+    const match = prices.find((price) =>
+      findCarExtraOffer([offer], {
+        id: price.extraServiceId,
+        slug: price.slug,
+        name: price.name,
+      }),
+    );
+    if (!match) return offer;
+    const priceEur = Number(match.priceEur);
+    if (!Number.isFinite(priceEur)) return offer;
+    const current = Number(offer.priceEur);
+    if (Number.isFinite(current) && Math.abs(current - priceEur) < 0.001) return offer;
+    changed = true;
+    return { ...offer, priceEur };
+  });
+  if (!changed) return description;
+  const blob = `<!--car-details:${JSON.stringify({ ...details, extraOffers })}-->`;
+  if (/<!--car-details:[\s\S]*?-->/.test(description)) {
+    return description.replace(/<!--car-details:[\s\S]*?-->/, blob);
+  }
+  return description;
+}
+
 export function readExtraOffers(details: CarDetailsBlob | null | undefined): CarExtraOffer[] {
   const raw = details && Array.isArray(details.extraOffers) ? details.extraOffers : [];
   return raw.filter(

@@ -1110,13 +1110,17 @@ export function PartnerCreateCarForm({
                     (Boolean(service.slug) && e.extraService?.slug === service.slug),
                 );
                 const pref = prefs.forService(service);
-                const forbidden = Boolean(fromCar?.forbidden || pref?.forbidden);
+                const cabinetPrice =
+                  prefs.trusted && pref && pref.priceEur != null && Number.isFinite(Number(pref.priceEur))
+                    ? Number(pref.priceEur)
+                    : null;
+                const forbidden = Boolean(pref?.forbidden || fromCar?.forbidden);
                 const price = forbidden
                   ? 0
-                  : fromCar?.priceEur != null
-                    ? Number(fromCar.priceEur)
-                    : pref?.priceEur != null
-                      ? Number(pref.priceEur)
+                  : cabinetPrice != null
+                    ? cabinetPrice
+                    : fromCar?.priceEur != null
+                      ? Number(fromCar.priceEur)
                       : Number(service.defaultPriceEur ?? service.minPriceEur ?? 0);
                 return { extraServiceId: service.id, priceEur: price, forbidden };
               });
@@ -1125,16 +1129,24 @@ export function PartnerCreateCarForm({
                 buildExtraSelections(filtered, existingPrices).map((row) => {
                   const service = filtered.find((s) => s.id === row.extraServiceId);
                   const offer = service ? findCarExtraOffer(offers, service) : undefined;
-                  const forbidden = offer ? Boolean(offer.forbidden) : Boolean(row.forbidden);
+                  const pref = service ? prefs.forService(service) : undefined;
+                  const cabinetPrice =
+                    prefs.trusted && pref && pref.priceEur != null && Number.isFinite(Number(pref.priceEur))
+                      ? Number(pref.priceEur)
+                      : null;
+                  const forbidden = offer ? Boolean(offer.forbidden) : Boolean(pref?.forbidden || row.forbidden);
                   const enabled = offer
                     ? !forbidden && offer.enabled !== false
                     : (service ? isMandatoryExtra(service) : false) ||
                       Boolean(row.forbidden) ||
                       carExtraIds.has(row.extraServiceId);
-                  const eurPrice =
-                    offer && offer.priceEur != null && String(offer.priceEur) !== ""
-                      ? String(offer.priceEur)
-                      : row.priceEur;
+                  const eurPrice = forbidden
+                    ? "0"
+                    : cabinetPrice != null
+                      ? String(cabinetPrice)
+                      : offer && offer.priceEur != null && String(offer.priceEur) !== ""
+                        ? String(offer.priceEur)
+                        : row.priceEur;
                   return {
                     ...row,
                     forbidden,

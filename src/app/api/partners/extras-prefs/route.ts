@@ -23,6 +23,7 @@ import {
 } from "@/lib/extras/pricing";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
 import { parseCarDetails } from "@/lib/cars/car-details";
+import { syncListingExtraPrices } from "@/lib/server/sync-listing-extra-prices";
 
 async function resolvePartnerId(userId: string, email?: string | null): Promise<string> {
   try {
@@ -293,6 +294,22 @@ export async function PUT(req: Request) {
     }
 
     const saved = await writePartnerExtraPrefs(partnerId, next);
+    const catalogById = new Map(catalog.map((service) => [service.id, service]));
+    await syncListingExtraPrices({
+      carIds: cars.map((car) => car.id),
+      userId: session.user.id,
+      email: session.user.email,
+      partnerId,
+      prices: saved.map((pref) => {
+        const service = catalogById.get(pref.extraServiceId);
+        return {
+          extraServiceId: pref.extraServiceId,
+          slug: service?.slug,
+          name: service?.name,
+          priceEur: pref.forbidden ? 0 : Number(pref.priceEur) || 0,
+        };
+      }),
+    });
     return NextResponse.json({ ok: true, prefs: saved });
   } catch (error) {
     console.error("[partners/extras-prefs PUT]", error);
