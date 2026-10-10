@@ -2309,11 +2309,7 @@ export function PartnerCreateCarForm({
             {tariffIntervals.map((tier, index) => (
               <Field
                 key={`${tier.fromDays}-${tier.toDays}-${index}`}
-                label={
-                  index === 0
-                    ? `${cc.dailyPrice} / ${tier.fromDays}–${tier.toDays} ${cc.daysRange}`
-                    : `${tier.fromDays}–${tier.toDays} ${cc.daysRange}`
-                }
+                label={`${tier.fromDays}–${tier.toDays} ${cc.daysRange}`}
                 required={index === 0}
                 invalid={fieldInvalid(`tariff-${index}`)}
               >
@@ -2352,8 +2348,7 @@ export function PartnerCreateCarForm({
             </Field>
           </div>
 
-          <div id="price" className="mt-8 scroll-mt-40">
-            <p className="mb-1.5 text-xs font-bold text-[#2a3340]">{cc.sections.price}</p>
+          <div id="price" className="mt-4 scroll-mt-40">
             {seasonMeta.length > 0 ? (
               <div className="overflow-x-auto rounded-lg border border-[#d5dde6]">
                 <table className="w-full min-w-[640px] text-left text-[11px]">
