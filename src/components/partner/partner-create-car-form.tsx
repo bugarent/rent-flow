@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, EyeOff, FileText, Trash2, UploadCloud } from "lucide-react";
+import { Check, EyeOff, Trash2, UploadCloud } from "lucide-react";
 import { CREATE_AUTO_BACKDROP_URL, MIN_PUBLIC_PHOTOS } from "@/lib/brand";
 import { isStudioCoverUrl } from "@/lib/cars/studio-cover-url";
 import { PARTNER_BASE } from "@/lib/routes";
@@ -76,7 +76,6 @@ import {
   type PartnerSeasonalPricing,
 } from "@/lib/partners/seasonal-pricing";
 import type { PartnerCreateCarCopy } from "@/lib/i18n/partner-ui";
-import { isAllowedInsuranceFile, insuranceFileName, isPdfUrl } from "@/lib/files/document-url";
 import {
   PartnerCarPhotoGallery,
   filledPhotoCount,
@@ -84,7 +83,6 @@ import {
 } from "@/components/partner/partner-car-photo-gallery";
 import { PartnerImageLightbox } from "@/components/partner/partner-image-lightbox";
 import { DateInput } from "@/components/ui/date-input";
-import { BirthDateSelect } from "@/components/cars/birth-date-select";
 
 function mdToDateInput(md: string): string {
   const n = normalizeMd(md) || "01-01";
@@ -493,7 +491,6 @@ export function PartnerCreateCarForm({
   );
   const [passportFront, setPassportFront] = useState("");
   const [passportBack, setPassportBack] = useState("");
-  const [insuranceUrl, setInsuranceUrl] = useState("");
   const [insuranceExpiresAt, setInsuranceExpiresAt] = useState("");
   const insuranceExpiredReview =
     awaitingAdminModeration &&
@@ -571,7 +568,6 @@ export function PartnerCreateCarForm({
     );
   }
 
-  const insuranceRef = useRef<HTMLInputElement>(null);
   const extrasFallbackRef = useRef(initialExtrasCatalog);
   if (extrasCatalog.length > 0) extrasFallbackRef.current = extrasCatalog;
   const initialDeliveryRef = useRef(initialDeliveryCatalog);
@@ -713,7 +709,6 @@ export function PartnerCreateCarForm({
           setPhotos(photoSlotsFromSaved(photoUrls));
           setPassportFront(String(car.passport?.frontUrl || ""));
           setPassportBack(String(car.passport?.backUrl || ""));
-          setInsuranceUrl(String(car.insuranceUrl || car.passport?.insuranceUrl || ""));
           setInsuranceExpiresAt(
             String(
               (car as { insuranceExpiresAt?: string }).insuranceExpiresAt ||
@@ -787,11 +782,13 @@ export function PartnerCreateCarForm({
           }
 
           const adminDel = delRes?.ok ? await delRes.json().catch(() => null) : null;
-          let deliveryList: DeliveryLocationView[] = Array.isArray(adminDel?.locations)
-            ? (adminDel.locations as DeliveryLocationView[])
-            : Array.isArray(adminDel)
-              ? (adminDel as DeliveryLocationView[])
-              : [];
+          let deliveryList: DeliveryLocationView[] = (
+            Array.isArray(adminDel?.locations)
+              ? (adminDel.locations as DeliveryLocationView[])
+              : Array.isArray(adminDel)
+                ? (adminDel as DeliveryLocationView[])
+                : []
+          ).filter((loc) => loc.isActive);
 
           const carDeliveries = Array.isArray(car.deliveryPrices) ? car.deliveryPrices : [];
           // Fallback: build catalog entries from the listing's saved delivery rows
@@ -813,11 +810,11 @@ export function PartnerCreateCarForm({
                 kind: "airport",
                 countryIso2: iso2 || "XX",
                 maxDeliveryPriceEur: Number(row?.priceEur) || 0,
-                isActive: loc?.isActive !== false,
+                isActive: loc?.isActive === true,
                 sortOrder: 0,
               });
             }
-            deliveryList = fromCar;
+            deliveryList = fromCar.filter((loc) => loc.isActive);
           }
           if (deliveryList.length) setDeliveryCatalog(deliveryList);
 
@@ -1095,7 +1092,6 @@ export function PartnerCreateCarForm({
           setPhotos(photoSlotsFromSaved(photoUrls));
           setPassportFront(String(car.passport?.frontUrl || ""));
           setPassportBack(String(car.passport?.backUrl || ""));
-          setInsuranceUrl(String(car.insuranceUrl || car.passport?.insuranceUrl || ""));
           setInsuranceExpiresAt(
             String(
               (car as { insuranceExpiresAt?: string }).insuranceExpiresAt ||
@@ -1211,11 +1207,15 @@ export function PartnerCreateCarForm({
             try {
               const adminDelRes = await fetch("/api/admin/delivery", { cache: "no-store" });
               const adminDel = adminDelRes.ok ? await adminDelRes.json() : null;
-              if (Array.isArray(adminDel?.locations)) {
-                deliveryList = adminDel.locations as DeliveryLocationView[];
-                setDeliveryCatalog(deliveryList);
-              } else if (Array.isArray(adminDel)) {
-                deliveryList = adminDel as DeliveryLocationView[];
+              const adminRows = (
+                Array.isArray(adminDel?.locations)
+                  ? (adminDel.locations as DeliveryLocationView[])
+                  : Array.isArray(adminDel)
+                    ? (adminDel as DeliveryLocationView[])
+                    : []
+              ).filter((loc) => loc.isActive);
+              if (adminRows.length) {
+                deliveryList = adminRows;
                 setDeliveryCatalog(deliveryList);
               }
             } catch {
@@ -1490,31 +1490,6 @@ export function PartnerCreateCarForm({
     }
   };
 
-  const onInsuranceFiles = async (files: FileList | null) => {
-    const file = files?.[0];
-    if (!file) return;
-    if (!isAllowedInsuranceFile(file)) {
-      showError(cc.certFormats, "certificate");
-      return;
-    }
-    setUploading(true);
-    setError("");
-    try {
-      setInsuranceUrl((await uploadFile(file)).url);
-      setInvalidFields((prev) => {
-        if (!prev.has("insurance-file")) return prev;
-        const next = new Set(prev);
-        next.delete("insurance-file");
-        return next;
-      });
-    } catch (err) {
-      showError(err instanceof Error ? err.message : common.uploadFailed, "certificate");
-    } finally {
-      setUploading(false);
-      if (insuranceRef.current) insuranceRef.current.value = "";
-    }
-  };
-
   const save = async (mode: "sales" | "internal" | "update") => {
     setError("");
     setSaveNotice("");
@@ -1557,8 +1532,6 @@ export function PartnerCreateCarForm({
     if (forSale && filledPhotoCount(photos) < MIN_PUBLIC_PHOTOS) mark("photo", ["photos"]);
     if (forSale && !passportFront) mark("certificate", ["passport-front", "passport"]);
     if (forSale && !passportBack) mark("certificate", ["passport-back", "passport"]);
-    if (forSale && !insuranceUrl) mark("certificate", ["insurance-file"]);
-    if (forSale && !insuranceExpiresAt.trim()) mark("certificate", ["insurance-expires"]);
 
     if (fields.length) {
       const uniqueGroups = new Set(
@@ -1567,8 +1540,6 @@ export function PartnerCreateCarForm({
           if (key === "color" || key === "bodyType") return "body";
           if (key.startsWith("tariff-") || key === "season-price") return "price";
           if (key.startsWith("passport")) return "passport";
-          if (key === "insurance-file") return "insurance-file";
-          if (key === "insurance-expires") return "insurance-expires";
           return key;
         }),
       );
@@ -1581,17 +1552,11 @@ export function PartnerCreateCarForm({
         else if (uniqueGroups.has("price")) message = cc.errDailyPrice;
         else if (uniqueGroups.has("photos")) message = cc.errPhotos.replace("{n}", String(MIN_PUBLIC_PHOTOS));
         else if (uniqueGroups.has("passport")) message = cc.errCertificate;
-        else if (uniqueGroups.has("insurance-file")) message = cc.errInsurance;
-        else if (uniqueGroups.has("insurance-expires")) message = cc.errInsuranceExpiresAt;
         else if (uniqueGroups.has("pickup") && locationsReady && !deliveryCatalog.length) {
           message = cc.errNoAirports;
         } else if (uniqueGroups.has("pickup")) message = cc.errPickup;
-      } else if (
-        uniqueGroups.has("passport") ||
-        uniqueGroups.has("insurance-file") ||
-        uniqueGroups.has("insurance-expires")
-      ) {
-        message = cc.errCertificateInsurance;
+      } else if (uniqueGroups.has("passport")) {
+        message = cc.errCertificate;
       }
       showError(message, firstSection, fields);
       return;
@@ -1782,8 +1747,6 @@ export function PartnerCreateCarForm({
           photos: photosForSave(photos),
           passportFrontUrl: passportFront || undefined,
           passportBackUrl: passportBack || undefined,
-          insuranceUrl: insuranceUrl || undefined,
-          insuranceExpiresAt: insuranceExpiresAt.trim() || undefined,
           extras,
           deliveryPrices,
           registrationNumber: plateNormalized || undefined,
@@ -2960,15 +2923,9 @@ export function PartnerCreateCarForm({
           invalid={
             fieldInvalid("passport") ||
             fieldInvalid("passport-front") ||
-            fieldInvalid("passport-back") ||
-            fieldInvalid("insurance-file")
+            fieldInvalid("passport-back")
           }
-          changed={
-            isChanged("passport") ||
-            isChanged("insurance") ||
-            isChanged("insuranceExpiresAt") ||
-            insuranceExpiredReview
-          }
+          changed={isChanged("passport")}
         >
           <p className="mb-1.5 text-xs text-slate-500">{cc.certPrivate}</p>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -3089,122 +3046,6 @@ export function PartnerCreateCarForm({
                 className="hidden"
                 onChange={(e) => void onPassportSide("back", e.target.files)}
               />
-            </div>
-          </div>
-          <div className="mt-4">
-            <p className="mb-1 text-[11px] font-semibold text-slate-800">
-              {cc.insuranceUploadTitle}
-              <span className="text-[#e11d48]"> *</span>
-            </p>
-            <div
-              className={cn(
-                "flex min-h-[80px] flex-col items-center justify-center rounded-lg border-2 border-dashed bg-slate-50 px-3 py-3 text-center",
-                fieldInvalid("insurance-file")
-                  ? "border-red-500 bg-red-50 ring-2 ring-red-200"
-                  : "border-slate-300",
-              )}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                void onInsuranceFiles(e.dataTransfer.files);
-              }}
-            >
-              {insuranceUrl ? (
-                <>
-                  {isPdfUrl(insuranceUrl) ? (
-                    <a
-                      href={insuranceUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-2 text-sm font-semibold text-sky-700 hover:underline"
-                    >
-                      <FileText className="h-8 w-8 text-slate-400" />
-                      <span>
-                        {cc.insurancePdfLabel}: {insuranceFileName(insuranceUrl)}
-                      </span>
-                    </a>
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={insuranceUrl}
-                      alt=""
-                      className="mx-auto h-28 cursor-zoom-in rounded object-contain"
-                      onClick={() => setDocPreview(insuranceUrl)}
-                    />
-                  )}
-                  <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      disabled={uploading}
-                      onClick={() => insuranceRef.current?.click()}
-                      className="rounded px-2.5 py-1 text-[11px] font-bold text-white disabled:opacity-60"
-                      style={{ backgroundColor: ACCENT_GREEN }}
-                    >
-                      {uploading ? cc.uploading : cc.selectFiles}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setInsuranceUrl("")}
-                      className="rounded border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700"
-                    >
-                      {cc.removeFile}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <UploadCloud className="mb-1.5 h-6 w-6 text-slate-400" />
-                  <p className="text-xs text-slate-600">{cc.dragCert}</p>
-                  <button
-                    type="button"
-                    disabled={uploading}
-                    onClick={() => insuranceRef.current?.click()}
-                    className="mt-1 rounded px-2.5 py-1 text-[11px] font-bold text-white disabled:opacity-60"
-                    style={{ backgroundColor: ACCENT_GREEN }}
-                  >
-                    {uploading ? cc.uploading : cc.selectFiles}
-                  </button>
-                </>
-              )}
-              <p className="mt-2 text-xs text-slate-500">{cc.certFormats}</p>
-              <input
-                ref={insuranceRef}
-                type="file"
-                accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,.pdf"
-                className="hidden"
-                onChange={(e) => void onInsuranceFiles(e.target.files)}
-              />
-            </div>
-            <div className="mt-3">
-              <label
-                className={cn(
-                  "mb-1 block text-[11px] font-semibold",
-                  insuranceExpiredReview || isChanged("insuranceExpiresAt")
-                    ? "text-red-700"
-                    : "text-slate-800",
-                )}
-              >
-                {cc.insuranceExpiresAtLabel}
-                <span className="text-[#e11d48]"> *</span>
-                {insuranceExpiredReview ? (
-                  <span className="ms-1 font-extrabold">· {insuranceExpiryReasonLabel(locale)}</span>
-                ) : null}
-              </label>
-              <BirthDateSelect
-                value={insuranceExpiresAt}
-                onChange={setInsuranceExpiresAt}
-                locale={locale}
-                disabled={isAdminReview}
-                invalid={
-                  fieldInvalid("insurance-expires") ||
-                  insuranceExpiredReview ||
-                  isChanged("insuranceExpiresAt")
-                }
-                yearMin={new Date().getFullYear()}
-                yearMax={new Date().getFullYear() + 20}
-                className="mt-0 max-w-lg"
-              />
-              <p className="mt-1 text-[11px] leading-snug text-slate-500">{cc.insuranceExpiresAtHelp}</p>
             </div>
           </div>
         </SectionCard>

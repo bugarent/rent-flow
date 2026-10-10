@@ -87,7 +87,7 @@ export async function buildMergedDeliveryRows(input: {
       travelTimeMinutes: dp.travelTimeMinutes ?? 0,
       deliveryLocation: {
         id: loc?.id || dp.deliveryLocationId,
-        isActive: loc ? loc.isActive !== false : Boolean(iata),
+        isActive: loc?.isActive === true,
         airport: iata
           ? {
               iata,

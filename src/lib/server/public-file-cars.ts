@@ -89,7 +89,7 @@ function toSearchCar(car: FileCarListing, byId: Map<string, DeliveryLocationView
         travelTimeMinutes: row.travelTimeMinutes ?? 0,
         deliveryLocation: {
           id: loc?.id || row.deliveryLocationId,
-          isActive: loc ? loc.isActive !== false : Boolean(iata),
+          isActive: loc?.isActive === true,
           airport: iata
             ? {
                 iata,

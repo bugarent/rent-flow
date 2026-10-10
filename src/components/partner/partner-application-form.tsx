@@ -20,10 +20,8 @@ function copyFor(locale: string) {
     return {
       title: "პარტნიორობის შეთავაზება",
       close: "დახურვა",
-      brand: "საფირმო სახელი",
       firstName: "სახელი",
       lastName: "გვარი",
-      email: "ელ. ფოსტა",
       country: "ქვეყანა",
       city: "ვინ ითხოვს პარტნიორობას",
       kindCompany: "კომპანია",
@@ -46,7 +44,6 @@ function copyFor(locale: string) {
       noWebsite: "არ მაქვს ვებსაიტი",
       credentials: "შესვლის მონაცემები",
       login: "ლოგინი (ელ. ფოსტა)",
-      emailMismatch: "ელ. ფოსტა და ლოგინი უნდა იყოს ერთი და იგივე მისამართი. სანამ არ დაემთხვევა, მოთხოვნა არ გაიგზავნება.",
       password: "პაროლი",
       confirm: "გაიმეორეთ პაროლი",
       submit: "განაცხადის გაგზავნა",
@@ -63,10 +60,8 @@ function copyFor(locale: string) {
     return {
       title: "Предложение о партнёрстве",
       close: "Закрыть",
-      brand: "Фирменное название",
       firstName: "Имя",
       lastName: "Фамилия",
-      email: "Эл. почта",
       country: "Страна",
       city: "Кто запрашивает партнёрство",
       kindCompany: "Компания",
@@ -89,7 +84,6 @@ function copyFor(locale: string) {
       noWebsite: "У меня нет сайта",
       credentials: "Данные входа",
       login: "Логин (эл. почта)",
-      emailMismatch: "Эл. почта и логин должны быть одним и тем же адресом. Пока они не совпадут, заявка не отправится.",
       password: "Пароль",
       confirm: "Повторите пароль",
       submit: "Отправить заявку",
@@ -105,10 +99,8 @@ function copyFor(locale: string) {
   return {
     title: "Partnership offer",
     close: "Close",
-    brand: "Brand name",
     firstName: "First name",
     lastName: "Last name",
-    email: "Email",
     country: "Country",
     city: "Who is requesting partnership",
     kindCompany: "Company",
@@ -131,7 +123,6 @@ function copyFor(locale: string) {
     noWebsite: "I don't have a website",
     credentials: "Login credentials",
     login: "Login (email)",
-    emailMismatch: "Email and login must be the same address. The request will not be sent until they match.",
     password: "Password",
     confirm: "Confirm password",
     submit: "Submit application",
@@ -183,7 +174,6 @@ export function PartnerApplicationForm({
   open,
   onClose,
   initialEmail = "",
-  initialCompany = "",
   initialCountry = "",
 }: {
   open: boolean;
@@ -195,10 +185,8 @@ export function PartnerApplicationForm({
   const { locale } = useSurfaceDictionary();
   const t = copyFor(locale);
   const formRef = useRef<HTMLFormElement>(null);
-  const [title, setTitle] = useState(initialCompany);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState(initialEmail);
   const [officeCountry, setOfficeCountry] = useState("");
   const defaultIso2 =
     initialCountry && /^[A-Za-z]{2}$/.test(initialCountry) ? initialCountry.toUpperCase() : "GE";
@@ -235,15 +223,9 @@ export function PartnerApplicationForm({
   const countryMissingPlace = (iso2: string) =>
     !placesForCountry(iso2).some((place) => locationCodes.includes(place.code));
 
-  const emailsDiffer =
-    email.trim().length > 0 &&
-    loginEmail.trim().length > 0 &&
-    email.trim().toLowerCase() !== loginEmail.trim().toLowerCase();
   const invalid = {
-    title: !title.trim(),
     firstName: !firstName.trim(),
     lastName: !lastName.trim(),
-    email: !emailOk(email) || emailsDiffer,
     officeCountry: !officeCountry.trim(),
     applicantKind: applicantKind !== "COMPANY" && applicantKind !== "PRIVATE",
     address: !address.trim(),
@@ -252,7 +234,7 @@ export function PartnerApplicationForm({
     primaryPhone: !phoneOk(primaryPhone) || primaryMessengers.length === 0,
     managerPhone: !phoneOk(managerPhone) || managerMessengers.length === 0,
     website: !noWebsite && !websiteOk(website),
-    login: !emailOk(loginEmail) || emailsDiffer,
+    login: !emailOk(loginEmail),
     password: password.length < 6,
     confirm: confirmPassword.length < 6 || confirmPassword !== password,
   };
@@ -275,7 +257,6 @@ export function PartnerApplicationForm({
     event.preventDefault();
     setError("");
     setShowErrors(true);
-    if (emailsDiffer) setError(t.emailMismatch);
     if (Object.values(invalid).some(Boolean) || (applicantKind !== "COMPANY" && applicantKind !== "PRIVATE")) {
       requestAnimationFrame(() => {
         formRef.current
@@ -284,8 +265,8 @@ export function PartnerApplicationForm({
       });
       return;
     }
-    const login = email.trim();
-    const idSeed = title.trim().replace(/\s+/g, "");
+    const login = loginEmail.trim().toLowerCase();
+    const idSeed = `${firstName.trim()}${lastName.trim()}`.replace(/\s+/g, "");
     const identificationNumber = (idSeed.length >= 5 ? idSeed : `${idSeed}00000`).slice(0, 40);
     setLoading(true);
     try {
@@ -298,7 +279,7 @@ export function PartnerApplicationForm({
           kind: applicantKind,
           identificationNumber,
           email: login,
-          contactEmail: email.trim(),
+          contactEmail: login,
           phone: nationalDigits(primaryPhone),
           phoneCountryIso2: primaryIso2,
           secondaryPhone: nationalDigits(managerPhone),
@@ -309,7 +290,6 @@ export function PartnerApplicationForm({
           fleetAgeRange: "AGE_0_5",
           countryIso2s,
           locationCodes,
-          title: title.trim(),
           officeCountry: officeCountry.trim(),
           centralOffice: "",
           address: address.trim(),
@@ -366,19 +346,10 @@ export function PartnerApplicationForm({
             <div className="rounded-xl border border-slate-200 bg-[#eef3f8] p-3 sm:p-4">
               <div className="grid gap-6 lg:grid-cols-2">
                 <div className="space-y-4">
-                  <TextField label={t.brand} value={title} onChange={setTitle} invalid={mark("title")} />
                   <div className="grid gap-3 sm:grid-cols-2">
                     <TextField label={t.firstName} value={firstName} onChange={setFirstName} invalid={mark("firstName")} />
                     <TextField label={t.lastName} value={lastName} onChange={setLastName} invalid={mark("lastName")} />
                   </div>
-                  <TextField
-                    label={t.email}
-                    value={email}
-                    onChange={setEmail}
-                    invalid={mark("email")}
-                    type="email"
-                    hint={showErrors && emailsDiffer ? t.emailMismatch : ""}
-                  />
                   <div className="grid gap-3 sm:grid-cols-2">
                     <ResidenceCountrySelect
                       label={t.country}
@@ -635,7 +606,7 @@ export function PartnerApplicationForm({
                       onChange={setLoginEmail}
                       invalid={mark("login")}
                       type="email"
-                      hint={showErrors && emailsDiffer ? t.emailMismatch : ""}
+                      autoComplete="email"
                     />
                     <TextField
                       label={t.password}

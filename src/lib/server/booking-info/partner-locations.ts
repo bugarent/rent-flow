@@ -168,7 +168,7 @@ export async function resolveLocationOptions(
 
     for (const dp of fileCar?.deliveryPrices || []) {
       const loc = byId.get(dp.deliveryLocationId);
-      if (!loc || !inCountry(loc)) continue;
+      if (!loc?.isActive || !inCountry(loc)) continue;
       const iata = String(loc.iata || "").toUpperCase();
       if (!iata || out.has(iata)) continue;
       out.set(iata, { iata, label: loc.label || iata });
@@ -177,8 +177,8 @@ export async function resolveLocationOptions(
       const iata = String(raw || "").trim().toUpperCase();
       if (!iata || out.has(iata)) continue;
       const loc = byIata.get(iata);
-      if (loc && !inCountry(loc)) continue;
-      out.set(iata, { iata, label: loc?.label || iata });
+      if (!loc?.isActive || !inCountry(loc)) continue;
+      out.set(iata, { iata, label: loc.label || iata });
     }
     // Always offer other active locations in the same booking country
     for (const loc of locs.filter((l) => l.isActive && inCountry(l))) {

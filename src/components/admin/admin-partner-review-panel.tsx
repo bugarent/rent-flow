@@ -6,11 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { PhoneMessengerIcons } from "@/components/partner/phone-messenger-icons";
 import { CountryFlag } from "@/components/ui/country-flag";
-import {
-  locationCodesEqual,
-  normalizeLocationCode,
-  searchPlacesForCountry,
-} from "@/lib/catalog/search-places";
+import { locationCodesEqual, normalizeLocationCode } from "@/lib/catalog/search-places";
 import { WORLD_COUNTRIES, worldCountryName } from "@/lib/catalog/world-countries";
 import { LOCALES, LOCALE_LABELS } from "@/lib/i18n/config";
 import { localizedPartnerStatus, PARTNER_SOCIAL_PLATFORMS, type PartnerSocialPlatform } from "@/lib/partner";
@@ -70,62 +66,29 @@ function selectedLocationsForCountry(
   catalog: CatalogLocation[],
 ): Array<{ id: string; label: string }> {
   const want = iso2.toUpperCase();
-  const places = searchPlacesForCountry(want);
   const out: Array<{ id: string; label: string }> = [];
   const seen = new Set<string>();
-
-  for (const place of places) {
-    const existing = catalog.find(
-      (loc) =>
-        loc.countryIso2.toUpperCase() === want &&
-        (locationCodesEqual(loc.iata || "", place.code) ||
-          locationCodesEqual(loc.airportId || "", place.code)),
-    );
-    const option: CatalogLocation = existing || {
-      id: place.code,
-      iata: place.code,
-      label: place.label,
-      countryIso2: want,
-    };
-    const selected = selectedIds.some((id) => locationMatchesId(option, id));
-    if (!selected) continue;
-    const key = normalizeLocationCode(option.iata || option.id);
+  for (const loc of locationsForCountry(want, catalog)) {
+    if (!isLocationSelected(loc, selectedIds, catalog)) continue;
+    const key = normalizeLocationCode(loc.iata || loc.id);
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ id: option.id, label: option.label });
+    out.push({ id: loc.id, label: loc.label });
   }
-
-  for (const id of selectedIds) {
-    const known = catalog.find((loc) => locationMatchesId(loc, id));
-    if (!known || known.countryIso2.toUpperCase() !== want) continue;
-    const key = normalizeLocationCode(known.iata || known.id);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({ id: known.id, label: known.label || known.id });
-  }
-
   return out;
 }
 
 function locationsForCountry(iso2: string, catalog: CatalogLocation[]): LocationOption[] {
   const want = iso2.toUpperCase();
   const byCode = new Map<string, LocationOption>();
-  for (const place of searchPlacesForCountry(want)) {
-    const code = normalizeLocationCode(place.code);
-    byCode.set(code, {
-      id: code,
-      label: place.label,
-      countryIso2: want,
-      iata: code,
-    });
-  }
   for (const loc of catalog) {
+    if (loc.isActive === false) continue;
     if (loc.countryIso2.toUpperCase() !== want) continue;
     const code = normalizeLocationCode(loc.iata || loc.airportId || loc.id);
-    const prev = byCode.get(code);
+    if (!code || byCode.has(code)) continue;
     byCode.set(code, {
-      id: loc.id || prev?.id || code,
-      label: loc.label || prev?.label || code,
+      id: loc.id || code,
+      label: loc.label || code,
       countryIso2: want,
       iata: code,
     });
@@ -918,20 +881,20 @@ export function AdminPartnerReviewPanel({
         };
 
   return (
-    <div className={cn("relative isolate flex min-h-screen flex-col", statusTheme.pageBg)}>
-      <div className={cn("h-1.5 w-full", statusTheme.bar)} aria-hidden />
-      <header
-        className={cn(
-          "sticky top-0 z-30 border-b backdrop-blur-md",
-          statusTheme.header,
-        )}
-      >
-        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-2 px-3 py-2 sm:px-5">
+    <div
+      className={cn(
+        "relative isolate flex h-[calc(100dvh-4.5rem)] min-h-0 flex-col overflow-hidden sm:h-[calc(100dvh-5rem)]",
+        statusTheme.pageBg,
+      )}
+    >
+      <div className={cn("h-1.5 w-full shrink-0", statusTheme.bar)} aria-hidden />
+      <header className={cn("shrink-0 border-b", statusTheme.header)}>
+        <div className="mx-auto flex max-w-[1200px] flex-col gap-1.5 px-3 py-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:px-5">
           {onBack ? (
             <button
               type="button"
               onClick={onBack}
-              className={cn("rounded px-2 py-0.5 text-xs font-bold", statusTheme.headerText)}
+              className={cn("inline-flex min-h-10 shrink-0 items-center rounded px-2 py-0.5 text-xs font-bold", statusTheme.headerText)}
               style={{ backgroundColor: "rgba(255,255,255,0.45)" }}
             >
               {resolvedBackLabel}
@@ -939,13 +902,13 @@ export function AdminPartnerReviewPanel({
           ) : (
             <Link
               href={resolvedBackHref}
-              className={cn("rounded px-2 py-0.5 text-xs font-bold", statusTheme.headerText)}
+              className={cn("inline-flex min-h-10 shrink-0 items-center rounded px-2 py-0.5 text-xs font-bold", statusTheme.headerText)}
               style={{ backgroundColor: "rgba(255,255,255,0.45)" }}
             >
               {resolvedBackLabel}
             </Link>
           )}
-          <h1 className={cn("text-sm font-extrabold sm:text-base", statusTheme.headerText)}>
+          <h1 className={cn("min-w-0 flex-1 break-words text-sm font-extrabold leading-tight sm:text-base", statusTheme.headerText)}>
             {pageTitle}
             <span className="ms-2 font-mono text-xs font-bold opacity-80 sm:text-sm">{code}</span>
           </h1>
@@ -968,7 +931,7 @@ export function AdminPartnerReviewPanel({
             type="button"
             onClick={() => setTab("main")}
             className={cn(
-              "shrink-0 rounded px-3 py-1.5 text-xs font-bold",
+              "inline-flex min-h-11 shrink-0 items-center rounded px-3 py-1.5 text-xs font-bold",
               tab === "main" ? statusTheme.tabActive + " underline decoration-2 underline-offset-2" : statusTheme.tabIdle,
               mainChanged && "text-red-800",
             )}
@@ -979,7 +942,7 @@ export function AdminPartnerReviewPanel({
             type="button"
             onClick={() => setTab("cars")}
             className={cn(
-              "shrink-0 rounded px-3 py-1.5 text-xs font-bold",
+              "inline-flex min-h-11 shrink-0 items-center rounded px-3 py-1.5 text-xs font-bold",
               tab === "cars" ? statusTheme.tabActive + " underline decoration-2 underline-offset-2" : statusTheme.tabIdle,
               pendingListings && "text-red-800",
             )}
@@ -1006,7 +969,7 @@ export function AdminPartnerReviewPanel({
         </div>
       ) : null}
 
-      <div className="mx-auto w-full max-w-[1200px] flex-1 space-y-5 px-3 py-5 pb-36 sm:px-5 lg:px-8">
+      <div className="mx-auto min-h-0 w-full max-w-[1200px] flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5 lg:px-8">
         {message ? (
           <p className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800">
             {message}
@@ -1663,7 +1626,7 @@ export function AdminPartnerReviewPanel({
         )}
       </div>
 
-      <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur-md sm:px-6">
+      <footer className="shrink-0 border-t border-slate-200 bg-white px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-3">
         <div className="mx-auto max-w-[1200px]">
           {(isAwaiting || isRejected) && !isApproved ? (
             <>
@@ -1672,11 +1635,16 @@ export function AdminPartnerReviewPanel({
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 rows={2}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base sm:text-sm"
               />
             </>
           ) : null}
-          <div className={cn("flex flex-wrap gap-2", isAwaiting || isRejected ? "mt-3" : "")}>
+          <div
+            className={cn(
+              "flex flex-wrap gap-2 [&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center [&_button]:inline-flex [&_button]:min-h-11 [&_button]:items-center",
+              isAwaiting || isRejected ? "mt-2" : "",
+            )}
+          >
             {isPrimaryPartner || status === "PENDING_REMODERATION" ? (
               <>
                 {canAgree ? (

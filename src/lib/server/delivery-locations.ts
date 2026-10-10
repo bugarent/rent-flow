@@ -766,7 +766,7 @@ export async function listPartnerScopedDeliveryLocations(
     const id = String(raw || "").trim();
     if (!id) continue;
     const existing = byId.get(id) || byIata.get(normalizeLocationCode(id).toUpperCase());
-    if (existing) result.set(existing.id, existing);
+    if (existing?.isActive) result.set(existing.id, existing);
   }
 
   return [...result.values()].sort((a, b) => a.sortOrder - b.sortOrder || a.iata.localeCompare(b.iata));
@@ -888,14 +888,16 @@ function locationOffersPickup(loc: DeliveryLocationView, pickupCodes: Set<string
   });
 }
 
-/** Search widget options: admin-enabled places that have a car, else catalog hubs on a fresh install. */
+/**
+ * Search widget options: a place is offered to customers only when the admin
+ * has activated it and an approved partner has it in their operating locations.
+ */
 export async function getSearchDeliveryAirports(): Promise<SearchAirportOption[]> {
   const hit = searchAirportsCache.get();
   if (hit) return hit;
 
   const all = await listDeliveryLocations();
   const locations = all.filter((loc) => loc.isActive);
-  const pickupCodes = locations.length ? await codesOfferingCarPickup(all) : new Set<string>();
   const partnerCodes = locations.length ? await approvedPartnerPlaceCodes() : new Set<string>();
 
   const toOption = (loc: {
@@ -924,24 +926,9 @@ export async function getSearchDeliveryAirports(): Promise<SearchAirportOption[]
     };
   };
 
-  let result: SearchAirportOption[];
-  if (all.length > 0) {
-    result = locations
-      .filter((loc) => locationOffersPickup(loc, pickupCodes) || locationOffersPickup(loc, partnerCodes))
-      .map(toOption);
-  } else {
-    const hubs = CATALOG_AIRPORTS.filter((a) => a.isHub);
-    const ordered = [...hubs.filter((a) => a.iata === "KUT"), ...hubs.filter((a) => a.iata !== "KUT")];
-    result = ordered.map((a) =>
-      toOption({
-        iata: a.iata,
-        label: `${a.name.en} (${a.iata})`,
-        country: a.countryName.en,
-        countryIso2: a.countryIso2,
-        kind: "airport",
-      }),
-    );
-  }
+  const result = locations
+    .filter((loc) => locationOffersPickup(loc, partnerCodes))
+    .map(toOption);
 
   searchAirportsCache.set(result);
   return result;

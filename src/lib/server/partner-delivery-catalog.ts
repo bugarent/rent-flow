@@ -29,7 +29,7 @@ export async function loadPartnerDeliveryCatalog(
     const seen = new Set<string>();
     for (const id of deliveryLocationIds) {
       const hit = byId.get(id) || byCode.get(normalizeLocationCode(id).toUpperCase());
-      if (!hit || seen.has(hit.id)) continue;
+      if (!hit?.isActive || seen.has(hit.id)) continue;
       seen.add(hit.id);
       out.push(hit);
     }

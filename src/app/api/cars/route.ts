@@ -469,15 +469,6 @@ export async function POST(req: Request) {
     if (forSale && (!front || !back)) {
       return NextResponse.json({ error: "Both sides of the car passport are required" }, { status: 400 });
     }
-    if (forSale && !normalizeInsuranceUrl(insuranceUrl)) {
-      return NextResponse.json({ error: "Insurance document is required" }, { status: 400 });
-    }
-    if (forSale && !normalizeInsuranceExpiresAt(insuranceExpiresAt)) {
-      return NextResponse.json(
-        { error: "Insurance expiry date is required" },
-        { status: 400 },
-      );
-    }
 
     const transmissionValue =
       String(transmission || "").toUpperCase() === "MANUAL" ? "MANUAL" : "AUTOMATIC";
