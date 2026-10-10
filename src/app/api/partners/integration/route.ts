@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getPartnerSession } from "@/lib/auth/sessions";
 import { resolvePartnerId } from "@/lib/server/partner-booking-access";
-import { listFileCarsForPartner } from "@/lib/server/partner-cars-store";
-import { ensureCarExportFeed } from "@/lib/server/channel-feeds-store";
+import { listPartnerOwnedCars } from "@/lib/server/partner-owned-cars";
+import { ensureCarExportFeed, listChannelFeedsForPartner } from "@/lib/server/channel-feeds-store";
 import { ensurePartnerWebsiteToken } from "@/lib/server/partner-integration-store";
 
 export async function GET(req: Request) {
@@ -11,10 +11,10 @@ export async function GET(req: Request) {
   const partnerId = await resolvePartnerId(session);
   if (!partnerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const cars = await listFileCarsForPartner({
-    userId: session.user.id,
-    email: session.user.email,
+  const cars = await listPartnerOwnedCars({
     partnerId,
+    userId: session.user.id,
+    email: session.user.email || "",
   });
   const origin = new URL(req.url).origin;
   const websiteToken = await ensurePartnerWebsiteToken(partnerId);
@@ -28,6 +28,7 @@ export async function GET(req: Request) {
       channelUrl: `${origin}/api/channel/ical/${feed.exportToken}`,
     });
   }
+  const feeds = await listChannelFeedsForPartner(partnerId);
 
   const pageUrl = `${origin}/embed/fleet/${websiteToken}`;
   const embedHtml = [
@@ -35,8 +36,21 @@ export async function GET(req: Request) {
     `<script src="${origin}/embed/fleet.js" data-token="${websiteToken}"></script>`,
   ].join("\n");
 
-  return NextResponse.json({
-    website: { pageUrl, embedHtml },
-    cars: rows,
-  });
+  return NextResponse.json(
+    {
+      website: { pageUrl, embedHtml },
+      cars: rows,
+      imports: feeds
+        .filter((feed) => feed.provider === "ical")
+        .map((feed) => ({
+          id: feed.id,
+          carId: feed.carId,
+          importUrl: feed.importUrl,
+          lastSyncAt: feed.lastSyncAt,
+          lastError: feed.lastError,
+          busyCount: feed.busy.length,
+        })),
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

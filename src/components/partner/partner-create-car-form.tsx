@@ -83,6 +83,8 @@ import {
 } from "@/components/partner/partner-car-photo-gallery";
 import { PartnerImageLightbox } from "@/components/partner/partner-image-lightbox";
 import { DateInput } from "@/components/ui/date-input";
+import { CarIcalImport } from "@/components/partner/integration/car-ical-import";
+import { integrationCopy } from "@/components/partner/integration/integration-copy";
 
 function mdToDateInput(md: string): string {
   const n = normalizeMd(md) || "01-01";
@@ -2476,6 +2478,16 @@ export function PartnerCreateCarForm({
             ) : null}
           </div>
         </SectionCard>
+
+        {!isAdminReview ? (
+          <SectionCard id="ical-import" title={integrationCopy(locale).icalLabel}>
+            {carId ? (
+              <CarIcalImport carId={carId} showLabel={false} />
+            ) : (
+              <p className="text-xs text-slate-500">{integrationCopy(locale).saveCarFirst}</p>
+            )}
+          </SectionCard>
+        ) : null}
 
         <SectionCard id="mileage" title={cc.sections.mileage}>
           <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-800">

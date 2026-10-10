@@ -6,4 +6,10 @@ export async function register() {
   } catch (error) {
     console.warn("[persist] could not prepare data directory", error);
   }
+  try {
+    const { startIcalSyncScheduler } = await import("@/lib/server/ical-sync-scheduler");
+    startIcalSyncScheduler();
+  } catch (error) {
+    console.warn("[ical-sync] scheduler not started", error);
+  }
 }

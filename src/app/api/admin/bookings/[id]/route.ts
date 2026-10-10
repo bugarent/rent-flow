@@ -111,11 +111,11 @@ export async function PATCH(
   const refundChanges = normalizeRefundChanges(body.refundChanges);
 
   try {
-    let dbBooking: { id: string; carId: string } | null = null;
+    let dbBooking: { id: string; carId: string; status: string } | null = null;
     try {
       const found = await prisma.booking.findUnique({
         where: { id },
-        select: { id: true, carId: true },
+        select: { id: true, carId: true, status: true },
       });
       dbBooking = found;
     } catch (error) {
@@ -248,6 +248,11 @@ export async function PATCH(
           ? { pendingChanges: null }
           : {}),
       });
+      if (updated && fileBooking.status !== "CONFIRMED" && updated.status === "CONFIRMED") {
+        void import("@/lib/server/partner-webhooks").then((m) =>
+          m.dispatchBookingWebhook(updated, "booking.confirmed"),
+        );
+      }
       const meaningfulChange = Boolean(
         applyPendingExtras ||
           pickupAirportIata ||
@@ -374,6 +379,12 @@ export async function PATCH(
         depositPaidEur: true,
       },
     });
+    if (dbBooking.status !== "CONFIRMED" && updated.status === "CONFIRMED") {
+      const confirmedId = dbBooking.id;
+      void import("@/lib/server/partner-webhooks").then((m) =>
+        m.dispatchBookingWebhook(confirmedId, "booking.confirmed"),
+      );
+    }
 
     const meaningfulChange = Boolean(
       pickupAt ||

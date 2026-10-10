@@ -289,11 +289,24 @@ async function resolvePartnerEmails(input: {
   );
 }
 
+const WEBHOOK_EVENTS = {
+  BOOKING_NEW: "booking.created",
+  BOOKING_EDITED: "booking.updated",
+  BOOKING_CANCELLED: "booking.cancelled",
+} as const;
+
+function queuePartnerWebhook(booking: string | FileBookingRecord, event: BookingNoticeEvent) {
+  void import("@/lib/server/partner-webhooks")
+    .then((mod) => mod.dispatchBookingWebhook(booking, WEBHOOK_EVENTS[event]))
+    .catch((error) => console.warn("[notify] partner webhook", error));
+}
+
 export async function notifyBookingEvent(
   bookingId: string,
   event: BookingNoticeEvent,
   opts?: { cancellationReason?: string; refundEur?: number },
 ) {
+  queuePartnerWebhook(bookingId, event);
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
     include: {
@@ -386,6 +399,7 @@ export async function notifyFileBookingEvent(
   event: BookingNoticeEvent = "BOOKING_NEW",
   opts?: { cancellationReason?: string; refundEur?: number },
 ) {
+  queuePartnerWebhook(booking, event);
   const { getFileCar } = await import("@/lib/server/partner-cars-store");
   const fileCar = await getFileCar(booking.carId);
   if (!fileCar) {

@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
+import { CopyButton } from "@/components/partner/integration/copy-button";
+import { ApiAccessCard } from "@/components/partner/integration/api-access-card";
+import { IcalImportCard, type IcalImportCar } from "@/components/partner/integration/ical-import-card";
+import { integrationCopy } from "@/components/partner/integration/integration-copy";
 
 type CarRow = {
   id: string;
@@ -10,11 +15,22 @@ type CarRow = {
   channelUrl: string;
 };
 
+type ImportRow = {
+  id: string;
+  carId: string;
+  importUrl: string;
+  lastSyncAt: string | null;
+  lastError: string | null;
+  busyCount: number;
+};
+
 type Payload = {
   website: { pageUrl: string; embedHtml: string };
   cars: CarRow[];
+  imports?: ImportRow[];
 };
 
+type Direction = "import" | "export";
 type Method = "channel" | "site";
 
 const copy = {
@@ -233,38 +249,16 @@ const copy = {
   },
 } as const;
 
-function CopyButton({
-  value,
-  copyLabel,
-  copiedLabel,
-}: {
-  value: string;
-  copyLabel: string;
-  copiedLabel: string;
-}) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      className="shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-[#0b1f4b] hover:bg-slate-50"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(value);
-          setCopied(true);
-          window.setTimeout(() => setCopied(false), 1600);
-        } catch {
-          /* ignore */
-        }
-      }}
-    >
-      {copied ? copiedLabel : copyLabel}
-    </button>
-  );
-}
+const tabClass = (active: boolean) =>
+  active
+    ? "rounded-lg bg-[#1d6fe8] px-4 py-2 text-sm font-bold text-white"
+    : "rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-sky-300";
 
 export function PartnerIntegrationPanel() {
   const { locale } = usePartnerLocale();
   const t = (copy as unknown as Record<string, (typeof copy)["en"]>)[locale] ?? copy.en;
+  const ti = integrationCopy(locale);
+  const [direction, setDirection] = useState<Direction>("import");
   const [method, setMethod] = useState<Method>("channel");
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState("");
@@ -293,6 +287,27 @@ export function PartnerIntegrationPanel() {
     };
   }, [t.error]);
 
+  const importCars = useMemo<IcalImportCar[]>(() => {
+    if (!data) return [];
+    const byCar = new Map((data.imports || []).map((row) => [row.carId, row]));
+    return data.cars.map((car) => {
+      const feed = byCar.get(car.id);
+      return {
+        id: car.id,
+        label: car.label,
+        registrationNumber: car.registrationNumber,
+        feed: feed
+          ? {
+              importUrl: feed.importUrl,
+              lastSyncAt: feed.lastSyncAt,
+              lastError: feed.lastError,
+              busyCount: feed.busyCount,
+            }
+          : null,
+      };
+    });
+  }, [data]);
+
   return (
     <div className="min-h-screen bg-[#eef2f7]">
       <div className="bg-[#3d2a6d] px-4 py-4 text-white">
@@ -303,82 +318,113 @@ export function PartnerIntegrationPanel() {
       </div>
 
       <main className="mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm sm:inline-grid sm:grid-cols-2">
           {(
             [
-              ["channel", t.channel],
-              ["site", t.site],
+              ["import", ti.importTab, ArrowDownToLine],
+              ["export", ti.exportTab, ArrowUpFromLine],
             ] as const
-          ).map(([id, label]) => (
+          ).map(([id, label, Icon]) => (
             <button
               key={id}
               type="button"
-              onClick={() => setMethod(id)}
+              onClick={() => setDirection(id)}
+              aria-pressed={direction === id}
               className={
-                method === id
-                  ? "rounded-lg bg-[#1d6fe8] px-4 py-2 text-sm font-bold text-white"
-                  : "rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-sky-300"
+                direction === id
+                  ? "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#3d2a6d] px-4 py-2 text-sm font-bold text-white"
+                  : "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
               }
             >
-              {label}
+              <Icon className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="min-w-0 break-words">{label}</span>
             </button>
           ))}
         </div>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          {loading ? <p className="text-sm text-slate-500">{t.loading}</p> : null}
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {direction === "import" ? (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+            <ApiAccessCard />
+            {error ? (
+              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-sm text-red-600">{error}</p>
+              </section>
+            ) : (
+              <IcalImportCard cars={importCars} loading={loading} />
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["channel", t.channel],
+                  ["site", t.site],
+                ] as const
+              ).map(([id, label]) => (
+                <button key={id} type="button" onClick={() => setMethod(id)} className={tabClass(method === id)}>
+                  {label}
+                </button>
+              ))}
+            </div>
 
-          {!loading && !error && method === "channel" ? (
-            <div>
-              <p className="text-sm leading-relaxed text-slate-600">{t.channelHint}</p>
-              {data && data.cars.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-500">{t.empty}</p>
+            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              {loading ? <p className="text-sm text-slate-500">{t.loading}</p> : null}
+              {error ? <p className="text-sm text-red-600">{error}</p> : null}
+
+              {!loading && !error && method === "channel" ? (
+                <div>
+                  <p className="text-sm leading-relaxed text-slate-600">{t.channelHint}</p>
+                  {data && data.cars.length === 0 ? (
+                    <p className="mt-4 text-sm text-slate-500">{t.empty}</p>
+                  ) : null}
+                  <ul className="mt-4 space-y-3">
+                    {data?.cars.map((car) => (
+                      <li key={car.id} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3">
+                        <p className="text-sm font-bold text-[#0b1f4b]">
+                          {car.label}
+                          {car.registrationNumber ? ` · ${car.registrationNumber}` : ""}
+                        </p>
+                        <div className="mt-2 flex items-start gap-2">
+                          <pre className="min-w-0 flex-1 overflow-auto whitespace-pre-wrap break-all rounded-md border border-slate-200 bg-white p-2 text-[11px] text-slate-700">
+                            {car.channelUrl}
+                          </pre>
+                          <CopyButton value={car.channelUrl} copyLabel={t.copy} copiedLabel={t.copied} />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ) : null}
-              <ul className="mt-4 space-y-3">
-                {data?.cars.map((car) => (
-                  <li key={car.id} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3">
-                    <p className="text-sm font-bold text-[#0b1f4b]">
-                      {car.label}
-                      {car.registrationNumber ? ` · ${car.registrationNumber}` : ""}
-                    </p>
-                    <div className="mt-2 flex items-start gap-2">
-                      <pre className="min-w-0 flex-1 overflow-auto whitespace-pre-wrap break-all rounded-md border border-slate-200 bg-white p-2 text-[11px] text-slate-700">
-                        {car.channelUrl}
-                      </pre>
-                      <CopyButton value={car.channelUrl} copyLabel={t.copy} copiedLabel={t.copied} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
 
-          {!loading && !error && method === "site" && data ? (
-            <div className="space-y-4">
-              <p className="text-sm leading-relaxed text-slate-600">{t.siteHint}</p>
-              <div>
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t.pageLink}</p>
-                  <CopyButton value={data.website.pageUrl} copyLabel={t.copy} copiedLabel={t.copied} />
+              {!loading && !error && method === "site" && data ? (
+                <div className="space-y-4">
+                  <p className="text-sm leading-relaxed text-slate-600">{t.siteHint}</p>
+                  <div>
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t.pageLink}</p>
+                      <CopyButton value={data.website.pageUrl} copyLabel={t.copy} copiedLabel={t.copied} />
+                    </div>
+                    <pre className="overflow-auto whitespace-pre-wrap break-all rounded-md border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-800">
+                      {data.website.pageUrl}
+                    </pre>
+                  </div>
+                  <div>
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t.embed}</p>
+                      <CopyButton value={data.website.embedHtml} copyLabel={t.copy} copiedLabel={t.copied} />
+                    </div>
+                    <pre className="overflow-auto whitespace-pre-wrap break-all rounded-md border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-800">
+                      {data.website.embedHtml}
+                    </pre>
+                  </div>
                 </div>
-                <pre className="overflow-auto whitespace-pre-wrap break-all rounded-md border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-800">
-                  {data.website.pageUrl}
-                </pre>
-              </div>
-              <div>
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t.embed}</p>
-                  <CopyButton value={data.website.embedHtml} copyLabel={t.copy} copiedLabel={t.copied} />
-                </div>
-                <pre className="overflow-auto whitespace-pre-wrap break-all rounded-md border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-800">
-                  {data.website.embedHtml}
-                </pre>
-              </div>
-            </div>
-          ) : null}
-        </section>
+              ) : null}
+            </section>
+          </>
+        )}
       </main>
     </div>
   );
 }
+

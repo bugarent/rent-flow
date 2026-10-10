@@ -197,6 +197,11 @@ export async function POST(req: Request) {
       } catch {
         /* best-effort */
       }
+      if (updated && file.status === "PENDING" && updated.status === "CONFIRMED") {
+        void import("@/lib/server/partner-webhooks").then((m) =>
+          m.dispatchBookingWebhook(updated, "booking.confirmed"),
+        );
+      }
       if (updated) {
         try {
           const { notifyFileBookingEvent } = await import("@/lib/notifications");
@@ -395,6 +400,11 @@ export async function POST(req: Request) {
         where: { id: booking.id },
         data,
       });
+      if (booking.status === "PENDING" && updated.status === "CONFIRMED") {
+        void import("@/lib/server/partner-webhooks").then((m) =>
+          m.dispatchBookingWebhook(booking.id, "booking.confirmed"),
+        );
+      }
 
       try {
         const { markPartnerBookingUpdated } = await import(

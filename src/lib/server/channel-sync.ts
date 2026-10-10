@@ -151,8 +151,18 @@ async function apiAvailabilityBlocks(): Promise<ApiBlock[]> {
   } catch {
     /* integration file optional */
   }
+  try {
+    const { listAllApiAvailability } = await import("@/lib/server/partner-api-availability-store");
+    rows.push(...(await listAllApiAvailability()));
+  } catch {
+    /* partner API store optional */
+  }
   apiBlockCache = { at: Date.now(), rows };
   return rows;
+}
+
+export function resetApiBlockCache() {
+  apiBlockCache = null;
 }
 
 export async function apiBlocksCar(carId: string, pickupAt: Date, dropoffAt: Date) {
