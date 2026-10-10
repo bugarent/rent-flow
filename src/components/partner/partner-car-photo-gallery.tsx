@@ -48,8 +48,6 @@ export function PartnerCarPhotoGallery({
     upload: string;
     uploading: string;
     remove: string;
-    cover: string;
-    coverHint: string;
     formats: string;
   };
 }) {
@@ -133,11 +131,13 @@ export function PartnerCarPhotoGallery({
 
   const handleFilesAt = async (index: number, files: FileList | null) => {
     if (!files?.length) return;
-    // First file goes into the clicked slot, extra files into the next empty slots.
+    // A new photo fills the first empty slot, so the first upload is the cover.
+    // Replacing a filled slot keeps that position; extra files follow into empty slots.
     const current = padSlots(photosRef.current);
-    const targets = [index];
+    const targets: number[] = [];
+    if (current[index]) targets.push(index);
     for (let at = 0; at < SLOT_COUNT && targets.length < files.length; at += 1) {
-      if (at !== index && !current[at]) targets.push(at);
+      if (!current[at]) targets.push(at);
     }
     const picked = Array.from(files).slice(0, targets.length);
     if (!picked.length) return;
@@ -181,18 +181,6 @@ export function PartnerCarPhotoGallery({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center sm:max-w-[200px]">
-        <div className="mx-auto flex h-28 w-full items-center justify-center overflow-hidden rounded-lg bg-white text-slate-400">
-          {slots[0] ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={slots[0]} alt="" className="h-full w-full object-contain" />
-          ) : (
-            <span className="text-xs font-semibold">{labels.cover}</span>
-          )}
-        </div>
-        <p className="mt-2 text-xs leading-snug text-slate-500">{labels.coverHint}</p>
-      </div>
-
       <p className="text-xs text-slate-500">{labels.formats}</p>
 
       <div
@@ -241,10 +229,7 @@ export function PartnerCarPhotoGallery({
                     <img
                       src={url}
                       alt=""
-                      className={cn(
-                        "h-full w-full cursor-zoom-in",
-                        index === 0 ? "object-contain bg-white" : "object-cover",
-                      )}
+                      className="h-full w-full cursor-zoom-in object-cover"
                       draggable={false}
                       onClick={() => {
                         if (suppressClick.current) {
@@ -288,7 +273,7 @@ export function PartnerCarPhotoGallery({
                   disabled={!filled || uploading}
                   onClick={() => {
                     const next = padSlots(photosRef.current);
-                    next[index] = "";
+                    next.splice(index, 1);
                     commitSlots(next);
                   }}
                   className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold text-red-700 enabled:hover:bg-red-50 disabled:opacity-30"

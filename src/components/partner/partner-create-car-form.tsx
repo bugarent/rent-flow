@@ -2910,8 +2910,6 @@ export function PartnerCreateCarForm({
               upload: cc.selectFiles,
               uploading: cc.uploading,
               remove: cc.removeFile,
-              cover: cc.cover,
-              coverHint: cc.coverHint,
               formats: cc.photoFormats.replace("{n}", String(MIN_PUBLIC_PHOTOS)),
             }}
           />
