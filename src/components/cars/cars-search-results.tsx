@@ -69,6 +69,8 @@ export type SearchResultCar = {
   photos: string[];
   partnerName: string;
   deliveryFeeEur: number;
+  /** Selected pickup place is offered and its one-way fee is 0. */
+  pickupFree?: boolean;
   pickupDeliveryFeeEur?: number;
   dropoffDeliveryFeeEur?: number;
   depositEur: number | null;
@@ -1922,8 +1924,9 @@ function CarResultCard({
   const displayDaily = priced.displayDailyEur;
   const depositEur = car.depositEur != null ? toNumber(car.depositEur, Number.NaN) : Number.NaN;
   const noDeposit = Number.isFinite(depositEur) && depositEur <= 0;
-  const lowDeposit = Number.isFinite(depositEur) && depositEur > 0 && depositEur < 100;
-  const freeDelivery = deliveryFee <= 0;
+  // 100 EUR is the low-deposit amount partners enter. Exactly 100 still counts.
+  const lowDeposit = Number.isFinite(depositEur) && depositEur > 0 && depositEur <= 100;
+  const freeDelivery = car.pickupFree === true || (car.pickupFree == null && deliveryFee <= 0);
   const airportTrip = isAirportSearchPlace(pickup) || isAirportSearchPlace(dropoff);
   const category = car.categoryLabel || car.categorySlug || null;
 

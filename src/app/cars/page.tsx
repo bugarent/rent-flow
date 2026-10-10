@@ -21,6 +21,7 @@ import {
 } from "@/lib/server/partner-extras-prefs-store";
 import {
   computeTripDeliveryFees,
+  matchDeliveryRowsForPlace,
   mergeDeliveryPrefsIntoRows,
 } from "@/lib/delivery/trip-fees";
 import { meetsBookingLeadTime, resolveBookingLeadMinutes } from "@/lib/delivery/booking-lead";
@@ -591,6 +592,8 @@ export default async function CarsPage({
       dropoff: dropoff || pickupIata,
       rentalDays,
     });
+    const pickupRows = pickupIata ? matchDeliveryRowsForPlace(car.deliveryPrices, pickupIata) : [];
+    const pickupFree = pickupIata ? pickupRows.length > 0 && fees.pickupFeeEur <= 0 : undefined;
     const partnerId = car.partner?.id || car.partnerId || "";
     const offeredFromPrefs: string[] = [];
     const prefCandidates = [
@@ -638,6 +641,7 @@ export default async function CarsPage({
       partnerName: car.partner?.companyName || "Partner",
       deliveryFeeEur: fees.totalFeeEur,
       pickupDeliveryFeeEur: fees.pickupFeeEur,
+      pickupFree,
       dropoffDeliveryFeeEur: fees.dropoffFeeEur,
       depositEur: depositRaw != null && Number.isFinite(depositRaw) ? depositRaw : null,
       cardRequired: details?.cardRequired === true,
