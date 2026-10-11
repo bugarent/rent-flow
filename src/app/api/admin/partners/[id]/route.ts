@@ -896,6 +896,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (action === "INVITE" || (action === "APPROVED" && existing.status === "PENDING")) {
     const activated = await activatePartnerFromStoredPassword(existing.id);
     if (activated.ok) {
+      const { publishPartnerSearchPlaces } = await import("@/lib/server/partner-search-coverage");
+      await publishPartnerSearchPlaces(activated.partnerId);
       return NextResponse.json({
         id: activated.partnerId,
         status: "APPROVED",

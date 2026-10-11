@@ -7,6 +7,7 @@ import {
   type PartnerCompanySettings,
 } from "@/lib/partners/company-settings";
 import { parseIso2List, parsePartnerMessengers } from "@/lib/partner";
+import { parsePartnerApplicationMessages } from "@/lib/partner-application-messages";
 
 const STORE = join(dataRoot(), "partner-company-settings.json");
 
@@ -51,6 +52,26 @@ export async function writeCompanySettingsFile(partnerId: string, settings: Part
   return next;
 }
 
+/** Countries and places from the latest partnership application, when settings have none. */
+function withApplicationPlaces(
+  settings: PartnerCompanySettings,
+  applicationMessages: unknown,
+): PartnerCompanySettings {
+  if (settings.deliveryLocationIds?.length || applicationMessages == null) return settings;
+  const messages = parsePartnerApplicationMessages(applicationMessages);
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const snapshot = messages[index]?.snapshot;
+    if (!snapshot?.locationCodes.length) continue;
+    const countries = parseIso2List(snapshot.countryIso2s);
+    return {
+      ...settings,
+      deliveryCountryIso2s: countries.length ? countries : settings.deliveryCountryIso2s,
+      deliveryLocationIds: snapshot.locationCodes,
+    };
+  }
+  return settings;
+}
+
 export async function resolveCompanySettings(
   partner: {
     id: string;
@@ -62,7 +83,14 @@ export async function resolveCompanySettings(
     messengers?: unknown;
     messenger?: string | null;
     operatingCountryIso2s?: unknown;
+    applicationMessages?: unknown;
   },
+): Promise<PartnerCompanySettings> {
+  return withApplicationPlaces(await resolveStoredCompanySettings(partner), partner.applicationMessages);
+}
+
+async function resolveStoredCompanySettings(
+  partner: Parameters<typeof resolveCompanySettings>[0],
 ): Promise<PartnerCompanySettings> {
   const fromPartnerCountries = parseIso2List(partner.operatingCountryIso2s);
   const partnerMessengers = parsePartnerMessengers(partner.messengers, partner.messenger);

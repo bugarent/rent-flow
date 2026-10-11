@@ -105,6 +105,7 @@ export type PartnerPersonalInfoCopy = {
   logoUploadFailed: string;
   saveFailed: string;
   pendingSave: string;
+  locationAwaitingApproval: string;
   pendingRemove: string;
   unlockedUntil: string;
   fieldRequired: string;
@@ -409,6 +410,7 @@ export const partnerUiEn: PartnerUiPack = {
     logoUploadFailed: "Logo upload failed",
     saveFailed: "Save failed",
     pendingSave: "(pending Save)",
+    locationAwaitingApproval: "Awaiting admin approval",
     pendingRemove: "(pending remove)",
     unlockedUntil: "Unlocked until",
     fieldRequired: "This field is required",
@@ -706,6 +708,7 @@ export const partnerUiKa: PartnerUiPack = {
     logoUploadFailed: "ლოგოს ატვირთვა ვერ მოხერხდა",
     saveFailed: "შენახვა ვერ მოხერხდა",
     pendingSave: "(ელოდება შენახვას)",
+    locationAwaitingApproval: "ელოდება ადმინის დამტკიცებას",
     pendingRemove: "(ელოდება წაშლას)",
     unlockedUntil: "გახსნილია",
     fieldRequired: "ეს ველი სავალდებულოა",
@@ -1004,6 +1007,7 @@ export const partnerUiRu: PartnerUiPack = {
     logoUploadFailed: "Не удалось загрузить логотип",
     saveFailed: "Не удалось сохранить",
     pendingSave: "(ожидает сохранения)",
+    locationAwaitingApproval: "Ждёт одобрения админа",
     pendingRemove: "(ожидает удаления)",
     unlockedUntil: "Разблокировано до",
     fieldRequired: "Это поле обязательно",

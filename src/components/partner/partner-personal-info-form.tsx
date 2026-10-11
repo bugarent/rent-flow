@@ -37,6 +37,12 @@ import { publishPartnerChromeSettings } from "@/components/partner/partner-chrom
 import { PartnerMessengerLinks, PartnerPhoneChat } from "@/components/admin/partner-phone-chat";
 import { PhoneMessengerIcons } from "@/components/partner/phone-messenger-icons";
 import { locationCodesEqual, normalizeLocationCode } from "@/lib/catalog/search-places";
+import {
+  countryLocationOptions,
+  fetchPartnerDeliveryRows,
+  requestableCountryOptions,
+  type CountryLocationOption,
+} from "@/components/partner/personal-info-locations";
 import type { PartnerSocialPlatform } from "@/lib/partner";
 
 async function uploadPartnerFile(file: File): Promise<string> {
@@ -235,7 +241,6 @@ export function PartnerPersonalInfoForm({
   const [pendingCountryRemoves, setPendingCountryRemoves] = useState<string[]>([]);
   const [countryNotice, setCountryNotice] = useState("");
   const [activeDeliveryLocations, setActiveDeliveryLocations] = useState<DeliveryLocationView[]>([]);
-  const [locationsLoadError, setLocationsLoadError] = useState("");
   const [invalidLocationCountries, setInvalidLocationCountries] = useState<Set<string>>(new Set());
   const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
   const [lastAdminNote, setLastAdminNote] = useState(lastAdminNoteInitial);
@@ -312,18 +317,7 @@ export function PartnerPersonalInfoForm({
     return (keysBySection[sectionId] || []).some((k) => changedMap.has(k));
   };
 
-  const countryOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const loc of activeDeliveryLocations) {
-      if (!loc.isActive) continue;
-      const iso2 = (loc.countryIso2 || "").toUpperCase();
-      if (iso2.length !== 2) continue;
-      if (!map.has(iso2)) map.set(iso2, worldCountryName(iso2));
-    }
-    return [...map.entries()]
-      .map(([iso2, name]) => ({ iso2, name }))
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-  }, [activeDeliveryLocations]);
+  const countryOptions = useMemo(() => requestableCountryOptions(), []);
 
   const committedCountries = settings.deliveryCountryIso2s ?? [];
   const visibleCommitted = committedCountries.filter((iso) => !pendingCountryRemoves.includes(iso));
@@ -366,28 +360,13 @@ export function PartnerPersonalInfoForm({
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        // Full catalog for id/label enrichment (not homepage-only)
-        const res = await fetch("/api/delivery-locations?all=1", { cache: "no-store" });
-        const data = await res.json().catch(() => ({}));
-        if (cancelled) return;
-        if (!res.ok) {
-          // Catalog places still work offline — only soft-warn
-          setLocationsLoadError("");
-          return;
-        }
-        const list = Array.isArray(data) ? data : Array.isArray(data.locations) ? data.locations : [];
-        setActiveDeliveryLocations(list as DeliveryLocationView[]);
-        setLocationsLoadError("");
-      } catch {
-        if (!cancelled) setLocationsLoadError("");
-      }
-    })();
+    void fetchPartnerDeliveryRows().then((rows) => {
+      if (!cancelled && rows) setActiveDeliveryLocations(rows);
+    });
     return () => {
       cancelled = true;
     };
-  }, [pi.locationsLoadError]);
+  }, []);
 
   useEffect(() => {
     const nodes = PERSONAL_INFO_SECTIONS.map((s) => document.getElementById(s.id)).filter(Boolean) as HTMLElement[];
@@ -685,28 +664,10 @@ export function PartnerPersonalInfoForm({
     setPendingCountryRemoves((prev) => (prev.includes(iso2) ? prev : [...prev, iso2]));
   };
 
-  type CountryLocationOption = {
-    id: string;
-    label: string;
-    countryIso2: string;
-    iata: string;
-    isActive: boolean;
-  };
-
-  const locationsForCountry = (iso2: string): CountryLocationOption[] => {
-    const want = iso2.toUpperCase();
-    return activeDeliveryLocations
-      .filter((loc) => loc.isActive && (loc.countryIso2 || "").toUpperCase() === want)
-      .map((loc) => ({
-        id: loc.id,
-        label: loc.label,
-        countryIso2: want,
-        iata: loc.iata || loc.airportId,
-        isActive: true,
-      }));
-  };
-
   const selectedLocationIds = settings.deliveryLocationIds ?? [];
+
+  const locationsForCountry = (iso2: string): CountryLocationOption[] =>
+    countryLocationOptions(iso2, activeDeliveryLocations, selectedLocationIds);
 
   const isLocationSelected = (loc: CountryLocationOption, selected: string[]) => {
     const selectedSet = new Set(selected);
@@ -729,6 +690,7 @@ export function PartnerPersonalInfoForm({
         label: locationId,
         countryIso2: countryIso2 || "",
         isActive: true,
+        approved: false,
       };
       const selected = isLocationSelected(target, list);
       const next = selected
@@ -1022,6 +984,8 @@ export function PartnerPersonalInfoForm({
         throw new Error(detail && /failed to save/i.test(errMsg) ? `${friendly} (${detail})` : friendly);
       }
       if (data.settings) {
+        const rows = await fetchPartnerDeliveryRows();
+        if (rows) setActiveDeliveryLocations(rows);
         setSettings({
           ...data.settings,
           tariffs: normalizeTariffIntervals(data.settings.tariffs ?? [], MAX_TARIFF_INTERVALS),
@@ -1480,9 +1444,6 @@ export function PartnerPersonalInfoForm({
                 {pi.deliveryHelp ? (
                   <p className="mb-2 text-[11px] text-slate-500">{pi.deliveryHelp}</p>
                 ) : null}
-                {locationsLoadError ? (
-                  <p className="mb-2 text-xs font-semibold text-red-700">{locationsLoadError}</p>
-                ) : null}
                 <div
                   className={cn(
                     "relative",
@@ -1585,7 +1546,14 @@ export function PartnerPersonalInfoForm({
                                     key={loc.id}
                                     className="flex items-center justify-between gap-2 rounded border border-emerald-200 bg-white px-2 py-1.5 text-xs"
                                   >
-                                    <span className="font-semibold text-slate-800">{loc.label}</span>
+                                    <span className="min-w-0 break-words font-semibold text-slate-800">
+                                      {loc.label}
+                                      {!loc.approved ? (
+                                        <span className="ms-1.5 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-900">
+                                          {pi.locationAwaitingApproval}
+                                        </span>
+                                      ) : null}
+                                    </span>
                                     <button
                                       type="button"
                                       className="font-semibold text-red-700"
@@ -1668,7 +1636,14 @@ export function PartnerPersonalInfoForm({
                                   key={loc.id}
                                   className="flex items-center justify-between gap-2 rounded border border-slate-100 bg-slate-50 px-2 py-1.5 text-xs"
                                 >
-                                  <span className="font-semibold text-slate-800">{loc.label}</span>
+                                  <span className="min-w-0 break-words font-semibold text-slate-800">
+                                    {loc.label}
+                                    {!loc.approved ? (
+                                      <span className="ms-1.5 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-900">
+                                        {pi.locationAwaitingApproval}
+                                      </span>
+                                    ) : null}
+                                  </span>
                                   <button
                                     type="button"
                                     className="font-semibold text-red-700"
