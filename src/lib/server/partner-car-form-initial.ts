@@ -1,4 +1,5 @@
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
+import { isCrossBorderExtra } from "@/lib/extras/cross-border";
 import { isMandatoryExtra, type ExtraServicePricing } from "@/lib/extras/pricing";
 import { LOCAL_PARTNER_ID, loadLocalPartner } from "@/lib/auth/local-partner-store";
 import { prisma } from "@/lib/prisma";
@@ -50,14 +51,12 @@ export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
     const enabledIds = new Set(
       prefs.filter((p) => p.enabled || p.forbidden).map((p) => p.extraServiceId),
     );
-    const hasPrefs = prefs.length > 0;
     return {
       initialDeliveryCatalog: delivery,
-      initialExtrasCatalog: extras.filter((service) => {
-        if (isMandatoryExtra(service)) return true;
-        if (!hasPrefs) return false;
-        return enabledIds.has(service.id);
-      }),
+      initialExtrasCatalog: extras.filter(
+        (service) =>
+          isMandatoryExtra(service) || !isCrossBorderExtra(service) || enabledIds.has(service.id),
+      ),
     };
   } catch {
     try {

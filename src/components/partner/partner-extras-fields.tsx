@@ -8,7 +8,7 @@ import {
   isMandatoryPricedExtra,
 } from "@/lib/extras/pricing";
 import { findCarExtraOffer, type CarExtraOffer } from "@/lib/cars/car-details";
-import { isListingInsuranceService } from "@/lib/extras/checkout-slot";
+import { isCrossBorderExtra } from "@/lib/extras/cross-border";
 import { partnerStatusLocked } from "@/lib/extras/partner-service-choice";
 import { formatAmountNumber } from "@/lib/utils";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
@@ -126,8 +126,9 @@ export function catalogIdsForOffers(catalog: ExtraServicePricing[], offers: CarE
 }
 
 /**
- * Services that stay on the car form.
- * A failed prefs response keeps the list already on screen instead of collapsing it.
+ * Services that stay on the car form: every active catalog service, so the partner
+ * switches each one on or off per listing. Cabinet prefs only set the default state.
+ * Cross-border stays gated by its cabinet permission.
  */
 export function extrasVisibleOnCarForm(
   catalog: ExtraServicePricing[],
@@ -139,20 +140,11 @@ export function extrasVisibleOnCarForm(
   },
 ): ExtraServicePricing[] {
   const prefs = indexExtraPrefs(opts.prefs);
-  const fallbackIds = new Set((opts.fallback || []).map((service) => service.id));
-  const fallbackSlugs = new Set(
-    (opts.fallback || []).map((service) => service.slug).filter(Boolean),
-  );
   return catalog.filter((service) => {
-    if (partnerStatusLocked(service)) return true;
+    if (!isCrossBorderExtra(service) || partnerStatusLocked(service)) return true;
     const pref = prefs.forService(service);
-    // Cabinet choice wins: off stays off the car form even if this car used the service before.
-    if (prefs.trusted && pref) return Boolean(pref.enabled || pref.forbidden);
-    if (prefs.trusted) return isListingInsuranceService(service);
-    if (isListingInsuranceService(service)) return true;
-    if (opts.carExtraIds?.has(service.id)) return true;
-    if (opts.offerIds?.has(service.id)) return true;
-    return fallbackIds.has(service.id) || (service.slug ? fallbackSlugs.has(service.slug) : false);
+    if (pref) return Boolean(pref.enabled || pref.forbidden);
+    return Boolean(opts.carExtraIds?.has(service.id) || opts.offerIds?.has(service.id));
   });
 }
 

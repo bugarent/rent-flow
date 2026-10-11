@@ -184,7 +184,7 @@ export async function hydrateListingExtras(raw: unknown): Promise<HydratedListin
  * Apply partner equipment prefs onto listing extras for customer checkout:
  * - enabled → normal service (price from car)
  * - forbidden → red notice, no price
- * - off → hidden entirely
+ * - off → not added from the cabinet; the car's own row (per-listing choice) stays
  * Mandatory/TPL catalog free extras are never hidden or forbidden by prefs.
  */
 export async function applyPartnerExtraOfferModes(
@@ -255,7 +255,9 @@ export async function applyPartnerExtraOfferModes(
         continue;
       }
       if (!pref.enabled && !mandatoryPriced) {
-        continue; // off — hide from customer
+        // Cabinet "off" is only the default for new listings; the car's own row is the partner's per-listing choice.
+        next.push(row);
+        continue;
       }
       const bounds = effectivePeriodBounds(
         row.extraService?.maxPeriodEur,
