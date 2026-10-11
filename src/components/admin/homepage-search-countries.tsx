@@ -11,12 +11,16 @@ import { WORLD_COUNTRIES, worldCountryName } from "@/lib/catalog/world-countries
 import { CountryFlag } from "@/components/ui/country-flag";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { locationKey, useHomepageLocations } from "@/components/admin/use-homepage-locations";
+import { lookupDeliveryCount } from "@/lib/delivery/partner-counts";
 
 export function HomepageSearchCountries({
   initialLocations,
+  deliveryCounts = {},
   compact = false,
 }: {
   initialLocations: DeliveryLocationView[];
+  /** Partners delivering to each place, keyed by location code. */
+  deliveryCounts?: Record<string, number>;
   compact?: boolean;
 }) {
   const { dictionary } = useAdminLocale();
@@ -77,6 +81,21 @@ export function HomepageSearchCountries({
   const airports = filteredPlaces.filter((p) => p.kind === "airport");
   const cities = filteredPlaces.filter((p) => p.kind === "city");
 
+  const deliveryCount = (code: string) => lookupDeliveryCount(deliveryCounts, [code]);
+  const sumDeliveries = (places: SearchPlace[]) => {
+    const seen = new Set<string>();
+    let total = 0;
+    for (const place of places) {
+      const key = locationKey(place.code);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      total += deliveryCount(place.code);
+    }
+    return total;
+  };
+  const airportDeliveries = sumDeliveries(airports);
+  const cityDeliveries = sumDeliveries(cities);
+
   const extraLocations = useMemo(() => {
     const catalogKeys = new Set(countryPlaces.map((p) => locationKey(p.code)));
     return locations.filter(
@@ -100,6 +119,7 @@ export function HomepageSearchCountries({
   function placeRow(place: SearchPlace) {
     const on = isOn(place.code);
     const saving = isPending(place.code);
+    const deliveries = deliveryCount(place.code);
     return (
       <li key={locationKey(place.code)} className="border-b border-slate-100 py-3 last:border-0">
         <label className={`flex min-w-0 cursor-pointer items-center gap-3 ${saving ? "opacity-60" : ""}`}>
@@ -108,9 +128,9 @@ export function HomepageSearchCountries({
             checked={on}
             aria-busy={saving}
             onChange={(e) => setPlace({ code: place.code, countryIso2: selectedIso2 }, e.target.checked)}
-            className="h-4 w-4"
+            className="h-4 w-4 shrink-0"
           />
-          <span>
+          <span className="min-w-0 flex-1">
             <span className="font-bold">{place.cityName}</span>
             {place.kind === "airport" && place.iata ? (
               <span className="ml-2 font-mono text-xs text-slate-500">{place.iata}</span>
@@ -120,6 +140,9 @@ export function HomepageSearchCountries({
               </span>
             )}
             <span className="mt-0.5 block text-xs text-slate-500">{place.name}</span>
+          </span>
+          <span className="shrink-0 rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-950">
+            {s.deliveryCount} {deliveries}
           </span>
         </label>
       </li>
@@ -236,19 +259,38 @@ export function HomepageSearchCountries({
           <div className={`mt-5 space-y-6 ${compact ? "max-h-[22rem] overflow-y-auto pr-1" : ""}`}>
             {airports.length > 0 ? (
               <div>
-                <h3 className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{s.airports}</h3>
+                <h3 className="flex flex-wrap items-baseline gap-x-2 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                  {s.airports}
+                  <span className="text-xs font-bold normal-case tracking-normal text-[#0b1f4b]">
+                    {s.deliveryCount} {airportDeliveries}
+                  </span>
+                </h3>
                 <ul className="mt-1 divide-y divide-slate-100">{airports.map(placeRow)}</ul>
               </div>
             ) : null}
             {cities.length > 0 ? (
               <div>
-                <h3 className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{s.cities}</h3>
+                <h3 className="flex flex-wrap items-baseline gap-x-2 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                  {s.cities}
+                  <span className="text-xs font-bold normal-case tracking-normal text-[#0b1f4b]">
+                    {s.deliveryCount} {cityDeliveries}
+                  </span>
+                </h3>
                 <ul className="mt-1 divide-y divide-slate-100">{cities.map(placeRow)}</ul>
               </div>
             ) : null}
             {extraLocations.length > 0 ? (
               <div>
-                <h3 className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{s.addedFromDelivery}</h3>
+                <h3 className="flex flex-wrap items-baseline gap-x-2 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                  {s.addedFromDelivery}
+                  <span className="text-xs font-bold normal-case tracking-normal text-[#0b1f4b]">
+                    {s.deliveryCount}{" "}
+                    {extraLocations.reduce(
+                      (sum, loc) => sum + lookupDeliveryCount(deliveryCounts, [loc.iata, loc.airportId, loc.id]),
+                      0,
+                    )}
+                  </span>
+                </h3>
                 <ul className="mt-1 divide-y divide-slate-100">
                   {extraLocations.map((loc) => {
                     const placeLike = {

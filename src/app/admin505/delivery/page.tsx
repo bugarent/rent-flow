@@ -1,4 +1,8 @@
 import { listDeliveryLocations } from "@/lib/server/delivery-locations";
+import {
+  countPartnersDeliveringByPlace,
+  syncListedPartnerDeliveryLocations,
+} from "@/lib/server/partner-search-coverage";
 import { requireAdmin } from "@/lib/auth/guards";
 import { DeliveryLocationsManager } from "@/components/admin/delivery-locations-manager";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
@@ -8,11 +12,16 @@ export default async function AdminDeliveryLocationsPage() {
   await requireAdmin();
 
   let locations: Awaited<ReturnType<typeof listDeliveryLocations>> = [];
+  let deliveryCounts: Record<string, number> = {};
   let queryError = "";
   const fxRates = await getFxRates();
 
   try {
-    locations = await listDeliveryLocations();
+    await syncListedPartnerDeliveryLocations();
+    [locations, deliveryCounts] = await Promise.all([
+      listDeliveryLocations(),
+      countPartnersDeliveringByPlace(),
+    ]);
   } catch (error) {
     console.error("[admin/delivery page]", error);
     queryError =
@@ -32,7 +41,11 @@ export default async function AdminDeliveryLocationsPage() {
           {queryError}
         </p>
       ) : null}
-      <DeliveryLocationsManager initialLocations={locations} fxRates={fxRates} />
+      <DeliveryLocationsManager
+        initialLocations={locations}
+        fxRates={fxRates}
+        deliveryCounts={deliveryCounts}
+      />
     </div>
   );
 }

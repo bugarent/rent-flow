@@ -62,6 +62,15 @@ const applicationSchema = z
     path: ["confirmPassword"],
   });
 
+async function registerApplicationLocations(codes: string[]) {
+  try {
+    const { registerApplicationDeliveryLocations } = await import("@/lib/server/partner-search-coverage");
+    await registerApplicationDeliveryLocations(codes);
+  } catch (error) {
+    console.warn("[partners] could not add application delivery locations:", error);
+  }
+}
+
 async function rememberPartnerPassword(partnerId: string, email: string, password: string) {
   try {
     const { setPartnerCredentials } = await import("@/lib/server/partner-credentials-store");
@@ -84,6 +93,7 @@ async function saveViaFile(input: {
     try {
       const { saveApplicationPlaces } = await import("@/lib/server/partner-search-coverage");
       await saveApplicationPlaces(partner.id, input.settings);
+      await registerApplicationLocations(input.settings.deliveryLocationIds || []);
     } catch {
       /* the application itself is already stored */
     }
@@ -310,6 +320,7 @@ export async function POST(req: Request) {
         });
 
         await saveApplicationPlaces(updated.id, placeSettings);
+        await registerApplicationLocations(locationCodes);
         await rememberPartnerPassword(updated.id, email, body.password);
 
         return NextResponse.json(
@@ -355,6 +366,7 @@ export async function POST(req: Request) {
       });
 
       await saveApplicationPlaces(partner.id, placeSettings);
+      await registerApplicationLocations(locationCodes);
       await rememberPartnerPassword(partner.id, email, body.password);
 
       return NextResponse.json(
@@ -398,6 +410,8 @@ export async function POST(req: Request) {
               sequentialNumber,
             },
           });
+          await saveApplicationPlaces(partner.id, placeSettings);
+          await registerApplicationLocations(locationCodes);
           await rememberPartnerPassword(partner.id, email, body.password);
           return NextResponse.json(
             {

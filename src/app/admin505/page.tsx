@@ -12,6 +12,10 @@ import { getFooterContactConfig } from "@/lib/server/footer-contact-store";
 import { getLegalPagesConfig } from "@/lib/server/legal-pages-store";
 import { listDeliveryLocations } from "@/lib/server/delivery-locations";
 import {
+  countPartnersDeliveringByPlace,
+  syncListedPartnerDeliveryLocations,
+} from "@/lib/server/partner-search-coverage";
+import {
   botsForAdminUi,
   getTelegramLiveBotsConfig,
 } from "@/lib/server/telegram-live-bots-store";
@@ -39,6 +43,11 @@ export default async function AdminOperationsHomePage() {
   } catch {
     /* database may be offline */
   }
+  try {
+    await syncListedPartnerDeliveryLocations();
+  } catch (error) {
+    console.warn("[admin homepage] sync partner delivery locations", error);
+  }
   const [
     categories,
     airports,
@@ -52,6 +61,7 @@ export default async function AdminOperationsHomePage() {
     footerContact,
     legalPages,
     searchLocations,
+    deliveryCounts,
   ] = await Promise.all([
     getHomepageCategories(),
     getHomepageAirports(),
@@ -65,6 +75,10 @@ export default async function AdminOperationsHomePage() {
     getFooterContactConfig(),
     getLegalPagesConfig(),
     listDeliveryLocations(),
+    countPartnersDeliveringByPlace().catch((error) => {
+      console.warn("[admin homepage] delivery counts", error);
+      return {} as Record<string, number>;
+    }),
   ]);
 
   return (
@@ -105,7 +119,11 @@ export default async function AdminOperationsHomePage() {
         <div className="min-w-0">
           <section className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
             <AdminSearchCountriesHeading />
-            <HomepageSearchCountries initialLocations={searchLocations} compact />
+            <HomepageSearchCountries
+              initialLocations={searchLocations}
+              deliveryCounts={deliveryCounts}
+              compact
+            />
           </section>
         </div>
         <div className="min-w-0">

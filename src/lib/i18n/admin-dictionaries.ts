@@ -212,6 +212,7 @@ export type AdminDictionary = {
     noPlaces: string;
     noCountryYet: string;
     placesHelp: string;
+    deliveryCount: string;
     liveBotSavedNote: string;
     bookingMailTitle: string;
     bookingMailHelp: string;
@@ -553,6 +554,7 @@ const en: AdminDictionary = {
     noPlaces: "No airports or major cities listed for this country yet.",
     noCountryYet: "No country is enabled yet. Select locations on the right to show them on the homepage.",
     placesHelp: "Turn on airports and major cities for homepage search.",
+    deliveryCount: "Deliveries",
     liveBotSavedNote: "Saved. New bookings are sent to this bot.",
     bookingMailTitle: "Booking email",
     bookingMailHelp:
@@ -896,6 +898,7 @@ const ka: AdminDictionary = {
     noPlaces: "ამ ქვეყანაში აეროპორტი ან ქალაქი ჯერ არ არის.",
     noCountryYet: "არც ერთი ქვეყანა არ არის ჩართული. მარჯვნივ აირჩიეთ ლოკაციები.",
     placesHelp: "ჩართეთ აეროპორტები და ქალაქები მთავარი გვერდის ძიებისთვის.",
+    deliveryCount: "მიწოდება",
     liveBotSavedNote: "შენახულია. ახალი ჯავშანი ამ ბოტზე გაიგზავნება.",
     bookingMailTitle: "ჯავშნის მაილი",
     bookingMailHelp:
@@ -1239,6 +1242,7 @@ const ru: AdminDictionary = {
     noPlaces: "Для этой страны аэропорты и города ещё не добавлены.",
     noCountryYet: "Ни одна страна не включена. Выберите локации справа.",
     placesHelp: "Включите аэропорты и города для поиска на главной.",
+    deliveryCount: "Доставки",
     liveBotSavedNote: "Сохранено. Новые брони отправляются этому боту.",
     bookingMailTitle: "Почта бронирования",
     bookingMailHelp:

@@ -151,6 +151,10 @@ export async function PATCH(req: Request) {
     const resolvedLocationIds = await resolvePartnerDeliveryLocationIds(
       settings.deliveryLocationIds || [],
     );
+    if (partner.status === "PENDING" && resolvedLocationIds.length) {
+      const { activatePartnerApprovedDeliveryLocations } = await import("@/lib/server/delivery-locations");
+      await activatePartnerApprovedDeliveryLocations(resolvedLocationIds);
+    }
 
     const nextSettings: PartnerCompanySettings = {
       ...settings,

@@ -17,6 +17,7 @@ import { uiText } from "@/lib/i18n/ui-text";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { DeliveryCountryFilter } from "@/components/admin/delivery-country-filter";
 import { isCityLocationCode } from "@/lib/catalog/search-places";
+import { lookupDeliveryCount } from "@/lib/delivery/partner-counts";
 import {
   ResponsiveDataList,
   MobileDataCard,
@@ -103,9 +104,12 @@ function CurrencyToggle({
 export function DeliveryLocationsManager({
   initialLocations,
   fxRates = DEFAULT_FX_RATES,
+  deliveryCounts = {},
 }: {
   initialLocations: DeliveryLocationView[];
   fxRates?: FxRates;
+  /** Partners delivering to each place, keyed by location code. */
+  deliveryCounts?: Record<string, number>;
 }) {
   const rates = fxRates;
   const { locale } = useAdminLocale();
@@ -147,6 +151,21 @@ export function DeliveryLocationsManager({
     }
     return { airports: scoped.length - cities, cities };
   }, [locations, countryIso2]);
+
+  const deliveryTotals = useMemo(() => {
+    const scoped = locations.filter(
+      (item) =>
+        item.isActive && (!countryIso2 || item.countryIso2.trim().toUpperCase() === countryIso2),
+    );
+    let airports = 0;
+    let cities = 0;
+    for (const item of scoped) {
+      const count = lookupDeliveryCount(deliveryCounts, [item.iata, item.airportId, item.id]);
+      if (isCityLocation(item)) cities += count;
+      else airports += count;
+    }
+    return { airports, cities };
+  }, [locations, countryIso2, deliveryCounts]);
   const activeLocations = useMemo(
     () =>
       sortLocationsByCountry(
@@ -485,35 +504,54 @@ export function DeliveryLocationsManager({
       {error ? <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</p> : null}
       {message ? <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p> : null}
 
-      <div className="flex min-w-0 flex-nowrap items-end gap-2">
-        <button
-          type="button"
-          aria-pressed={!countryIso2}
-          onClick={() => setCountryIso2("")}
-          className={`min-h-11 shrink-0 rounded-xl border px-3 text-sm font-bold sm:px-4 sm:text-base ${
-            !countryIso2
-              ? "border-[#0b1f4b] bg-[#0b1f4b] text-white"
-              : "border-slate-300 bg-white text-[#0b1f4b] hover:bg-slate-50"
-          }`}
-        >
-          {phrase("All", "ყველა", "Все")}
-        </button>
-        <DeliveryCountryFilter
-          countries={countries}
-          valueIso2={countryIso2}
-          onChange={setCountryIso2}
-          label={phrase("Country", "ქვეყანა", "Страна")}
-          allLabel={phrase("All", "ყველა", "Все")}
-          searchLabel={phrase("Search country", "მოძებნეთ ქვეყანა", "Найти страну")}
-          emptyLabel={phrase("No matching country", "ქვეყანა ვერ მოიძებნა", "Страна не найдена")}
-        />
-        <div className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3">
-          <span className="text-lg font-black tabular-nums text-[#0b1f4b] sm:text-xl">{locationCounts.airports}</span>
-          <span className="text-xs font-semibold text-slate-600 sm:text-sm">{phrase("airports", "აეროპორტი", "аэропорта")}</span>
+      <div className="space-y-3">
+        <div className="flex min-w-0 items-start gap-2">
+          <div className="shrink-0">
+            <p className="mb-1.5 select-none text-sm font-semibold text-transparent" aria-hidden>
+              {phrase("Country", "ქვეყანა", "Страна")}
+            </p>
+            <button
+              type="button"
+              aria-pressed={!countryIso2}
+              onClick={() => setCountryIso2("")}
+              className={`min-h-11 rounded-xl border px-3 text-sm font-bold sm:px-4 sm:text-base ${
+                !countryIso2
+                  ? "border-[#0b1f4b] bg-[#0b1f4b] text-white"
+                  : "border-slate-300 bg-white text-[#0b1f4b] hover:bg-slate-50"
+              }`}
+            >
+              {phrase("All", "ყველა", "Все")}
+            </button>
+          </div>
+          <DeliveryCountryFilter
+            className="min-w-0 flex-1"
+            countries={countries}
+            valueIso2={countryIso2}
+            onChange={setCountryIso2}
+            label={phrase("Country", "ქვეყანა", "Страна")}
+            allLabel={phrase("All", "ყველა", "Все")}
+            searchLabel={phrase("Search country", "მოძებნეთ ქვეყანა", "Найти страну")}
+            emptyLabel={phrase("No matching country", "ქვეყანა ვერ მოიძებნა", "Страна не найдена")}
+          />
         </div>
-        <div className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3">
-          <span className="text-lg font-black tabular-nums text-[#0b1f4b] sm:text-xl">{locationCounts.cities}</span>
-          <span className="text-xs font-semibold text-slate-600 sm:text-sm">{phrase("cities", "ქალაქი", "города")}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3">
+            <span className="text-lg font-black tabular-nums text-[#0b1f4b] sm:text-xl">{locationCounts.airports}</span>
+            <span className="text-xs font-semibold text-slate-600 sm:text-sm">{phrase("airports", "აეროპორტი", "аэропорта")}</span>
+            <span className="text-xs font-bold text-[#0b1f4b] sm:text-sm">
+              {phrase("Deliveries", "მიწოდება", "Доставки")} {deliveryTotals.airports}
+            </span>
+          </div>
+          <div className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3">
+            <span className="text-lg font-black tabular-nums text-[#0b1f4b] sm:text-xl">{locationCounts.cities}</span>
+            <span className="text-xs font-semibold text-slate-600 sm:text-sm">{phrase("cities", "ქალაქი", "города")}</span>
+            <span className="text-xs font-bold text-[#0b1f4b] sm:text-sm">
+              {phrase("Deliveries", "მიწოდება", "Доставки")} {deliveryTotals.cities}
+            </span>
+          </div>
+          <div className="ms-auto md:hidden">
+            <CurrencyToggle value={currency} onChange={switchCurrency} />
+          </div>
         </div>
       </div>
 
@@ -564,9 +602,6 @@ export function DeliveryLocationsManager({
         }
         mobile={
           <>
-            <div className="mb-2 flex items-center justify-end">
-              <CurrencyToggle value={currency} onChange={switchCurrency} />
-            </div>
             {activeLocations.length === 0 ? (
               <p className="rounded-2xl border bg-white p-8 text-center text-sm text-slate-500">
                 {countryIso2

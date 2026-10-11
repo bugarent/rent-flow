@@ -85,7 +85,7 @@ export function DeliveryCountryFilter({
         <ChevronDown className={cn("h-4 w-4 shrink-0 text-slate-400 transition", open && "rotate-180")} aria-hidden />
       </button>
       {open ? (
-        <div className="absolute z-30 mt-1 flex max-h-80 w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+        <div className="mt-1 flex max-h-80 w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
           <div className="border-b border-slate-100 p-2">
             <input
               ref={searchRef}

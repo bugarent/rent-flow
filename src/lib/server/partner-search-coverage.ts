@@ -7,9 +7,13 @@ import {
   type PartnerCompanySettings,
 } from "@/lib/partners/company-settings";
 import { prisma } from "@/lib/prisma";
+import { parsePartnerApplicationMessages } from "@/lib/partner-application-messages";
+import { parseProfileModeration } from "@/lib/partners/profile-moderation";
 import {
   activatePartnerApprovedDeliveryLocations,
   clearSearchAirportsCache,
+  ensureDeliveryLocationByCode,
+  listDeliveryLocations,
   retireUnusedPartnerPlaces,
 } from "@/lib/server/delivery-locations";
 import { writeCompanySettingsFile, readCompanySettingsFile } from "@/lib/server/partner-company-settings-store";
@@ -156,4 +160,179 @@ export async function retirePartnerSearchPlaces(partnerId: string, presetCodes?:
   const codes = presetCodes?.length ? presetCodes : await listedPlaceCodes(partnerId);
   await retireUnusedPartnerPlaces(partnerId, codes);
   clearSearchAirportsCache();
+}
+
+type PartnerPlaceGroup = {
+  partnerId: string;
+  /** New application — these places should appear in the admin delivery list. */
+  pending: boolean;
+  codes: string[];
+};
+
+function codesFromSettingsOrSnapshot(
+  settings: PartnerCompanySettings | null | undefined,
+  messages: unknown,
+): string[] {
+  const fromSettings = (settings?.deliveryLocationIds || []).map((code) => String(code || "").trim()).filter(Boolean);
+  if (fromSettings.length) return fromSettings;
+  const parsed = parsePartnerApplicationMessages(messages);
+  for (let index = parsed.length - 1; index >= 0; index -= 1) {
+    const codes = parsed[index]?.snapshot.locationCodes || [];
+    if (codes.length) return codes;
+  }
+  return [];
+}
+
+/** Places partners marked for car delivery, including applications still awaiting review. */
+async function listedPartnerPlaceGroups(): Promise<PartnerPlaceGroup[]> {
+  const groups: PartnerPlaceGroup[] = [];
+  const seen = new Set<string>();
+
+  try {
+    const partners = await prisma.partner.findMany({
+      where: { status: { in: ["PENDING", "APPROVED", "PENDING_REMODERATION"] } },
+      select: {
+        id: true,
+        status: true,
+        companySettings: true,
+        profileModeration: true,
+        applicationMessages: true,
+      },
+    });
+    for (const partner of partners) {
+      let settings = parseCompanySettings(partner.companySettings);
+      if (partner.status === "PENDING_REMODERATION") {
+        const published = parseProfileModeration(partner.profileModeration).publishedSettings;
+        if (published) settings = published;
+      }
+      const codes = codesFromSettingsOrSnapshot(settings, partner.applicationMessages);
+      if (!codes.length) continue;
+      seen.add(partner.id);
+      groups.push({
+        partnerId: partner.id,
+        pending: partner.status === "PENDING",
+        codes,
+      });
+    }
+  } catch {
+    /* file applications below */
+  }
+
+  try {
+    const { listFilePartnerApplications } = await import("@/lib/server/partner-applications-store");
+    const files = await listFilePartnerApplications();
+    for (const partner of files) {
+      if (seen.has(partner.id)) continue;
+      if (partner.status !== "PENDING" && partner.status !== "APPROVED") continue;
+      const settings = await readCompanySettingsFile(partner.id);
+      const codes = codesFromSettingsOrSnapshot(settings, partner.applicationMessages);
+      if (!codes.length) continue;
+      groups.push({
+        partnerId: partner.id,
+        pending: partner.status === "PENDING",
+        codes,
+      });
+    }
+  } catch {
+    /* ignore */
+  }
+
+  return groups;
+}
+
+function rememberPlaceKey(keys: Set<string>, raw: string) {
+  const norm = normalizeLocationCode(raw || "").toUpperCase();
+  if (norm) keys.add(norm);
+}
+
+/**
+ * Put a partner application's pickup places into the admin delivery catalog
+ * and turn them on so the list and the airport/city counts include them.
+ */
+export async function registerApplicationDeliveryLocations(codes: string[]): Promise<string[]> {
+  const unique = [...new Set(codes.map((code) => String(code || "").trim()).filter(Boolean))];
+  if (!unique.length) return [];
+  return activatePartnerApprovedDeliveryLocations(unique);
+}
+
+/**
+ * Keep the delivery catalog aligned with partner applications.
+ * Pending applications are shown in the admin list. Places an admin already
+ * turned off for an approved partner stay off.
+ */
+export async function syncListedPartnerDeliveryLocations(): Promise<void> {
+  const groups = await listedPartnerPlaceGroups();
+  if (!groups.length) return;
+
+  const pending = new Set<string>();
+  const approved = new Set<string>();
+  for (const group of groups) {
+    const target = group.pending ? pending : approved;
+    for (const code of group.codes) target.add(code);
+  }
+
+  if (pending.size) {
+    await activatePartnerApprovedDeliveryLocations([...pending]);
+  }
+
+  if (approved.size) {
+    const existing = await listDeliveryLocations({ activeOnly: false });
+    const known = new Set<string>();
+    for (const loc of existing) {
+      rememberPlaceKey(known, loc.id);
+      rememberPlaceKey(known, loc.iata);
+      rememberPlaceKey(known, loc.airportId);
+    }
+    for (const raw of approved) {
+      const code = normalizeLocationCode(raw).toUpperCase();
+      const place = findSearchPlace(raw);
+      const placeCode = place ? normalizeLocationCode(place.code).toUpperCase() : "";
+      if ((code && known.has(code)) || (placeCode && known.has(placeCode))) continue;
+      const created = await ensureDeliveryLocationByCode(raw, { isActive: true });
+      if (!created) continue;
+      rememberPlaceKey(known, created.id);
+      rememberPlaceKey(known, created.iata);
+      rememberPlaceKey(known, created.airportId);
+    }
+  }
+}
+
+/** How many partners deliver to each place code (id, IATA, and city code). */
+export async function countPartnersDeliveringByPlace(): Promise<Record<string, number>> {
+  const groups = await listedPartnerPlaceGroups();
+  const locations = await listDeliveryLocations({ activeOnly: false });
+  const owners = new Map<string, Set<string>>();
+
+  const add = (partnerId: string, raw: string) => {
+    const norm = normalizeLocationCode(raw || "").toUpperCase();
+    if (!norm) return;
+    const set = owners.get(norm) ?? new Set<string>();
+    set.add(partnerId);
+    owners.set(norm, set);
+  };
+
+  for (const group of groups) {
+    const keys = new Set<string>();
+    for (const raw of group.codes) {
+      const norm = normalizeLocationCode(raw).toUpperCase();
+      if (norm) keys.add(norm);
+      const place = findSearchPlace(raw);
+      if (place) keys.add(normalizeLocationCode(place.code).toUpperCase());
+      const loc = locations.find((row) =>
+        [row.id, row.iata, row.airportId].some(
+          (value) => normalizeLocationCode(value || "").toUpperCase() === norm,
+        ),
+      );
+      if (!loc) continue;
+      for (const value of [loc.id, loc.iata, loc.airportId]) {
+        const key = normalizeLocationCode(value || "").toUpperCase();
+        if (key) keys.add(key);
+      }
+    }
+    for (const key of keys) add(group.partnerId, key);
+  }
+
+  const counts: Record<string, number> = {};
+  for (const [key, partners] of owners) counts[key] = partners.size;
+  return counts;
 }
