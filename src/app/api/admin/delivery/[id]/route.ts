@@ -26,6 +26,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const body = patchSchema.parse(await req.json());
     const row = await updateDeliveryLocation(id, body);
     if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (body.isActive !== undefined) {
+      const { markAdminDisabledPlace } = await import("@/lib/server/delivery-admin-disabled-store");
+      await markAdminDisabledPlace(row.iata || row.airportId, !body.isActive);
+    }
     return NextResponse.json(row);
   } catch (error) {
     if (error instanceof z.ZodError) {

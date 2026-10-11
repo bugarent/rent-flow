@@ -524,7 +524,7 @@ export function DeliveryLocationsManager({
             </button>
           </div>
           <DeliveryCountryFilter
-            className="min-w-0 flex-1"
+            className="min-w-[10rem] flex-1"
             countries={countries}
             valueIso2={countryIso2}
             onChange={setCountryIso2}
