@@ -6,13 +6,13 @@ import type { ExtraServicePricing } from "@/lib/extras/pricing";
 import {
   capPartnerMaxPeriod,
   clampPartnerDailyPrice,
-  isMandatoryExtra,
   isMandatoryFreeExtra,
   isPeriodForcedFreeExtra,
   optionalPeriodMoney,
 } from "@/lib/extras/pricing";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
 import { isListingInsuranceService } from "@/lib/extras/checkout-slot";
+import { partnerStatusLocked } from "@/lib/extras/partner-service-choice";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { usePartnerMoney } from "@/components/providers/partner-money-context";
 import { PartnerEurMoneyInput } from "@/components/partner/partner-eur-money-input";
@@ -336,11 +336,12 @@ export function PartnerEquipmentServicePanel({
       .filter((s) => s.isActive !== false)
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((service) => {
-        const mandatory = isMandatoryExtra(service);
+        const locked = partnerStatusLocked(service);
+        const insuranceOn = isListingInsuranceService(service);
         return {
           service,
-          mode: mandatory ? ("on" as const) : ("off" as const),
-          priceEur: mandatory
+          mode: locked || insuranceOn ? ("on" as const) : ("off" as const),
+          priceEur: locked
             ? String(clampPartnerDailyPrice(service.minPriceEur, service.maxPriceEur, 0))
             : String(
                 clampPartnerDailyPrice(
@@ -404,12 +405,12 @@ export function PartnerEquipmentServicePanel({
                 maxPeriodEur?: number | null;
                 carIds?: string[];
               }) => {
-                const mandatory = isMandatoryExtra(item.service);
+                const locked = partnerStatusLocked(item.service);
                 const mandatoryFree = isMandatoryFreeExtra(item.service);
                 const mode = modeFromFlags(
                   Boolean(item.enabled),
                   Boolean(item.forbidden),
-                  mandatory,
+                  locked,
                 );
                 const periodFree = isPeriodForcedFreeExtra(item.service);
                 const periodCap = capPartnerMaxPeriod(item.service.maxPeriodEur, item.maxPeriodEur);
@@ -731,7 +732,7 @@ export function PartnerEquipmentServicePanel({
   /* —— Create / Edit detail view —— */
   if (creating || editingRow) {
     const title = creating ? t.add.replace("+ ", "") : localizedExtraCopy(locale, editingRow!.service.name, editingRow!.service.nameI18n);
-    const mandatory = editingRow ? isMandatoryExtra(editingRow.service) : false;
+    const statusLocked = editingRow ? partnerStatusLocked(editingRow.service) : false;
     const mandatoryFree = editingRow ? isMandatoryFreeExtra(editingRow.service) : false;
     const periodFree = editingRow ? isPeriodForcedFreeExtra(editingRow.service) : false;
     const maxCap = editingRow?.adminMaxDaily ?? null;
@@ -771,7 +772,7 @@ export function PartnerEquipmentServicePanel({
             <p className="mb-3 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">
               {t.mandatoryFree}
             </p>
-          ) : mandatory && !creating ? (
+          ) : statusLocked && !mandatoryFree && !creating ? (
             <p className="mb-3 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900">
               {t.mandatoryPricedHint}
             </p>
@@ -940,7 +941,7 @@ export function PartnerEquipmentServicePanel({
                     ) : null}
                   </label>
 
-                  {!mandatory ? (
+                  {!statusLocked ? (
                     <div>
                       <p className="mb-1.5 text-xs font-semibold text-slate-500">{t.status}</p>
                       <div className="flex flex-wrap gap-1.5">
@@ -1045,7 +1046,7 @@ export function PartnerEquipmentServicePanel({
                     else setRow(editingRow!.service.id, { carIds: ids });
                   }}
                   locale={locale}
-                  disabled={mandatory || modeValue === "off"}
+                  disabled={statusLocked || modeValue === "off"}
                 />
               </section>
             </div>
@@ -1126,7 +1127,7 @@ export function PartnerEquipmentServicePanel({
                   <tbody>
                     {orderedRows.map((row, idx) => {
                       const mandatory = isMandatoryFreeExtra(row.service);
-                      const mandatoryAny = isMandatoryExtra(row.service);
+                      const statusLocked = partnerStatusLocked(row.service);
                       const periodFree = isPeriodForcedFreeExtra(row.service);
                       const dailyNum = Number(row.priceEur);
                       const dailyIsZero =
@@ -1177,7 +1178,7 @@ export function PartnerEquipmentServicePanel({
                           key={row.service.id}
                           className={cn(
                             "border-t border-slate-100",
-                            mandatoryAny
+                            statusLocked
                               ? "border-l-4 border-l-emerald-500 bg-emerald-50"
                               : idx % 2 === 0
                                 ? "bg-white"
@@ -1191,7 +1192,7 @@ export function PartnerEquipmentServicePanel({
                                 {localizedExtraCopy(locale, row.service.description, row.service.descriptionI18n)}
                               </p>
                             ) : null}
-                            {mandatoryAny ? (
+                            {statusLocked ? (
                               <span
                                 className={cn(
                                   "mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold",
@@ -1249,7 +1250,7 @@ export function PartnerEquipmentServicePanel({
                             )}
                           </td>
                           <td className="px-3 py-3 align-top text-right">
-                            {mandatoryAny ? (
+                            {statusLocked ? (
                               <div className="flex flex-col items-end gap-1.5">
                                 <span
                                   title={t.mandatoryLockedTitle}
@@ -1298,7 +1299,7 @@ export function PartnerEquipmentServicePanel({
                 <div className="space-y-1.5">
                   {[...phoneInsuranceRows, ...phoneServiceRows].map((row) => {
                     const mandatory = isMandatoryFreeExtra(row.service);
-                    const mandatoryAny = isMandatoryExtra(row.service);
+                    const statusLocked = partnerStatusLocked(row.service);
                     const periodFree = isPeriodForcedFreeExtra(row.service);
                     const dailyNum = Number(row.priceEur);
                     const dailyIsZero =
@@ -1378,7 +1379,7 @@ export function PartnerEquipmentServicePanel({
                           </span>
                           <span className="shrink-0 text-xs font-semibold text-slate-400">{priceCell}</span>
                         </button>
-                        {mandatoryAny ? (
+                        {statusLocked ? (
                           <span
                             title={t.mandatoryLockedTitle}
                             className="mb-0.5 inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700"

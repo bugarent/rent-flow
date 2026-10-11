@@ -947,7 +947,7 @@ export function PartnerCreateCarForm({
                 const service = filtered.find((item) => item.id === row.extraServiceId);
                 const pref = service ? prefs.forService(service) : undefined;
                 const mandatory = service ? isMandatoryExtra(service) : false;
-                const insurance = service ? isProtectionInsuranceService(service) : false;
+                const insurance = service ? isListingInsuranceService(service) : false;
                 let enabled = row.enabled;
                 let forbidden = Boolean(row.forbidden);
                 if (!mandatory && pref?.forbidden) {

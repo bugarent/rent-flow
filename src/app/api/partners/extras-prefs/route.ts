@@ -22,7 +22,8 @@ import {
   optionalPeriodMoney,
 } from "@/lib/extras/pricing";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
-import { isProtectionInsuranceService } from "@/lib/extras/checkout-slot";
+import { isListingInsuranceService } from "@/lib/extras/checkout-slot";
+import { partnerStatusLocked } from "@/lib/extras/partner-service-choice";
 import { parseCarDetails } from "@/lib/cars/car-details";
 import { syncListingExtraPrices } from "@/lib/server/sync-listing-extra-prices";
 
@@ -192,11 +193,12 @@ export async function GET() {
       })
       .map((service) => {
       const mandatory = isMandatoryExtra(service);
+      const locked = partnerStatusLocked(service);
       const mandatoryFree = isMandatoryFreeExtra(service);
       const pref = prefById.get(service.id);
       const max = service.maxPriceEur;
-      const forbidden = mandatory ? false : Boolean(pref?.forbidden);
-      const insuranceDefault = !pref && isProtectionInsuranceService(service);
+      const forbidden = locked ? false : Boolean(pref?.forbidden);
+      const insuranceDefault = !pref && isListingInsuranceService(service);
       const defaultPrice =
         mandatoryFree || forbidden || isPeriodForcedFreeExtra(service)
           ? 0
@@ -210,7 +212,7 @@ export async function GET() {
       const carIds = Array.isArray(pref?.carIds) ? pref.carIds.map(String) : allCarIds;
       return {
         service,
-        enabled: mandatory ? true : forbidden ? true : pref ? Boolean(pref.enabled) : insuranceDefault,
+        enabled: locked ? true : forbidden ? true : pref ? Boolean(pref.enabled) : insuranceDefault,
         forbidden,
         priceEur: defaultPrice,
         maxPriceEur: max,
@@ -248,8 +250,9 @@ export async function PUT(req: Request) {
       const service = byId.get(id);
       if (!service) continue;
       const mandatory = isMandatoryExtra(service);
+      const locked = partnerStatusLocked(service);
       const mandatoryFree = isMandatoryFreeExtra(service);
-      const forbidden = mandatory ? false : Boolean(row?.forbidden);
+      const forbidden = locked ? false : Boolean(row?.forbidden);
       const cleanedIds = cleanCarIds(row?.carIds, allowedCarIds);
       // undefined = legacy "all cars"; [] = explicitly none; otherwise filtered list.
       const carIds = mandatory
@@ -274,7 +277,7 @@ export async function PUT(req: Request) {
       }
       next.push({
         extraServiceId: id,
-        enabled: mandatory ? true : forbidden ? true : Boolean(row?.enabled),
+        enabled: locked ? true : forbidden ? true : Boolean(row?.enabled),
         forbidden,
         priceEur:
           mandatoryFree || forbidden || isPeriodForcedFreeExtra(service)

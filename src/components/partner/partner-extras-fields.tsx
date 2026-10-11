@@ -8,7 +8,8 @@ import {
   isMandatoryPricedExtra,
 } from "@/lib/extras/pricing";
 import { findCarExtraOffer, type CarExtraOffer } from "@/lib/cars/car-details";
-import { isProtectionInsuranceService } from "@/lib/extras/checkout-slot";
+import { isListingInsuranceService } from "@/lib/extras/checkout-slot";
+import { partnerStatusLocked } from "@/lib/extras/partner-service-choice";
 import { formatAmountNumber } from "@/lib/utils";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { knownText } from "@/lib/i18n/known-record-text";
@@ -143,11 +144,12 @@ export function extrasVisibleOnCarForm(
     (opts.fallback || []).map((service) => service.slug).filter(Boolean),
   );
   return catalog.filter((service) => {
-    if (isMandatoryExtra(service) || isProtectionInsuranceService(service)) return true;
+    if (partnerStatusLocked(service)) return true;
     const pref = prefs.forService(service);
     // Cabinet choice wins: off stays off the car form even if this car used the service before.
     if (prefs.trusted && pref) return Boolean(pref.enabled || pref.forbidden);
-    if (prefs.trusted) return false;
+    if (prefs.trusted) return isListingInsuranceService(service);
+    if (isListingInsuranceService(service)) return true;
     if (opts.carExtraIds?.has(service.id)) return true;
     if (opts.offerIds?.has(service.id)) return true;
     return fallbackIds.has(service.id) || (service.slug ? fallbackSlugs.has(service.slug) : false);
