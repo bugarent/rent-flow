@@ -590,13 +590,12 @@ export function PartnerCreateCarForm({
           setPricingCurrency(nextCurrency);
           setFxRates(nextRates);
 
-          const [categoriesRes, carRes, delRes] = await Promise.all([
+          const [categoriesRes, carRes] = await Promise.all([
             fetch("/api/partners/car-categories").catch(() => null),
             fetch(`/api/cars/${encodeURIComponent(carId)}`, {
               cache: "no-store",
               signal: AbortSignal.timeout(20_000),
             }),
-            fetch("/api/admin/delivery", { cache: "no-store" }).catch(() => null),
           ]);
           if (cancelled) return;
 
@@ -618,9 +617,16 @@ export function PartnerCreateCarForm({
             throw new Error(typeof car.error === "string" ? car.error : errUpdateFailedRef.current);
           }
           const partnerId = String(car.partner?.id || "");
-          const extrasRes = await fetch(
-            partnerId ? `/api/extras?partnerId=${encodeURIComponent(partnerId)}` : "/api/extras",
-          ).catch(() => null);
+          const [extrasRes, delRes] = await Promise.all([
+            fetch(
+              partnerId ? `/api/extras?partnerId=${encodeURIComponent(partnerId)}` : "/api/extras",
+            ).catch(() => null),
+            partnerId
+              ? fetch(`/api/admin/delivery?partnerId=${encodeURIComponent(partnerId)}`, {
+                  cache: "no-store",
+                }).catch(() => null)
+              : Promise.resolve(null),
+          ]);
           const extras = extrasRes?.ok ? await extrasRes.json().catch(() => []) : [];
 
           const details = parseCarDetails(car.description);
@@ -799,13 +805,14 @@ export function PartnerCreateCarForm({
           ).filter((loc) => loc.isActive);
 
           const carDeliveries = Array.isArray(car.deliveryPrices) ? car.deliveryPrices : [];
-          // Fallback: build catalog entries from the listing's saved delivery rows
-          // so admin review still shows pick-up places when global catalog is empty.
-          if (!deliveryList.length && carDeliveries.length) {
+          // Admin sees only the partner's approved places, plus places already saved
+          // on this listing so existing selections are never silently dropped.
+          if (carDeliveries.length) {
+            const scopedIds = new Set(deliveryList.map((loc) => loc.id));
             const fromCar: DeliveryLocationView[] = [];
             for (const row of carDeliveries) {
               const id = String(row?.deliveryLocationId || "");
-              if (!id) continue;
+              if (!id || scopedIds.has(id)) continue;
               const loc = row?.deliveryLocation;
               const iata = String(loc?.airport?.iata || "").toUpperCase();
               const iso2 = String(loc?.airport?.city?.country?.iso2 || "").toUpperCase();
@@ -822,9 +829,9 @@ export function PartnerCreateCarForm({
                 sortOrder: 0,
               });
             }
-            deliveryList = fromCar.filter((loc) => loc.isActive);
+            deliveryList = [...deliveryList, ...fromCar.filter((loc) => loc.isActive)];
           }
-          if (deliveryList.length) setDeliveryCatalog(deliveryList);
+          setDeliveryCatalog(deliveryList);
 
           const selectedIds = carDeliveries
             .map((d: { deliveryLocationId?: string }) => String(d.deliveryLocationId || ""))
@@ -1228,9 +1235,13 @@ export function PartnerCreateCarForm({
             meRes.ok && Array.isArray(me.deliveryCatalog) && me.deliveryCatalog.length
               ? (me.deliveryCatalog as DeliveryLocationView[])
               : initialDeliveryRef.current;
-          if (isAdminReview && !deliveryList.length) {
+          const carPartnerId = String(car.partner?.id || "");
+          if (isAdminReview && !deliveryList.length && carPartnerId) {
             try {
-              const adminDelRes = await fetch("/api/admin/delivery", { cache: "no-store" });
+              const adminDelRes = await fetch(
+                `/api/admin/delivery?partnerId=${encodeURIComponent(carPartnerId)}`,
+                { cache: "no-store" },
+              );
               const adminDel = adminDelRes.ok ? await adminDelRes.json() : null;
               const adminRows = (
                 Array.isArray(adminDel?.locations)

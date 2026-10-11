@@ -7,6 +7,7 @@ import {
   listConfigurableAirports,
   listDeliveryLocations,
 } from "@/lib/server/delivery-locations";
+import { loadPartnerDeliveryCatalog } from "@/lib/server/partner-delivery-catalog";
 
 async function requireAdmin() {
   const session = await getAdminSession();
@@ -21,10 +22,15 @@ const createSchema = z.object({
   sortOrder: z.number().int().optional(),
 });
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     if (!(await requireAdmin())) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+    }
+    const partnerId = new URL(req.url).searchParams.get("partnerId")?.trim();
+    if (partnerId) {
+      const locations = await loadPartnerDeliveryCatalog(partnerId);
+      return NextResponse.json({ locations }, { headers: { "Cache-Control": "no-store" } });
     }
     const [locations, availableAirports, partnerCountries] = await Promise.all([
       listDeliveryLocations(),
