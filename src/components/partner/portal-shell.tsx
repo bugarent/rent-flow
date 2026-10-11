@@ -3,6 +3,12 @@
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { PartnerPortalTopBar } from "@/components/partner/partner-portal-top-bar";
+import {
+  PartnerExtrasGateNotice,
+  PartnerExtrasGateProvider,
+  isPartnerExtrasPath,
+  usePartnerExtrasGate,
+} from "@/components/partner/partner-extras-gate";
 import { PartnerIdleLogout } from "@/components/partner/partner-idle-logout";
 import { PartnerRemoderationBanner } from "@/components/partner/partner-remoderation-banner";
 import { PARTNER_BASE, PARTNER_LOGIN, PARTNER_REGISTER, PARTNER_VERIFY } from "@/lib/routes";
@@ -38,8 +44,19 @@ export function PartnerPortalShell({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
+  return (
+    <PartnerExtrasGateProvider>
+      <PartnerCabinetFrame>{children}</PartnerCabinetFrame>
+    </PartnerExtrasGateProvider>
+  );
+}
+
+function PartnerCabinetFrame({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const { gate } = usePartnerExtrasGate();
+  const blocked = gate && !isPartnerExtrasPath(pathname);
   const ownBg = usesOwnPageBackground(pathname);
-  const calendar = isCalendarPath(pathname);
+  const calendar = isCalendarPath(pathname) && !blocked;
 
   return (
     <div
@@ -72,7 +89,7 @@ export function PartnerPortalShell({ children }: { children: ReactNode }) {
       </header>
       <PartnerRemoderationBanner />
       <div className={cn("relative z-0 flex-1", calendar && "flex min-h-0 flex-col overflow-hidden")}>
-        {children}
+        {blocked ? <PartnerExtrasGateNotice /> : children}
       </div>
     </div>
   );

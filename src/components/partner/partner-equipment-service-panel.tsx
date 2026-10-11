@@ -12,7 +12,7 @@ import {
   optionalPeriodMoney,
 } from "@/lib/extras/pricing";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
-import { isProtectionInsuranceSlot } from "@/lib/extras/checkout-slot";
+import { isProtectionInsuranceService } from "@/lib/extras/checkout-slot";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { usePartnerMoney } from "@/components/providers/partner-money-context";
 import { PartnerEurMoneyInput } from "@/components/partner/partner-eur-money-input";
@@ -1080,12 +1080,8 @@ export function PartnerEquipmentServicePanel({
   const orderedRows = [...rows].sort(
     (a, b) => a.service.sortOrder - b.service.sortOrder || a.service.name.localeCompare(b.service.name),
   );
-  const phoneInsuranceRows = orderedRows.filter((row) =>
-    isProtectionInsuranceSlot(row.service.checkoutSlot),
-  );
-  const phoneServiceRows = orderedRows.filter(
-    (row) => !isProtectionInsuranceSlot(row.service.checkoutSlot),
-  );
+  const phoneInsuranceRows = orderedRows.filter((row) => isProtectionInsuranceService(row.service));
+  const phoneServiceRows = orderedRows.filter((row) => !isProtectionInsuranceService(row.service));
 
   /* —— List table view —— */
   return (
@@ -1106,6 +1102,14 @@ export function PartnerEquipmentServicePanel({
           </p>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm max-md:overflow-visible max-md:border-0 max-md:bg-transparent max-md:shadow-none">
+            {phoneInsuranceRows.length > 0 ? (
+              <h2
+                id="partner-insurance-services"
+                className="scroll-mt-24 px-3 pb-1 pt-3 text-sm font-extrabold text-[#0b1f4b] max-md:px-0.5"
+              >
+                {t.insuranceGroup}
+              </h2>
+            ) : null}
             <ResponsiveDataList
               desktop={
                 <table className="min-w-full text-left text-sm">
@@ -1292,11 +1296,6 @@ export function PartnerEquipmentServicePanel({
               }
               mobile={
                 <div className="space-y-1.5">
-                  {phoneInsuranceRows.length > 0 ? (
-                    <p className="px-0.5 text-xs font-extrabold uppercase tracking-wide text-slate-500">
-                      {t.insuranceGroup}
-                    </p>
-                  ) : null}
                   {[...phoneInsuranceRows, ...phoneServiceRows].map((row) => {
                     const mandatory = isMandatoryFreeExtra(row.service);
                     const mandatoryAny = isMandatoryExtra(row.service);

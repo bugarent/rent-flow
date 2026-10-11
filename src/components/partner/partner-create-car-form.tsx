@@ -9,7 +9,7 @@ import { isStudioCoverUrl } from "@/lib/cars/studio-cover-url";
 import { PARTNER_BASE } from "@/lib/routes";
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
 import { isMandatoryExtra, isMandatoryFreeExtra } from "@/lib/extras/pricing";
-import { isProtectionInsuranceSlot } from "@/lib/extras/checkout-slot";
+import { isProtectionInsuranceService } from "@/lib/extras/checkout-slot";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import {
   buildExtraSelections,
@@ -736,7 +736,10 @@ export function PartnerCreateCarForm({
             const offerIds = catalogIdsForOffers(extras, offers);
             const filtered = extras.filter(
               (service: ExtraServicePricing) =>
-                isMandatoryExtra(service) || carExtraIds.has(service.id) || offerIds.has(service.id),
+                isMandatoryExtra(service) ||
+                isProtectionInsuranceService(service) ||
+                carExtraIds.has(service.id) ||
+                offerIds.has(service.id),
             );
             setExtrasCatalog(filtered);
             setExtraSelections(
@@ -937,13 +940,30 @@ export function PartnerCreateCarForm({
             });
             setExtrasCatalog(filtered);
             setExtraSelections(
-              buildExtraSelections(filtered, existingPrices).map((row) => ({
-                ...row,
-                priceEur:
-                  row.forbidden || !row.priceEur || row.priceEur === "0"
+              buildExtraSelections(filtered, existingPrices).map((row) => {
+                const service = filtered.find((item) => item.id === row.extraServiceId);
+                const pref = service ? prefs.forService(service) : undefined;
+                const mandatory = service ? isMandatoryExtra(service) : false;
+                const insurance = service ? isProtectionInsuranceService(service) : false;
+                let enabled = row.enabled;
+                let forbidden = Boolean(row.forbidden);
+                if (!mandatory && pref?.forbidden) {
+                  enabled = true;
+                  forbidden = true;
+                } else if (!mandatory && pref && pref.enabled === false) {
+                  enabled = false;
+                  forbidden = false;
+                } else if (!mandatory && !pref && insurance) {
+                  enabled = true;
+                  forbidden = false;
+                }
+                const priceEur = forbidden
+                  ? "0"
+                  : !row.priceEur || row.priceEur === "0"
                     ? row.priceEur
-                    : eurToPartnerAmount(row.priceEur, nextCurrency, nextRates),
-              })),
+                    : eurToPartnerAmount(row.priceEur, nextCurrency, nextRates);
+                return { ...row, enabled, forbidden, priceEur };
+              }),
             );
           }
         }
@@ -2573,12 +2593,8 @@ export function PartnerCreateCarForm({
               const sorted = [...extrasCatalog]
                 .filter((service) => service.isActive !== false)
                 .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
-              const insuranceServices = sorted.filter((service) =>
-                isProtectionInsuranceSlot(service.checkoutSlot),
-              );
-              const otherServices = sorted.filter(
-                (service) => !isProtectionInsuranceSlot(service.checkoutSlot),
-              );
+              const insuranceServices = sorted.filter((service) => isProtectionInsuranceService(service));
+              const otherServices = sorted.filter((service) => !isProtectionInsuranceService(service));
               const offerCard = (service: ExtraServicePricing, variant: "insurance" | "light" | "desktop") => {
                 const row = extraSelections.find((s) => s.extraServiceId === service.id);
                 const mandatory = isMandatoryExtra(service);
@@ -2745,8 +2761,23 @@ export function PartnerCreateCarForm({
                     ) : null}
                     {otherServices.map((service) => offerCard(service, "light"))}
                   </div>
-                  <div className="hidden md:grid md:grid-cols-2 md:gap-1.5">
-                    {sorted.map((service) => offerCard(service, "desktop"))}
+                  <div className="hidden md:block">
+                    {insuranceServices.length > 0 ? (
+                      <p id="listing-insurance-services" className="mb-1 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                        {knownText(locale, cc.sections.insurance)}
+                      </p>
+                    ) : null}
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {insuranceServices.map((service) => offerCard(service, "desktop"))}
+                    </div>
+                    {otherServices.length > 0 ? (
+                      <p className="mb-1 mt-2 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                        {knownText(locale, cc.sections.extras)}
+                      </p>
+                    ) : null}
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {otherServices.map((service) => offerCard(service, "desktop"))}
+                    </div>
                   </div>
                 </>
               );

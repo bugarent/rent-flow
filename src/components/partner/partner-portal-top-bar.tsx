@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CalendarDays, Menu, Plus, UserRound } from "lucide-react";
+import { usePartnerExtrasGate } from "@/components/partner/partner-extras-gate";
 import { PARTNER_BASE } from "@/lib/routes";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { usePartnerMoney } from "@/components/providers/partner-money-context";
@@ -34,6 +35,7 @@ export function PartnerPortalTopBar({
   className?: string;
 }) {
   const pathname = usePathname();
+  const { gate, extrasHref } = usePartnerExtrasGate();
   const { dictionary } = usePartnerLocale();
   const { pricingCurrency, setPricingCurrency } = usePartnerMoney();
   const t = dictionary.calendar;
@@ -129,13 +131,32 @@ export function PartnerPortalTopBar({
   const activeLabel =
     items.find((item) => isActivePath(pathname, item.href, item.mode))?.label ?? "Partner";
 
+  const isExtrasItem = (href: string) => href.startsWith(`${PARTNER_BASE}/equipment-service`);
+  const extrasHint = t.equipmentService;
+
+  const itemHref = (href: string) => (gate && isExtrasItem(href) ? extrasHref : href);
+  const itemClass = (href: string, active: boolean, opts?: { addCar?: boolean; stacked?: boolean }) =>
+    cn(
+      linkClass(active && !(gate && isExtrasItem(href)), {
+        addCar: Boolean(opts?.addCar) && !(gate && isExtrasItem(href)),
+        stacked: opts?.stacked,
+      }),
+      gate &&
+        isExtrasItem(href) &&
+        "bg-amber-400 font-extrabold text-amber-950 ring-2 ring-amber-200 hover:bg-amber-300",
+    );
+
   return (
     <div className={cn("flex w-full min-w-0 items-center gap-x-1", className)}>
       <button
         type="button"
         className={cn(
           "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg md:hidden",
-          dark ? "bg-white/10 text-white hover:bg-white/15" : "bg-slate-100 text-[#0b1f4b]",
+          gate
+            ? "bg-amber-400 text-amber-950 ring-2 ring-amber-200"
+            : dark
+              ? "bg-white/10 text-white hover:bg-white/15"
+              : "bg-slate-100 text-[#0b1f4b]",
         )}
         aria-label="Open menu"
         aria-expanded={menuOpen}
@@ -155,15 +176,22 @@ export function PartnerPortalTopBar({
         {items.map((item) => {
           const active = isActivePath(pathname, item.href, item.mode);
           const Icon = "icon" in item ? item.icon : null;
+          const blocked = gate && !isExtrasItem(item.href);
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={itemHref(item.href)}
               prefetch={false}
               aria-current={active ? "page" : undefined}
+              aria-disabled={blocked || undefined}
+              title={gate && isExtrasItem(item.href) ? extrasHint : undefined}
+              onClick={(event) => {
+                if (blocked) event.preventDefault();
+              }}
               className={cn(
-                linkClass(active, { addCar: item.addCar }),
+                itemClass(item.href, active, { addCar: item.addCar }),
                 item.truncate ? "min-w-0 shrink" : "shrink-0",
+                blocked && "cursor-not-allowed opacity-60",
               )}
             >
               {Icon ? (
@@ -208,14 +236,25 @@ export function PartnerPortalTopBar({
           {items.map((item) => {
             const active = isActivePath(pathname, item.href, item.mode);
             const Icon = "icon" in item ? item.icon : null;
+            const blocked = gate && !isExtrasItem(item.href);
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={itemHref(item.href)}
                 prefetch={false}
                 aria-current={active ? "page" : undefined}
-                onClick={closeMenu}
-                className={linkClass(active, { addCar: item.addCar, stacked: true })}
+                aria-disabled={blocked || undefined}
+                onClick={(event) => {
+                  if (blocked) {
+                    event.preventDefault();
+                    return;
+                  }
+                  closeMenu();
+                }}
+                className={cn(
+                  itemClass(item.href, active, { addCar: item.addCar, stacked: true }),
+                  blocked && "cursor-not-allowed opacity-60",
+                )}
               >
                 {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
                 {item.label}

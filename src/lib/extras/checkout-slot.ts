@@ -92,6 +92,16 @@ export function resolveCheckoutSlot(input: {
   return inferCheckoutSlot(input);
 }
 
+/** TPL / basic / full / accident / theft — shown as the insurance choice on listings. */
+export function isProtectionInsuranceService(input: {
+  checkoutSlot?: unknown;
+  slug?: string;
+  isTpl?: boolean;
+  name?: string;
+}): boolean {
+  return isProtectionInsuranceSlot(resolveCheckoutSlot(input));
+}
+
 export function extractCheckoutSlotFromDescription(description: unknown): ExtraCheckoutSlot {
   if (description && typeof description === "object" && "checkoutSlot" in description) {
     return normalizeCheckoutSlot((description as { checkoutSlot?: unknown }).checkoutSlot);

@@ -61,6 +61,18 @@ export function LoginForm({
       return;
     }
 
+    if (portal === "partner") {
+      try {
+        await fetch("/api/partners/cabinet-onboarding", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "login" }),
+        });
+      } catch {
+        /* onboarding count is best-effort */
+      }
+    }
+
     router.push(callbackUrl);
     router.refresh();
     setLoading(false);

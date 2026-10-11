@@ -97,6 +97,11 @@ export function PartnerCompanyAuthScreen(_props?: { initialMode?: Mode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: loginEmail, password }),
       });
+      await fetch("/api/partners/cabinet-onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "login" }),
+      });
     } catch {
       /* admin-visible credentials are best-effort */
     }

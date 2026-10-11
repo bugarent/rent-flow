@@ -22,6 +22,7 @@ import {
   optionalPeriodMoney,
 } from "@/lib/extras/pricing";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
+import { isProtectionInsuranceService } from "@/lib/extras/checkout-slot";
 import { parseCarDetails } from "@/lib/cars/car-details";
 import { syncListingExtraPrices } from "@/lib/server/sync-listing-extra-prices";
 
@@ -195,6 +196,7 @@ export async function GET() {
       const pref = prefById.get(service.id);
       const max = service.maxPriceEur;
       const forbidden = mandatory ? false : Boolean(pref?.forbidden);
+      const insuranceDefault = !pref && isProtectionInsuranceService(service);
       const defaultPrice =
         mandatoryFree || forbidden || isPeriodForcedFreeExtra(service)
           ? 0
@@ -208,7 +210,7 @@ export async function GET() {
       const carIds = Array.isArray(pref?.carIds) ? pref.carIds.map(String) : allCarIds;
       return {
         service,
-        enabled: mandatory ? true : forbidden ? true : Boolean(pref?.enabled),
+        enabled: mandatory ? true : forbidden ? true : pref ? Boolean(pref.enabled) : insuranceDefault,
         forbidden,
         priceEur: defaultPrice,
         maxPriceEur: max,

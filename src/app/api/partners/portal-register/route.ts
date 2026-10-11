@@ -12,7 +12,8 @@ import {
   listFilePartnerApplications,
   updateFilePartnerStatus,
 } from "@/lib/server/partner-applications-store";
-import { saveLocalPartner } from "@/lib/auth/local-partner-store";
+import { saveLocalPartner, LOCAL_PARTNER_ID } from "@/lib/auth/local-partner-store";
+import { enrollPartnerCabinetOnboarding } from "@/lib/server/partner-cabinet-onboarding";
 
 const schema = z.object({
   email: z.string().email(),
@@ -238,6 +239,9 @@ export async function POST(req: Request) {
         } catch (locError) {
           console.warn("[partners/portal-register] airports:", locError);
         }
+        await enrollPartnerCabinetOnboarding(result.id).catch((error) => {
+          console.warn("[partners/portal-register] onboarding", error);
+        });
         return NextResponse.json({
           partnerId: result.id,
           status: result.status,
@@ -270,6 +274,10 @@ export async function POST(req: Request) {
         /* best-effort */
       }
       await updateFilePartnerStatus(partner.id, "PENDING_FINAL", null);
+      await enrollPartnerCabinetOnboarding(partner.id).catch((error) => {
+        console.warn("[partners/portal-register] onboarding", error);
+      });
+      await enrollPartnerCabinetOnboarding(LOCAL_PARTNER_ID).catch(() => undefined);
       return NextResponse.json({
         partnerId: partner.id,
         status: "PENDING_FINAL",
@@ -361,6 +369,9 @@ export async function POST(req: Request) {
       console.warn("[partners/portal-register] airports:", locError);
     }
 
+    await enrollPartnerCabinetOnboarding(result.id).catch((error) => {
+      console.warn("[partners/portal-register] onboarding", error);
+    });
     return NextResponse.json({
       partnerId: result.id,
       status: result.status,
