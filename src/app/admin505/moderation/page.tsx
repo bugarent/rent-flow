@@ -25,6 +25,12 @@ import {
   filterDirectoryPartners,
 } from "@/lib/server/admin-partner-rows";
 
+function registrationEmail(
+  partner: { email?: string | null; user?: { email?: string | null } | null } | undefined,
+): string {
+  return (partner?.user?.email || partner?.email || "").trim();
+}
+
 async function loadCars(): Promise<{
   cars: ModerationCarView[];
   dbOffline: boolean;
@@ -35,17 +41,24 @@ async function loadCars(): Promise<{
       console.warn("[admin/moderation] insurance expiry", error);
     });
 
-    const rows = await prisma.car.findMany({
-      where: {
-        status: {
-          in: [ListingStatus.PENDING, ListingStatus.PENDING_REMODERATION],
+    const [rows, fileCars] = await Promise.all([
+      prisma.car.findMany({
+        where: {
+          status: {
+            in: [ListingStatus.PENDING, ListingStatus.PENDING_REMODERATION],
+          },
         },
-      },
-      orderBy: { updatedAt: "desc" },
-    });
+        orderBy: { updatedAt: "desc" },
+      }),
+      listFilePendingCars(),
+    ]);
 
     const carIds = rows.map((c) => c.id);
-    const partnerIds = [...new Set(rows.map((c) => c.partnerId).filter(Boolean))];
+    const partnerIds = [
+      ...new Set(
+        [...rows.map((c) => c.partnerId), ...fileCars.map((c) => c.partnerId)].filter(Boolean),
+      ),
+    ];
 
     const [photos, passports, partners] = await Promise.all([
       carIds.length
@@ -64,7 +77,12 @@ async function loadCars(): Promise<{
       partnerIds.length
         ? prisma.partner.findMany({
             where: { id: { in: partnerIds } },
-            select: { id: true, companyName: true },
+            select: {
+              id: true,
+              companyName: true,
+              email: true,
+              user: { select: { email: true } },
+            },
           })
         : Promise.resolve([]),
     ]);
@@ -91,7 +109,9 @@ async function loadCars(): Promise<{
         model: car.model,
         year: car.year,
         hiddenReason: car.hiddenReason,
+        partnerId: car.partnerId,
         partnerName: partnerById.get(car.partnerId)?.companyName ?? "—",
+        partnerEmail: registrationEmail(partnerById.get(car.partnerId)),
         photos: photosByCar.get(car.id) ?? [],
         passportFrontUrl: passport?.frontUrl ?? null,
         passportBackUrl: passport?.backUrl ?? null,
@@ -102,7 +122,6 @@ async function loadCars(): Promise<{
       };
     });
     const seen = new Set(prismaCars.map((c) => c.id));
-    const fileCars = await listFilePendingCars();
     const extraIds = fileCars.filter((c) => !seen.has(c.id)).map((c) => c.id);
     const fileInsurance = extraIds.length ? await readCarInsuranceDocs(extraIds) : new Map();
     const merged = [
@@ -118,7 +137,10 @@ async function loadCars(): Promise<{
             model: car.model,
             year: car.year,
             hiddenReason: car.hiddenReason ?? null,
+            partnerId: car.partnerId,
             partnerName: car.partnerName ?? "—",
+            partnerEmail:
+              registrationEmail(partnerById.get(car.partnerId)) || (car.partnerEmail || "").trim(),
             photos: car.photos.map((url, index) => ({ id: `${car.id}-photo-${index}`, url })),
             passportFrontUrl: car.passportFrontUrl ?? null,
             passportBackUrl: car.passportBackUrl ?? null,
@@ -161,7 +183,9 @@ async function loadCars(): Promise<{
           model: car.model,
           year: car.year,
           hiddenReason: car.hiddenReason ?? null,
+          partnerId: car.partnerId,
           partnerName: car.partnerName ?? "—",
+          partnerEmail: (car.partnerEmail || "").trim(),
           photos: car.photos.map((url, index) => ({ id: `${car.id}-photo-${index}`, url })),
           passportFrontUrl: car.passportFrontUrl ?? null,
           passportBackUrl: car.passportBackUrl ?? null,

@@ -18,10 +18,13 @@ export default async function AdminPartnerModerationReviewPage({
   const returnTab = sp.returnTab?.trim().toLowerCase();
 
   let backHref = `${ADMIN_BASE}/partners`;
-  let backTarget: "partners" | "profiles" | "primary" = "partners";
+  let backTarget: "partners" | "profiles" | "primary" | "listings" = "partners";
   if (returnTab === "profiles") {
     backHref = `${ADMIN_BASE}/moderation?tab=profiles`;
     backTarget = "profiles";
+  } else if (returnTab === "listings") {
+    backHref = `${ADMIN_BASE}/moderation?tab=listings`;
+    backTarget = "listings";
   } else if (returnTab === "primary") {
     backHref = `${ADMIN_BASE}/moderation?tab=primary`;
     backTarget = "primary";

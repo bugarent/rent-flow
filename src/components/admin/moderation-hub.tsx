@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { ADMIN_BASE } from "@/lib/routes";
 import { useBpLabels } from "@/components/admin/business-partners/labels";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { uiText } from "@/lib/i18n/ui-text";
@@ -27,7 +29,9 @@ export type ModerationCarView = {
   model: string;
   year: number;
   hiddenReason: string | null;
+  partnerId: string;
   partnerName: string;
+  partnerEmail: string;
   photos: Array<{ id: string; url: string }>;
   passportFrontUrl: string | null;
   passportBackUrl: string | null;
@@ -103,6 +107,8 @@ type Labels = {
   noReviews: string;
   noProfiles: string;
   openPartner: string;
+  openUser: string;
+  openPersonalInfo: string;
   rejectProfile: string;
   dbOfflineHint: string;
 };
@@ -207,6 +213,12 @@ export function ModerationHub({
         "Изменений профиля пока нет.",
       ),
       openPartner: phrase("Open review", "განხილვის გახსნა", "Открыть проверку"),
+      openUser: phrase("User", "მომხმარებელი", "Пользователь"),
+      openPersonalInfo: phrase(
+        "Open personal info",
+        "პირადი ინფოს გახსნა",
+        "Открыть личные данные",
+      ),
       rejectProfile: phrase("Reject", "უარყოფა", "Отклонить"),
       dbOfflineHint: phrase(
         "No data while the database is offline.",
@@ -405,6 +417,15 @@ export function ModerationHub({
                     </p>
                   ) : null}
                   <p className="truncate text-xs text-slate-500">{car.partnerName}</p>
+                  {car.partnerId ? (
+                    <Link
+                      href={`${ADMIN_BASE}/moderation/partners/${encodeURIComponent(car.partnerId)}?returnTab=listings`}
+                      className="mt-1.5 inline-flex min-h-10 max-w-full items-center break-all rounded-lg bg-[#0b1f4b] px-3 py-2 text-left text-xs font-bold text-white hover:bg-[#16336e]"
+                      aria-label={`${labels.openPersonalInfo}: ${car.partnerEmail || car.partnerName || labels.openUser}`}
+                    >
+                      {car.partnerEmail || labels.openUser}
+                    </Link>
+                  ) : null}
                 </div>
                 <div className="relative z-10 shrink-0 sm:ms-auto">
                   <ListingModerationActions
