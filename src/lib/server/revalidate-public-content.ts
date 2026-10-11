@@ -1,9 +1,20 @@
 import "server-only";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { PUBLIC_CONTENT_TAG } from "@/lib/server/public-data-cache";
+
+/** Drop cached public data so the next request reads fresh content. */
+export function revalidatePublicData() {
+  try {
+    revalidateTag(PUBLIC_CONTENT_TAG, { expire: 0 });
+  } catch (error) {
+    console.warn("[revalidate] public data", error);
+  }
+}
 
 /** Drop cached public pages after an admin content save. */
 export function revalidatePublishedContent() {
+  revalidatePublicData();
   try {
     revalidatePath("/", "layout");
     revalidatePath("/cars");

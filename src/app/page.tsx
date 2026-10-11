@@ -4,17 +4,15 @@ import { PopularAirports } from "@/components/landing/popular-airports";
 import { GoogleReviewsCarousel } from "@/components/landing/google-reviews-carousel";
 import { HowItWorksPanel, WhyChooseUsPanel } from "@/components/landing/why-and-how";
 import {
-  getHomepageAirports,
-  getHomepageCategories,
-  getPopularAirportsLayoutSetting,
-} from "@/lib/server/homepage";
-import { getSearchDeliveryAirports } from "@/lib/server/delivery-locations";
-import {
-  defaultHomepageInfoContent,
-  getHomepageInfoContent,
-} from "@/lib/server/homepage-info-blocks-store";
-import { getPublicHomepageGoogleReviews } from "@/lib/server/homepage-google-reviews-store";
-import { getPublicCustomBookingChannels } from "@/lib/server/custom-booking-channels-store";
+  cachedCustomBookingChannels,
+  cachedHomepageAirports,
+  cachedHomepageCategories,
+  cachedHomepageGoogleReviews,
+  cachedHomepageInfoContent,
+  cachedPopularAirportsLayout,
+  cachedSearchDeliveryAirports,
+} from "@/lib/server/public-page-data";
+import { defaultHomepageInfoContent } from "@/lib/server/homepage-info-blocks-store";
 import { DEFAULT_CUSTOM_BOOKING_CHANNELS } from "@/lib/catalog/custom-booking-channels";
 import { softTimeout } from "@/lib/server/soft-timeout";
 import type { AirportCardTranslations } from "@/lib/catalog/homepage-airport-i18n";
@@ -42,13 +40,13 @@ export default async function Home() {
 
   const [options, popularAirports, categories, airportsLayout, infoContent, googleReviews, bookingChannels] =
     await Promise.all([
-      softTimeout(getSearchDeliveryAirports(), [], 6000),
-      softTimeout(getHomepageAirports(), airportFallback, 6000),
-      softTimeout(getHomepageCategories(), categoryFallback, 6000),
-      softTimeout(getPopularAirportsLayoutSetting(), "grid" as const, 6000),
-      softTimeout(getHomepageInfoContent(), defaultHomepageInfoContent(), 6000),
-      softTimeout(getPublicHomepageGoogleReviews(), null, 6000),
-      softTimeout(getPublicCustomBookingChannels(), DEFAULT_CUSTOM_BOOKING_CHANNELS, 6000),
+      softTimeout(cachedSearchDeliveryAirports(), [], 6000),
+      softTimeout(cachedHomepageAirports(), airportFallback, 6000),
+      softTimeout(cachedHomepageCategories(), categoryFallback, 6000),
+      softTimeout(cachedPopularAirportsLayout(), "grid" as const, 6000),
+      softTimeout(cachedHomepageInfoContent(), defaultHomepageInfoContent(), 6000),
+      softTimeout(cachedHomepageGoogleReviews(), null, 6000),
+      softTimeout(cachedCustomBookingChannels(), DEFAULT_CUSTOM_BOOKING_CHANNELS, 6000),
     ]);
 
   return (

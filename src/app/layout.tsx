@@ -8,8 +8,8 @@ import { PublicShell } from "@/components/layout/public-shell";
 import { JsonLd } from "@/components/seo/json-ld";
 import { SEO_SITE_NAME } from "@/lib/brand";
 import { getDictionary } from "@/lib/i18n/dictionaries";
-import { getFxRates, readPreferences } from "@/lib/server/preferences";
-import { getPublicFooterContact } from "@/lib/server/footer-contact-store";
+import { readPreferences } from "@/lib/server/preferences";
+import { cachedFooterContact, cachedFxRates } from "@/lib/server/public-page-data";
 import { isRtl } from "@/lib/i18n/config";
 import { SITE_URL, PRIMARY_KEYWORDS } from "@/lib/seo/config";
 import { buildPageMetadata } from "@/lib/seo/metadata";
@@ -85,8 +85,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const { defaultFxRates } = await import("@/lib/server/preferences");
   const { emptyFooterContact } = await import("@/lib/catalog/footer-contact");
   const [fxRates, footerContact] = await Promise.all([
-    softTimeout(getFxRates(), defaultFxRates(), 1500),
-    softTimeout(getPublicFooterContact(), emptyFooterContact(), 6000),
+    softTimeout(cachedFxRates(), defaultFxRates(), 1500),
+    softTimeout(cachedFooterContact(), emptyFooterContact(), 6000),
   ]);
   const dir = isRtl(locale) ? "rtl" : "ltr";
 

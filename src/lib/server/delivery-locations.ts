@@ -5,7 +5,10 @@ import { mkdir, readFile, writeFile } from "@/lib/server/durable-fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
+import {
+  revalidatePublicData,
+  revalidatePublishedContent,
+} from "@/lib/server/revalidate-public-content";
 import { CATALOG_AIRPORTS } from "@/lib/catalog/airports";
 import {
   findSearchPlace,
@@ -83,6 +86,7 @@ async function writeFileStore(rows: StoredDeliveryLocation[]) {
 
 export function clearSearchAirportsCache() {
   searchAirportsCache.clear();
+  revalidatePublicData();
 }
 
 /** Countries that currently have approved partners (via partner airport locations). */
@@ -632,7 +636,7 @@ export async function activatePartnerApprovedDeliveryLocations(rawIds: string[])
       console.warn("[delivery-locations] activatePartnerApprovedDeliveryLocations", id, error);
     }
   }
-  searchAirportsCache.clear();
+  clearSearchAirportsCache();
   return ids;
 }
 
@@ -709,7 +713,7 @@ export async function retireUnusedPartnerPlaces(partnerId: string, listed: strin
       console.warn("[delivery-locations] retireUnusedPartnerPlaces", loc.id, error);
     }
   }
-  searchAirportsCache.clear();
+  clearSearchAirportsCache();
 }
 
 /**
