@@ -33,6 +33,7 @@ import {
 import { extrasModerationChange } from "@/lib/cars/car-details";
 import { explainListingUpdateError } from "@/lib/cars/listing-update-error";
 import { hiddenReasonAfterPartnerEdit, isPubliclyVisibleListing } from "@/lib/cars/listing-visibility";
+import { clearPublishedCarSnapshot } from "@/lib/server/car-published-store";
 import {
   normalizePartnerCategorySlug,
   resolveCategorySlugForCar,
@@ -44,6 +45,7 @@ import {
   PUBLIC_CAR_INCLUDE,
   shapeFileCarForApi,
 } from "@/lib/server/public-car-payload";
+import { revalidatePublishedListing } from "@/lib/server/revalidate-public-content";
 
 async function resolveCarExtras(rawExtras: unknown) {
   const catalog = await listExtraServices({ activeOnly: true });
@@ -268,15 +270,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const { liveInputFromCarFields, recordPartnerListingEditDiff } = await import(
       "@/lib/server/car-listing-edit-diff"
     );
-    const nextStatus =
-      fileAdmin && fileBody.status
-        ? String(fileBody.status)
-        : fileOwner
-          ? nextListingStatusAfterPartnerEdit(fileCar.status)
-          : fileCar.status;
+    const adminCorrection = Boolean(fileAdmin && fileBody.adminEdit === true);
+    const adminPublish = Boolean(adminCorrection && fileBody.publish === true);
+    const nextStatus = adminPublish
+      ? "APPROVED"
+      : adminCorrection
+        ? fileCar.status
+        : fileAdmin && fileBody.status
+          ? String(fileBody.status)
+          : fileOwner
+            ? nextListingStatusAfterPartnerEdit(fileCar.status)
+            : fileCar.status;
     const insuranceBefore = await readCarInsuranceUrl(id);
-    const beforeLive = fileOwner
-      ? liveInputFromCarFields({
+    const beforeLive =
+      fileOwner && !adminCorrection
+        ? liveInputFromCarFields({
           title: fileCar.title,
           description: fileCar.description,
           dailyRateEur: fileCar.dailyRateEur,
@@ -331,8 +339,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       registrationNumber: nextRegistration || null,
       categorySlug: nextCategorySlug,
       status: nextStatus as typeof fileCar.status,
-      hiddenReason:
-        nextStatus === "APPROVED"
+      hiddenReason: adminPublish
+        ? null
+        : nextStatus === "APPROVED"
           ? null
           : fileAdmin && fileBody.hiddenReason !== undefined
             ? fileBody.hiddenReason
@@ -346,18 +355,30 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       photos: Array.isArray(photos) ? photos : fileCar.photos,
       passportFrontUrl: fileBody.passportFrontUrl ?? fileCar.passportFrontUrl,
       passportBackUrl: fileBody.passportBackUrl ?? fileCar.passportBackUrl,
-      extras: Array.isArray(fileBody.extras)
-        ? fileBody.extras
-            .filter(
-              (e: { enabled?: boolean; forbidden?: boolean }) =>
-                e.forbidden === true || e.enabled !== false,
-            )
-            .map((e: { extraServiceId: string; priceEur?: number | null; forbidden?: boolean }) => ({
-              extraServiceId: e.extraServiceId,
-              priceEur: e.forbidden ? 0 : Number(e.priceEur ?? 0),
-              ...(e.forbidden ? { forbidden: true as const } : {}),
-            }))
-        : fileCar.extras,
+      extras: (() => {
+        if (!Array.isArray(fileBody.extras)) return fileCar.extras;
+        if (adminCorrection && fileBody.extras.length === 0) return fileCar.extras;
+        const mapped = fileBody.extras
+          .filter(
+            (e: { enabled?: boolean; forbidden?: boolean }) =>
+              e.forbidden === true || e.enabled !== false,
+          )
+          .map((e: { extraServiceId: string; priceEur?: number | null; forbidden?: boolean }) => ({
+            extraServiceId: e.extraServiceId,
+            priceEur: e.forbidden ? 0 : Number(e.priceEur ?? 0),
+            ...(e.forbidden ? { forbidden: true as const } : {}),
+          }));
+        if (!adminCorrection) return mapped;
+        const inputIds = new Set(
+          fileBody.extras
+            .map((e: { extraServiceId?: string }) => String(e.extraServiceId || ""))
+            .filter(Boolean),
+        );
+        const kept = (fileCar.extras || []).filter(
+          (e) => e.extraServiceId && !inputIds.has(e.extraServiceId),
+        );
+        return [...mapped, ...kept];
+      })(),
       deliveryPrices: Array.isArray(fileBody.deliveryPrices)
         ? fileBody.deliveryPrices
             .filter((d: { enabled?: boolean }) => d.enabled !== false)
@@ -429,6 +450,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         console.error("[cars PATCH file] recordPartnerListingEditDiff", error);
       }
     }
+    if (adminPublish || (adminCorrection && nextStatus === "APPROVED")) {
+      await clearPublishedCarSnapshot(id);
+      clearPublicCarCache(id);
+      revalidatePublishedListing(id);
+    }
     return NextResponse.json({
       ...fileCarToApiShape(saved, insuranceUrl, insuranceExpiresAt),
       deliveryAdjustments: [],
@@ -443,7 +469,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   // Partner "Update" always saves the listing and sends it to re-moderation.
   // An admin cookie in the same browser must not skip that write.
-  if (isOwner) {
+  // adminEdit saves the same fields and keeps the current moderation status.
+  const adminCorrection = Boolean(isAdmin && body.adminEdit === true);
+  const adminPublish = Boolean(adminCorrection && body.publish === true);
+  if (isOwner || adminCorrection) {
     const photos: string[] | undefined = body.photos ?? body.images;
     if (photos && photos.length < MIN_PUBLIC_PHOTOS) {
       return NextResponse.json(
@@ -474,7 +503,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       const { liveInputFromCarFields, recordPartnerListingEditDiff } = await import(
         "@/lib/server/car-listing-edit-diff"
       );
-      const nextStatus = nextListingStatusAfterPartnerEdit(String(car.status));
+      const nextStatus = adminPublish
+        ? "APPROVED"
+        : adminCorrection
+          ? String(car.status)
+          : nextListingStatusAfterPartnerEdit(String(car.status));
       const insuranceBefore = await readCarInsuranceUrl(id);
       const existingPhotos = Array.isArray(car.photos)
         ? car.photos
@@ -499,33 +532,54 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         passportBackUrl: car.passport?.backUrl || "",
         insuranceUrl: insuranceBefore || "",
       });
-      const extraRows = body.extras !== undefined ? await resolveCarExtras(body.extras) : null;
+      let extraRows = body.extras !== undefined ? await resolveCarExtras(body.extras) : null;
+      if (adminCorrection && extraRows && Array.isArray(body.extras) && body.extras.length === 0) {
+        extraRows = null;
+      } else if (adminCorrection && extraRows && Array.isArray(car.extras)) {
+        const inputIds = new Set(
+          (Array.isArray(body.extras) ? body.extras : [])
+            .map((row: { extraServiceId?: string }) => String(row?.extraServiceId || ""))
+            .filter(Boolean),
+        );
+        for (const existing of car.extras) {
+          const extraServiceId = String(existing.extraServiceId || "");
+          if (!extraServiceId || inputIds.has(extraServiceId)) continue;
+          if (extraRows.some((row) => row.extraServiceId === extraServiceId)) continue;
+          extraRows.push({ extraServiceId, priceEur: Number(existing.priceEur) || 0 });
+        }
+      }
       let deliveryRows: ReturnType<typeof resolvePartnerDeliveryPrices>["rows"] | null = null;
       let deliveryAdjustments: ReturnType<typeof resolvePartnerDeliveryPrices>["adjustments"] = [];
       if (body.deliveryPrices !== undefined) {
         const deliveryCatalog = await listPartnerScopedDeliveryLocations(car.partnerId);
         if (!deliveryCatalog.length) {
-          return NextResponse.json(
-            { error: "No operating airports on your partner profile. Contact admin before listing." },
-            { status: 400 },
-          );
+          if (!adminCorrection) {
+            return NextResponse.json(
+              { error: "No operating airports on your partner profile. Contact admin before listing." },
+              { status: 400 },
+            );
+          }
+        } else {
+          const resolved = resolvePartnerDeliveryPrices(deliveryCatalog, body.deliveryPrices);
+          deliveryAdjustments = resolved.adjustments;
+          if (!resolved.rows.length) {
+            if (!adminCorrection) {
+              return NextResponse.json(
+                {
+                  error: "Enable Delivery for at least one of your operating airports.",
+                  code: "NO_DELIVERY",
+                },
+                { status: 400 },
+              );
+            }
+          } else {
+            const persistable = await persistableCarDeliveryRows(resolved.rows, deliveryCatalog);
+            // null = database check failed; leave the car's existing delivery rows in place.
+            // An empty list means every selected place is file-only (cities). Those stay in
+            // the listing description and must not abort the rest of the update.
+            deliveryRows = persistable;
+          }
         }
-        const resolved = resolvePartnerDeliveryPrices(deliveryCatalog, body.deliveryPrices);
-        deliveryAdjustments = resolved.adjustments;
-        if (!resolved.rows.length) {
-          return NextResponse.json(
-            {
-              error: "Enable Delivery for at least one of your operating airports.",
-              code: "NO_DELIVERY",
-            },
-            { status: 400 },
-          );
-        }
-        const persistable = await persistableCarDeliveryRows(resolved.rows, deliveryCatalog);
-        // null = database check failed; leave the car's existing delivery rows in place.
-        // An empty list means every selected place is file-only (cities). Those stay in
-        // the listing description and must not abort the rest of the update.
-        deliveryRows = persistable;
       }
 
       if (body.year != null && !Number.isInteger(Number(body.year))) {
@@ -646,11 +700,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
               | "APPROVED"
               | "REJECTED"
               | "HIDDEN",
-            hiddenReason: hiddenReasonAfterPartnerEdit({
-              prevStatus: String(car.status),
-              prevReason: car.hiddenReason,
-              nextStatus,
-            }),
+            hiddenReason: adminPublish
+              ? null
+              : hiddenReasonAfterPartnerEdit({
+                  prevStatus: String(car.status),
+                  prevReason: car.hiddenReason,
+                  nextStatus,
+                }),
           },
           include: {
             photos: true,
@@ -673,6 +729,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         }
         await persistCarInsuranceDocument(id, undefined, body.insuranceExpiresAt);
       }
+      if (!adminCorrection) {
       try {
         const insuranceDoc = await readCarInsuranceDoc(id);
         const insuranceUrl = insuranceDoc?.insuranceUrl || null;
@@ -722,9 +779,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       } catch (error) {
         console.error("[cars PATCH] recordPartnerListingEditDiff", error);
       }
+      }
       const insuranceAfter = await readCarInsuranceDoc(id);
-      const updateNotice =
-        nextStatus === "PENDING_REMODERATION"
+      if (adminPublish || (adminCorrection && nextStatus === "APPROVED")) {
+        await clearPublishedCarSnapshot(id);
+        clearPublicCarCache(id);
+        revalidatePublishedListing(id);
+      }
+      const updateNotice = adminPublish
+        ? "PUBLISHED"
+        : adminCorrection
+          ? "SAVED"
+          : nextStatus === "PENDING_REMODERATION"
           ? "REMODERATION"
           : nextStatus === "PENDING"
             ? "PENDING"

@@ -14,10 +14,10 @@ export type AdminBackTarget = "partners" | "profiles" | "listings" | "primary" |
 
 export function adminBackLabel(locale: string | null | undefined, target: AdminBackTarget): string {
   if (target === "partners") return uiText(locale, "← Partners", "← პარტნიორები", "← Партнёры");
-  if (target === "profiles") return uiText(locale, "← Profiles", "← პროფილები", "← Профили");
+  if (target === "profiles") return uiText(locale, "← Profile", "← პროფილი", "← Профиль");
   if (target === "listings") return uiText(locale, "← Listings", "← განცხადებები", "← Объявления");
   if (target === "primary") {
-    return uiText(locale, "← Primary moderation", "← პირველადი მოდერაცია", "← Первичная модерация");
+    return uiText(locale, "← Profile", "← პროფილი", "← Профиль");
   }
   return uiText(locale, "← Moderation", "← მოდერაცია", "← Модерация");
 }

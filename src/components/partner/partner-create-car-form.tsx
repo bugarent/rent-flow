@@ -9,7 +9,7 @@ import { isStudioCoverUrl } from "@/lib/cars/studio-cover-url";
 import { PARTNER_BASE } from "@/lib/routes";
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
 import { isMandatoryExtra, isMandatoryFreeExtra } from "@/lib/extras/pricing";
-import { isProtectionInsuranceService } from "@/lib/extras/checkout-slot";
+import { isListingInsuranceService, isProtectionInsuranceService } from "@/lib/extras/checkout-slot";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import {
   buildExtraSelections,
@@ -250,7 +250,7 @@ const ACCENT_GREEN = "#28a745";
 const CONTENT_MAX = "lg:max-w-[calc(100%-7cm)]";
 
 const inputClass =
-  "w-full rounded-md border border-[#c5ced8] bg-white px-2.5 py-1.5 text-xs text-[#1f2937] outline-none transition placeholder:text-[#9aa3af] focus:border-[#5b4a8a] focus:ring-1 focus:ring-[#5b4a8a]/20";
+  "w-full min-h-11 rounded-md border border-[#c5ced8] bg-white px-2.5 py-2 text-base text-[#1f2937] outline-none transition placeholder:text-[#9aa3af] focus:border-[#5b4a8a] focus:ring-1 focus:ring-[#5b4a8a]/20 sm:min-h-10 sm:py-1.5 sm:text-sm";
 
 function Field({
   label,
@@ -590,8 +590,7 @@ export function PartnerCreateCarForm({
           setPricingCurrency(nextCurrency);
           setFxRates(nextRates);
 
-          const [extrasRes, categoriesRes, carRes, delRes] = await Promise.all([
-            fetch("/api/extras").catch(() => null),
+          const [categoriesRes, carRes, delRes] = await Promise.all([
             fetch("/api/partners/car-categories").catch(() => null),
             fetch(`/api/cars/${encodeURIComponent(carId)}`, {
               cache: "no-store",
@@ -614,11 +613,15 @@ export function PartnerCreateCarForm({
             );
           }
 
-          const extras = extrasRes?.ok ? await extrasRes.json().catch(() => []) : [];
           const car = await carRes.json().catch(() => ({}));
           if (!carRes.ok) {
             throw new Error(typeof car.error === "string" ? car.error : errUpdateFailedRef.current);
           }
+          const partnerId = String(car.partner?.id || "");
+          const extrasRes = await fetch(
+            partnerId ? `/api/extras?partnerId=${encodeURIComponent(partnerId)}` : "/api/extras",
+          ).catch(() => null);
+          const extras = extrasRes?.ok ? await extrasRes.json().catch(() => []) : [];
 
           const details = parseCarDetails(car.description);
           setListingStatus(String(car.status || ""));
@@ -1512,7 +1515,10 @@ export function PartnerCreateCarForm({
     }
   };
 
-  const save = async (mode: "sales" | "internal" | "update") => {
+  const save = async (
+    mode: "sales" | "internal" | "update",
+    opts?: { publish?: boolean },
+  ): Promise<boolean> => {
     setError("");
     setSaveNotice("");
     setInvalidFields(new Set());
@@ -1581,7 +1587,7 @@ export function PartnerCreateCarForm({
         message = cc.errCertificate;
       }
       showError(message, firstSection, fields);
-      return;
+      return false;
     }
 
     let nextDeliveries = deliverySelections;
@@ -1769,10 +1775,11 @@ export function PartnerCreateCarForm({
           photos: photosForSave(photos),
           passportFrontUrl: passportFront || undefined,
           passportBackUrl: passportBack || undefined,
-          extras,
+          ...(isAdminReview && extrasCatalog.length === 0 ? {} : { extras }),
           deliveryPrices,
           registrationNumber: plateNormalized || undefined,
           categorySlug: categorySlug.trim() || null,
+          ...(isAdminReview ? { adminEdit: true, ...(opts?.publish ? { publish: true } : {}) } : {}),
           ...(isEdit
             ? {}
             : { status: mode === "internal" ? "DRAFT" : "PENDING" }),
@@ -1823,13 +1830,17 @@ export function PartnerCreateCarForm({
           showError(specific ? `${headline}. ${specific}` : headline);
         }
         setLoading(false);
-        return;
+        return false;
       }
       const adjustments = Array.isArray(data.deliveryAdjustments) ? data.deliveryAdjustments : [];
-      if (adjustments.length > 0) {
+      if (adjustments.length > 0 && !isAdminReview) {
         setServerCaps(adjustments);
         setLoading(false);
-        return;
+        return false;
+      }
+      if (isAdminReview) {
+        setLoading(false);
+        return true;
       }
       const notice =
         data.updateNotice === "REMODERATION"
@@ -1844,9 +1855,11 @@ export function PartnerCreateCarForm({
         router.push(PARTNER_BASE);
         router.refresh();
       }, 1600);
+      return true;
     } catch (err) {
       showError(err instanceof Error ? err.message : isEdit ? cc.errUpdateFailed : cc.errCreateFailed);
       setLoading(false);
+      return false;
     }
   };
 
@@ -1901,6 +1914,10 @@ export function PartnerCreateCarForm({
     setError("");
     setAdminMessage("");
     try {
+      if (status === "APPROVED") {
+        const saved = await save("update", { publish: true });
+        if (!saved) return;
+      }
       const res = await fetch(`/api/cars/${encodeURIComponent(carId)}/moderate`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -2003,7 +2020,7 @@ export function PartnerCreateCarForm({
               type="button"
               onClick={() => scrollTo(id)}
               className={cn(
-                "shrink-0 rounded px-2 py-1 whitespace-nowrap",
+                "inline-flex min-h-11 shrink-0 items-center rounded px-2.5 py-2 whitespace-nowrap",
                 activeSection === id
                   ? "underline decoration-2 underline-offset-2"
                   : "opacity-65 hover:bg-black/5 hover:opacity-100",
@@ -2028,7 +2045,7 @@ export function PartnerCreateCarForm({
       <div
         className={cn(
           "relative z-10 mx-auto w-full flex-1 px-2 py-2 sm:px-3",
-          isAdminReview ? "pb-44 pointer-events-none select-none [&_a]:pointer-events-auto" : "pb-28",
+          isAdminReview ? "pb-44" : "pb-28",
           CONTENT_MAX,
         )}
       >
@@ -2076,6 +2093,13 @@ export function PartnerCreateCarForm({
                 {formatExtrasChange(changePrev("extras") || "", locale)}
               </p>
             ) : null}
+            <p className="mt-2 text-sm font-semibold">
+              {locale === "ka"
+                ? "შეგიძლიათ შეასწოროთ ველები ამ ფანჯრებში. თანხმობის შემდეგ შესწორებული განცხადება მაშინვე ჩნდება საიტზე."
+                : locale === "ru"
+                  ? "Можно исправить поля в этих разделах и затем нажать «Одобрить» — будет одобрено уже исправленное объявление."
+                  : "You can correct the fields in these sections, then approve the updated listing."}
+            </p>
           </div>
         ) : null}
 
@@ -2105,7 +2129,6 @@ export function PartnerCreateCarForm({
                 value={make}
                 onChange={(e) => onBrandChange(e.target.value)}
                 required
-                disabled={isAdminReview}
               >
                 <option value="">{cc.selectBrand}</option>
                 {brandOptions.map((brand) => (
@@ -2132,7 +2155,6 @@ export function PartnerCreateCarForm({
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
                 required
-                disabled={isAdminReview}
               >
                 <option value="">{common.select}</option>
                 {CAR_COLORS.map((c) => (
@@ -2155,7 +2177,7 @@ export function PartnerCreateCarForm({
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
                 required
-                disabled={!make || isAdminReview}
+                disabled={!make}
               >
                 <option value="">{make ? cc.selectModel : cc.selectModelFirst}</option>
                 {modelOptions.map((m) => (
@@ -2178,7 +2200,6 @@ export function PartnerCreateCarForm({
                 value={categorySlug}
                 onChange={(e) => setCategorySlug(e.target.value)}
                 required
-                disabled={isAdminReview}
               >
                 <option value="">{common.select}</option>
                 {categoryOptions.map((c) => (
@@ -2210,7 +2231,6 @@ export function PartnerCreateCarForm({
                   inputMode="text"
                   lang="en"
                   required
-                  readOnly={isAdminReview}
                 />
               </Field>
               <Field
@@ -2224,7 +2244,6 @@ export function PartnerCreateCarForm({
                   className={cn(inputClass, fieldInvalid("year") && "border-red-500 ring-2 ring-red-200")}
                   value={year}
                   onChange={(e) => setYear(e.target.value)}
-                  disabled={isAdminReview}
                 >
                   {YEARS.map((y) => (
                     <option key={y} value={y}>
@@ -2244,7 +2263,6 @@ export function PartnerCreateCarForm({
                 className={inputClass}
                 value={licenseCat}
                 onChange={(e) => setLicenseCat(e.target.value)}
-                disabled={isAdminReview}
               >
                 {["A", "B", "C", "D"].map((c) => (
                   <option key={c} value={c}>
@@ -2263,7 +2281,6 @@ export function PartnerCreateCarForm({
                   className={inputClass}
                   value={minDriverAge}
                   onChange={(e) => setMinDriverAge(e.target.value)}
-                  disabled={isAdminReview}
                 >
                   {Array.from({ length: 53 }, (_, i) => String(i + 18)).map((age) => (
                     <option key={age} value={age}>
@@ -2281,7 +2298,6 @@ export function PartnerCreateCarForm({
                   className={inputClass}
                   value={minLicenseYears}
                   onChange={(e) => setMinLicenseYears(e.target.value)}
-                  disabled={isAdminReview}
                 >
                   {Array.from({ length: 11 }, (_, i) => String(i)).map((years) => (
                     <option key={years} value={years}>
@@ -2593,8 +2609,8 @@ export function PartnerCreateCarForm({
               const sorted = [...extrasCatalog]
                 .filter((service) => service.isActive !== false)
                 .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
-              const insuranceServices = sorted.filter((service) => isProtectionInsuranceService(service));
-              const otherServices = sorted.filter((service) => !isProtectionInsuranceService(service));
+              const insuranceServices = sorted.filter((service) => isListingInsuranceService(service));
+              const otherServices = sorted.filter((service) => !isListingInsuranceService(service));
               const offerCard = (service: ExtraServicePricing, variant: "insurance" | "light" | "desktop") => {
                 const row = extraSelections.find((s) => s.extraServiceId === service.id);
                 const mandatory = isMandatoryExtra(service);
@@ -3127,15 +3143,21 @@ export function PartnerCreateCarForm({
               <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
                 <button
                   type="button"
-                  disabled={adminBusy}
+                  disabled={adminBusy || loading}
                   onClick={() => void runAdminAction("APPROVED")}
-                  className="inline-flex min-h-10 items-center justify-center rounded-md bg-green-600 px-3 py-1.5 text-xs font-extrabold text-white disabled:opacity-60 sm:px-4"
+                  className="inline-flex min-h-11 items-center justify-center rounded-md bg-green-600 px-3 py-1.5 text-xs font-extrabold text-white disabled:opacity-60 sm:px-4"
                 >
-                  {locale === "ka" ? "თანხმობა" : "Approve"}
+                  {loading
+                    ? locale === "ka"
+                      ? "ინახება…"
+                      : "Saving…"
+                    : locale === "ka"
+                      ? "თანხმობა"
+                      : "Approve"}
                 </button>
                 <button
                   type="button"
-                  disabled={adminBusy}
+                  disabled={adminBusy || loading}
                   onClick={() => setRejectModalOpen(true)}
                   className="inline-flex min-h-10 items-center justify-center rounded-md bg-amber-500 px-3 py-1.5 text-xs font-extrabold text-white disabled:opacity-60 sm:px-4"
                 >

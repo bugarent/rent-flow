@@ -10,6 +10,7 @@ import {
 } from "@/lib/server/car-rejection-store";
 import { acknowledgeReviewedInsuranceExpiry } from "@/lib/server/car-insurance-store";
 import { clearPublicCarCache } from "@/lib/server/public-car-payload";
+import { revalidatePublishedListing } from "@/lib/server/revalidate-public-content";
 
 function isMissingRecord(error: unknown): boolean {
   return Boolean(error && typeof error === "object" && (error as { code?: string }).code === "P2025");
@@ -110,6 +111,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         await clearPublishedCarSnapshot(id);
         await clearCarRejectionNotice(id);
         clearPublicCarCache(id);
+        revalidatePublishedListing(id);
       } else {
         await writeCarRejectionNotice(id, hiddenReason || "");
       }
@@ -139,6 +141,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         await clearPublishedCarSnapshot(id);
         await clearCarRejectionNotice(id);
         clearPublicCarCache(id);
+        revalidatePublishedListing(id);
       } else {
         await writeCarRejectionNotice(id, hiddenReason || "");
       }

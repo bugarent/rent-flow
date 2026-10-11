@@ -6,11 +6,14 @@ export function SocialBadge({
   platform,
   locale,
   compact = false,
+  href,
 }: {
   platform: PartnerSocialPlatform;
   locale: string;
   /** Smaller icon used only in calendar booking detail view. */
   compact?: boolean;
+  /** Opens a chat on this messenger when the partner activated it. */
+  href?: string | null;
 }) {
   const meta: Record<PartnerSocialPlatform, { className: string; path: string }> = {
     WHATSAPP: {
@@ -28,16 +31,13 @@ export function SocialBadge({
   };
   const m = meta[platform];
   const label = socialLabel(platform, locale);
-  return (
-    <span
-      title={label}
-      aria-label={label}
-      className={cn(
-        "group relative inline-flex items-center justify-center shadow-sm",
-        compact ? "h-5 w-5 rounded-md" : "h-9 w-9 rounded-lg",
-        m.className,
-      )}
-    >
+  const className = cn(
+    "group relative inline-flex items-center justify-center shadow-sm",
+    compact ? "h-8 w-8 rounded-md" : "h-10 w-10 rounded-lg",
+    m.className,
+  );
+  const body = (
+    <>
       <svg viewBox="0 0 24 24" className={compact ? "h-3 w-3" : "h-4 w-4"} aria-hidden>
         <path fill="currentColor" d={m.path} />
       </svg>
@@ -50,6 +50,25 @@ export function SocialBadge({
       >
         {label}
       </span>
-    </span>
+    </>
+  );
+  if (!href) {
+    return (
+      <span title={label} aria-label={label} className={className}>
+        {body}
+      </span>
+    );
+  }
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={label}
+      aria-label={label}
+      className={cn(className, "pointer-events-auto")}
+    >
+      {body}
+    </a>
   );
 }

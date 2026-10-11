@@ -346,7 +346,7 @@ export function PartnersManager({
     const base = onPartnersPage
       ? `${ADMIN_BASE}/partners/${encodeURIComponent(id)}`
       : `${ADMIN_BASE}/moderation/partners/${encodeURIComponent(id)}`;
-    if (mode === "primary") return `${base}?returnTab=primary`;
+    if (mode === "primary") return `${base}?returnTab=profiles`;
     if (mode === "catalog" || filter === "DIRECTORY") return `${base}?returnTab=directory`;
     if (mode === "directory") {
       const selected = tabs.filter((tab) => tab !== "CUSTOMERS");

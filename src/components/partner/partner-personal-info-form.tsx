@@ -33,6 +33,7 @@ import { LOCALES, LOCALE_LABELS, type Locale } from "@/lib/i18n/config";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import { CREATE_AUTO_BACKDROP_URL } from "@/lib/brand";
 import { PartnerTelegramVerifyBanner } from "@/components/partner/partner-telegram-verify-banner";
+import { PartnerMessengerLinks, PartnerPhoneChat } from "@/components/admin/partner-phone-chat";
 import { PhoneMessengerIcons } from "@/components/partner/phone-messenger-icons";
 import { locationCodesEqual, normalizeLocationCode } from "@/lib/catalog/search-places";
 import type { PartnerSocialPlatform } from "@/lib/partner";
@@ -1711,13 +1712,28 @@ export function PartnerPersonalInfoForm({
                   previous={fieldChange("primaryPhone")?.from || fieldChange("primaryMessengers")?.from}
                 >
                   <div className="flex items-start gap-2">
+                    {isAdminReview ? (
+                      <PartnerPhoneChat
+                        className="min-w-0 flex-1 text-base"
+                        locale={locale === "ka" || locale === "ru" ? locale : "en"}
+                        phone={settings.primaryPhone}
+                        messengers={settings.primaryMessengers ?? []}
+                      />
+                    ) : (
                     <input
                       className={cn(fieldClass("primaryPhone"), "min-w-0 flex-1")}
                       value={settings.primaryPhone}
                       onChange={(e) => patch({ primaryPhone: e.target.value })}
                       onBlur={() => validateFieldLive("primaryPhone")}
                     />
+                    )}
                     <div data-field="primaryMessengers">
+                      {isAdminReview ? (
+                        <PartnerMessengerLinks
+                          phone={settings.primaryPhone}
+                          messengers={settings.primaryMessengers ?? []}
+                        />
+                      ) : (
                       <PhoneMessengerIcons
                         selected={settings.primaryMessengers ?? []}
                         invalid={invalidFields.has("primaryMessengers")}
@@ -1731,6 +1747,7 @@ export function PartnerPersonalInfoForm({
                           markFieldInvalid("primaryMessengers", primaryMessengers.length === 0);
                         }}
                       />
+                      )}
                     </div>
                   </div>
                 </Field>
@@ -1752,13 +1769,28 @@ export function PartnerPersonalInfoForm({
                   previous={fieldChange("secondaryPhone")?.from || fieldChange("secondaryMessengers")?.from}
                 >
                   <div className="flex items-start gap-2">
+                    {isAdminReview ? (
+                      <PartnerPhoneChat
+                        className="min-w-0 flex-1 text-base"
+                        locale={locale === "ka" || locale === "ru" ? locale : "en"}
+                        phone={settings.secondaryPhone}
+                        messengers={settings.secondaryMessengers ?? []}
+                      />
+                    ) : (
                     <input
                       className={cn(fieldClass("secondaryPhone"), "min-w-0 flex-1")}
                       value={settings.secondaryPhone}
                       onChange={(e) => patch({ secondaryPhone: e.target.value })}
                       onBlur={() => validateFieldLive("secondaryPhone")}
                     />
+                    )}
                     <div data-field="secondaryMessengers">
+                      {isAdminReview ? (
+                        <PartnerMessengerLinks
+                          phone={settings.secondaryPhone}
+                          messengers={settings.secondaryMessengers ?? []}
+                        />
+                      ) : (
                       <PhoneMessengerIcons
                         selected={settings.secondaryMessengers ?? []}
                         invalid={invalidFields.has("secondaryMessengers")}
@@ -1772,6 +1804,7 @@ export function PartnerPersonalInfoForm({
                           markFieldInvalid("secondaryMessengers", secondaryMessengers.length === 0);
                         }}
                       />
+                      )}
                     </div>
                   </div>
                 </Field>

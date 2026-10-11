@@ -1,5 +1,7 @@
 import { Building2 } from "lucide-react";
 import type { ReactNode } from "react";
+import { PartnerPhoneChat } from "@/components/admin/partner-phone-chat";
+import { partnerMessengerChatHref } from "@/lib/partners/messenger-chat-link";
 import { SocialBadge } from "../social-badge";
 import { languageLabel, normalizeSocial } from "../helpers";
 import { cn } from "@/lib/utils";
@@ -125,7 +127,11 @@ export function PartnerSection({
           </FieldBox>
           <FieldBox label={t.phone} tone="emerald">
             <div>
-              <p>{booking.partner?.phone || "—"}</p>
+              <PartnerPhoneChat
+                phone={booking.partner?.phone || ""}
+                messengers={booking.partner?.primaryMessengers || []}
+                locale={locale === "ka" || locale === "ru" ? locale : "en"}
+              />
               {normalizeSocial(booking.partner?.primaryMessengers || []).length ? (
                 <div className="mt-0.5 flex flex-wrap items-center gap-1">
                   {normalizeSocial(booking.partner?.primaryMessengers || []).map((platform) => (
@@ -134,6 +140,7 @@ export function PartnerSection({
                       platform={platform}
                       locale={locale}
                       compact
+                      href={partnerMessengerChatHref(platform, booking.partner?.phone || "")}
                     />
                   ))}
                 </div>
@@ -142,7 +149,11 @@ export function PartnerSection({
           </FieldBox>
           <FieldBox label={t.secondaryPhone} tone="amber">
             <div>
-              <p>{booking.partner?.secondaryPhone || "—"}</p>
+              <PartnerPhoneChat
+                phone={booking.partner?.secondaryPhone || ""}
+                messengers={booking.partner?.secondaryMessengers || []}
+                locale={locale === "ka" || locale === "ru" ? locale : "en"}
+              />
               {normalizeSocial(booking.partner?.secondaryMessengers || []).length ? (
                 <div className="mt-0.5 flex flex-wrap items-center gap-1">
                   {normalizeSocial(booking.partner?.secondaryMessengers || []).map((platform) => (
@@ -151,6 +162,7 @@ export function PartnerSection({
                       platform={platform}
                       locale={locale}
                       compact
+                      href={partnerMessengerChatHref(platform, booking.partner?.secondaryPhone || "")}
                     />
                   ))}
                 </div>
@@ -203,7 +215,11 @@ export function PartnerSection({
                 {t.phone}
               </dt>
               <dd className={cn("font-semibold text-slate-900", tight && "leading-snug")}>
-                {booking.partner?.phone || "—"}
+                <PartnerPhoneChat
+                  phone={booking.partner?.phone || ""}
+                  messengers={booking.partner?.primaryMessengers || []}
+                  locale={locale === "ka" || locale === "ru" ? locale : "en"}
+                />
               </dd>
               {normalizeSocial(booking.partner?.primaryMessengers || []).length ? (
                 <div className={cn("flex flex-wrap items-center", tight ? "mt-1 gap-1" : "mt-1.5 gap-1.5")}>
@@ -213,6 +229,7 @@ export function PartnerSection({
                       platform={platform}
                       locale={locale}
                       compact={tight}
+                      href={partnerMessengerChatHref(platform, booking.partner?.phone || "")}
                     />
                   ))}
                 </div>
@@ -223,7 +240,11 @@ export function PartnerSection({
                 {t.secondaryPhone}
               </dt>
               <dd className={cn("font-semibold text-slate-900", tight && "leading-snug")}>
-                {booking.partner?.secondaryPhone || "—"}
+                <PartnerPhoneChat
+                  phone={booking.partner?.secondaryPhone || ""}
+                  messengers={booking.partner?.secondaryMessengers || []}
+                  locale={locale === "ka" || locale === "ru" ? locale : "en"}
+                />
               </dd>
               {normalizeSocial(booking.partner?.secondaryMessengers || []).length ? (
                 <div className={cn("flex flex-wrap items-center", tight ? "mt-1 gap-1" : "mt-1.5 gap-1.5")}>
@@ -233,6 +254,7 @@ export function PartnerSection({
                       platform={platform}
                       locale={locale}
                       compact={tight}
+                      href={partnerMessengerChatHref(platform, booking.partner?.secondaryPhone || "")}
                     />
                   ))}
                 </div>

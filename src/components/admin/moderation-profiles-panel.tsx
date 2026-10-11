@@ -10,6 +10,8 @@ type Props = {
   profiles: ModerationProfileView[];
   profilesError: string;
   profilesDbOffline: boolean;
+  /** Inside the combined Profile window — no second card or title. */
+  embedded?: boolean;
   labels: {
     profilesTitle: string;
     profilesBody: string;
@@ -24,6 +26,7 @@ export function ModerationProfilesPanel({
   profiles: profilesProp,
   profilesError,
   profilesDbOffline,
+  embedded = false,
   labels,
 }: Props) {
   const L = useBpLabels();
@@ -67,10 +70,11 @@ export function ModerationProfilesPanel({
     }
   };
 
-  return (
-    <section role="tabpanel" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <h2 className="text-lg font-extrabold text-[#0b1f4b]">{labels.profilesTitle}</h2>
-      <p className="mt-1 text-sm text-slate-500">{labels.profilesBody}</p>
+  const showEmpty = !embedded || Boolean(profilesError || profilesDbOffline || message);
+  if (embedded && profiles.length === 0 && !showEmpty) return null;
+
+  const list = (
+    <>
 
       {(profilesDbOffline || profilesError) && (
         <div
@@ -118,13 +122,13 @@ export function ModerationProfilesPanel({
               <div className="flex flex-wrap gap-2">
                 <Link
                   href={`${ADMIN_BASE}/moderation/partners/${encodeURIComponent(p.id)}?returnTab=profiles`}
-                  className="rounded-lg bg-[#0b1f4b] px-3 py-2 text-sm font-bold text-white hover:bg-[#14365a]"
+                  className="inline-flex min-h-11 items-center rounded-lg bg-[#0b1f4b] px-3 py-2 text-sm font-bold text-white hover:bg-[#14365a]"
                 >
                   {labels.openPartner}
                 </Link>
                 <button
                   type="button"
-                  className="rounded-lg border border-red-400 bg-red-50 px-3 py-2 text-sm font-bold text-red-800 hover:bg-red-100"
+                  className="inline-flex min-h-11 items-center rounded-lg border border-red-400 bg-red-50 px-3 py-2 text-sm font-bold text-red-800 hover:bg-red-100"
                   onClick={() => {
                     setRejectTarget(p);
                     setRejectNote("");
@@ -148,7 +152,7 @@ export function ModerationProfilesPanel({
             ) : null}
           </article>
         ))}
-        {profiles.length === 0 ? (
+        {profiles.length === 0 && showEmpty ? (
           <p className="text-slate-500">
             {profilesDbOffline ? labels.dbOfflineHint : labels.noProfiles}
           </p>
@@ -205,6 +209,18 @@ export function ModerationProfilesPanel({
           </div>
         </div>
       ) : null}
+    </>
+  );
+
+  if (embedded) {
+    return <div className="mt-6 border-t border-slate-200 pt-5">{list}</div>;
+  }
+
+  return (
+    <section role="tabpanel" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <h2 className="text-lg font-extrabold text-[#0b1f4b]">{labels.profilesTitle}</h2>
+      <p className="mt-1 text-sm text-slate-500">{labels.profilesBody}</p>
+      {list}
     </section>
   );
 }

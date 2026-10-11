@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requirePartnerApi } from "@/lib/auth/sessions";
+import { getAdminSession, requirePartnerApi } from "@/lib/auth/sessions";
 import { prisma } from "@/lib/prisma";
 import { LOCAL_PARTNER_ID, loadLocalPartner } from "@/lib/auth/local-partner-store";
 import { isDbOfflineError } from "@/lib/server/db-errors";
@@ -21,13 +21,18 @@ async function resolvePartnerId(userId: string, email?: string | null): Promise<
 }
 
 /** Active extras catalog for the signed-in partner (global + their custom services). */
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await requirePartnerApi();
-    if (!session) {
+    const admin = await getAdminSession();
+    const isAdmin = admin?.user?.role === "ADMIN";
+    if (!session && !isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const partnerId = await resolvePartnerId(session.user.id, session.user.email);
+    const requestedPartner = new URL(req.url).searchParams.get("partnerId")?.trim() || "";
+    const partnerId = session
+      ? await resolvePartnerId(session.user.id, session.user.email)
+      : requestedPartner;
     const [global, customs] = await Promise.all([
       listExtraServices({ activeOnly: true }),
       listPartnerCustomExtrasAsPricing(partnerId, { activeOnly: true }),

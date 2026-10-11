@@ -91,8 +91,6 @@ export type ModerationPartnerRow = {
 type Labels = {
   title: string;
   body: string;
-  primaryTab: string;
-  primaryTitle: string;
   primaryBody: string;
   listingsTab: string;
   reviewsTab: string;
@@ -129,7 +127,7 @@ type Props = {
   profilesDbOffline: boolean;
 };
 
-type TabId = "primary" | "listings" | "reviews" | "profiles";
+type TabId = "listings" | "reviews" | "profiles";
 
 const PRIMARY_STATUSES = new Set(["PENDING", "INVITED", "PENDING_FINAL", "NEEDS_CORRECTION"]);
 
@@ -169,20 +167,18 @@ export function ModerationHub({
     return {
       title: dictionary.pages.moderation.title,
       body: phrase(
-        "Choose a section: primary moderation, car listings, profiles, or reviews.",
-        "აირჩიეთ ქვეფანჯარა: პირველადი მოდერაცია, განცხადებები, პროფილები ან შეფასებები.",
-        "Выберите раздел: первичная модерация, объявления, профили или отзывы.",
+        "Choose a section: profiles, car listings, or reviews.",
+        "აირჩიეთ ქვეფანჯარა: პროფილი, განცხადებები ან შეფასებები.",
+        "Выберите раздел: профиль, объявления или отзывы.",
       ),
-      primaryTab: phrase("Primary moderation", "პირველადი მოდერაცია", "Первичная модерация"),
-      primaryTitle: phrase("Primary moderation", "პირველადი მოდერაცია", "Первичная модерация"),
       primaryBody: phrase(
-        "New partner applications waiting for a first review.",
-        "ახალი პარტნიორის განაცხადები, რომლებიც პირველ გადამოწმებას ელოდება.",
-        "Новые заявки партнёров, которые ждут первой проверки.",
+        "New partner applications and personal-info changes waiting for review.",
+        "ახალი პარტნიორის განაცხადები და პირადი ინფოს ცვლილებები, რომლებიც გადამოწმებას ელოდება.",
+        "Новые заявки партнёров и изменения личных данных, которые ждут проверки.",
       ),
       listingsTab: phrase("Listings", "განცხადებები", "Объявления"),
       reviewsTab: dictionary.nav.reviews,
-      profilesTab: phrase("Profiles", "პროფილები", "Профили"),
+      profilesTab: phrase("Profile", "პროფილი", "Профиль"),
       listingsTitle: phrase("Listing moderation", "განცხადებების მოდერაცია", "Модерация объявлений"),
       listingsBody: phrase(
         "Approve or reject car listings waiting for review.",
@@ -233,18 +229,15 @@ export function ModerationHub({
 
   const tab: TabId = useMemo(() => {
     const raw = searchParams.get("tab");
-    const partnerTab = searchParams.get("partnerTab")?.trim().toLowerCase();
     if (raw === "reviews") return "reviews";
-    if (raw === "profiles") return "profiles";
     if (raw === "listings") return "listings";
-    if (raw === "primary" || partnerTab === "primary" || !raw) return "primary";
-    return "primary";
+    return "profiles";
   }, [searchParams]);
 
   const setTab = useCallback(
     (next: TabId) => {
       const params = new URLSearchParams(searchParams.toString());
-      if (next === "primary") params.delete("tab");
+      if (next === "profiles") params.delete("tab");
       else params.set("tab", next);
       params.delete("partnerTab");
       const qs = params.toString();
@@ -258,17 +251,20 @@ export function ModerationHub({
 
   const primaryPartners = partners.filter((p) => PRIMARY_STATUSES.has(p.status));
 
+  const profileIds = new Set([
+    ...primaryPartners.map((p) => p.id),
+    ...profiles.map((p) => p.id),
+  ]);
   const tabCounts = {
-    primary: primaryPartners.length,
     listings: visibleCars.length,
-    profiles: profiles.length,
+    profiles: profileIds.size,
     reviews: reviews.length,
   } as const;
 
   const tabPending = {
-    primary: primaryPartners.reduce((sum, p) => sum + partnerAttention(p), 0),
     listings: visibleCars.length,
-    profiles: profiles.length,
+    profiles:
+      primaryPartners.reduce((sum, p) => sum + partnerAttention(p), 0) + profiles.length,
     reviews: reviewsBadgeCount ?? reviews.filter((r) => r.status === "PENDING").length,
   } as const;
 
@@ -278,15 +274,14 @@ export function ModerationHub({
       <p className="mb-5 text-sm text-slate-600">{labels.body}</p>
 
       <div
-        className="mb-6 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm lg:grid-cols-4"
+        className="mb-6 grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm sm:grid-cols-3"
         role="tablist"
         aria-label={labels.title}
       >
         {(
           [
-            ["primary", labels.primaryTab],
-            ["listings", labels.listingsTab],
             ["profiles", labels.profilesTab],
+            ["listings", labels.listingsTab],
             ["reviews", labels.reviewsTab],
           ] as const
         ).map(([id, label]) => {
@@ -301,7 +296,7 @@ export function ModerationHub({
               aria-selected={selected}
               onClick={() => setTab(id)}
               className={cn(
-                "rounded-lg px-2 py-2.5 text-center text-sm font-bold leading-snug transition sm:px-3",
+                "min-h-11 rounded-lg px-2 py-2.5 text-center text-sm font-bold leading-snug transition sm:px-3",
                 selected && !hasPending && "bg-[#0b1f4b] text-white",
                 selected && hasPending && "bg-amber-400 text-amber-950 ring-2 ring-amber-500",
                 !selected && !hasPending && "text-slate-600 hover:bg-slate-50",
@@ -330,9 +325,9 @@ export function ModerationHub({
         })}
       </div>
 
-      {tab === "primary" ? (
+      {tab === "profiles" ? (
         <section role="tabpanel" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <h2 className="text-lg font-extrabold text-[#0b1f4b]">{labels.primaryTitle}</h2>
+          <h2 className="text-lg font-extrabold text-[#0b1f4b]">{labels.profilesTab}</h2>
           <p className="mt-1 mb-4 text-sm text-slate-500">{labels.primaryBody}</p>
           {(partnersDbOffline || partnersError) && (
             <div
@@ -348,6 +343,20 @@ export function ModerationHub({
             </div>
           )}
           <PartnersManager initialPartners={partners} mode="primary" />
+          <ModerationProfilesPanel
+            embedded
+            profiles={profiles}
+            profilesError={profilesError}
+            profilesDbOffline={profilesDbOffline}
+            labels={{
+              profilesTitle: labels.profilesTitle,
+              profilesBody: labels.profilesBody,
+              openPartner: labels.openPartner,
+              rejectProfile: labels.rejectProfile,
+              noProfiles: labels.noProfiles,
+              dbOfflineHint: labels.dbOfflineHint,
+            }}
+          />
         </section>
       ) : null}
 
@@ -442,22 +451,6 @@ export function ModerationHub({
             ) : null}
           </div>
         </section>
-      ) : null}
-
-      {tab === "profiles" ? (
-        <ModerationProfilesPanel
-          profiles={profiles}
-          profilesError={profilesError}
-          profilesDbOffline={profilesDbOffline}
-          labels={{
-            profilesTitle: labels.profilesTitle,
-            profilesBody: labels.profilesBody,
-            openPartner: labels.openPartner,
-            rejectProfile: labels.rejectProfile,
-            noProfiles: labels.noProfiles,
-            dbOfflineHint: labels.dbOfflineHint,
-          }}
-        />
       ) : null}
 
       {tab === "reviews" ? (

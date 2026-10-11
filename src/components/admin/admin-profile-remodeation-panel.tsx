@@ -55,7 +55,7 @@ function flattenChanges(
 
 export function AdminProfileRemoderationPanel({
   partnerId,
-  backHref = `${ADMIN_BASE}/moderation?tab=profiles`,
+  backHref = `${ADMIN_BASE}/moderation`,
   backTarget = "profiles",
 }: Props) {
   const { locale: adminLocale } = useAdminLocale();

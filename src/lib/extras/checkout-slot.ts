@@ -92,7 +92,7 @@ export function resolveCheckoutSlot(input: {
   return inferCheckoutSlot(input);
 }
 
-/** TPL / basic / full / accident / theft — shown as the insurance choice on listings. */
+/** TPL / basic / full / accident / theft — checkout insurance panel. */
 export function isProtectionInsuranceService(input: {
   checkoutSlot?: unknown;
   slug?: string;
@@ -100,6 +100,17 @@ export function isProtectionInsuranceService(input: {
   name?: string;
 }): boolean {
   return isProtectionInsuranceSlot(resolveCheckoutSlot(input));
+}
+
+/** Insurance block on a listing and in the partner cabinet. Theft is an ordinary extra there. */
+export function isListingInsuranceService(input: {
+  checkoutSlot?: unknown;
+  slug?: string;
+  isTpl?: boolean;
+  name?: string;
+}): boolean {
+  const slot = resolveCheckoutSlot(input);
+  return slot === "tpl" || slot === "basic" || slot === "full" || slot === "accident";
 }
 
 export function extractCheckoutSlotFromDescription(description: unknown): ExtraCheckoutSlot {

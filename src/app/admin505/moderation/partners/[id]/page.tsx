@@ -19,15 +19,12 @@ export default async function AdminPartnerModerationReviewPage({
 
   let backHref = `${ADMIN_BASE}/partners`;
   let backTarget: "partners" | "profiles" | "primary" | "listings" = "partners";
-  if (returnTab === "profiles") {
-    backHref = `${ADMIN_BASE}/moderation?tab=profiles`;
+  if (returnTab === "profiles" || returnTab === "primary") {
+    backHref = `${ADMIN_BASE}/moderation`;
     backTarget = "profiles";
   } else if (returnTab === "listings") {
     backHref = `${ADMIN_BASE}/moderation?tab=listings`;
     backTarget = "listings";
-  } else if (returnTab === "primary") {
-    backHref = `${ADMIN_BASE}/moderation?tab=primary`;
-    backTarget = "primary";
   } else {
     const partnerTabs = directoryPartnerTabQuery(returnTab);
     if (partnerTabs) {

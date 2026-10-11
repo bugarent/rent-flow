@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { PartnerPhoneChat } from "@/components/admin/partner-phone-chat";
 import { PhoneMessengerIcons } from "@/components/partner/phone-messenger-icons";
+import { partnerMessengerChatHref } from "@/lib/partners/messenger-chat-link";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { locationCodesEqual, normalizeLocationCode } from "@/lib/catalog/search-places";
 import { WORLD_COUNTRIES, worldCountryName } from "@/lib/catalog/world-countries";
@@ -110,7 +112,13 @@ function isLocationSelected(
   });
 }
 
-function MessengerReadOnly({ selected }: { selected: PartnerSocialPlatform[] }) {
+function MessengerReadOnly({
+  selected,
+  phone,
+}: {
+  selected: PartnerSocialPlatform[];
+  phone: string;
+}) {
   return (
     <div className="flex shrink-0 items-center gap-1">
       {PARTNER_SOCIAL_PLATFORMS.map((platform) => {
@@ -121,18 +129,32 @@ function MessengerReadOnly({ selected }: { selected: PartnerSocialPlatform[] }) 
             : platform.value === "VIBER"
               ? "bg-[#7360F2] text-white"
               : "bg-[#2AABEE] text-white";
+        const className = cn(
+          "pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-md text-[10px] font-bold",
+          color,
+          active ? "ring-2 ring-offset-1 ring-slate-900 opacity-100" : "pointer-events-none opacity-35",
+        );
+        const mark = platform.value === "WHATSAPP" ? "WA" : platform.value === "VIBER" ? "VB" : "TG";
+        const href = active ? partnerMessengerChatHref(platform.value, phone) : null;
+        if (!href) {
+          return (
+            <span key={platform.value} title={platform.label} className={className}>
+              {mark}
+            </span>
+          );
+        }
         return (
-          <span
+          <a
             key={platform.value}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
             title={platform.label}
-            className={cn(
-              "inline-flex h-9 w-9 items-center justify-center rounded-md text-[10px] font-bold",
-              color,
-              active ? "ring-2 ring-offset-1 ring-slate-900 opacity-100" : "opacity-35",
-            )}
+            aria-label={platform.label}
+            className={className}
           >
-            {platform.value === "WHATSAPP" ? "WA" : platform.value === "VIBER" ? "VB" : "TG"}
-          </span>
+            {mark}
+          </a>
         );
       })}
     </div>
@@ -1427,17 +1449,20 @@ export function AdminPartnerReviewPanel({
                         : "border-[#c5ced8] bg-white",
                     )}
                   >
-                    {editable ? (
-                      <input
-                        className={cn(inputClass, "min-w-0 flex-1 border-0 bg-transparent px-0 py-0 shadow-none")}
-                        value={settings.primaryPhone || ""}
-                        onChange={(e) => patchDraft({ primaryPhone: e.target.value })}
-                      />
-                    ) : (
-                      <span className="min-w-0 flex-1 text-sm font-semibold">
-                        {settings.primaryPhone || detail.phone || "—"}
-                      </span>
-                    )}
+                    <PartnerPhoneChat
+                      className="min-w-0 flex-1 text-sm"
+                      locale={locale}
+                      phone={settings.primaryPhone || detail.phone || ""}
+                      messengers={settings.primaryMessengers || []}
+                      edit={
+                        editable
+                          ? {
+                              label: uiText(locale, "Edit", "შეცვლა", "Изменить"),
+                              onChange: (primaryPhone) => patchDraft({ primaryPhone }),
+                            }
+                          : undefined
+                      }
+                    />
                     {editable ? (
                       <PhoneMessengerIcons
                         selected={(settings.primaryMessengers || []) as PartnerSocialPlatform[]}
@@ -1446,6 +1471,7 @@ export function AdminPartnerReviewPanel({
                       />
                     ) : (
                       <MessengerReadOnly
+                        phone={settings.primaryPhone || detail.phone || ""}
                         selected={(settings.primaryMessengers || []) as PartnerSocialPlatform[]}
                       />
                     )}
@@ -1473,17 +1499,20 @@ export function AdminPartnerReviewPanel({
                         : "border-[#c5ced8] bg-white",
                     )}
                   >
-                    {editable ? (
-                      <input
-                        className={cn(inputClass, "min-w-0 flex-1 border-0 bg-transparent px-0 py-0 shadow-none")}
-                        value={settings.secondaryPhone || ""}
-                        onChange={(e) => patchDraft({ secondaryPhone: e.target.value })}
-                      />
-                    ) : (
-                      <span className="min-w-0 flex-1 text-sm font-semibold">
-                        {settings.secondaryPhone || detail.secondaryPhone || "—"}
-                      </span>
-                    )}
+                    <PartnerPhoneChat
+                      className="min-w-0 flex-1 text-sm"
+                      locale={locale}
+                      phone={settings.secondaryPhone || detail.secondaryPhone || ""}
+                      messengers={settings.secondaryMessengers || []}
+                      edit={
+                        editable
+                          ? {
+                              label: uiText(locale, "Edit", "შეცვლა", "Изменить"),
+                              onChange: (secondaryPhone) => patchDraft({ secondaryPhone }),
+                            }
+                          : undefined
+                      }
+                    />
                     {editable ? (
                       <PhoneMessengerIcons
                         selected={(settings.secondaryMessengers || []) as PartnerSocialPlatform[]}
@@ -1492,6 +1521,7 @@ export function AdminPartnerReviewPanel({
                       />
                     ) : (
                       <MessengerReadOnly
+                        phone={settings.secondaryPhone || detail.secondaryPhone || ""}
                         selected={(settings.secondaryMessengers || []) as PartnerSocialPlatform[]}
                       />
                     )}

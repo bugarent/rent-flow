@@ -12,7 +12,7 @@ import {
   optionalPeriodMoney,
 } from "@/lib/extras/pricing";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
-import { isProtectionInsuranceService } from "@/lib/extras/checkout-slot";
+import { isListingInsuranceService } from "@/lib/extras/checkout-slot";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { usePartnerMoney } from "@/components/providers/partner-money-context";
 import { PartnerEurMoneyInput } from "@/components/partner/partner-eur-money-input";
@@ -1080,8 +1080,8 @@ export function PartnerEquipmentServicePanel({
   const orderedRows = [...rows].sort(
     (a, b) => a.service.sortOrder - b.service.sortOrder || a.service.name.localeCompare(b.service.name),
   );
-  const phoneInsuranceRows = orderedRows.filter((row) => isProtectionInsuranceService(row.service));
-  const phoneServiceRows = orderedRows.filter((row) => !isProtectionInsuranceService(row.service));
+  const phoneInsuranceRows = orderedRows.filter((row) => isListingInsuranceService(row.service));
+  const phoneServiceRows = orderedRows.filter((row) => !isListingInsuranceService(row.service));
 
   /* —— List table view —— */
   return (
