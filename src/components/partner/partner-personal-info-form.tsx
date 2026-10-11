@@ -33,6 +33,7 @@ import { LOCALES, LOCALE_LABELS, type Locale } from "@/lib/i18n/config";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import { CREATE_AUTO_BACKDROP_URL } from "@/lib/brand";
 import { PartnerTelegramVerifyBanner } from "@/components/partner/partner-telegram-verify-banner";
+import { publishPartnerChromeSettings } from "@/components/partner/partner-chrome-settings";
 import { PartnerMessengerLinks, PartnerPhoneChat } from "@/components/admin/partner-phone-chat";
 import { PhoneMessengerIcons } from "@/components/partner/phone-messenger-icons";
 import { locationCodesEqual, normalizeLocationCode } from "@/lib/catalog/search-places";
@@ -1033,6 +1034,15 @@ export function PartnerPersonalInfoForm({
       if (data.moderation) {
         setPartnerStatus(String(data.moderation.partnerStatus || partnerStatus));
         setPendingRemoderation(Boolean(data.moderation.pendingRemoderation));
+        if (!isAdminReview) {
+          const currency = data.settings?.pricingCurrency;
+          publishPartnerChromeSettings({
+            pendingRemoderation: Boolean(data.moderation.pendingRemoderation),
+            ...(currency === "USD" || currency === "EUR" || currency === "GEL"
+              ? { pricingCurrency: currency }
+              : {}),
+          });
+        }
       }
       if (data.passwordChanged) {
         setOldPassword("");

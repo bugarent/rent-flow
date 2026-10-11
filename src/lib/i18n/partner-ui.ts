@@ -396,7 +396,7 @@ export const partnerUiEn: PartnerUiPack = {
     stopServiceHelp:
       "If you stop the service, your partner account becomes inactive for new public listings. Existing data is kept for admin review.",
     remodeation:
-      "Profile changes are waiting for admin remoderation. Your listings stay hidden in search until approved.",
+      "Profile changes are waiting for admin review. You can keep working and add new cars as usual.",
     locked: "Locked",
     alreadyInList: "This country is already in the saved list.",
     saved: "Saved",
@@ -693,7 +693,7 @@ export const partnerUiKa: PartnerUiPack = {
     stopServiceHelp:
       "თუ სერვისს შეწყვეტთ, ანგარიში გაუქმდება ახალი საჯარო განცხადებებისთვის. არსებული მონაცემები ადმინისთვის შენარჩუნდება.",
     remodeation:
-      "პროფილის ცვლილებები ელოდება ადმინის ხელახალ მოდერაციას. განცხადებები ძიებაში დამალულია დამტკიცებამდე.",
+      "პროფილის ცვლილებები ელოდება ადმინის დამტკიცებას. ამ დროს შეგიძლიათ ჩვეულებრივ იმუშაოთ და ახალი მანქანები დაამატოთ.",
     locked: "ჩაკეტილია",
     alreadyInList: "ეს ქვეყანა უკვე შენახულ სიაშია.",
     saved: "შენახულია",
@@ -991,7 +991,7 @@ export const partnerUiRu: PartnerUiPack = {
     stopServiceHelp:
       "При остановке сервиса аккаунт станет неактивным для новых объявлений. Данные сохраняются для админа.",
     remodeation:
-      "Изменения профиля ждут повторной модерации. Объявления скрыты в поиске до одобрения.",
+      "Изменения профиля ждут проверки админа. Вы можете работать как обычно и добавлять новые машины.",
     locked: "Заблокировано",
     alreadyInList: "Эта страна уже в сохранённом списке.",
     saved: "Сохранено",

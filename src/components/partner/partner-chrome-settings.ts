@@ -61,3 +61,27 @@ export function invalidatePartnerChromeSettings() {
   cachedAt = 0;
   inflight = null;
 }
+
+type Listener = (next: PartnerChromeSettings) => void;
+const listeners = new Set<Listener>();
+
+export function subscribePartnerChromeSettings(listener: Listener): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/** Push fresh values from a save response so cabinet chrome updates without a reload. */
+export function publishPartnerChromeSettings(patch: Partial<PartnerChromeSettings>) {
+  const next: PartnerChromeSettings = {
+    pricingCurrency: null,
+    pendingRemoderation: false,
+    ...cached,
+    ...patch,
+  };
+  cached = next;
+  cachedAt = Date.now();
+  inflight = null;
+  for (const listener of listeners) listener(next);
+}

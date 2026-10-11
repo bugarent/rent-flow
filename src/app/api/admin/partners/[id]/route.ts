@@ -853,28 +853,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         /* optional */
       }
 
-      let listingsRestored = 0;
-      try {
-        const partnerIds = new Set<string>([id]);
-        if (email) {
-          const dbPartners = await prisma.partner.findMany({
-            where: { email },
-            select: { id: true },
-          });
-          for (const p of dbPartners) partnerIds.add(p.id);
-        }
-        const result = await prisma.car.updateMany({
-          where: {
-            partnerId: { in: [...partnerIds] },
-            status: { in: ["PENDING_REMODERATION", "PENDING"] },
-          },
-          data: { status: "APPROVED", hiddenReason: null },
-        });
-        listingsRestored = result.count;
-      } catch {
-        /* DB offline — partner profile still approved in file store */
-      }
-
       const { publishPartnerSearchPlaces } = await import("@/lib/server/partner-search-coverage");
       await publishPartnerSearchPlaces(id);
 
@@ -883,11 +861,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         status: "APPROVED",
         sequentialNumber,
         partnerCode: formatPartnerCode(sequentialNumber),
-        listingsRestored,
-        message:
-          listingsRestored > 0
-            ? `Remoderation approved — ${listingsRestored} listing(s) activated.`
-            : "Remoderation approved — changes applied; listings active when partner status is APPROVED.",
+        message: "Remoderation approved — profile changes applied.",
       });
     }
 
@@ -1151,22 +1125,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       /* optional file mirror */
     }
 
-    let listingsRestored = 0;
-    if (existing.status === "PENDING_REMODERATION" || existing.status === "APPROVED") {
-      try {
-        const result = await prisma.car.updateMany({
-          where: {
-            partnerId: id,
-            status: { in: ["PENDING_REMODERATION", "PENDING"] },
-          },
-          data: { status: "APPROVED", hiddenReason: null },
-        });
-        listingsRestored = result.count;
-      } catch (carError) {
-        console.warn("[admin/partners] listing restore failed", carError);
-      }
-    }
-
     if (existing.userId) {
       await prisma.user.update({
         where: { id: existing.userId },
@@ -1182,12 +1140,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       status: partner.status,
       sequentialNumber: partner.sequentialNumber,
       partnerCode: formatPartnerCode(partner.sequentialNumber),
-      listingsRestored,
       message:
         existing.status === "PENDING_REMODERATION"
-          ? listingsRestored > 0
-            ? `Remoderation approved — ${listingsRestored} listing(s) activated.`
-            : "Remoderation approved — partner listings visible again."
+          ? "Remoderation approved — profile changes applied."
           : "Partner account activated.",
     });
   }

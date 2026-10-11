@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
-import { fetchPartnerChromeSettings } from "@/components/partner/partner-chrome-settings";
+import {
+  fetchPartnerChromeSettings,
+  subscribePartnerChromeSettings,
+} from "@/components/partner/partner-chrome-settings";
 import { cn } from "@/lib/utils";
 
 /** Yellow remodeation notice for partner cabinet chrome (keeps green accent strip above). */
@@ -12,11 +15,23 @@ export function PartnerRemoderationBanner({ className }: { className?: string })
 
   useEffect(() => {
     let cancelled = false;
-    void fetchPartnerChromeSettings().then((data) => {
-      if (!cancelled) setPending(data.pendingRemoderation);
+    const load = (force = false) => {
+      void fetchPartnerChromeSettings(force).then((data) => {
+        if (!cancelled) setPending(data.pendingRemoderation);
+      });
+    };
+    load();
+    const unsubscribe = subscribePartnerChromeSettings((next) => {
+      if (!cancelled) setPending(next.pendingRemoderation);
     });
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load(true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
+      unsubscribe();
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
 
