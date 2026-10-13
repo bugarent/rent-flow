@@ -3,6 +3,7 @@ import {
   countPartnersDeliveringByPlace,
   syncListedPartnerDeliveryLocations,
 } from "@/lib/server/partner-search-coverage";
+import { resetLegacyAutoDeliveryLimits } from "@/lib/server/delivery-price-limit";
 import { requireAdmin } from "@/lib/auth/guards";
 import { DeliveryLocationsManager } from "@/components/admin/delivery-locations-manager";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
@@ -18,6 +19,7 @@ export default async function AdminDeliveryLocationsPage() {
 
   try {
     await syncListedPartnerDeliveryLocations();
+    await resetLegacyAutoDeliveryLimits();
     [locations, deliveryCounts] = await Promise.all([
       listDeliveryLocations(),
       countPartnersDeliveringByPlace(),

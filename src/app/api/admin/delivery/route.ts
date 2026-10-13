@@ -8,6 +8,7 @@ import {
   listDeliveryLocations,
 } from "@/lib/server/delivery-locations";
 import { loadPartnerDeliveryCatalog } from "@/lib/server/partner-delivery-catalog";
+import { DEFAULT_DELIVERY_MAX_EUR } from "@/lib/delivery/pricing";
 
 async function requireAdmin() {
   const session = await getAdminSession();
@@ -17,7 +18,7 @@ async function requireAdmin() {
 
 const createSchema = z.object({
   airportId: z.string().min(1),
-  maxDeliveryPriceEur: z.number().min(0),
+  maxDeliveryPriceEur: z.number().min(0).optional().default(DEFAULT_DELIVERY_MAX_EUR),
   isActive: z.boolean().optional().default(true),
   sortOrder: z.number().int().optional(),
 });

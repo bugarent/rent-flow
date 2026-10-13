@@ -593,9 +593,7 @@ export async function POST(req: Request) {
             prefs = await readPartnerDeliveryPrefs(key);
             if (prefs.length) break;
           }
-          if (prefs.length) {
-            rows = mergeDeliveryPrefsIntoRows(rows, prefs);
-          }
+          rows = mergeDeliveryPrefsIntoRows(rows, prefs);
           const { evaluatePickupLeadTime } = await import("@/lib/delivery/booking-lead");
           const lead = evaluatePickupLeadTime({
             pickupAt,

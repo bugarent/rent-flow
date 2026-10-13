@@ -5,6 +5,7 @@ import { LOCAL_PARTNER_ID, loadLocalPartner } from "@/lib/auth/local-partner-sto
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import { listPartnerScopedDeliveryLocations } from "@/lib/server/delivery-locations";
 import { capFreeAfterDays, normalizeDeliveryPrice } from "@/lib/delivery/pricing";
+import { resetLegacyAutoDeliveryLimits } from "@/lib/server/delivery-price-limit";
 import {
   readPartnerDeliveryPrefs,
   writePartnerDeliveryPrefs,
@@ -51,6 +52,7 @@ export async function GET() {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const partnerId = await resolvePartnerId(session.user.id, session.user.email);
+    await resetLegacyAutoDeliveryLimits();
     const [catalog, prefs, pricingCurrency, crossBorderEnabled] = await Promise.all([
       listPartnerScopedDeliveryLocations(partnerId),
       readPartnerDeliveryPrefs(partnerId),
@@ -89,15 +91,24 @@ export async function PUT(req: Request) {
     const partnerId = await resolvePartnerId(session.user.id, session.user.email);
     const body = await req.json();
     const raw = Array.isArray(body?.prefs) ? body.prefs : Array.isArray(body) ? body : [];
-    const catalog = await listPartnerScopedDeliveryLocations(partnerId);
+    const [catalog, previous] = await Promise.all([
+      listPartnerScopedDeliveryLocations(partnerId),
+      readPartnerDeliveryPrefs(partnerId),
+    ]);
     const byId = new Map(catalog.map((l) => [l.id, l]));
+    const previousById = new Map(previous.map((p) => [p.deliveryLocationId, p]));
 
     const next: PartnerDeliveryPref[] = [];
     for (const row of raw) {
       const id = String(row?.deliveryLocationId || "").trim();
       const loc = byId.get(id);
       if (!loc) continue;
-      const { priceEur } = normalizeDeliveryPrice(loc.maxDeliveryPriceEur, Number(row?.priceEur));
+      const capped = normalizeDeliveryPrice(loc.maxDeliveryPriceEur, Number(row?.priceEur));
+      // The form shows prices already lowered to the admin limit. Saving that shown
+      // value keeps the partner's own higher price, so raising the limit restores it.
+      const stored = previousById.get(id)?.priceEur ?? 0;
+      const keepStored = stored > capped.priceEur && capped.priceEur >= Math.max(0, loc.maxDeliveryPriceEur);
+      const priceEur = keepStored ? stored : capped.priceEur;
       const freeRaw = row?.freeAfterDays;
       const parsedFree =
         freeRaw == null || freeRaw === "" || Number.isNaN(Number(freeRaw))

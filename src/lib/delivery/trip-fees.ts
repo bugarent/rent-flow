@@ -14,9 +14,19 @@ export type DeliveryPriceRowLike = {
   deliveryLocation?: {
     id?: string;
     isActive?: boolean;
+    maxDeliveryPriceEur?: unknown;
     airport?: { iata?: string; city?: { country?: { iso2?: string } } } | null;
   } | null;
 };
+
+/** Partner price never exceeds the admin limit of the location (limit 0 = free). */
+function withinAdminLimit<T extends DeliveryPriceRowLike>(row: T): T {
+  const rawMax = row.deliveryLocation?.maxDeliveryPriceEur;
+  if (rawMax == null || rawMax === "") return row;
+  const max = Math.max(0, toNumber(rawMax, 0));
+  if (toNumber(row.priceEur, 0) <= max) return row;
+  return { ...row, priceEur: max };
+}
 
 /** Overlay partner Delivery-page prefs onto a car's delivery price rows. */
 export function mergeDeliveryPrefsIntoRows<T extends DeliveryPriceRowLike>(
@@ -24,18 +34,17 @@ export function mergeDeliveryPrefsIntoRows<T extends DeliveryPriceRowLike>(
   prefs: PartnerDeliveryPref[] | undefined,
 ): T[] {
   if (!rows?.length) return [];
-  if (!prefs?.length) return rows;
-  const byId = new Map(prefs.map((p) => [p.deliveryLocationId, p]));
+  const byId = new Map((prefs ?? []).map((p) => [p.deliveryLocationId, p]));
   return rows.map((row) => {
     const locId = String(row.deliveryLocationId || row.deliveryLocation?.id || "");
     const pref = locId ? byId.get(locId) : undefined;
-    if (!pref || pref.enabled === false) return row;
-    return {
+    if (!pref || pref.enabled === false) return withinAdminLimit(row);
+    return withinAdminLimit({
       ...row,
       priceEur: pref.priceEur,
       freeAfterDays: pref.freeAfterDays,
       travelTimeMinutes: pref.travelTimeMinutes,
-    };
+    });
   });
 }
 

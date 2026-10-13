@@ -1,7 +1,7 @@
 import { dataRoot } from "@/lib/persistent-paths";
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "@/lib/server/durable-fs";
+import { mkdir, readFile, readFileForUpdate, withStoreLock, writeFile } from "@/lib/server/durable-fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
@@ -19,6 +19,7 @@ import {
 import { worldCountryName } from "@/lib/catalog/world-countries";
 import { parseIso2List } from "@/lib/partner";
 import {
+  DEFAULT_DELIVERY_MAX_EUR,
   localizeJsonName,
   normalizeMaxFreeAfterDays,
   type DeliveryLocationView,
@@ -49,7 +50,35 @@ async function readFileStore(): Promise<StoredDeliveryLocation[]> {
     const raw = await readFile(DATA_FILE, "utf8");
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.map((row, index) => {
+    return normalizeStoredRows(parsed);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Change the saved locations list. The latest saved list is re-read inside the
+ * lock; if it cannot be read or parsed, nothing is written (no rows are lost).
+ */
+async function mutateFileStore<T>(
+  update: (rows: StoredDeliveryLocation[]) => { rows: StoredDeliveryLocation[] | null; result: T },
+): Promise<T> {
+  return withStoreLock(DATA_FILE, async () => {
+    const raw = await readFileForUpdate(DATA_FILE);
+    let current: StoredDeliveryLocation[] = [];
+    if (raw != null) {
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) throw new Error("Saved delivery locations are unreadable. Nothing was changed.");
+      current = normalizeStoredRows(parsed);
+    }
+    const { rows, result } = update(current);
+    if (rows) await writeFileStore(rows);
+    return result;
+  });
+}
+
+function normalizeStoredRows(parsed: unknown[]): StoredDeliveryLocation[] {
+  return parsed.map((row, index) => {
       const item = row as Partial<StoredDeliveryLocation>;
       const rawCode = String(item.iata || item.airportId || "");
       const code = rawCode ? normalizeLocationCode(rawCode) : "";
@@ -72,9 +101,6 @@ async function readFileStore(): Promise<StoredDeliveryLocation[]> {
         updatedAt: String(item.updatedAt || new Date().toISOString()),
       };
     });
-  } catch {
-    return [];
-  }
 }
 
 async function writeFileStore(rows: StoredDeliveryLocation[]) {
@@ -305,39 +331,45 @@ export async function createDeliveryLocation(input: {
   const createInFile = async (): Promise<DeliveryLocationView> => {
     const place = findSearchPlace(input.airportId);
     const iata = place?.code ?? normalizeLocationCode(input.airportId);
-    const fileRows = await readFileStore();
-    const existingRow = fileRows.find(
-      (r) => normalizeLocationCode(r.iata) === iata || r.airportId === input.airportId,
-    );
-    if (existingRow) return reuseExisting(existingRow.id, existingRow.isActive);
+    const outcome = await mutateFileStore<
+      { existing: StoredDeliveryLocation; created?: never } | { created: StoredDeliveryLocation; existing?: never }
+    >((fileRows) => {
+      const existingRow = fileRows.find(
+        (r) => normalizeLocationCode(r.iata) === iata || r.airportId === input.airportId,
+      );
+      if (existingRow) return { rows: null, result: { existing: existingRow } };
 
-    const now = new Date().toISOString();
-    const view: StoredDeliveryLocation = {
-      id: randomUUID(),
-      airportId: input.airportId,
-      iata,
-      label: place?.label ?? (CATALOG_AIRPORTS.find((a) => a.iata === iata)
-        ? `${CATALOG_AIRPORTS.find((a) => a.iata === iata)!.name.en} (${iata})`
-        : iata),
-      country: place ? worldCountryName(place.countryIso2) : CATALOG_AIRPORTS.find((a) => a.iata === iata)?.countryName.en ?? "",
-      countryIso2: place?.countryIso2 ?? CATALOG_AIRPORTS.find((a) => a.iata === iata)?.countryIso2 ?? "",
-      maxDeliveryPriceEur,
-      isActive,
-      sortOrder,
-      kind: place?.kind ?? (isCityLocationCode(iata) ? "city" : "airport"),
-      individualBookingEnabled: false,
-      createdAt: now,
-      updatedAt: now,
-    };
-    await writeFileStore([...fileRows, view]);
-    const { createdAt: _c, updatedAt: _u, ...publicView } = view;
+      const now = new Date().toISOString();
+      const view: StoredDeliveryLocation = {
+        id: randomUUID(),
+        airportId: input.airportId,
+        iata,
+        label: place?.label ?? (CATALOG_AIRPORTS.find((a) => a.iata === iata)
+          ? `${CATALOG_AIRPORTS.find((a) => a.iata === iata)!.name.en} (${iata})`
+          : iata),
+        country: place ? worldCountryName(place.countryIso2) : CATALOG_AIRPORTS.find((a) => a.iata === iata)?.countryName.en ?? "",
+        countryIso2: place?.countryIso2 ?? CATALOG_AIRPORTS.find((a) => a.iata === iata)?.countryIso2 ?? "",
+        maxDeliveryPriceEur,
+        isActive,
+        sortOrder,
+        kind: place?.kind ?? (isCityLocationCode(iata) ? "city" : "airport"),
+        individualBookingEnabled: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+      return { rows: [...fileRows, view], result: { created: view } };
+    });
+    if (outcome.existing) return reuseExisting(outcome.existing.id, outcome.existing.isActive);
+    const { createdAt: _c, updatedAt: _u, ...publicView } = outcome.created;
     return publicView;
   };
 
+  if (isCityLocationCode(input.airportId) || findSearchPlace(input.airportId)?.kind === "city") {
+    return createInFile();
+  }
+
+  let view: DeliveryLocationView;
   try {
-    if (isCityLocationCode(input.airportId) || findSearchPlace(input.airportId)?.kind === "city") {
-      return createInFile();
-    }
     const airport = await prisma.airport.findFirst({
       where: {
         OR: [{ id: input.airportId }, { iata: input.airportId.toUpperCase() }],
@@ -365,7 +397,7 @@ export async function createDeliveryLocation(input: {
       include: { airport: { include: { city: { include: { country: true } } } } },
     });
 
-    const view: DeliveryLocationView = {
+    view = {
       id: row.id,
       airportId: row.airportId,
       iata: row.airport.iata,
@@ -376,14 +408,6 @@ export async function createDeliveryLocation(input: {
       isActive: row.isActive,
       sortOrder: row.sortOrder,
     };
-
-    const fileRows = await readFileStore();
-    const now = new Date().toISOString();
-    await writeFileStore([
-      ...fileRows.filter((r) => r.airportId !== view.airportId && r.iata !== view.iata),
-      { ...view, createdAt: now, updatedAt: now },
-    ]);
-    return view;
   } catch (error) {
     if (error instanceof Error && error.message.includes("already configured")) {
       throw error;
@@ -391,6 +415,24 @@ export async function createDeliveryLocation(input: {
     console.warn("[delivery-locations] create via file store:", error);
     return createInFile();
   }
+
+  // The database row is saved; a failed mirror must not create a second row.
+  const created = view;
+  try {
+    await mutateFileStore((fileRows) => {
+      const now = new Date().toISOString();
+      return {
+        rows: [
+          ...fileRows.filter((r) => r.airportId !== created.airportId && r.iata !== created.iata),
+          { ...created, createdAt: now, updatedAt: now },
+        ],
+        result: undefined,
+      };
+    });
+  } catch (error) {
+    console.warn("[delivery-locations] create mirror skipped:", error);
+  }
+  return created;
 }
 
 function nextMaxFreeAfterDays(
@@ -411,6 +453,8 @@ export async function updateDeliveryLocation(
     maxFreeAfterDays?: number | null;
   },
 ): Promise<DeliveryLocationView | null> {
+  // Partner prices are never rewritten when the price limit changes: the limit is
+  // applied when fees are shown/charged, so raising it again restores partner prices.
   const clampPartners = async (maxFreeAfterDays: number | null) => {
     if (input.maxFreeAfterDays === undefined || maxFreeAfterDays == null) return;
     const { clampAllPartnerFreeAfterDays } = await import("@/lib/server/partner-delivery-prefs-store");
@@ -418,54 +462,60 @@ export async function updateDeliveryLocation(
   };
 
   const patchFile = async (): Promise<DeliveryLocationView | null> => {
-    const fileRows = await readFileStore();
-    const idx = fileRows.findIndex((r) => r.id === id);
-    if (idx < 0) return null;
-    const current = fileRows[idx];
-    const maxFreeAfterDays = nextMaxFreeAfterDays(input, current);
-    const next: StoredDeliveryLocation = {
-      ...current,
-      maxDeliveryPriceEur:
-        input.maxDeliveryPriceEur != null
-          ? Math.max(0, Number(input.maxDeliveryPriceEur))
-          : current.maxDeliveryPriceEur,
-      maxFreeAfterDays,
-      isActive: input.isActive ?? current.isActive,
-      sortOrder: input.sortOrder ?? current.sortOrder,
-      individualBookingEnabled:
-        input.individualBookingEnabled != null
-          ? input.individualBookingEnabled
-          : current.individualBookingEnabled === true,
-      updatedAt: new Date().toISOString(),
-    };
-    fileRows[idx] = next;
-    await writeFileStore(fileRows);
-    await clampPartners(maxFreeAfterDays);
+    const next = await mutateFileStore((fileRows) => {
+      const idx = fileRows.findIndex((r) => r.id === id);
+      if (idx < 0) return { rows: null, result: null };
+      const current = fileRows[idx];
+      const updated: StoredDeliveryLocation = {
+        ...current,
+        maxDeliveryPriceEur:
+          input.maxDeliveryPriceEur != null
+            ? Math.max(0, Number(input.maxDeliveryPriceEur))
+            : current.maxDeliveryPriceEur,
+        maxFreeAfterDays: nextMaxFreeAfterDays(input, current),
+        isActive: input.isActive ?? current.isActive,
+        sortOrder: input.sortOrder ?? current.sortOrder,
+        individualBookingEnabled:
+          input.individualBookingEnabled != null
+            ? input.individualBookingEnabled
+            : current.individualBookingEnabled === true,
+        updatedAt: new Date().toISOString(),
+      };
+      const rows = [...fileRows];
+      rows[idx] = updated;
+      return { rows, result: updated };
+    });
+    if (!next) return null;
+    await clampPartners(next.maxFreeAfterDays ?? null);
     const { createdAt: _c, updatedAt: _u, ...view } = next;
     return enrichLocationView(view);
   };
 
-  try {
-    const data: {
-      maxDeliveryPriceEur?: number;
-      isActive?: boolean;
-      sortOrder?: number;
-    } = {};
-    if (input.maxDeliveryPriceEur != null) data.maxDeliveryPriceEur = Math.max(0, Number(input.maxDeliveryPriceEur));
-    if (input.isActive != null) data.isActive = input.isActive;
-    if (input.sortOrder != null) data.sortOrder = input.sortOrder;
+  const data: {
+    maxDeliveryPriceEur?: number;
+    isActive?: boolean;
+    sortOrder?: number;
+  } = {};
+  if (input.maxDeliveryPriceEur != null) data.maxDeliveryPriceEur = Math.max(0, Number(input.maxDeliveryPriceEur));
+  if (input.isActive != null) data.isActive = input.isActive;
+  if (input.sortOrder != null) data.sortOrder = input.sortOrder;
 
-    const row = await prisma.deliveryLocation.update({
+  let row;
+  try {
+    row = await prisma.deliveryLocation.update({
       where: { id },
       data,
       include: { airport: { include: { city: { include: { country: true } } } } },
     });
+  } catch (error) {
+    console.warn("[delivery-locations] update via file store:", error);
+    return patchFile();
+  }
 
-    const fileRows = await readFileStore();
+  const view = await mutateFileStore((fileRows) => {
     const prev = fileRows.find((r) => r.id === id);
     const now = new Date().toISOString();
-    const maxFreeAfterDays = nextMaxFreeAfterDays(input, prev);
-    const view: DeliveryLocationView = enrichLocationView({
+    const saved: DeliveryLocationView = enrichLocationView({
       id: row.id,
       airportId: row.airportId,
       iata: row.airport.iata,
@@ -473,7 +523,7 @@ export async function updateDeliveryLocation(
       country: localizeJsonName(row.airport.city.country.name, row.airport.city.country.iso2),
       countryIso2: row.airport.city.country.iso2,
       maxDeliveryPriceEur: toNumber(row.maxDeliveryPriceEur),
-      maxFreeAfterDays,
+      maxFreeAfterDays: nextMaxFreeAfterDays(input, prev),
       isActive: row.isActive,
       sortOrder: row.sortOrder,
       kind: prev?.kind,
@@ -482,17 +532,13 @@ export async function updateDeliveryLocation(
           ? input.individualBookingEnabled
           : prev?.individualBookingEnabled === true,
     });
-
-    await writeFileStore([
-      ...fileRows.filter((r) => r.id !== id),
-      { ...view, createdAt: prev?.createdAt || now, updatedAt: now },
-    ]);
-    await clampPartners(maxFreeAfterDays);
-    return view;
-  } catch (error) {
-    console.warn("[delivery-locations] update via file store:", error);
-    return patchFile();
-  }
+    return {
+      rows: [...fileRows.filter((r) => r.id !== id), { ...saved, createdAt: prev?.createdAt || now, updatedAt: now }],
+      result: saved,
+    };
+  });
+  await clampPartners(view.maxFreeAfterDays ?? null);
+  return view;
 }
 
 export async function deleteDeliveryLocation(id: string): Promise<boolean> {
@@ -501,13 +547,14 @@ export async function deleteDeliveryLocation(id: string): Promise<boolean> {
   } catch (error) {
     console.warn("[delivery-locations] delete DB path:", error);
   }
-  const fileRows = await readFileStore();
-  const next = fileRows.filter((r) => r.id !== id);
-  await writeFileStore(next);
-  return fileRows.length !== next.length || true;
+  await mutateFileStore((fileRows) => {
+    const next = fileRows.filter((r) => r.id !== id);
+    return { rows: next.length === fileRows.length ? null : next, result: undefined };
+  });
+  return true;
 }
 
-const DEFAULT_PARTNER_DELIVERY_MAX_EUR = 100;
+const DEFAULT_PARTNER_DELIVERY_MAX_EUR = DEFAULT_DELIVERY_MAX_EUR;
 
 /**
  * Upsert a delivery location for an airport id (no partner-country gate).

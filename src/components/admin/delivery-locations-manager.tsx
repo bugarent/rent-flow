@@ -18,6 +18,7 @@ import { CountryFlag } from "@/components/ui/country-flag";
 import { DeliveryCountryFilter } from "@/components/admin/delivery-country-filter";
 import { isCityLocationCode } from "@/lib/catalog/search-places";
 import { lookupDeliveryCount } from "@/lib/delivery/partner-counts";
+import { DeliveryLimitBadge } from "@/components/admin/delivery-limit-badge";
 import {
   ResponsiveDataList,
   MobileDataCard,
@@ -127,6 +128,8 @@ export function DeliveryLocationsManager({
   const [countryIso2, setCountryIso2] = useState("");
 
   const symbol = currencySymbol(currency);
+  const freeLabel = phrase("Free", "უფასო", "Бесплатно");
+  const rangeLabel = phrase("Partner price", "პარტნიორის ფასი", "Цена партнёра");
 
   const countries = useMemo(() => {
     const map = new Map<string, { iso2: string; name: string; count: number }>();
@@ -210,14 +213,24 @@ export function DeliveryLocationsManager({
   const saveRow = async (id: string) => {
     setError("");
     setMessage("");
-    const raw = priceDrafts[id] ?? "";
+    const current = locations.find((x) => x.id === id);
+    const raw = (priceDrafts[id] ?? "").trim().replace(",", ".");
     const amount = Number(raw);
-    if (!Number.isFinite(amount) || amount < 0) {
-      setError(`Enter a valid maximum delivery price (${symbol}).`);
+    if (raw === "" || !Number.isFinite(amount) || amount < 0) {
+      setError(
+        phrase(
+          `Enter a valid maximum delivery price (${symbol}). Enter 0 for free delivery.`,
+          `ჩაწერეთ სწორი მაქსიმალური ფასი (${symbol}). უფასო მიწოდებისთვის ჩაწერეთ 0.`,
+          `Укажите корректную максимальную цену (${symbol}). Для бесплатной доставки укажите 0.`,
+        ),
+      );
       return;
     }
 
-    const maxDeliveryPriceEur = convertToEur(amount, currency, rates);
+    // An unchanged amount keeps the exact stored EUR value (no currency rounding drift).
+    const unchanged =
+      current != null && amount === roundMoney(convertFromEur(current.maxDeliveryPriceEur, currency, rates));
+    const maxDeliveryPriceEur = unchanged ? current.maxDeliveryPriceEur : convertToEur(amount, currency, rates);
     const daysRaw = (daysDrafts[id] ?? "").trim();
     let maxFreeAfterDays: number | null = null;
     if (daysRaw !== "") {
@@ -235,8 +248,8 @@ export function DeliveryLocationsManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ maxDeliveryPriceEur, maxFreeAfterDays }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not update");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.id) throw new Error(data.error || "Could not update");
       setLocations((prev) => prev.map((x) => (x.id === data.id ? data : x)));
       setPriceDrafts((prev) => ({
         ...prev,
@@ -247,9 +260,11 @@ export function DeliveryLocationsManager({
         [id]: data.maxFreeAfterDays == null ? "" : String(data.maxFreeAfterDays),
       }));
       const daysLabel = data.maxFreeAfterDays == null ? "no day limit" : `${data.maxFreeAfterDays} days`;
-      setMessage(
-        `Saved max delivery ${symbol}${toDisplayAmount(data.maxDeliveryPriceEur, currency, rates)} and free after ${daysLabel} for ${data.label || data.iata}.`,
-      );
+      const limitLabel =
+        Number(data.maxDeliveryPriceEur) > 0
+          ? `max delivery ${symbol}${toDisplayAmount(data.maxDeliveryPriceEur, currency, rates)}`
+          : phrase("free delivery", "უფასო მიწოდება", "бесплатная доставка");
+      setMessage(`${phrase("Saved", "შენახულია", "Сохранено")}: ${limitLabel}, free after ${daysLabel} — ${data.label || data.iata}.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save");
     } finally {
@@ -339,6 +354,9 @@ export function DeliveryLocationsManager({
                 }
               }}
             />
+          </div>
+          <div className="mt-1">
+            <DeliveryLimitBadge amount={draft} symbol={symbol} freeLabel={freeLabel} rangeLabel={rangeLabel} />
           </div>
         </td>
         <td className="p-3">
@@ -430,7 +448,7 @@ export function DeliveryLocationsManager({
               step="0.01"
               inputMode="decimal"
               aria-label={`Max delivery for ${item.label} (${currency})`}
-              className="w-28 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm font-semibold text-[#0b1f4b] outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+              className="w-28 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-base font-semibold text-[#0b1f4b] outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 sm:text-sm"
               value={draft}
               disabled={busy}
               onChange={(e) => setDraft(item.id, e.target.value)}
@@ -441,6 +459,9 @@ export function DeliveryLocationsManager({
                 }
               }}
             />
+          </div>
+          <div className="mt-1 flex justify-end">
+            <DeliveryLimitBadge amount={draft} symbol={symbol} freeLabel={freeLabel} rangeLabel={rangeLabel} />
           </div>
         </MobileDataRow>
         <MobileDataRow label={phrase("Free after days", "უფასო დღის შემდეგ", "Бесплатно после дней")}>
@@ -553,6 +574,13 @@ export function DeliveryLocationsManager({
             <CurrencyToggle value={currency} onChange={switchCurrency} />
           </div>
         </div>
+        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-900 sm:text-sm">
+          {phrase(
+            "0 = free delivery for everyone. Enter a limit to let partners charge between 0 and that amount; higher partner prices are lowered to the limit automatically.",
+            "0 = მიწოდება უფასოა ყველასთვის. ჩაწერეთ ლიმიტი და პარტნიორი შეძლებს ფასის მითითებას 0-დან ამ თანხამდე; ლიმიტზე მაღალი ფასები ავტომატურად ჩამოიწევს ლიმიტამდე.",
+            "0 = доставка бесплатна для всех. Укажите лимит — партнёры смогут ставить цену от 0 до этой суммы; более высокие цены автоматически снизятся до лимита.",
+          )}
+        </p>
       </div>
 
       <ResponsiveDataList

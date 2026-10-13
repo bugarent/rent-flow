@@ -66,6 +66,17 @@ export function capFreeAfterDays(
   return { freeAfterDays: raw, capped: false };
 }
 
+/**
+ * New delivery locations start free. The admin may later set a limit; partner
+ * one-way prices then stay between 0 and that limit.
+ */
+export const DEFAULT_DELIVERY_MAX_EUR = 0;
+
+/** Admin limit of 0 means delivery to this place is always free. */
+export function isFreeDeliveryLimit(maxDeliveryPriceEur: unknown): boolean {
+  return toNumber(maxDeliveryPriceEur, 0) <= 0;
+}
+
 /** Cap partner delivery price to admin max; returns adjusted price + whether it was capped. */
 export function normalizeDeliveryPrice(
   maxDeliveryPriceEur: number,

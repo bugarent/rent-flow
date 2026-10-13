@@ -123,9 +123,13 @@ function parseJsonPayload(raw: string): unknown {
   }
 }
 
-async function readFromDb(absPath: string): Promise<string | null> {
+/** `ok: false` = the saved copy exists somewhere but could not be read right now. */
+type DbRead = { ok: true; text: string | null } | { ok: false };
+
+async function readFromDbStrict(absPath: string): Promise<DbRead> {
+  if (!databaseUrl()) return { ok: true, text: null };
   const pool = storePool();
-  if (!pool) return null;
+  if (!pool) return { ok: false };
   try {
     await ensureTable(pool);
     const result = await pool.query<{ payload: unknown }>(
@@ -133,13 +137,66 @@ async function readFromDb(absPath: string): Promise<string | null> {
       [jsonStoreKey(absPath)],
     );
     const row = result.rows[0];
-    if (!row) return null;
-    return JSON.stringify(row.payload, null, 2);
+    return { ok: true, text: row ? JSON.stringify(row.payload, null, 2) : null };
   } catch (error) {
     noteStoreError(error);
     console.warn("[json-store] read failed", jsonStoreKey(absPath), error);
-    return null;
+    return { ok: false };
   }
+}
+
+async function readFromDb(absPath: string): Promise<string | null> {
+  const result = await readFromDbStrict(absPath);
+  return result.ok ? result.text : null;
+}
+
+export class StoreUnavailableError extends Error {
+  constructor() {
+    super("Saved data could not be loaded right now, so the save was stopped and no data was removed. Please try again.");
+    this.name = "StoreUnavailableError";
+  }
+}
+
+/**
+ * Read a JSON store before rewriting it. Unlike `readFile`, this never answers
+ * with an empty or stale copy when the saved store cannot be reached — it throws
+ * `StoreUnavailableError`, so the caller saves nothing instead of overwriting data.
+ * Returns null only when the store has genuinely never been saved.
+ */
+export async function readFileForUpdate(path: string): Promise<string | null> {
+  if (!preferDatabaseCopy(path)) {
+    try {
+      return fsReadFileSync(path, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      const fromDb = await readFromDbStrict(path);
+      if (!fromDb.ok) throw new StoreUnavailableError();
+      return fromDb.text;
+    }
+  }
+  const fromDb = await readFromDbStrict(path);
+  if (!fromDb.ok) throw new StoreUnavailableError();
+  if (fromDb.text != null) return fromDb.text;
+  try {
+    return await fsReadFile(path, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+const storeLocks = new Map<string, Promise<unknown>>();
+
+/** Run read-modify-write steps on one store one at a time within this server instance. */
+export function withStoreLock<T>(path: string, task: () => Promise<T>): Promise<T> {
+  const previous = storeLocks.get(path) ?? Promise.resolve();
+  const run = previous.catch(() => undefined).then(task);
+  const tail = run.catch(() => undefined);
+  storeLocks.set(path, tail);
+  void tail.then(() => {
+    if (storeLocks.get(path) === tail) storeLocks.delete(path);
+  });
+  return run;
 }
 
 async function writeToDb(absPath: string, text: string): Promise<boolean> {

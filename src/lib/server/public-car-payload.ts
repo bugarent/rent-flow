@@ -36,7 +36,6 @@ async function deliveryRows(partnerId: string, rows: unknown) {
     if (!prefs.length && partnerId.startsWith("file-partner-")) {
       prefs = await readPartnerDeliveryPrefs(partnerId.slice("file-partner-".length));
     }
-    if (!prefs.length) return undefined;
     return mergeDeliveryPrefsIntoRows(rows as Array<Record<string, unknown>>, prefs);
   } catch {
     return undefined;

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/responsive-data-list";
 import { PARTNER_BASE } from "@/lib/routes";
 import { capFreeAfterDays, type DeliveryLocationView } from "@/lib/delivery/pricing";
-import { PartnerEurMoneyInput } from "@/components/partner/partner-eur-money-input";
+import { PartnerDeliveryPriceCell } from "@/components/partner/partner-delivery-price-cell";
 import { cn } from "@/lib/utils";
 
 type RowState = {
@@ -40,7 +40,10 @@ function copyFor(locale: string) {
       empty:
         "პირად ინფოში ჯერ არც ერთი მიწოდების ლოკაცია არ გაქვთ გააქტიურებული.",
       openPersonal: "პირადი ინფო",
-      help: "მიუთითეთ აყვანის/დაბრუნების ერთი მიმართულების ფასი თითოეულ ლოკაციაზე. თანხა ემატება მომხმარებლის ჯამურ ფასს.",
+      help: "ახალ ლოკაციებზე მიწოდება უფასოა. თუ ადმინს ლიმიტი აქვს დაწესებული, შეგიძლიათ მიუთითოთ ერთი მიმართულების ფასი 0-დან ამ ლიმიტამდე — თანხა ემატება მომხმარებლის ჯამურ ფასს.",
+      free: "უფასო",
+      maxHint: "მაქს. {amount}",
+      priceCapped: "ადმინის ლიმიტია {amount}. ფასი ჩამოიწია ლიმიტამდე.",
       errSave: "შენახვა ვერ მოხერხდა.",
       freeAfterCapped: "ადმინის მაქსიმუმია {n} დღე. უფრო გრძელი პერიოდი ჩაიწერა {n}-ად.",
       loading: "იტვირთება…",
@@ -66,7 +69,10 @@ function copyFor(locale: string) {
       saved: "Сохранено",
       empty: "В личной информации ещё нет активных локаций доставки.",
       openPersonal: "Личная информация",
-      help: "Укажите цену доставки/возврата в одну сторону для каждой локации. Сумма добавится к итогу клиента.",
+      help: "Доставка в новые локации бесплатна. Если администратор задал лимит, укажите цену в одну сторону от 0 до этого лимита — сумма добавится к итогу клиента.",
+      free: "Бесплатно",
+      maxHint: "макс. {amount}",
+      priceCapped: "Лимит администратора — {amount}. Цена снижена до лимита.",
       errSave: "Не удалось сохранить.",
       freeAfterCapped: "Максимум администратора — {n} дн. Более длинный срок записан как {n}.",
       loading: "Загрузка…",
@@ -91,7 +97,10 @@ function copyFor(locale: string) {
     saved: "Saved",
     empty: "No delivery locations are activated in Personal info yet.",
     openPersonal: "Personal info",
-    help: "Set a one-way delivery/collection price per location. The fee is added to the customer total.",
+    help: "Delivery to new locations is free. When the admin sets a limit, you can charge a one-way price from 0 up to that limit — the fee is added to the customer total.",
+    free: "Free",
+    maxHint: "max {amount}",
+    priceCapped: "Admin limit is {amount}. The price was lowered to the limit.",
     errSave: "Could not save.",
     freeAfterCapped: "Admin maximum is {n} days. A longer period was set to {n}.",
     loading: "Loading…",
@@ -329,11 +338,14 @@ export function PartnerDeliveryPanel() {
                             </label>
                           </td>
                           <td className="px-3 py-2.5 align-middle">
-                            <PartnerEurMoneyInput
-                              eurValue={row.priceEur}
+                            <PartnerDeliveryPriceCell
+                              priceEur={row.priceEur}
+                              maxDeliveryPriceEur={row.maxDeliveryPriceEur}
                               disabled={!row.enabled}
-                              onEurChange={(eur) => updateRow(row.location.id, { priceEur: eur })}
-                              className="w-24 rounded-md border border-slate-200 bg-white py-1 font-bold text-slate-900 disabled:opacity-50"
+                              freeLabel={t.free}
+                              maxLabel={t.maxHint}
+                              onPriceChange={(eur) => updateRow(row.location.id, { priceEur: eur })}
+                              onCapped={(max) => setCapNotice(t.priceCapped.replaceAll("{amount}", max))}
                             />
                           </td>
                           <td className="px-3 py-2.5 align-middle">
@@ -400,11 +412,15 @@ export function PartnerDeliveryPanel() {
                           </label>
                         </MobileDataRow>
                         <MobileDataRow label={t.oneWay}>
-                          <PartnerEurMoneyInput
-                            eurValue={row.priceEur}
+                          <PartnerDeliveryPriceCell
+                            priceEur={row.priceEur}
+                            maxDeliveryPriceEur={row.maxDeliveryPriceEur}
                             disabled={!row.enabled}
-                            onEurChange={(eur) => updateRow(row.location.id, { priceEur: eur })}
-                            className="w-28 rounded-md border border-slate-200 bg-white py-1 text-end font-bold text-slate-900 disabled:opacity-50"
+                            freeLabel={t.free}
+                            maxLabel={t.maxHint}
+                            align="end"
+                            onPriceChange={(eur) => updateRow(row.location.id, { priceEur: eur })}
+                            onCapped={(max) => setCapNotice(t.priceCapped.replaceAll("{amount}", max))}
                           />
                         </MobileDataRow>
                         <MobileDataRow label={t.freeAfter}>

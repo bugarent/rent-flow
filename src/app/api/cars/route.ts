@@ -264,7 +264,7 @@ export async function GET(req: Request) {
         const pid = String(car.partnerId || car.partner?.id || "");
         let rows = car.deliveryPrices ?? [];
         const prefs = prefsCache.get(pid);
-        if (prefs?.length) rows = mergeDeliveryPrefsIntoRows(rows, prefs);
+        rows = mergeDeliveryPrefsIntoRows(rows, prefs);
         const matching = rows.filter((row) => {
           const loc = row.deliveryLocation;
           if (!loc?.isActive || !loc.airport) return false;

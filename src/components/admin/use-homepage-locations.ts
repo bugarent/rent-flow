@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import type { DeliveryLocationView } from "@/lib/delivery/pricing";
+import { DEFAULT_DELIVERY_MAX_EUR, type DeliveryLocationView } from "@/lib/delivery/pricing";
 import { normalizeLocationCode } from "@/lib/catalog/search-places";
 
-const DEFAULT_MAX_EUR = 10;
 /** Upper bound on save round-trips per place while the admin keeps clicking it. */
 const MAX_SYNC_PASSES = 6;
 
@@ -73,7 +72,7 @@ async function saveLocation(
   const res = await fetch("/api/admin/delivery", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ airportId: key, maxDeliveryPriceEur: DEFAULT_MAX_EUR, isActive: true }),
+    body: JSON.stringify({ airportId: key, maxDeliveryPriceEur: DEFAULT_DELIVERY_MAX_EUR, isActive: true }),
   });
   const data = await readJson(res);
   if (res.ok) return data as unknown as DeliveryLocationView;

@@ -88,6 +88,7 @@ export async function buildMergedDeliveryRows(input: {
       deliveryLocation: {
         id: loc?.id || dp.deliveryLocationId,
         isActive: loc?.isActive === true,
+        maxDeliveryPriceEur: loc?.maxDeliveryPriceEur,
         airport: iata
           ? {
               iata,
@@ -137,6 +138,7 @@ export async function buildMergedDeliveryRows(input: {
       /* keep car rows */
     }
   }
+  rows = mergeDeliveryPrefsIntoRows(rows, []);
 
   const labelByIata = new Map<string, { label: string }>();
   for (const [iata, loc] of byIata) {
