@@ -9,6 +9,7 @@ import {
   type PartnerExtraInput,
 } from "@/lib/extras/pricing";
 import { resolvePartnerDeliveryPrices } from "@/lib/delivery/pricing";
+import { scopePickupPlacesInDescription } from "@/lib/cars/scope-pickup-places";
 import { listPartnerScopedDeliveryLocations, persistableCarDeliveryRows } from "@/lib/server/delivery-locations";
 import { persistCarInsuranceDocument } from "@/lib/server/car-passport-docs";
 import {
@@ -552,6 +553,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       let deliveryAdjustments: ReturnType<typeof resolvePartnerDeliveryPrices>["adjustments"] = [];
       if (body.deliveryPrices !== undefined) {
         const deliveryCatalog = await listPartnerScopedDeliveryLocations(car.partnerId);
+        if (typeof body.description === "string") {
+          body.description = scopePickupPlacesInDescription(body.description, deliveryCatalog);
+        }
         if (!deliveryCatalog.length) {
           if (!adminCorrection) {
             return NextResponse.json(
@@ -812,15 +816,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
   }
 
-  return NextResponse.json(
-    await prisma.car.update({
-      where: { id },
-      data: {
-        status: body.status ?? undefined,
-        hiddenReason: body.status === "APPROVED" ? null : body.hiddenReason,
-      },
-    }),
-  );
+  const statusUpdated = await prisma.car.update({
+    where: { id },
+    data: {
+      status: body.status ?? undefined,
+      hiddenReason: body.status === "APPROVED" ? null : body.hiddenReason,
+    },
+  });
+  revalidatePublishedListing(id);
+  return NextResponse.json(statusUpdated);
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -861,6 +865,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     } catch {
       /* optional */
     }
+    revalidatePublishedListing(id);
     return NextResponse.json({ ok: true });
   }
 
@@ -876,5 +881,6 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   } catch {
     /* optional */
   }
+  revalidatePublishedListing(id);
   return NextResponse.json({ ok: true });
 }

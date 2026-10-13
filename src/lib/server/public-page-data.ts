@@ -16,7 +16,7 @@ import { getFxRates } from "@/lib/server/preferences";
 const nonEmpty = (rows: unknown[]) => rows.length > 0;
 
 export const cachedSearchDeliveryAirports = cachedPublicRead(
-  "search-delivery-airports",
+  "search-delivery-airports:listing-backed",
   getSearchDeliveryAirports,
   { keep: nonEmpty },
 );

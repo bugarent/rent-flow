@@ -21,6 +21,7 @@ import {
   isValidRegistrationNumber,
   normalizeRegistrationNumber,
 } from "@/lib/cars/registration-number";
+import { scopePickupPlacesInDescription } from "@/lib/cars/scope-pickup-places";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import { LOCAL_PARTNER_ID, TEST_PARTNER_EMAIL, loadLocalPartner } from "@/lib/auth/local-partner-store";
 import { normalizeLogin } from "@/lib/crypto";
@@ -408,7 +409,7 @@ export async function POST(req: Request) {
       year,
       pricePerDay,
       dailyRateEur,
-      description,
+      description: descriptionRaw,
       images,
       photos,
       techPassportUrl,
@@ -428,6 +429,7 @@ export async function POST(req: Request) {
       categorySlug: categorySlugRaw,
     } = body;
 
+    let description: string | null | undefined = descriptionRaw;
     const publicPhotos: string[] = photos ?? images ?? [];
     const listingStatus =
       String(statusRaw || "").toUpperCase() === "DRAFT" || String(statusRaw || "").toUpperCase() === "HIDDEN"
@@ -517,6 +519,7 @@ export async function POST(req: Request) {
       }
 
       const deliveryCatalog = await listPartnerScopedDeliveryLocations(partner.id);
+      description = scopePickupPlacesInDescription(description, deliveryCatalog);
       if (forSale && !deliveryCatalog.length && !deliveryRowsFromBody(deliveryPrices).length) {
         return NextResponse.json(
           { error: "No operating airports on your partner profile. Contact admin before listing." },

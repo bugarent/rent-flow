@@ -894,7 +894,8 @@ function locationOffersPickup(loc: DeliveryLocationView, pickupCodes: Set<string
 
 /**
  * Search widget options: a place is offered to customers only when the admin
- * has activated it and an approved partner has it in their operating locations.
+ * has activated it, an approved partner has it in their operating locations,
+ * and one of that partner's live listings delivers there.
  */
 export async function getSearchDeliveryAirports(): Promise<SearchAirportOption[]> {
   const hit = searchAirportsCache.get();
@@ -902,7 +903,8 @@ export async function getSearchDeliveryAirports(): Promise<SearchAirportOption[]
 
   const all = await listDeliveryLocations();
   const locations = all.filter((loc) => loc.isActive);
-  const partnerCodes = locations.length ? await approvedPartnerPlaceCodes() : new Set<string>();
+  const { bookablePlaceKeys } = await import("@/lib/server/search-place-coverage");
+  const partnerCodes = locations.length ? await bookablePlaceKeys(all) : new Set<string>();
 
   const toOption = (loc: {
     iata: string;

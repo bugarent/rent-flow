@@ -179,7 +179,7 @@ const LISTED_PARTNER_STATUS_LIST = [
 ] as const;
 const LISTED_PARTNER_STATUSES = new Set<string>(LISTED_PARTNER_STATUS_LIST);
 
-type PartnerPlaceGroup = {
+export type PartnerPlaceGroup = {
   partnerId: string;
   codes: string[];
 };
@@ -199,13 +199,25 @@ function codesFromSettingsOrSnapshot(
 }
 
 /** Places partners marked for car delivery, including applications still awaiting review. */
-async function listedPartnerPlaceGroups(): Promise<PartnerPlaceGroup[]> {
+function listedPartnerPlaceGroups(): Promise<PartnerPlaceGroup[]> {
+  return partnerPlaceGroups(LISTED_PARTNER_STATUS_LIST, LISTED_PARTNER_STATUSES);
+}
+
+/** Places of partners an administrator approved (live profile snapshot while remoderation is pending). */
+export function approvedPartnerPlaceGroups(): Promise<PartnerPlaceGroup[]> {
+  return partnerPlaceGroups(["APPROVED", "PENDING_REMODERATION"], new Set(["APPROVED"]));
+}
+
+async function partnerPlaceGroups(
+  dbStatuses: readonly string[],
+  fileStatuses: Set<string>,
+): Promise<PartnerPlaceGroup[]> {
   const groups: PartnerPlaceGroup[] = [];
   const seen = new Set<string>();
 
   try {
     const partners = await prisma.partner.findMany({
-      where: { status: { in: [...LISTED_PARTNER_STATUS_LIST] } },
+      where: { status: { in: [...dbStatuses] as (typeof LISTED_PARTNER_STATUS_LIST)[number][] } },
       select: {
         id: true,
         status: true,
@@ -234,7 +246,7 @@ async function listedPartnerPlaceGroups(): Promise<PartnerPlaceGroup[]> {
     const files = await listFilePartnerApplications();
     for (const partner of files) {
       if (seen.has(partner.id)) continue;
-      if (!LISTED_PARTNER_STATUSES.has(partner.status)) continue;
+      if (!fileStatuses.has(partner.status)) continue;
       const settings = await readCompanySettingsFile(partner.id);
       const codes = codesFromSettingsOrSnapshot(settings, partner.applicationMessages);
       if (!codes.length) continue;
