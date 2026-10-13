@@ -43,6 +43,9 @@ export type PartnerPersonalInfoCopy = {
   selectCountry: string;
   selectLocation: string;
   noLocations: string;
+  selectAllLocations: string;
+  locationsPicked: string;
+  locationsDone: string;
   locationRequired: string;
   countriesNeedLocation: string;
   countriesNeedOne: string;
@@ -343,6 +346,9 @@ export const partnerUiEn: PartnerUiPack = {
     selectCountry: "Select country",
     selectLocation: "Select location",
     noLocations: "No locations listed for this country yet",
+    selectAllLocations: "Select all",
+    locationsPicked: "{n} selected",
+    locationsDone: "Done",
     locationRequired: "Select at least one location before saving this country.",
     countriesNeedLocation: "For each country, pick at least one location, then press Save.",
     countriesNeedOne: "Select at least one country, then press Save.",
@@ -642,6 +648,9 @@ export const partnerUiKa: PartnerUiPack = {
     selectCountry: "აირჩიეთ ქვეყანა",
     selectLocation: "აირჩიეთ ლოკაცია",
     noLocations: "ამ ქვეყნისთვის ლოკაციები ჯერ არ არის ჩამონათვალში",
+    selectAllLocations: "ყველას მონიშვნა",
+    locationsPicked: "მონიშნულია {n}",
+    locationsDone: "მზადაა",
     locationRequired: "ლოკაციის არჩევა სავალდებულოა ამ ქვეყნის შენახვამდე.",
     countriesNeedLocation: "ყოველი ქვეყნისთვის აირჩიეთ მინიმუმ ერთი ლოკაცია, შემდეგ დააჭირეთ შენახვას.",
     countriesNeedOne: "აირჩიეთ მინიმუმ ერთი ქვეყანა, შემდეგ დააჭირეთ შენახვას.",
@@ -941,6 +950,9 @@ export const partnerUiRu: PartnerUiPack = {
     selectCountry: "Выберите страну",
     selectLocation: "Выберите локацию",
     noLocations: "Для этой страны пока нет локаций в каталоге",
+    selectAllLocations: "Выбрать все",
+    locationsPicked: "Выбрано: {n}",
+    locationsDone: "Готово",
     locationRequired: "Выберите хотя бы одну локацию перед сохранением страны.",
     countriesNeedLocation: "Для каждой страны выберите хотя бы одну локацию, затем нажмите Сохранить.",
     countriesNeedOne: "Выберите хотя бы одну страну, затем нажмите Сохранить.",

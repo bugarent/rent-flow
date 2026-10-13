@@ -36,6 +36,7 @@ import { PartnerTelegramVerifyBanner } from "@/components/partner/partner-telegr
 import { publishPartnerChromeSettings } from "@/components/partner/partner-chrome-settings";
 import { PartnerMessengerLinks, PartnerPhoneChat } from "@/components/admin/partner-phone-chat";
 import { PhoneMessengerIcons } from "@/components/partner/phone-messenger-icons";
+import { PartnerLocationMultiPicker } from "@/components/partner/partner-location-multi-picker";
 import { locationCodesEqual, normalizeLocationCode } from "@/lib/catalog/search-places";
 import {
   countryLocationOptions,
@@ -1506,33 +1507,13 @@ export function PartnerPersonalInfoForm({
                             </button>
                           </div>
                           <div className="mt-2 space-y-1.5" data-country-locations={iso2}>
-                            <select
-                              className={cn(
-                                inputClass,
-                                "text-xs",
-                                invalidLocationCountries.has(iso2) && inputErrorClass,
-                              )}
-                              disabled={locs.filter((l) => l.isActive).length === 0}
-                              value=""
-                              onChange={(e) => {
-                                if (e.target.value) toggleDeliveryLocation(e.target.value, iso2);
-                                e.target.value = "";
-                              }}
-                            >
-                              <option value="">
-                                {locs.some((l) => l.isActive) ? pi.selectLocation : pi.noLocations}
-                              </option>
-                              {locs
-                                .filter(
-                                  (loc) =>
-                                    loc.isActive && !isLocationSelected(loc, selectedLocationIds),
-                                )
-                                .map((loc) => (
-                                  <option key={loc.id} value={loc.id}>
-                                    {loc.label}
-                                  </option>
-                                ))}
-                            </select>
+                            <PartnerLocationMultiPicker
+                              locations={locs}
+                              isSelected={(loc) => isLocationSelected(loc, selectedLocationIds)}
+                              onToggle={(loc) => toggleDeliveryLocation(loc.id, iso2)}
+                              invalid={invalidLocationCountries.has(iso2)}
+                              copy={pi}
+                            />
                             {invalidLocationCountries.has(iso2) ? (
                               <p className="text-[11px] font-semibold text-red-700">
                                 {pi.locationRequired}
@@ -1596,33 +1577,13 @@ export function PartnerPersonalInfoForm({
                           </button>
                         </div>
                         <div className="mt-2 space-y-1.5" data-country-locations={iso2}>
-                          <select
-                            className={cn(
-                              inputClass,
-                              "text-xs",
-                              invalidLocationCountries.has(iso2) && inputErrorClass,
-                            )}
-                            disabled={locs.filter((l) => l.isActive).length === 0}
-                            value=""
-                            onChange={(e) => {
-                              if (e.target.value) toggleDeliveryLocation(e.target.value, iso2);
-                              e.target.value = "";
-                            }}
-                          >
-                            <option value="">
-                              {locs.some((l) => l.isActive) ? pi.selectLocation : pi.noLocations}
-                            </option>
-                            {locs
-                              .filter(
-                                (loc) =>
-                                  loc.isActive && !isLocationSelected(loc, selectedLocationIds),
-                              )
-                              .map((loc) => (
-                                <option key={loc.id} value={loc.id}>
-                                  {loc.label}
-                                </option>
-                              ))}
-                          </select>
+                          <PartnerLocationMultiPicker
+                            locations={locs}
+                            isSelected={(loc) => isLocationSelected(loc, selectedLocationIds)}
+                            onToggle={(loc) => toggleDeliveryLocation(loc.id, iso2)}
+                            invalid={invalidLocationCountries.has(iso2)}
+                            copy={pi}
+                          />
                           {invalidLocationCountries.has(iso2) ? (
                             <p className="text-[11px] font-semibold text-red-700">
                               {pi.locationRequired}

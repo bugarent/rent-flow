@@ -144,6 +144,7 @@ export const CAR_MAKES_MODELS: CarMakeModels[] = [
       "Orlando",
       "Bolt",
       "Bolt EUV",
+      "Volt",
     ],
   },
   {
@@ -363,6 +364,24 @@ export const CAR_MAKES_MODELS: CarMakeModels[] = [
       "Commander",
       "Patriot",
       "Liberty",
+    ],
+  },
+  {
+    make: "Jetour",
+    models: [
+      "X50",
+      "X70",
+      "X70 Plus",
+      "X90",
+      "X90 Plus",
+      "Dashing",
+      "Traveller (T2)",
+      "T1",
+      "Shanhai L6",
+      "Shanhai L7",
+      "Shanhai L9",
+      "Shanhai T1",
+      "Shanhai T2",
     ],
   },
   {
