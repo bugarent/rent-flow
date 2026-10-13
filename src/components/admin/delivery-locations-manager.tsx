@@ -16,15 +16,11 @@ import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { uiText } from "@/lib/i18n/ui-text";
 import { Search } from "lucide-react";
 import { CountryFlag } from "@/components/ui/country-flag";
-import { lookupDeliveryCount } from "@/lib/delivery/partner-counts";
 import { DeliveryLimitBadge } from "@/components/admin/delivery-limit-badge";
 import { DeliveryCountryAccordion } from "@/components/admin/delivery-country-accordion";
+import { DeliveryCountRatio } from "@/components/admin/delivery-count-ratio";
 import { COUNTRY_NAMES_KA } from "@/lib/catalog/country-names-ka";
-import {
-  groupDeliveryByCountry,
-  isCityLocation,
-  matchesCountryQuery,
-} from "@/components/admin/delivery-country-groups";
+import { groupDeliveryByCountry, matchesCountryQuery } from "@/components/admin/delivery-country-groups";
 import {
   ResponsiveDataList,
   MobileDataCard,
@@ -105,12 +101,12 @@ function CurrencyToggle({
 export function DeliveryLocationsManager({
   initialLocations,
   fxRates = DEFAULT_FX_RATES,
-  deliveryCounts = {},
+  deliverableKeys = [],
 }: {
   initialLocations: DeliveryLocationView[];
   fxRates?: FxRates;
-  /** Partners delivering to each place, keyed by location code. */
-  deliveryCounts?: Record<string, number>;
+  /** Upper-case codes / ids of places where a partner's live listing is marked for delivery. */
+  deliverableKeys?: string[];
 }) {
   const rates = fxRates;
   const { locale } = useAdminLocale();
@@ -132,39 +128,38 @@ export function DeliveryLocationsManager({
   const freeLabel = phrase("No limit", "ლიმიტის გარეშე", "Без лимита");
   const rangeLabel = phrase("Partner price", "პარტნიორის ფასი", "Цена партнёра");
 
+  const deliverableSet = useMemo(() => new Set(deliverableKeys), [deliverableKeys]);
+
   /** Countries with active places that match the search, each with only its active places. */
   const activeGroups = useMemo(
     () =>
       groupDeliveryByCountry(
         locations.filter((item) => item.isActive),
-        deliveryCounts,
+        deliverableSet,
       ).filter((group) => matchesCountryQuery(group, countryQuery)),
-    [locations, deliveryCounts, countryQuery],
+    [locations, deliverableSet, countryQuery],
   );
 
   const totals = useMemo(() => {
-    const sum = { airports: 0, cities: 0, airportDeliveries: 0, cityDeliveries: 0 };
+    const sum = { airports: 0, cities: 0, activeAirports: 0, activeCities: 0 };
     for (const group of activeGroups) {
       sum.airports += group.airports;
       sum.cities += group.cities;
-      for (const item of group.items) {
-        const count = lookupDeliveryCount(deliveryCounts, [item.iata, item.airportId, item.id]);
-        if (isCityLocation(item)) sum.cityDeliveries += count;
-        else sum.airportDeliveries += count;
-      }
+      sum.activeAirports += group.activeAirports;
+      sum.activeCities += group.activeCities;
     }
     return sum;
-  }, [activeGroups, deliveryCounts]);
+  }, [activeGroups]);
 
   const inactiveLocations = useMemo(
     () =>
       groupDeliveryByCountry(
         locations.filter((item) => !item.isActive),
-        deliveryCounts,
+        deliverableSet,
       )
         .filter((group) => matchesCountryQuery(group, countryQuery))
         .flatMap((group) => group.items),
-    [locations, deliveryCounts, countryQuery],
+    [locations, deliverableSet, countryQuery],
   );
 
   // A search that leaves exactly one country opens it straight away.
@@ -508,9 +503,13 @@ export function DeliveryLocationsManager({
   };
 
   const groupLabels = {
-    airports: phrase("airports", "აეროპორტი", "аэропорта"),
-    cities: phrase("cities", "ქალაქი", "города"),
-    deliveries: phrase("Deliveries", "მიწოდება", "Доставки"),
+    airports: phrase("Airports", "აეროპორტი", "Аэропорты"),
+    cities: phrase("Cities", "ქალაქი", "Города"),
+    active: phrase(
+      "with delivery on partner listings",
+      "მიწოდება პარტნიორის განცხადებებით",
+      "с доставкой по объявлениям партнёров",
+    ),
   };
 
   const renderTable = (items: DeliveryLocationView[]) => (
@@ -559,31 +558,26 @@ export function DeliveryLocationsManager({
           />
         </label>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3">
-            <span className="text-lg font-black tabular-nums text-[#0b1f4b] sm:text-xl">{totals.airports}</span>
-            <span className="text-xs font-semibold text-slate-600 sm:text-sm">{phrase("airports", "აეროპორტი", "аэропорта")}</span>
-            <span className="text-xs font-bold text-[#0b1f4b] sm:text-sm">
-              {phrase("Deliveries", "მიწოდება", "Доставки")} {totals.airportDeliveries}
-            </span>
+          <div className="flex min-h-11 min-w-0 items-center rounded-xl border border-slate-200 bg-white px-3 text-sm sm:text-base">
+            <DeliveryCountRatio
+              label={groupLabels.airports}
+              total={totals.airports}
+              active={totals.activeAirports}
+              activeTitle={groupLabels.active}
+            />
           </div>
-          <div className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3">
-            <span className="text-lg font-black tabular-nums text-[#0b1f4b] sm:text-xl">{totals.cities}</span>
-            <span className="text-xs font-semibold text-slate-600 sm:text-sm">{phrase("cities", "ქალაქი", "города")}</span>
-            <span className="text-xs font-bold text-[#0b1f4b] sm:text-sm">
-              {phrase("Deliveries", "მიწოდება", "Доставки")} {totals.cityDeliveries}
-            </span>
+          <div className="flex min-h-11 min-w-0 items-center rounded-xl border border-slate-200 bg-white px-3 text-sm sm:text-base">
+            <DeliveryCountRatio
+              label={groupLabels.cities}
+              total={totals.cities}
+              active={totals.activeCities}
+              activeTitle={groupLabels.active}
+            />
           </div>
           <div className="ms-auto">
             <CurrencyToggle value={currency} onChange={switchCurrency} />
           </div>
         </div>
-        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-900 sm:text-sm">
-          {phrase(
-            "0 = no limit: each partner's own delivery price is charged (new places start free). Enter a limit to cap partner prices at that amount; higher partner prices are lowered to the limit automatically.",
-            "0 = ლიმიტის გარეშე: მოქმედებს პარტნიორის მიერ მითითებული მიწოდების ფასი (ახალ ლოკაციაზე თავიდან უფასოა). ჩაწერეთ ლიმიტი და პარტნიორის ფასი ამ თანხას ვერ გადააჭარბებს; უფრო მაღალი ფასი ავტომატურად ჩამოიწევს ლიმიტამდე.",
-            "0 = без лимита: действует цена доставки партнёра (новые места сначала бесплатны). Укажите лимит — цена партнёра не превысит эту сумму; более высокие цены автоматически снизятся до лимита.",
-          )}
-        </p>
       </div>
 
       {activeGroups.length === 0 ? (

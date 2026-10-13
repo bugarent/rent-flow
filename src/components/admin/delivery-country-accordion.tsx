@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { cn } from "@/lib/utils";
 import type { DeliveryCountryGroup } from "@/components/admin/delivery-country-groups";
+import { DeliveryCountRatio } from "@/components/admin/delivery-count-ratio";
 
 /** Collapsible country row: header with counts, the country's places when open. */
 export function DeliveryCountryAccordion({
@@ -20,7 +21,7 @@ export function DeliveryCountryAccordion({
   title: string;
   open: boolean;
   onToggle: () => void;
-  labels: { airports: string; cities: string; deliveries: string };
+  labels: { airports: string; cities: string; active: string };
   children: ReactNode;
 }) {
   const panelId = `delivery-country-${group.iso2}`;
@@ -39,16 +40,19 @@ export function DeliveryCountryAccordion({
         <CountryFlag iso2={group.iso2} title={title} className="h-5 w-7 shrink-0 rounded-sm shadow-sm" />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-base font-extrabold text-[#0b1f4b]">{title}</span>
-          <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs font-semibold text-slate-500">
-            <span>
-              {group.airports} {labels.airports}
-            </span>
-            <span>
-              {group.cities} {labels.cities}
-            </span>
-            <span className="text-[#0b1f4b]">
-              {labels.deliveries} {group.deliveries}
-            </span>
+          <span className="mt-0.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs sm:text-sm">
+            <DeliveryCountRatio
+              label={labels.airports}
+              total={group.airports}
+              active={group.activeAirports}
+              activeTitle={labels.active}
+            />
+            <DeliveryCountRatio
+              label={labels.cities}
+              total={group.cities}
+              active={group.activeCities}
+              activeTitle={labels.active}
+            />
           </span>
         </span>
         <ChevronDown

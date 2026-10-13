@@ -1,6 +1,5 @@
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
-import { isCityLocationCode } from "@/lib/catalog/search-places";
-import { lookupDeliveryCount } from "@/lib/delivery/partner-counts";
+import { isCityLocationCode, normalizeLocationCode } from "@/lib/catalog/search-places";
 import { COUNTRY_NAMES_KA } from "@/lib/catalog/country-names-ka";
 
 export type DeliveryCountryGroup = {
@@ -9,14 +8,24 @@ export type DeliveryCountryGroup = {
   items: DeliveryLocationView[];
   airports: number;
   cities: number;
-  /** Partner deliveries to this country's places. */
-  deliveries: number;
+  /** Airports where at least one partner listing is marked for delivery. */
+  activeAirports: number;
+  /** Cities where at least one partner listing is marked for delivery. */
+  activeCities: number;
 };
 
 export function isCityLocation(item: DeliveryLocationView) {
   if (item.kind === "city") return true;
   if (item.kind === "airport") return false;
   return isCityLocationCode(item.iata) || isCityLocationCode(item.airportId);
+}
+
+/** `deliverableKeys` holds upper-case location codes / ids from the server. */
+export function hasListingDelivery(item: DeliveryLocationView, deliverableKeys: ReadonlySet<string>) {
+  return [item.iata, item.airportId, item.id].some((raw) => {
+    const key = normalizeLocationCode(raw || "").toUpperCase();
+    return Boolean(key && deliverableKeys.has(key));
+  });
 }
 
 const SEARCH_LOCALES = ["en", "ka", "ru"] as const;
@@ -44,20 +53,33 @@ export function matchesCountryQuery(group: Pick<DeliveryCountryGroup, "iso2" | "
 /** One group per country, alphabetical; places inside sorted by label. */
 export function groupDeliveryByCountry(
   items: DeliveryLocationView[],
-  deliveryCounts: Record<string, number>,
+  deliverableKeys: ReadonlySet<string>,
 ): DeliveryCountryGroup[] {
   const map = new Map<string, DeliveryCountryGroup>();
   for (const item of items) {
     const iso2 = item.countryIso2.trim().toUpperCase() || "XX";
     let group = map.get(iso2);
     if (!group) {
-      group = { iso2, name: item.country || iso2, items: [], airports: 0, cities: 0, deliveries: 0 };
+      group = {
+        iso2,
+        name: item.country || iso2,
+        items: [],
+        airports: 0,
+        cities: 0,
+        activeAirports: 0,
+        activeCities: 0,
+      };
       map.set(iso2, group);
     }
     group.items.push(item);
-    if (isCityLocation(item)) group.cities += 1;
-    else group.airports += 1;
-    group.deliveries += lookupDeliveryCount(deliveryCounts, [item.iata, item.airportId, item.id]);
+    const active = hasListingDelivery(item, deliverableKeys);
+    if (isCityLocation(item)) {
+      group.cities += 1;
+      if (active) group.activeCities += 1;
+    } else {
+      group.airports += 1;
+      if (active) group.activeAirports += 1;
+    }
   }
   const groups = [...map.values()];
   for (const group of groups) {

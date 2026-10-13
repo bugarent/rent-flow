@@ -1,8 +1,6 @@
 import { listDeliveryLocations } from "@/lib/server/delivery-locations";
-import {
-  countPartnersDeliveringByPlace,
-  syncListedPartnerDeliveryLocations,
-} from "@/lib/server/partner-search-coverage";
+import { syncListedPartnerDeliveryLocations } from "@/lib/server/partner-search-coverage";
+import { bookablePlaceKeys } from "@/lib/server/search-place-coverage";
 import { resetLegacyAutoDeliveryLimits } from "@/lib/server/delivery-price-limit";
 import { requireAdmin } from "@/lib/auth/guards";
 import { DeliveryLocationsManager } from "@/components/admin/delivery-locations-manager";
@@ -13,17 +11,19 @@ export default async function AdminDeliveryLocationsPage() {
   await requireAdmin();
 
   let locations: Awaited<ReturnType<typeof listDeliveryLocations>> = [];
-  let deliveryCounts: Record<string, number> = {};
+  let deliverableKeys: string[] = [];
   let queryError = "";
   const fxRates = await getFxRates();
 
   try {
     await syncListedPartnerDeliveryLocations();
     await resetLegacyAutoDeliveryLimits();
-    [locations, deliveryCounts] = await Promise.all([
-      listDeliveryLocations(),
-      countPartnersDeliveringByPlace(),
-    ]);
+    locations = await listDeliveryLocations();
+    const keys = await bookablePlaceKeys(locations).catch((error) => {
+      console.error("[admin/delivery page] deliverable places", error);
+      return new Set<string>();
+    });
+    deliverableKeys = [...keys];
   } catch (error) {
     console.error("[admin/delivery page]", error);
     queryError =
@@ -46,7 +46,7 @@ export default async function AdminDeliveryLocationsPage() {
       <DeliveryLocationsManager
         initialLocations={locations}
         fxRates={fxRates}
-        deliveryCounts={deliveryCounts}
+        deliverableKeys={deliverableKeys}
       />
     </div>
   );
