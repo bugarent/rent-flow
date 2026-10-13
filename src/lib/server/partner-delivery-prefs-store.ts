@@ -19,12 +19,44 @@ export type PartnerDeliveryPref = {
 
 type StoreFile = Record<string, PartnerDeliveryPref[]>;
 
+/** Last copy read or written by this instance; used only when the saved store cannot be reached. */
+let lastGood: StoreFile | null = null;
+/** A slow database must not stall search pages when a recent copy is already in memory. */
+const FRESH_READ_WAIT_MS = 4000;
+
+function parseStore(raw: string | null): StoreFile | null {
+  if (raw == null) return {};
+  const parsed = JSON.parse(raw) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  return parsed as StoreFile;
+}
+
+/**
+ * Prices must be the latest saved ones: a stale per-instance copy would show a
+ * partner their old prices after saving and charge customers the old fee.
+ */
 async function readStore(): Promise<StoreFile> {
   try {
-    const raw = await readFile(STORE, "utf8");
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object") return {};
-    return parsed as StoreFile;
+    const fresh = readFileForUpdate(STORE).then(parseStore);
+    const store = lastGood
+      ? await Promise.race([
+          fresh,
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), FRESH_READ_WAIT_MS)),
+        ])
+      : await fresh;
+    if (store) {
+      lastGood = store;
+      return store;
+    }
+    void fresh.then((late) => {
+      if (late) lastGood = late;
+    }, () => undefined);
+  } catch (error) {
+    console.warn("[partner-delivery-prefs] fresh read failed", error);
+  }
+  if (lastGood) return lastGood;
+  try {
+    return parseStore(await readFile(STORE, "utf8")) ?? {};
   } catch {
     return {};
   }
@@ -33,6 +65,7 @@ async function readStore(): Promise<StoreFile> {
 async function writeStore(data: StoreFile) {
   await mkdir(dataRoot(), { recursive: true });
   await writeFile(STORE, JSON.stringify(data, null, 2), "utf8");
+  lastGood = data;
 }
 
 /**
@@ -79,16 +112,27 @@ export async function readPartnerDeliveryPrefs(partnerId: string): Promise<Partn
   return rows.map(cleanPref).filter((r): r is PartnerDeliveryPref => Boolean(r));
 }
 
+/**
+ * Save the given locations' prices. Locations missing from `prefs` (for example a
+ * place the admin switched off for a while) keep their saved price.
+ */
 export async function writePartnerDeliveryPrefs(
   partnerId: string,
   prefs: PartnerDeliveryPref[],
 ): Promise<PartnerDeliveryPref[]> {
   const cleaned = prefs.map(cleanPref).filter((r): r is PartnerDeliveryPref => Boolean(r));
+  const submitted = new Set(cleaned.map((p) => p.deliveryLocationId));
+  let merged = cleaned;
   await mutateStore((store) => {
-    store[partnerId] = cleaned;
+    const previous = Array.isArray(store[partnerId]) ? store[partnerId] : [];
+    const kept = previous
+      .map(cleanPref)
+      .filter((p): p is PartnerDeliveryPref => Boolean(p) && !submitted.has(p!.deliveryLocationId));
+    merged = [...cleaned, ...kept];
+    store[partnerId] = merged;
     return true;
   });
-  return cleaned;
+  return merged;
 }
 
 /** Rewrite every partner's free-after days for one location down to the admin maximum. */

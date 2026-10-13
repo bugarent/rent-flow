@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import {
@@ -44,7 +44,8 @@ function copyFor(locale: string) {
       free: "უფასო",
       maxHint: "მაქს. {amount}",
       priceCapped: "ადმინის ლიმიტია {amount}. ფასი ჩამოიწია ლიმიტამდე.",
-      errSave: "შენახვა ვერ მოხერხდა.",
+      errSave: "შენახვა ვერ მოხერხდა. შენახული ფასები არ შეცვლილა — სცადეთ ხელახლა.",
+      errLoad: "მიწოდების ფასები ვერ ჩაიტვირთა. განაახლეთ გვერდი.",
       freeAfterCapped: "ადმინის მაქსიმუმია {n} დღე. უფრო გრძელი პერიოდი ჩაიწერა {n}-ად.",
       loading: "იტვირთება…",
       crossBorderTitle: "შესაძლებელი საზღვრის გადაკვეთა",
@@ -73,7 +74,8 @@ function copyFor(locale: string) {
       free: "Бесплатно",
       maxHint: "макс. {amount}",
       priceCapped: "Лимит администратора — {amount}. Цена снижена до лимита.",
-      errSave: "Не удалось сохранить.",
+      errSave: "Не удалось сохранить. Сохранённые цены не изменились — попробуйте ещё раз.",
+      errLoad: "Не удалось загрузить цены доставки. Обновите страницу.",
       freeAfterCapped: "Максимум администратора — {n} дн. Более длинный срок записан как {n}.",
       loading: "Загрузка…",
       crossBorderTitle: "Возможен выезд за границу",
@@ -101,7 +103,8 @@ function copyFor(locale: string) {
     free: "Free",
     maxHint: "max {amount}",
     priceCapped: "Admin limit is {amount}. The price was lowered to the limit.",
-    errSave: "Could not save.",
+    errSave: "Could not save. Your saved prices were not changed — please try again.",
+    errLoad: "Delivery prices could not be loaded. Please refresh the page.",
     freeAfterCapped: "Admin maximum is {n} days. A longer period was set to {n}.",
     loading: "Loading…",
     crossBorderTitle: "Border crossing allowed",
@@ -110,6 +113,31 @@ function copyFor(locale: string) {
     crossBorderOn: "On",
     crossBorderOff: "Off",
   };
+}
+
+type PanelItem = {
+  location: DeliveryLocationView;
+  enabled: boolean;
+  priceEur: number;
+  freeAfterDays: number | null;
+  travelTimeMinutes: number;
+  maxDeliveryPriceEur: number;
+};
+
+function rowsFromItems(items: unknown): RowState[] {
+  if (!Array.isArray(items)) return [];
+  return (items as PanelItem[]).map((item) => {
+    const mins = Math.max(0, Number(item.travelTimeMinutes) || 0);
+    return {
+      location: item.location,
+      enabled: item.enabled !== false,
+      priceEur: String(item.priceEur ?? 0),
+      freeAfterDays: String(item.freeAfterDays ?? 0),
+      travelHours: String(Math.floor(mins / 60)),
+      travelMinutes: String(mins % 60),
+      maxDeliveryPriceEur: Number(item.maxDeliveryPriceEur) || 0,
+    };
+  });
 }
 
 function cityKey(loc: DeliveryLocationView) {
@@ -135,48 +163,28 @@ export function PartnerDeliveryPanel() {
   const [error, setError] = useState("");
   const [capNotice, setCapNotice] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch("/api/partners/delivery-prefs");
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "load failed");
-      setCrossBorderEnabled(Boolean(data.crossBorderEnabled));
-      const items = Array.isArray(data.items) ? data.items : [];
-      setRows(
-        items.map(
-          (item: {
-            location: DeliveryLocationView;
-            enabled: boolean;
-            priceEur: number;
-            freeAfterDays: number | null;
-            travelTimeMinutes: number;
-            maxDeliveryPriceEur: number;
-          }) => {
-            const mins = Math.max(0, Number(item.travelTimeMinutes) || 0);
-            return {
-              location: item.location,
-              enabled: item.enabled !== false,
-              priceEur: String(item.priceEur ?? 0),
-              freeAfterDays: String(item.freeAfterDays ?? 0),
-              travelHours: String(Math.floor(mins / 60)),
-              travelMinutes: String(mins % 60),
-              maxDeliveryPriceEur: Number(item.maxDeliveryPriceEur) || 0,
-            };
-          },
-        ),
-      );
-    } catch {
-      setError(t.errSave);
-    } finally {
-      setLoading(false);
-    }
-  }, [t.errSave]);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+    fetch("/api/partners/delivery-prefs", { cache: "no-store" })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "load failed");
+        if (cancelled) return;
+        setCrossBorderEnabled(Boolean(data.crossBorderEnabled));
+        setRows(rowsFromItems(data.items));
+      })
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const grouped = useMemo(() => {
     const map = new Map<string, RowState[]>();
@@ -230,11 +238,15 @@ export function PartnerDeliveryPanel() {
           })),
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "save failed");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !Array.isArray(data?.items)) {
+        setError(t.errSave);
+        return;
+      }
+      setRows(rowsFromItems(data.items));
+      if (typeof data.crossBorderEnabled === "boolean") setCrossBorderEnabled(data.crossBorderEnabled);
       setSavedFlash(true);
-      window.setTimeout(() => setSavedFlash(false), 2000);
-      await load();
+      window.setTimeout(() => setSavedFlash(false), 2500);
     } catch {
       setError(t.errSave);
     } finally {
@@ -262,7 +274,9 @@ export function PartnerDeliveryPanel() {
 
       <main className="mx-auto max-w-6xl px-4 py-6">
         <p className="mb-4 text-sm text-slate-600">{t.help}</p>
-        {error ? <p className="mb-3 text-sm font-medium text-red-600">{error}</p> : null}
+        {error || loadFailed ? (
+          <p className="mb-3 text-sm font-medium text-red-600">{error || t.errLoad}</p>
+        ) : null}
         {capNotice ? <p className="mb-3 text-sm font-medium text-amber-700">{capNotice}</p> : null}
 
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-sm">
@@ -475,7 +489,7 @@ export function PartnerDeliveryPanel() {
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <button
             type="button"
-            disabled={saving}
+            disabled={saving || loadFailed}
             onClick={() => void save()}
             className="rounded-md bg-[#28a745] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#23923d] disabled:opacity-60"
           >

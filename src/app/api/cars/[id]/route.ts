@@ -11,6 +11,7 @@ import {
 import { resolvePartnerDeliveryPrices } from "@/lib/delivery/pricing";
 import { scopePickupPlacesInDescription } from "@/lib/cars/scope-pickup-places";
 import { listPartnerScopedDeliveryLocations, persistableCarDeliveryRows } from "@/lib/server/delivery-locations";
+import { withPartnerDeliveryPrices } from "@/lib/server/partner-delivery-listing-sync";
 import { persistCarInsuranceDocument } from "@/lib/server/car-passport-docs";
 import {
   normalizeInsuranceExpiresAt,
@@ -577,7 +578,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
               );
             }
           } else {
-            const persistable = await persistableCarDeliveryRows(resolved.rows, deliveryCatalog);
+            const pricedRows = await withPartnerDeliveryPrices(car.partnerId, resolved.rows, deliveryCatalog);
+            const persistable = await persistableCarDeliveryRows(pricedRows, deliveryCatalog);
             // null = database check failed; leave the car's existing delivery rows in place.
             // An empty list means every selected place is file-only (cities). Those stay in
             // the listing description and must not abort the rest of the update.

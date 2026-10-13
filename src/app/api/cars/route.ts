@@ -15,6 +15,7 @@ import {
 } from "@/lib/extras/pricing";
 import { resolvePartnerDeliveryPrices } from "@/lib/delivery/pricing";
 import { listPartnerScopedDeliveryLocations, persistableCarDeliveryRows } from "@/lib/server/delivery-locations";
+import { withPartnerDeliveryPrices } from "@/lib/server/partner-delivery-listing-sync";
 import { ensureExtrasExistInDb, extrasRowsForCarFk, listExtraServices } from "@/lib/server/extras-store";
 import { isCityLocationCode, parseCityLocationCode } from "@/lib/catalog/search-places";
 import {
@@ -533,7 +534,8 @@ export async function POST(req: Request) {
             adjustments: [] as typeof deliveryAdjustments,
           };
       deliveryAdjustments = resolved.adjustments;
-      const persistable = await persistableCarDeliveryRows(resolved.rows, deliveryCatalog);
+      const pricedRows = await withPartnerDeliveryPrices(partner.id, resolved.rows, deliveryCatalog);
+      const persistable = await persistableCarDeliveryRows(pricedRows, deliveryCatalog);
       deliveryRows = persistable ?? [];
 
       if (forSale && !deliveryRows.length && !resolved.rows.length) {

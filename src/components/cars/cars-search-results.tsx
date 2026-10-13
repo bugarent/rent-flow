@@ -1,8 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CarsSearchTripEditor } from "@/components/cars/cars-search-trip-editor";
+import {
+  SEARCH_RESULTS_PAGE_SIZE,
+  SearchResultsPagination,
+} from "@/components/cars/search-results-pagination";
 import { carsSearchHeading } from "@/components/cars/cars-search-heading";
 import { SEARCH_EXTRA } from "@/components/cars/cars-search-locale-copy";
 import type { SearchAirportOption } from "@/components/search/airport-search";
@@ -1156,6 +1160,17 @@ export function CarsSearchResults({
     return list;
   }, [carsWithCategory, appliedFilterState, categories, days, sort, referralDiscountPercent]);
 
+  // A new filter or sort result starts again on page 1.
+  const [pageState, setPageState] = useState({ list: filtered, page: 1 });
+  const pageCount = Math.max(1, Math.ceil(filtered.length / SEARCH_RESULTS_PAGE_SIZE));
+  const page = pageState.list === filtered ? Math.min(pageState.page, pageCount) : 1;
+  const pageCars = filtered.slice((page - 1) * SEARCH_RESULTS_PAGE_SIZE, page * SEARCH_RESULTS_PAGE_SIZE);
+  const resultsTopRef = useRef<HTMLDivElement>(null);
+  const goToPage = (next: number) => {
+    setPageState({ list: filtered, page: Math.min(Math.max(1, next), pageCount) });
+    resultsTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const bookHref = (id: string) => {
     const params = new URLSearchParams({
       startDate: startDate || "",
@@ -1771,8 +1786,11 @@ export function CarsSearchResults({
         ) : null}
 
         {/* Grid */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
-          {filtered.map((car) => (
+        <div
+          ref={resultsTopRef}
+          className="grid scroll-mt-4 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4"
+        >
+          {pageCars.map((car) => (
             <CarResultCard
               key={car.id}
               car={car}
@@ -1787,6 +1805,14 @@ export function CarsSearchResults({
             />
           ))}
         </div>
+
+        <SearchResultsPagination
+          page={page}
+          pageCount={pageCount}
+          onPageChange={goToPage}
+          prevLabel={locale === "ka" ? "წინა გვერდი" : locale === "ru" ? "Предыдущая страница" : "Previous page"}
+          nextLabel={locale === "ka" ? "შემდეგი გვერდი" : locale === "ru" ? "Следующая страница" : "Next page"}
+        />
 
         {filtered.length === 0 ? (
           <p className="py-16 text-center text-slate-500">{emptyMessage}</p>

@@ -4,8 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { LOCAL_PARTNER_ID, loadLocalPartner } from "@/lib/auth/local-partner-store";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import { listPartnerScopedDeliveryLocations } from "@/lib/server/delivery-locations";
-import { capFreeAfterDays, normalizeDeliveryPrice } from "@/lib/delivery/pricing";
+import {
+  capFreeAfterDays,
+  normalizeDeliveryPrice,
+  type DeliveryLocationView,
+} from "@/lib/delivery/pricing";
 import { resetLegacyAutoDeliveryLimits } from "@/lib/server/delivery-price-limit";
+import { StoreUnavailableError } from "@/lib/server/durable-fs";
+import { syncPartnerDeliveryPricesToListings } from "@/lib/server/partner-delivery-listing-sync";
 import {
   readPartnerDeliveryPrefs,
   writePartnerDeliveryPrefs,
@@ -46,6 +52,24 @@ async function partnerPricingCurrency(partnerId: string): Promise<string> {
   return file?.pricingCurrency || DEFAULT_PARTNER_PRICING_CURRENCY;
 }
 
+function panelItems(catalog: DeliveryLocationView[], prefs: PartnerDeliveryPref[]) {
+  const prefById = new Map(prefs.map((p) => [p.deliveryLocationId, p]));
+  return catalog.map((loc) => {
+    const pref = prefById.get(loc.id);
+    const { priceEur } = normalizeDeliveryPrice(loc.maxDeliveryPriceEur, pref?.priceEur ?? 0);
+    const { freeAfterDays } = capFreeAfterDays(loc.maxFreeAfterDays, pref?.freeAfterDays ?? 0);
+    return {
+      location: loc,
+      enabled: pref ? pref.enabled !== false : true,
+      priceEur,
+      freeAfterDays: freeAfterDays ?? 0,
+      travelTimeMinutes: pref?.travelTimeMinutes ?? 0,
+      maxDeliveryPriceEur: loc.maxDeliveryPriceEur,
+      maxFreeAfterDays: loc.maxFreeAfterDays ?? null,
+    };
+  });
+}
+
 export async function GET() {
   try {
     const session = await requirePartnerApi();
@@ -59,24 +83,10 @@ export async function GET() {
       partnerPricingCurrency(partnerId),
       isPartnerCrossBorderEnabled(partnerId),
     ]);
-    const prefById = new Map(prefs.map((p) => [p.deliveryLocationId, p]));
-
-    const items = catalog.map((loc) => {
-      const pref = prefById.get(loc.id);
-      const { priceEur } = normalizeDeliveryPrice(loc.maxDeliveryPriceEur, pref?.priceEur ?? 0);
-      const { freeAfterDays } = capFreeAfterDays(loc.maxFreeAfterDays, pref?.freeAfterDays ?? 0);
-      return {
-        location: loc,
-        enabled: pref ? pref.enabled !== false : true,
-        priceEur,
-        freeAfterDays: freeAfterDays ?? 0,
-        travelTimeMinutes: pref?.travelTimeMinutes ?? 0,
-        maxDeliveryPriceEur: loc.maxDeliveryPriceEur,
-        maxFreeAfterDays: loc.maxFreeAfterDays ?? null,
-      };
-    });
-
-    return NextResponse.json({ partnerId, pricingCurrency, items, crossBorderEnabled });
+    return NextResponse.json(
+      { partnerId, pricingCurrency, items: panelItems(catalog, prefs), crossBorderEnabled },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
     console.error("[partners/delivery-prefs GET]", error);
     return NextResponse.json({ error: "Could not load delivery preferences" }, { status: 500 });
@@ -125,6 +135,12 @@ export async function PUT(req: Request) {
     }
 
     const saved = await writePartnerDeliveryPrefs(partnerId, next);
+    const listingsUpdated = await syncPartnerDeliveryPricesToListings(partnerId, saved, catalog).catch(
+      (error) => {
+        console.error("[partners/delivery-prefs PUT] listing sync", error);
+        return 0;
+      },
+    );
 
     let crossBorderEnabled = await isPartnerCrossBorderEnabled(partnerId);
     if (typeof body?.crossBorderEnabled === "boolean") {
@@ -132,9 +148,20 @@ export async function PUT(req: Request) {
       crossBorderEnabled = body.crossBorderEnabled;
     }
 
-    return NextResponse.json({ ok: true, prefs: saved, crossBorderEnabled });
+    return NextResponse.json(
+      {
+        ok: true,
+        prefs: saved,
+        items: panelItems(catalog, saved),
+        listingsUpdated,
+        crossBorderEnabled,
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
     console.error("[partners/delivery-prefs PUT]", error);
-    return NextResponse.json({ error: "Could not save delivery preferences" }, { status: 500 });
+    const message =
+      error instanceof StoreUnavailableError ? error.message : "Could not save delivery preferences";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
