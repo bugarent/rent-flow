@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAdminSession } from "@/lib/auth/sessions";
 import { deleteExtraService, updateExtraService } from "@/lib/server/extras-store";
+import { adminLimit } from "@/lib/extras/pricing";
 
 async function requireAdmin() {
   const session = await getAdminSession();
@@ -30,11 +31,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const { id } = await params;
     const body = patchSchema.parse(await req.json());
 
-    if (
-      body.minPriceEur != null &&
-      body.maxPriceEur != null &&
-      body.maxPriceEur < body.minPriceEur
-    ) {
+    const minLimit = adminLimit(body.minPriceEur);
+    const maxLimit = adminLimit(body.maxPriceEur);
+    if (minLimit != null && maxLimit != null && maxLimit < minLimit) {
       return NextResponse.json(
         { error: "Maximum daily price must be >= minimum daily price" },
         { status: 400 },

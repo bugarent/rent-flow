@@ -26,7 +26,7 @@ function parseOptionalNumber(raw: string): number | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
   const n = Number(trimmed);
-  return Number.isFinite(n) ? n : null;
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 function parsePriceWindows(minRaw: string, maxRaw: string, periodRaw: string): Bounds {
@@ -88,6 +88,7 @@ export function ExtraPriceWindows({
         step="0.01"
         disabled={disabled || saving}
         title={hint}
+        placeholder="0"
         value={value}
         onChange={(e) => {
           onChange(e.target.value);

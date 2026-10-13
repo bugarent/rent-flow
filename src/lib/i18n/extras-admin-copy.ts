@@ -740,18 +740,122 @@ const OVERLAY: Record<string, Copy> = {
 };
 
 const MANDATORY_PRICED_HINT: Record<string, string> = {
-  en: "Mandatory · partner sets the price (0 = free, up to the max)",
-  ka: "სავალდებულო · ფასს პარტნიორი აწესებს (0 = უფასო, მაქსიმუმამდე)",
-  ru: "Обязательно · цену задаёт партнёр (0 = бесплатно, до максимума)",
-  tr: "Zorunlu · fiyatı partner belirler (0 = ücretsiz, maksimuma kadar)",
-  de: "Pflicht · Preis legt der Partner fest (0 = gratis, bis zum Maximum)",
-  es: "Obligatorio · el socio fija el precio (0 = gratis, hasta el máximo)",
-  fr: "Obligatoire · le partenaire fixe le prix (0 = gratuit, jusqu’au max)",
+  en: "Mandatory · partner sets the price within the limits",
+  ka: "სავალდებულო · ფასს პარტნიორი აწესებს ზღვრებში",
+  ru: "Обязательно · цену задаёт партнёр в пределах лимитов",
+  tr: "Zorunlu · fiyatı partner sınırlar içinde belirler",
+  de: "Pflicht · Preis legt der Partner innerhalb der Grenzen fest",
+  es: "Obligatorio · el socio fija el precio dentro de los límites",
+  fr: "Obligatoire · le partenaire fixe le prix dans les limites",
+};
+
+type LimitHints = Pick<Copy, "formHint" | "minDayHint" | "maxDayHint" | "periodHint">;
+
+/** 0 or empty in any admin window = no limit for the partner; it never means "free". */
+const LIMIT_HINTS: Record<string, LimitHints> = {
+  en: {
+    formHint:
+      "Min/max daily price and the rental maximum limit what the partner can charge. 0 or empty = no limit: the partner sets any amount. 0 never means the service is free.",
+    minDayHint: "0 or empty = no minimum. Any other number = the lowest daily price the partner can set.",
+    maxDayHint: "0 or empty = no maximum. Any other number = the highest daily price the partner can set.",
+    periodHint: "0 or empty = no limit. Any other number = the maximum total for the whole rental.",
+  },
+  ka: {
+    formHint:
+      "მინ./მაქს. დღის ფასი და მაქს. პერიოდი პარტნიორის ზღვრებია. 0 ან ცარიელი = ზღვარი არ არის: პარტნიორი ნებისმიერ თანხას აწესებს. 0 არ ნიშნავს, რომ სერვისი უფასოა.",
+    minDayHint: "0 ან ცარიელი = მინიმუმი არ არის. სხვა რიცხვი = ყველაზე დაბალი დღის ფასი, რასაც პარტნიორი დააწესებს.",
+    maxDayHint: "0 ან ცარიელი = მაქსიმუმი არ არის. სხვა რიცხვი = ყველაზე მაღალი დღის ფასი, რასაც პარტნიორი დააწესებს.",
+    periodHint: "0 ან ცარიელი = ზღვარი არ არის. სხვა რიცხვი = მაქსიმალური თანხა მთელ ქირაობაზე.",
+  },
+  ru: {
+    formHint:
+      "Мин./макс. цена в день и максимум за аренду ограничивают партнёра. 0 или пусто = без лимита: партнёр ставит любую сумму. 0 не означает, что услуга бесплатна.",
+    minDayHint: "0 или пусто = без минимума. Другое число = самая низкая цена в день для партнёра.",
+    maxDayHint: "0 или пусто = без максимума. Другое число = самая высокая цена в день для партнёра.",
+    periodHint: "0 или пусто = без лимита. Другое число = максимум за всю аренду.",
+  },
+  tr: {
+    formHint:
+      "Günlük min/maks fiyat ve kiralama maksimumu partnerin sınırlarıdır. 0 veya boş = sınır yok: partner istediği tutarı belirler. 0 ücretsiz demek değildir.",
+    minDayHint: "0 veya boş = minimum yok. Başka sayı = partnerin koyabileceği en düşük günlük fiyat.",
+    maxDayHint: "0 veya boş = maksimum yok. Başka sayı = partnerin koyabileceği en yüksek günlük fiyat.",
+    periodHint: "0 veya boş = sınır yok. Başka sayı = tüm kiralama için en yüksek toplam.",
+  },
+  de: {
+    formHint:
+      "Min./max. Tagespreis und das Mietmaximum begrenzen den Partner. 0 oder leer = kein Limit: der Partner setzt jeden Betrag. 0 heißt nicht kostenlos.",
+    minDayHint: "0 oder leer = kein Minimum. Andere Zahl = niedrigster Tagespreis des Partners.",
+    maxDayHint: "0 oder leer = kein Maximum. Andere Zahl = höchster Tagespreis des Partners.",
+    periodHint: "0 oder leer = kein Limit. Andere Zahl = Höchstbetrag für die ganze Miete.",
+  },
+  es: {
+    formHint:
+      "El precio diario mín./máx. y el máximo del alquiler limitan al socio. 0 o vacío = sin límite: el socio fija cualquier importe. 0 no significa gratis.",
+    minDayHint: "0 o vacío = sin mínimo. Otro número = precio diario más bajo del socio.",
+    maxDayHint: "0 o vacío = sin máximo. Otro número = precio diario más alto del socio.",
+    periodHint: "0 o vacío = sin límite. Otro número = máximo de todo el alquiler.",
+  },
+  fr: {
+    formHint:
+      "Le prix journalier min./max. et le maximum de location limitent le partenaire. 0 ou vide = pas de limite : le partenaire fixe n’importe quel montant. 0 ne veut pas dire gratuit.",
+    minDayHint: "0 ou vide = pas de minimum. Autre nombre = prix journalier le plus bas du partenaire.",
+    maxDayHint: "0 ou vide = pas de maximum. Autre nombre = prix journalier le plus haut du partenaire.",
+    periodHint: "0 ou vide = pas de limite. Autre nombre = maximum pour toute la location.",
+  },
+  it: {
+    formHint:
+      "Prezzo giornaliero min./max. e massimo del noleggio limitano il partner. 0 o vuoto = nessun limite: il partner imposta qualsiasi importo. 0 non significa gratis.",
+    minDayHint: "0 o vuoto = nessun minimo. Altro numero = prezzo giornaliero più basso del partner.",
+    maxDayHint: "0 o vuoto = nessun massimo. Altro numero = prezzo giornaliero più alto del partner.",
+    periodHint: "0 o vuoto = nessun limite. Altro numero = massimo per tutto il noleggio.",
+  },
+  nl: {
+    formHint:
+      "Min./max. dagprijs en het huurmaximum begrenzen de partner. 0 of leeg = geen limiet: de partner kiest elk bedrag. 0 betekent niet gratis.",
+    minDayHint: "0 of leeg = geen minimum. Ander getal = laagste dagprijs van de partner.",
+    maxDayHint: "0 of leeg = geen maximum. Ander getal = hoogste dagprijs van de partner.",
+    periodHint: "0 of leeg = geen limiet. Ander getal = maximum voor de hele huur.",
+  },
+  pl: {
+    formHint:
+      "Min./maks. cena dzienna i maksimum wynajmu ograniczają partnera. 0 lub puste = bez limitu: partner ustala dowolną kwotę. 0 nie oznacza za darmo.",
+    minDayHint: "0 lub puste = bez minimum. Inna liczba = najniższa cena dzienna partnera.",
+    maxDayHint: "0 lub puste = bez maksimum. Inna liczba = najwyższa cena dzienna partnera.",
+    periodHint: "0 lub puste = bez limitu. Inna liczba = maksimum za cały wynajem.",
+  },
+  zh: {
+    formHint: "每日最低/最高价和整段租期上限用于限制合作伙伴。0 或留空 = 无限制：合作伙伴可设任意金额。0 不代表免费。",
+    minDayHint: "0 或留空 = 无最低价。其他数字 = 合作伙伴可设的最低日价。",
+    maxDayHint: "0 或留空 = 无最高价。其他数字 = 合作伙伴可设的最高日价。",
+    periodHint: "0 或留空 = 无限制。其他数字 = 整段租期的最高金额。",
+  },
+  ar: {
+    formHint:
+      "الحد الأدنى/الأقصى للسعر اليومي والحد الأقصى للإيجار يقيّدان الشريك. 0 أو فارغ = بلا حد: يحدد الشريك أي مبلغ. 0 لا يعني مجاني.",
+    minDayHint: "0 أو فارغ = بلا حد أدنى. أي رقم آخر = أدنى سعر يومي للشريك.",
+    maxDayHint: "0 أو فارغ = بلا حد أقصى. أي رقم آخر = أعلى سعر يومي للشريك.",
+    periodHint: "0 أو فارغ = بلا حد. أي رقم آخر = الحد الأقصى لكامل الإيجار.",
+  },
+  ko: {
+    formHint:
+      "일일 최소/최대 가격과 대여 최대 금액은 파트너의 한도입니다. 0 또는 비움 = 제한 없음: 파트너가 원하는 금액을 설정합니다. 0은 무료가 아닙니다.",
+    minDayHint: "0 또는 비움 = 최소 없음. 다른 숫자 = 파트너의 최저 일일 가격.",
+    maxDayHint: "0 또는 비움 = 최대 없음. 다른 숫자 = 파트너의 최고 일일 가격.",
+    periodHint: "0 또는 비움 = 제한 없음. 다른 숫자 = 전체 대여 최대 금액.",
+  },
+  th: {
+    formHint:
+      "ราคาต่อวันต่ำสุด/สูงสุดและยอดสูงสุดตลอดการเช่าเป็นขีดจำกัดของพาร์ทเนอร์ 0 หรือว่าง = ไม่จำกัด: พาร์ทเนอร์ตั้งราคาใดก็ได้ 0 ไม่ได้แปลว่าฟรี",
+    minDayHint: "0 หรือว่าง = ไม่มีขั้นต่ำ ตัวเลขอื่น = ราคาต่อวันต่ำสุดของพาร์ทเนอร์",
+    maxDayHint: "0 หรือว่าง = ไม่มีเพดาน ตัวเลขอื่น = ราคาต่อวันสูงสุดของพาร์ทเนอร์",
+    periodHint: "0 หรือว่าง = ไม่จำกัด ตัวเลขอื่น = ยอดสูงสุดตลอดการเช่า",
+  },
 };
 
 export function extrasAdminCopy(locale: string): Copy & { mandatoryPricedHint: string } {
   return {
     ...(OVERLAY[locale] ?? EN),
+    ...(LIMIT_HINTS[locale] ?? LIMIT_HINTS.en),
     mandatoryPricedHint: MANDATORY_PRICED_HINT[locale] ?? MANDATORY_PRICED_HINT.en,
   };
 }

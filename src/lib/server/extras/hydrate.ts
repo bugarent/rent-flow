@@ -409,8 +409,7 @@ export async function mergeFreeInsuranceExtras(
   );
   const merged = [...extras];
   for (const service of catalog) {
-    const isFree = service.mode === "free" || service.isTpl || isMandatoryFreeExtra(service);
-    if (!isFree) continue;
+    if (service.mode !== "free" && !isMandatoryFreeExtra(service)) continue;
 
     if (isInsuranceCheckoutSlot(service.checkoutSlot)) {
       if (presentIds.has(service.id) || presentSlots.has(service.checkoutSlot)) continue;

@@ -195,7 +195,7 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
       setError(copy.maxNegative);
       return;
     }
-    if (minPriceEur != null && maxPriceEur != null && maxPriceEur < minPriceEur) {
+    if (minPriceEur != null && maxPriceEur != null && maxPriceEur > 0 && maxPriceEur < minPriceEur) {
       setError(copy.maxBelowMin);
       return;
     }

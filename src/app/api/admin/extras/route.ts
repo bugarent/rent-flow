@@ -6,6 +6,7 @@ import {
   listExtraServices,
 } from "@/lib/server/extras-store";
 import { isDbOfflineError } from "@/lib/server/db-errors";
+import { adminLimit } from "@/lib/extras/pricing";
 
 async function requireAdmin() {
   const session = await getAdminSession();
@@ -28,12 +29,9 @@ const upsertSchema = z.object({
 });
 
 function normalizeBounds(min: number | null | undefined, max: number | null | undefined) {
-  const hasMin = min != null && Number.isFinite(min);
-  const hasMax = max != null && Number.isFinite(max);
-  if (!hasMin && !hasMax) return { minPriceEur: null, maxPriceEur: null };
-  const minPriceEur = hasMin ? Number(min) : 0;
-  const maxPriceEur = hasMax ? Number(max) : minPriceEur;
-  if (maxPriceEur < minPriceEur) {
+  const minPriceEur = adminLimit(min);
+  const maxPriceEur = adminLimit(max);
+  if (minPriceEur != null && maxPriceEur != null && maxPriceEur < minPriceEur) {
     throw new Error("Maximum daily price must be >= minimum daily price");
   }
   return { minPriceEur, maxPriceEur };
@@ -71,7 +69,7 @@ export async function POST(req: Request) {
       minPriceEur: bounds.minPriceEur,
       maxPriceEur: bounds.maxPriceEur,
       maxPeriodEur,
-      defaultPriceEur: bounds.maxPriceEur != null && bounds.maxPriceEur <= 0 ? 0 : (body.defaultPriceEur ?? bounds.minPriceEur ?? 0),
+      defaultPriceEur: body.defaultPriceEur ?? bounds.minPriceEur ?? 0,
       isActive: body.isActive ?? true,
       sortOrder: body.sortOrder ?? 100,
       checkoutSlot: body.checkoutSlot,

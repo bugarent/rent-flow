@@ -24,7 +24,7 @@ export type ExtraServicePricing = {
   defaultPriceEur: number;
   minPriceEur: number | null;
   maxPriceEur: number | null;
-  /** Cap on this extra for the whole rental (EUR). Null = no cap. 0 = free when partner enables it. Charged amount is min(daily × days, cap). */
+  /** Cap on this extra for the whole rental (EUR). Null = no cap. Charged amount is min(daily × days, cap). */
   maxPeriodEur: number | null;
   mode: ExtraPricingMode;
   checkoutSlot: ExtraCheckoutSlot;
@@ -50,19 +50,22 @@ export function localizeExtraName(name: unknown, fallback = "Extra"): string {
 }
 
 /**
- * Pricing modes:
- * - toggle: both min and max empty → partner on/off (no daily price range)
- * - ranged: min and/or max set (0 is a valid bound) → partner prices within [min, max]
- * - free: only via isTpl / mandatory flag — NOT from min=max=0
- *
- * Min day €0 means “from zero upward”, not “this service is free”.
+ * Admin limits (min/day, max/day, max period): empty or 0 = no limit for the partner,
+ * any positive number = that bound. A 0 never makes a service free; the partner always
+ * sets the daily price inside whatever bounds exist.
  */
 export function resolveExtraPricingMode(
-  minPriceEur: number | null | undefined,
-  maxPriceEur: number | null | undefined,
+  _minPriceEur?: number | null,
+  _maxPriceEur?: number | null,
 ): ExtraPricingMode {
-  if (minPriceEur == null && maxPriceEur == null) return "toggle";
   return "ranged";
+}
+
+/** Admin limit: positive number = bound, empty / 0 / invalid = no limit. */
+export function adminLimit(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Number(n.toFixed(2)) : null;
 }
 
 /** Catalog “Free cancellation 48” — optional free; mutually exclusive with paid cancellation protection. */
@@ -102,29 +105,26 @@ export function isMandatoryExtra(service: MandatoryCandidate): boolean {
   return Boolean(service.isTpl);
 }
 
-/** Admin daily max > 0 on a mandatory extra → partner sets the price (0…max). */
+/** System TPL pack: the only mandatory extra that is always a free inclusion. */
+function isCoreTplExtra(service: MandatoryCandidate): boolean {
+  return String(service.slug || "").toLowerCase().trim() === "tpl";
+}
+
+/** Admin-mandatory extra the partner prices within the admin bounds (no bound = any amount). */
 export function isMandatoryPricedExtra(service: MandatoryCandidate): boolean {
-  if (!isMandatoryExtra(service)) return false;
-  const max = Number(service.maxPriceEur);
-  return service.maxPriceEur != null && Number.isFinite(max) && max > 0;
+  return isMandatoryExtra(service) && !isCoreTplExtra(service);
 }
 
-/** True when the extra is a locked €0 inclusion (mandatory with no admin price ceiling > 0). */
+/** True when the extra is a locked €0 inclusion (system TPL). */
 export function isMandatoryFreeExtra(service: MandatoryCandidate): boolean {
-  return isMandatoryExtra(service) && !isMandatoryPricedExtra(service);
+  return isMandatoryExtra(service) && isCoreTplExtra(service);
 }
 
-/**
- * Admin “max period €” = 0 → partner may turn the service on/off, but when on it is free
- * for the partner and for the customer. Empty/null means no period cap (not free).
- */
-export function isPeriodForcedFreeExtra(service: {
+/** Admin period 0 means "no period limit", so no catalog value forces a free rental. */
+export function isPeriodForcedFreeExtra(_service: {
   maxPeriodEur?: number | null;
 }): boolean {
-  const raw = service.maxPeriodEur;
-  if (raw == null) return false;
-  const n = Number(raw);
-  return Number.isFinite(n) && n === 0;
+  return false;
 }
 
 export function toExtraServicePricing(row: {
@@ -143,26 +143,12 @@ export function toExtraServicePricing(row: {
   nameI18n?: ExtraCopyBag;
   descriptionI18n?: ExtraCopyBag;
 }): ExtraServicePricing {
-  const min =
-    row.minPriceEur == null || row.minPriceEur === ""
-      ? null
-      : toNumber(row.minPriceEur, NaN);
-  const max =
-    row.maxPriceEur == null || row.maxPriceEur === ""
-      ? null
-      : toNumber(row.maxPriceEur, NaN);
-  const minPriceEur = min != null && Number.isFinite(min) ? min : null;
-  const maxPriceEur = max != null && Number.isFinite(max) ? max : null;
-  const periodRaw =
-    row.maxPeriodEur === undefined || row.maxPeriodEur == null || row.maxPeriodEur === ""
-      ? null
-      : toNumber(row.maxPeriodEur, NaN);
-  // Keep 0: admin period 0 means optional free. Strip only negative / NaN.
-  let maxPeriodEur =
-    periodRaw != null && Number.isFinite(periodRaw) && periodRaw >= 0 ? periodRaw : null;
+  const minPriceEur = adminLimit(row.minPriceEur);
+  const maxPriceEur = adminLimit(row.maxPriceEur);
+  let maxPeriodEur = adminLimit(row.maxPeriodEur);
   if (row.maxPeriodEur === undefined) {
     const embedded = extractStoredMaxPeriod(row.description);
-    if (embedded.present) maxPeriodEur = embedded.value;
+    if (embedded.present) maxPeriodEur = adminLimit(embedded.value);
   }
   const name = localizeExtraName(row.name);
   const description = localizeExtraName(row.description, "");
@@ -230,11 +216,8 @@ export function normalizePartnerExtraPrice(
   // Ranged: partner offers it with a daily price in [min, max] (max null = no ceiling).
   if (input.enabled === false) return null;
   let price = toNumber(input.priceEur, service.defaultPriceEur);
-  const min = service.minPriceEur != null ? Math.max(0, Number(service.minPriceEur)) : 0;
-  const max =
-    service.maxPriceEur != null && Number.isFinite(Number(service.maxPriceEur))
-      ? Math.max(0, Number(service.maxPriceEur))
-      : null;
+  const min = adminLimit(service.minPriceEur) ?? 0;
+  const max = adminLimit(service.maxPriceEur);
 
   if (!Number.isFinite(price) || price < 0) price = min;
   if (price < min) price = min;
@@ -245,18 +228,16 @@ export function normalizePartnerExtraPrice(
 
 /**
  * Partner daily price stays inside the admin min/max.
- * 0 and 10 means any amount from 0 through 10. A higher or lower number
- * is rewritten to that bound. No admin maximum means no ceiling.
+ * 0 and 10 means any amount up to 10. A higher or lower number
+ * is rewritten to that bound. Empty or 0 admin maximum means no ceiling.
  */
 export function clampPartnerDailyPrice(
   minPriceEur: number | null | undefined,
   maxPriceEur: number | null | undefined,
   price: number | null | undefined,
 ): number {
-  const minRaw = minPriceEur == null ? NaN : Number(minPriceEur);
-  const maxRaw = maxPriceEur == null ? NaN : Number(maxPriceEur);
-  const min = Number.isFinite(minRaw) ? Math.max(0, minRaw) : 0;
-  const max = Number.isFinite(maxRaw) ? Math.max(0, maxRaw) : null;
+  const min = adminLimit(minPriceEur) ?? 0;
+  const max = adminLimit(maxPriceEur);
   let n = Number(price);
   if (!Number.isFinite(n) || n < 0) n = min;
   if (n < min) n = min;
@@ -267,8 +248,7 @@ export function clampPartnerDailyPrice(
 
 /**
  * Partner "max for the rental" cannot exceed the admin period maximum.
- * Admin 0 still means period-forced free (partner enables at €0).
- * Empty admin maximum means no period ceiling.
+ * Empty or 0 admin maximum means no period ceiling.
  */
 export function capPartnerMaxPeriod(
   adminMax: number | null | undefined,
@@ -292,7 +272,7 @@ export function optionalPeriodMoney(value: unknown): number | null {
   return Number(n.toFixed(2));
 }
 
-/** Admin period field: empty = null, 0 stays 0 (free), positive stays positive. */
+/** Admin period field as stored: empty = null; 0 is kept and read back as "no limit". */
 export function optionalAdminPeriodMoney(value: unknown): number | null {
   if (value == null || value === "") return null;
   const n = Number(value);
@@ -302,7 +282,7 @@ export function optionalAdminPeriodMoney(value: unknown): number | null {
 
 /**
  * Partner period floor/cap, still respecting an admin catalog ceiling when one exists.
- * Admin period 0 forces a free rental charge. The floor never sits above the ceiling.
+ * Admin period 0 means no ceiling. The floor never sits above the ceiling.
  */
 export function effectivePeriodBounds(
   catalogMax: number | null | undefined,
@@ -326,7 +306,7 @@ export function effectivePeriodBounds(
 /**
  * Charge for one extra over the rental.
  * Total = daily × days, then raised to the minimum (if set) and cut at the maximum (if set).
- * Admin period 0 → always €0. Empty/null period max means no ceiling.
+ * Empty / 0 period max means no ceiling.
  * Daily €0 with a selection minimum still charges that floor (not “free”).
  */
 export function extraPeriodCharge(
@@ -336,7 +316,6 @@ export function extraPeriodCharge(
   maxPeriodEur?: number | null,
   minPeriodEur?: number | null,
 ): number {
-  if (Number(maxPeriodEur) === 0) return 0;
   const dayCount = Math.max(1, Number(days) || 1);
   const units = Math.max(0, Number(qty) || 0);
   const daily = Math.max(0, Number(dailyPrice) || 0);
@@ -357,9 +336,8 @@ export function extraPeriodCharge(
 export function isExtraChargeFree(
   dailyPrice: number,
   minPeriodEur?: number | null,
-  maxPeriodEur?: number | null,
+  _maxPeriodEur?: number | null,
 ): boolean {
-  if (Number(maxPeriodEur) === 0) return true;
   if (optionalPeriodMoney(minPeriodEur) != null) return false;
   return Math.max(0, Number(dailyPrice) || 0) <= 0;
 }
