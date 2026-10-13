@@ -51,6 +51,7 @@ export function PartnerDeliveryPriceCell({
       <PartnerEurMoneyInput
         eurValue={priceEur}
         disabled={disabled}
+        symbolOutside
         onEurChange={(eur) => {
           const n = Number(eur);
           if (eur !== "" && Number.isFinite(n) && n > maxDeliveryPriceEur) {
@@ -61,7 +62,7 @@ export function PartnerDeliveryPriceCell({
           onPriceChange(eur);
         }}
         className={cn(
-          "w-28 rounded-md border border-slate-200 bg-white py-1 font-bold text-slate-900 disabled:opacity-50",
+          "min-h-9 w-24 rounded-md border border-slate-200 bg-white py-1 font-bold text-slate-900 disabled:opacity-50",
           align === "end" && "text-end",
         )}
       />

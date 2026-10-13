@@ -33,6 +33,7 @@ function copyFor(locale: string) {
       freeAfter: "უფასო … დღის შემდეგ",
       travelTime: "გზის დრო",
       hours: "სთ",
+      days: "დღე",
       minutes: "წთ",
       save: "შენახვა",
       saving: "ინახება…",
@@ -64,6 +65,7 @@ function copyFor(locale: string) {
       freeAfter: "Бесплатно после … дней",
       travelTime: "Время в пути",
       hours: "ч",
+      days: "дн.",
       minutes: "мин",
       save: "Сохранить",
       saving: "Сохранение…",
@@ -93,6 +95,7 @@ function copyFor(locale: string) {
     freeAfter: "Free after … days",
     travelTime: "Travel time",
     hours: "h",
+    days: "days",
     minutes: "min",
     save: "Save",
     saving: "Saving…",
@@ -378,6 +381,7 @@ export function PartnerDeliveryPanel() {
                               onChange={(e) => setFreeAfterDays(row, e.target.value)}
                               className="w-20 rounded-md border border-slate-200 px-2 py-1 text-sm font-bold disabled:opacity-50"
                             />
+                            <span className="ml-1 text-xs text-slate-500">{t.days}</span>
                           </td>
                           <td className="px-3 py-2.5 align-middle">
                             <div className="inline-flex items-center gap-1">
@@ -451,8 +455,9 @@ export function PartnerDeliveryPanel() {
                                 : undefined
                             }
                             onChange={(e) => setFreeAfterDays(row, e.target.value)}
-                            className="w-20 rounded-md border border-slate-200 px-2 py-1 text-end text-sm font-bold disabled:opacity-50"
+                            className="w-20 rounded-md border border-slate-200 px-2 py-1 text-end text-base font-bold disabled:opacity-50"
                           />
+                          <span className="ml-1 text-xs font-medium text-slate-500">{t.days}</span>
                         </MobileDataRow>
                         <MobileDataRow label={t.travelTime}>
                           <div className="inline-flex flex-wrap items-center justify-end gap-1">
