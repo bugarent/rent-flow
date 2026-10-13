@@ -245,11 +245,15 @@ function OfferModeButtons({
   onPick,
   labels,
   layout,
+  disabled = false,
+  disabledTitle,
 }: {
   active: OfferMode;
   onPick: (mode: OfferMode) => void;
   labels: { on: string; forbidden: string; off: string };
   layout: "grid" | "inline";
+  disabled?: boolean;
+  disabledTitle?: string;
 }) {
   return (
     <div className={layout === "grid" ? "grid grid-cols-3 gap-1" : "flex flex-nowrap justify-end gap-1"}>
@@ -263,9 +267,12 @@ function OfferModeButtons({
         <button
           key={mode}
           type="button"
+          disabled={disabled}
+          title={disabled ? disabledTitle : undefined}
           onClick={() => onPick(mode)}
           className={cn(
-            "inline-flex items-center justify-center rounded-md border font-bold leading-tight",
+            "inline-flex items-center justify-center rounded-md border font-bold leading-tight disabled:cursor-not-allowed",
+            disabled && active !== mode && "opacity-40",
             layout === "grid" ? "min-h-10 px-1 text-[11px]" : "h-8 whitespace-nowrap px-1.5 text-[11px]",
             tone === "green" &&
               (active === mode
@@ -941,9 +948,16 @@ export function PartnerEquipmentServicePanel({
                     ) : null}
                   </label>
 
-                  {!statusLocked ? (
-                    <div>
-                      <p className="mb-1.5 text-xs font-semibold text-slate-500">{t.status}</p>
+                  <div>
+                      <p className="mb-1.5 flex items-center gap-1 text-xs font-semibold text-slate-500">
+                        {t.status}
+                        {statusLocked ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                            <Lock className="h-3 w-3" />
+                            {t.mandatoryBadge}
+                          </span>
+                        ) : null}
+                      </p>
                       <div className="flex flex-wrap gap-1.5">
                         {(
                           [
@@ -955,6 +969,8 @@ export function PartnerEquipmentServicePanel({
                           <button
                             key={mode}
                             type="button"
+                            disabled={statusLocked}
+                            title={statusLocked ? t.mandatoryLockedTitle : undefined}
                             onClick={() => {
                               if (creating) {
                                 setDraftMode(mode);
@@ -968,7 +984,8 @@ export function PartnerEquipmentServicePanel({
                               }
                             }}
                             className={cn(
-                              "rounded-md border px-2.5 py-1.5 text-xs font-bold transition",
+                              "min-h-10 rounded-md border px-2.5 py-1.5 text-xs font-bold transition disabled:cursor-not-allowed",
+                              statusLocked && modeValue !== mode && "opacity-40",
                               tone === "green" &&
                                 (modeValue === mode
                                   ? "border-[#28a745] bg-[#28a745] text-white"
@@ -987,10 +1004,7 @@ export function PartnerEquipmentServicePanel({
                           </button>
                         ))}
                       </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs font-semibold text-emerald-700">{t.free}</p>
-                  )}
+                  </div>
 
                   {editingRow && isCrossBorderExtra(editingRow.service) && modeValue === "on" ? (
                     <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-bold text-emerald-700">
@@ -1197,9 +1211,13 @@ export function PartnerEquipmentServicePanel({
                               >
                                 {localizedExtraCopy(locale, row.service.name, row.service.nameI18n)}
                               </p>
-                              {statusLocked && (mandatory || dailyIsZero) ? (
-                                <span className="inline-block rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
-                                  {t.free}
+                              {statusLocked ? (
+                                <span
+                                  title={t.mandatoryLockedTitle}
+                                  className="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700"
+                                >
+                                  <Lock className="h-3 w-3" />
+                                  {t.mandatoryBadge}
                                 </span>
                               ) : null}
                             </div>
@@ -1229,7 +1247,7 @@ export function PartnerEquipmentServicePanel({
                             ) : null}
                           </td>
                           <td className="px-3 py-1.5 align-top text-xs leading-snug text-slate-600">
-                            <div className="w-[150px] truncate" title={carsLabel}>
+                            <div className="w-[130px] truncate" title={carsLabel}>
                               {colon >= 0 ? (
                                 <>
                                   <span className="font-semibold text-[#0b1f4b]">
@@ -1243,45 +1261,34 @@ export function PartnerEquipmentServicePanel({
                             </div>
                           </td>
                           <td className="py-1.5 pl-1 pr-3 align-top text-right">
-                            {statusLocked ? (
-                              <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1">
+                              <OfferModeButtons
+                                active={statusLocked ? "on" : row.mode}
+                                labels={{ on: t.on, forbidden: t.forbidden, off: t.off }}
+                                layout="inline"
+                                disabled={statusLocked}
+                                disabledTitle={t.mandatoryLockedTitle}
+                                onPick={(mode) => applyOfferMode(row, mode)}
+                              />
+                              {statusLocked && mandatory ? (
                                 <span
                                   title={t.mandatoryLockedTitle}
-                                  className="inline-flex h-8 items-center gap-1 rounded-md bg-emerald-600 px-2.5 text-xs font-extrabold text-white"
+                                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700"
                                 >
                                   <Lock className="h-3.5 w-3.5" />
-                                  {t.mandatoryBadge}
                                 </span>
-                                {!mandatory ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setEditingId(row.service.id)}
-                                    className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-bold text-[#1d6fe8] hover:bg-sky-50"
-                                  >
-                                    <Pencil className="h-3 w-3" />
-                                    {t.setPrice}
-                                  </button>
-                                ) : null}
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-end gap-1">
-                                <OfferModeButtons
-                                  active={row.mode}
-                                  labels={{ on: t.on, forbidden: t.forbidden, off: t.off }}
-                                  layout="inline"
-                                  onPick={(mode) => applyOfferMode(row, mode)}
-                                />
+                              ) : (
                                 <button
                                   type="button"
                                   onClick={() => setEditingId(row.service.id)}
-                                  title={t.edit}
-                                  aria-label={t.edit}
+                                  title={statusLocked ? t.setPrice : t.edit}
+                                  aria-label={statusLocked ? t.setPrice : t.edit}
                                   className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-sky-200 bg-white text-[#1d6fe8] hover:bg-sky-50"
                                 >
                                   <Pencil className="h-3.5 w-3.5" />
                                 </button>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1382,14 +1389,14 @@ export function PartnerEquipmentServicePanel({
                             </span>
                           ) : null}
                         </button>
-                        {statusLocked ? null : (
-                          <OfferModeButtons
-                            active={row.mode}
-                            labels={{ on: t.on, forbidden: t.forbidden, off: t.off }}
-                            layout="grid"
-                            onPick={(mode) => applyOfferMode(row, mode)}
-                          />
-                        )}
+                        <OfferModeButtons
+                          active={statusLocked ? "on" : row.mode}
+                          labels={{ on: t.on, forbidden: t.forbidden, off: t.off }}
+                          layout="grid"
+                          disabled={statusLocked}
+                          disabledTitle={t.mandatoryLockedTitle}
+                          onPick={(mode) => applyOfferMode(row, mode)}
+                        />
                         {open && canEditPrices ? (
                           <div className="mt-1 space-y-1.5 border-t border-slate-100 pt-1.5">
                             <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">

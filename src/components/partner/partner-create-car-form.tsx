@@ -2663,18 +2663,7 @@ export function PartnerCreateCarForm({
                     )}
                   </span>
                 );
-                const buttons = mandatory ? (
-                  <span
-                    className={cn(
-                      "inline-flex items-center justify-center rounded border font-bold uppercase tracking-wide",
-                      variant === "light"
-                        ? "min-h-10 border-emerald-200 bg-emerald-50 px-2 text-[11px] text-emerald-800"
-                        : "min-h-11 border-emerald-500 bg-emerald-600 px-3 text-xs text-white md:min-h-0 md:px-1 md:py-0.5 md:text-[8px]",
-                    )}
-                  >
-                    {knownText(locale, cc.mandatory)}
-                  </span>
-                ) : (
+                const buttons = (
                   <div className={cn(variant === "desktop" ? "flex flex-wrap items-center gap-2 md:justify-end md:gap-1" : "grid grid-cols-3 gap-1")}>
                     {(
                       [
@@ -2686,9 +2675,12 @@ export function PartnerCreateCarForm({
                       <button
                         key={mode}
                         type="button"
+                        disabled={mandatory}
+                        title={mandatory ? knownText(locale, cc.mandatory) : undefined}
                         onClick={() => setOffer(mode === "on" ? "on" : mode === "forbidden" ? "forbidden" : "off")}
                         className={cn(
-                          "inline-flex items-center justify-center rounded border font-bold leading-tight",
+                          "inline-flex items-center justify-center rounded border font-bold leading-tight disabled:cursor-not-allowed",
+                          mandatory && !active && "opacity-40",
                           variant === "desktop"
                             ? "min-h-11 px-3 text-xs uppercase tracking-wide md:min-h-0 md:px-1 md:py-0.5 md:text-[8px]"
                             : "min-h-10 px-1 text-[11px]",
@@ -2735,13 +2727,14 @@ export function PartnerCreateCarForm({
                         <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-700">
                           {extraLabel(service)}
                         </p>
+                        {mandatory ? (
+                          <span className="shrink-0 text-[10px] font-bold text-emerald-700">
+                            {knownText(locale, cc.mandatory)}
+                          </span>
+                        ) : null}
                         {price}
                       </div>
-                      {mandatory ? (
-                        <p className="text-[10px] font-bold text-emerald-700">{knownText(locale, cc.mandatory)}</p>
-                      ) : (
-                        buttons
-                      )}
+                      {buttons}
                     </div>
                   );
                 }
