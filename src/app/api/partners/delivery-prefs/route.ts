@@ -6,6 +6,7 @@ import { isDbOfflineError } from "@/lib/server/db-errors";
 import { listPartnerScopedDeliveryLocations } from "@/lib/server/delivery-locations";
 import {
   capFreeAfterDays,
+  hasDeliveryPriceLimit,
   normalizeDeliveryPrice,
   type DeliveryLocationView,
 } from "@/lib/delivery/pricing";
@@ -117,7 +118,10 @@ export async function PUT(req: Request) {
       // The form shows prices already lowered to the admin limit. Saving that shown
       // value keeps the partner's own higher price, so raising the limit restores it.
       const stored = previousById.get(id)?.priceEur ?? 0;
-      const keepStored = stored > capped.priceEur && capped.priceEur >= Math.max(0, loc.maxDeliveryPriceEur);
+      const keepStored =
+        hasDeliveryPriceLimit(loc.maxDeliveryPriceEur) &&
+        stored > capped.priceEur &&
+        capped.priceEur >= loc.maxDeliveryPriceEur;
       const priceEur = keepStored ? stored : capped.priceEur;
       const freeRaw = row?.freeAfterDays;
       const parsedFree =

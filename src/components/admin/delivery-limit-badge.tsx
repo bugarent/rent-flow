@@ -1,4 +1,4 @@
-/** Shows what the admin delivery limit means for partners: free, or a 0…limit price range. */
+/** Shows what the admin delivery limit means for partners: no limit (0), or a 0…limit price range. */
 export function DeliveryLimitBadge({
   amount,
   symbol,

@@ -1,5 +1,6 @@
 import {
   effectiveOneWayDeliveryPrice,
+  hasDeliveryPriceLimit,
   type PartnerDeliveryInput,
 } from "@/lib/delivery/pricing";
 import { isCityLocationCode, parseCityLocationCode } from "@/lib/catalog/search-places";
@@ -15,27 +16,75 @@ export type DeliveryPriceRowLike = {
     id?: string;
     isActive?: boolean;
     maxDeliveryPriceEur?: unknown;
-    airport?: { iata?: string; city?: { country?: { iso2?: string } } } | null;
+    airport?: { iata?: string; city?: { name?: unknown; country?: { iso2?: string } } } | null;
   } | null;
 };
 
-/** Partner price never exceeds the admin limit of the location (limit 0 = free). */
+/** Partner price never exceeds the admin limit of the location (limit 0 = no limit). */
 function withinAdminLimit<T extends DeliveryPriceRowLike>(row: T): T {
   const rawMax = row.deliveryLocation?.maxDeliveryPriceEur;
-  if (rawMax == null || rawMax === "") return row;
-  const max = Math.max(0, toNumber(rawMax, 0));
+  if (!hasDeliveryPriceLimit(rawMax)) return row;
+  const max = toNumber(rawMax, 0);
   if (toNumber(row.priceEur, 0) <= max) return row;
   return { ...row, priceEur: max };
+}
+
+/** City delivery places by location id (city places are not stored on listings). */
+export type CityDeliveryPlace = {
+  id: string;
+  code: string;
+  countryIso2: string;
+  isActive: boolean;
+  maxDeliveryPriceEur: number;
+};
+
+function rowCountry(row: DeliveryPriceRowLike): string {
+  return String(row.deliveryLocation?.airport?.city?.country?.iso2 || "").toUpperCase();
+}
+
+/**
+ * The partner's "City delivery" price for a city applies to every listing the
+ * partner offers in that country, so a city search charges that exact price.
+ */
+function cityRowsFromPrefs(
+  rows: DeliveryPriceRowLike[],
+  prefs: PartnerDeliveryPref[],
+  cityPlaces: ReadonlyMap<string, CityDeliveryPlace>,
+): DeliveryPriceRowLike[] {
+  const present = new Set(rows.map((r) => String(r.deliveryLocationId || r.deliveryLocation?.id || "")));
+  const countries = new Set(
+    rows.filter((r) => r.deliveryLocation?.isActive !== false).map(rowCountry).filter(Boolean),
+  );
+  const extra: DeliveryPriceRowLike[] = [];
+  for (const pref of prefs) {
+    if (pref.enabled === false || present.has(pref.deliveryLocationId)) continue;
+    const place = cityPlaces.get(pref.deliveryLocationId);
+    if (!place || !place.isActive || !countries.has(place.countryIso2.toUpperCase())) continue;
+    extra.push({
+      deliveryLocationId: place.id,
+      priceEur: pref.priceEur,
+      freeAfterDays: pref.freeAfterDays,
+      travelTimeMinutes: pref.travelTimeMinutes,
+      deliveryLocation: {
+        id: place.id,
+        isActive: true,
+        maxDeliveryPriceEur: place.maxDeliveryPriceEur,
+        airport: { iata: place.code, city: { country: { iso2: place.countryIso2.toUpperCase() } } },
+      },
+    });
+  }
+  return extra;
 }
 
 /** Overlay partner Delivery-page prefs onto a car's delivery price rows. */
 export function mergeDeliveryPrefsIntoRows<T extends DeliveryPriceRowLike>(
   rows: T[] | undefined,
   prefs: PartnerDeliveryPref[] | undefined,
+  cityPlaces?: ReadonlyMap<string, CityDeliveryPlace>,
 ): T[] {
   if (!rows?.length) return [];
   const byId = new Map((prefs ?? []).map((p) => [p.deliveryLocationId, p]));
-  return rows.map((row) => {
+  const merged = rows.map((row) => {
     const locId = String(row.deliveryLocationId || row.deliveryLocation?.id || "");
     const pref = locId ? byId.get(locId) : undefined;
     if (!pref || pref.enabled === false) return withinAdminLimit(row);
@@ -46,6 +95,21 @@ export function mergeDeliveryPrefsIntoRows<T extends DeliveryPriceRowLike>(
       travelTimeMinutes: pref.travelTimeMinutes,
     });
   });
+  if (!cityPlaces?.size || !prefs?.length) return merged;
+  const cityRows = cityRowsFromPrefs(merged, prefs, cityPlaces).map(
+    (row) => withinAdminLimit(row) as unknown as T,
+  );
+  return [...merged, ...cityRows];
+}
+
+function cityNameSlug(name: unknown): string {
+  const text =
+    typeof name === "string"
+      ? name
+      : name && typeof name === "object" && "en" in name
+        ? String((name as { en?: unknown }).en || "")
+        : "";
+  return text.trim().toLowerCase().replace(/\s+/g, "-");
 }
 
 export function matchDeliveryRowsForPlace(
@@ -54,16 +118,17 @@ export function matchDeliveryRowsForPlace(
 ): DeliveryPriceRowLike[] {
   if (!placeCode || !rows?.length) return [];
   const code = placeCode.toUpperCase();
-  const cityIso2 = isCityLocationCode(placeCode)
-    ? parseCityLocationCode(placeCode)?.iso2?.toUpperCase()
-    : null;
-  return rows.filter((row) => {
-    const loc = row.deliveryLocation;
-    if (!loc?.airport) return false;
-    if (loc.isActive === false) return false;
-    if (cityIso2) return loc.airport.city?.country?.iso2?.toUpperCase() === cityIso2;
-    return loc.airport.iata?.toUpperCase() === code;
+  const active = rows.filter((row) => row.deliveryLocation?.airport && row.deliveryLocation.isActive !== false);
+  const exact = active.filter((row) => row.deliveryLocation?.airport?.iata?.toUpperCase() === code);
+  const city = isCityLocationCode(placeCode) ? parseCityLocationCode(placeCode) : null;
+  if (!city || exact.length) return exact;
+
+  // No price for this city itself: use the airport in the same city, then the country.
+  const inCountry = active.filter((row) => rowCountry(row) === city.iso2.toUpperCase());
+  const sameCity = inCountry.filter((row) => {
+    return cityNameSlug(row.deliveryLocation?.airport?.city?.name) === city.slug;
   });
+  return sameCity.length ? sameCity : inCountry;
 }
 
 function legFeeFromRows(rows: DeliveryPriceRowLike[], rentalDays: number): number {

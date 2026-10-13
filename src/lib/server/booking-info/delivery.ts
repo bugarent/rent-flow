@@ -92,7 +92,10 @@ export async function buildMergedDeliveryRows(input: {
         airport: iata
           ? {
               iata,
-              city: { country: { iso2: String(loc?.countryIso2 || "").toUpperCase() } },
+              city: {
+                name: loc?.cityName,
+                country: { iso2: String(loc?.countryIso2 || "").toUpperCase() },
+              },
             }
           : null,
       },
@@ -121,7 +124,8 @@ export async function buildMergedDeliveryRows(input: {
       }
 
       if (rows.length && prefs.length) {
-        rows = mergeDeliveryPrefsIntoRows(rows, prefs);
+        const { loadCityDeliveryPlaces } = await import("@/lib/server/city-delivery-places");
+        rows = mergeDeliveryPrefsIntoRows(rows, prefs, await loadCityDeliveryPlaces());
       } else if (!rows.length && prefs.length) {
         rows = prefs
           .filter((p) => p.enabled !== false)

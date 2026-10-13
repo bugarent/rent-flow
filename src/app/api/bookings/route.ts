@@ -572,15 +572,20 @@ export async function POST(req: Request) {
               deliveryLocation: {
                 id: loc?.id || row.deliveryLocationId,
                 isActive: loc?.isActive === true,
+                maxDeliveryPriceEur: loc?.maxDeliveryPriceEur,
                 airport: iata
                   ? {
                       iata,
-                      city: { country: { iso2: (loc?.countryIso2 || "").toUpperCase() } },
+                      city: {
+                        name: loc?.cityName,
+                        country: { iso2: (loc?.countryIso2 || "").toUpperCase() },
+                      },
                     }
                   : null,
               },
             };
           });
+          const { loadCityDeliveryPlaces } = await import("@/lib/server/city-delivery-places");
           const partnerKeys = [
             fileCar.partnerId,
             fileCar.partnerUserId,
@@ -593,7 +598,7 @@ export async function POST(req: Request) {
             prefs = await readPartnerDeliveryPrefs(key);
             if (prefs.length) break;
           }
-          rows = mergeDeliveryPrefsIntoRows(rows, prefs);
+          rows = mergeDeliveryPrefsIntoRows(rows, prefs, await loadCityDeliveryPlaces());
           const { evaluatePickupLeadTime } = await import("@/lib/delivery/booking-lead");
           const lead = evaluatePickupLeadTime({
             pickupAt,
@@ -932,10 +937,12 @@ export async function POST(req: Request) {
             ? {
                 id: row.deliveryLocation.id,
                 isActive: row.deliveryLocation.isActive,
+                maxDeliveryPriceEur: row.deliveryLocation.maxDeliveryPriceEur,
                 airport: row.deliveryLocation.airport
                   ? {
                       iata: row.deliveryLocation.airport.iata,
                       city: {
+                        name: row.deliveryLocation.airport.city?.name,
                         country: {
                           iso2: row.deliveryLocation.airport.city?.country?.iso2 || "",
                         },
@@ -946,6 +953,7 @@ export async function POST(req: Request) {
             : null,
         })),
         prefs,
+        await (await import("@/lib/server/city-delivery-places")).loadCityDeliveryPlaces(),
       );
       const { evaluatePickupLeadTime } = await import("@/lib/delivery/booking-lead");
       const lead = evaluatePickupLeadTime({

@@ -44,7 +44,8 @@ export type FileSearchCar = {
     deliveryLocation: {
       id: string;
       isActive: boolean;
-      airport: { iata: string; city: { country: { iso2: string } } } | null;
+      maxDeliveryPriceEur?: number;
+      airport: { iata: string; city: { name?: string; country: { iso2: string } } } | null;
     } | null;
   }>;
 };
@@ -90,10 +91,14 @@ function toSearchCar(car: FileCarListing, byId: Map<string, DeliveryLocationView
         deliveryLocation: {
           id: loc?.id || row.deliveryLocationId,
           isActive: loc?.isActive === true,
+          maxDeliveryPriceEur: loc?.maxDeliveryPriceEur ?? 0,
           airport: iata
             ? {
                 iata,
-                city: { country: { iso2: (loc?.countryIso2 || "").toUpperCase() } },
+                city: {
+                  name: loc?.cityName,
+                  country: { iso2: (loc?.countryIso2 || "").toUpperCase() },
+                },
               }
             : null,
         },

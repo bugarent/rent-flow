@@ -32,11 +32,16 @@ async function deliveryRows(partnerId: string, rows: unknown) {
   try {
     const { readPartnerDeliveryPrefs } = await import("@/lib/server/partner-delivery-prefs-store");
     const { mergeDeliveryPrefsIntoRows } = await import("@/lib/delivery/trip-fees");
+    const { loadCityDeliveryPlaces } = await import("@/lib/server/city-delivery-places");
     let prefs = await readPartnerDeliveryPrefs(partnerId);
     if (!prefs.length && partnerId.startsWith("file-partner-")) {
       prefs = await readPartnerDeliveryPrefs(partnerId.slice("file-partner-".length));
     }
-    return mergeDeliveryPrefsIntoRows(rows as Array<Record<string, unknown>>, prefs);
+    return mergeDeliveryPrefsIntoRows(
+      rows as Array<Record<string, unknown>>,
+      prefs,
+      await loadCityDeliveryPlaces(),
+    );
   } catch {
     return undefined;
   }
@@ -194,10 +199,14 @@ export async function shapeFileCarForApi(
       deliveryLocation: {
         id: loc?.id || row.deliveryLocationId,
         isActive: loc?.isActive === true,
+        maxDeliveryPriceEur: loc?.maxDeliveryPriceEur,
         airport: iata
           ? {
               iata,
-              city: { country: { iso2: (loc?.countryIso2 || "").toUpperCase() } },
+              city: {
+                name: loc?.cityName,
+                country: { iso2: (loc?.countryIso2 || "").toUpperCase() },
+              },
             }
           : null,
       },

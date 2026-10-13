@@ -14,6 +14,7 @@ import {
   periodDiscountPercentByCarId,
 } from "@/lib/server/partner-period-discounts-store";
 import { readPartnerDeliveryPrefsMap } from "@/lib/server/partner-delivery-prefs-store";
+import { loadCityDeliveryPlaces } from "@/lib/server/city-delivery-places";
 import {
   readPartnerExtraPrefsMap,
   partnerExtraPrefAppliesToCar,
@@ -462,12 +463,13 @@ export default async function CarsPage({
     cars = keepCars(cars, (car) => !expiredIds.has(car.id) || "insurance expired");
   }
 
+  const cityPlaces = await loadCityDeliveryPlaces();
   cars = cars.map((car) => {
     const pid = car.partnerId || car.partner?.id || "";
     const prefs = prefsByPartner.get(pid) || [];
     return {
       ...car,
-      deliveryPrices: mergeDeliveryPrefsIntoRows(car.deliveryPrices, prefs),
+      deliveryPrices: mergeDeliveryPrefsIntoRows(car.deliveryPrices, prefs, cityPlaces),
     };
   });
 

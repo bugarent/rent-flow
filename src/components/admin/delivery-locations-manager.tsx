@@ -129,7 +129,7 @@ export function DeliveryLocationsManager({
   const [openCountries, setOpenCountries] = useState<ReadonlyMap<string, boolean>>(() => new Map());
 
   const symbol = currencySymbol(currency);
-  const freeLabel = phrase("Free", "უფასო", "Бесплатно");
+  const freeLabel = phrase("No limit", "ლიმიტის გარეშე", "Без лимита");
   const rangeLabel = phrase("Partner price", "პარტნიორის ფასი", "Цена партнёра");
 
   /** Countries with active places that match the search, each with only its active places. */
@@ -206,9 +206,9 @@ export function DeliveryLocationsManager({
     if (raw === "" || !Number.isFinite(amount) || amount < 0) {
       setError(
         phrase(
-          `Enter a valid maximum delivery price (${symbol}). Enter 0 for free delivery.`,
-          `ჩაწერეთ სწორი მაქსიმალური ფასი (${symbol}). უფასო მიწოდებისთვის ჩაწერეთ 0.`,
-          `Укажите корректную максимальную цену (${symbol}). Для бесплатной доставки укажите 0.`,
+          `Enter a valid maximum delivery price (${symbol}). Enter 0 for no limit.`,
+          `ჩაწერეთ სწორი მაქსიმალური ფასი (${symbol}). ლიმიტის გარეშე — ჩაწერეთ 0.`,
+          `Укажите корректную максимальную цену (${symbol}). Без лимита — укажите 0.`,
         ),
       );
       return;
@@ -250,7 +250,7 @@ export function DeliveryLocationsManager({
       const limitLabel =
         Number(data.maxDeliveryPriceEur) > 0
           ? `max delivery ${symbol}${toDisplayAmount(data.maxDeliveryPriceEur, currency, rates)}`
-          : phrase("free delivery", "უფასო მიწოდება", "бесплатная доставка");
+          : phrase("no limit (partner price)", "ლიმიტის გარეშე (პარტნიორის ფასი)", "без лимита (цена партнёра)");
       setMessage(`${phrase("Saved", "შენახულია", "Сохранено")}: ${limitLabel}, free after ${daysLabel} — ${data.label || data.iata}.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save");
@@ -579,9 +579,9 @@ export function DeliveryLocationsManager({
         </div>
         <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-900 sm:text-sm">
           {phrase(
-            "0 = free delivery for everyone. Enter a limit to let partners charge between 0 and that amount; higher partner prices are lowered to the limit automatically.",
-            "0 = მიწოდება უფასოა ყველასთვის. ჩაწერეთ ლიმიტი და პარტნიორი შეძლებს ფასის მითითებას 0-დან ამ თანხამდე; ლიმიტზე მაღალი ფასები ავტომატურად ჩამოიწევს ლიმიტამდე.",
-            "0 = доставка бесплатна для всех. Укажите лимит — партнёры смогут ставить цену от 0 до этой суммы; более высокие цены автоматически снизятся до лимита.",
+            "0 = no limit: each partner's own delivery price is charged (new places start free). Enter a limit to cap partner prices at that amount; higher partner prices are lowered to the limit automatically.",
+            "0 = ლიმიტის გარეშე: მოქმედებს პარტნიორის მიერ მითითებული მიწოდების ფასი (ახალ ლოკაციაზე თავიდან უფასოა). ჩაწერეთ ლიმიტი და პარტნიორის ფასი ამ თანხას ვერ გადააჭარბებს; უფრო მაღალი ფასი ავტომატურად ჩამოიწევს ლიმიტამდე.",
+            "0 = без лимита: действует цена доставки партнёра (новые места сначала бесплатны). Укажите лимит — цена партнёра не превысит эту сумму; более высокие цены автоматически снизятся до лимита.",
           )}
         </p>
       </div>

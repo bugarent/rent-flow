@@ -2,13 +2,13 @@
 
 import { PartnerEurMoneyInput } from "@/components/partner/partner-eur-money-input";
 import { usePartnerMoney } from "@/components/providers/partner-money-context";
-import { isFreeDeliveryLimit } from "@/lib/delivery/pricing";
+import { hasDeliveryPriceLimit } from "@/lib/delivery/pricing";
 import { formatPartnerAmount, partnerCurrencySymbol } from "@/lib/partners/pricing-currency";
 import { cn } from "@/lib/utils";
 
 /**
- * One-way delivery price for a partner location. Admin limit 0 → always free
- * (no input); otherwise the price is kept between 0 and the admin limit.
+ * One-way delivery price for a partner location. 0 = free delivery. When the
+ * admin has set a limit, the price is kept between 0 and that limit.
  */
 export function PartnerDeliveryPriceCell({
   priceEur,
@@ -31,21 +31,10 @@ export function PartnerDeliveryPriceCell({
   onCapped: (maxText: string) => void;
 }) {
   const { pricingCurrency, fromEur } = usePartnerMoney();
-
-  if (isFreeDeliveryLimit(maxDeliveryPriceEur)) {
-    return (
-      <span
-        className={cn(
-          "inline-flex min-h-8 items-center rounded-full bg-emerald-100 px-3 text-xs font-extrabold uppercase tracking-wide text-emerald-800",
-          disabled && "opacity-50",
-        )}
-      >
-        {freeLabel}
-      </span>
-    );
-  }
-
+  const limited = hasDeliveryPriceLimit(maxDeliveryPriceEur);
   const maxText = `${partnerCurrencySymbol(pricingCurrency)}${formatPartnerAmount(fromEur(maxDeliveryPriceEur))}`;
+  const isFree = (Number(priceEur) || 0) <= 0;
+
   return (
     <div className={cn("flex flex-col gap-0.5", align === "end" ? "items-end" : "items-start")}>
       <PartnerEurMoneyInput
@@ -54,7 +43,7 @@ export function PartnerDeliveryPriceCell({
         symbolOutside
         onEurChange={(eur) => {
           const n = Number(eur);
-          if (eur !== "" && Number.isFinite(n) && n > maxDeliveryPriceEur) {
+          if (limited && eur !== "" && Number.isFinite(n) && n > maxDeliveryPriceEur) {
             onPriceChange(String(maxDeliveryPriceEur));
             onCapped(maxText);
             return;
@@ -66,7 +55,14 @@ export function PartnerDeliveryPriceCell({
           align === "end" && "text-end",
         )}
       />
-      <span className="text-[11px] font-semibold text-slate-500">{maxLabel.replace("{amount}", maxText)}</span>
+      <span className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-slate-500">
+        {isFree ? (
+          <span className="rounded-full bg-emerald-100 px-2 py-px font-extrabold uppercase tracking-wide text-emerald-800">
+            {freeLabel}
+          </span>
+        ) : null}
+        {limited ? <span>{maxLabel.replace("{amount}", maxText)}</span> : null}
+      </span>
     </div>
   );
 }

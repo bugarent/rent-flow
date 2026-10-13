@@ -250,6 +250,8 @@ export async function GET(req: Request) {
         ),
       ];
       const prefsCache = await readPartnerDeliveryPrefsMap(partnerIds);
+      const { loadCityDeliveryPlaces } = await import("@/lib/server/city-delivery-places");
+      const cityPlaces = await loadCityDeliveryPlaces();
       cars = cars.filter((raw) => {
         const car = raw as {
           partnerId?: string;
@@ -265,7 +267,7 @@ export async function GET(req: Request) {
         const pid = String(car.partnerId || car.partner?.id || "");
         let rows = car.deliveryPrices ?? [];
         const prefs = prefsCache.get(pid);
-        rows = mergeDeliveryPrefsIntoRows(rows, prefs);
+        rows = mergeDeliveryPrefsIntoRows(rows, prefs, cityPlaces);
         const matching = rows.filter((row) => {
           const loc = row.deliveryLocation;
           if (!loc?.isActive || !loc.airport) return false;
