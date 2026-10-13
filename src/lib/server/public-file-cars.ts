@@ -1,6 +1,6 @@
 import "server-only";
 
-import { isCityLocationCode, normalizeLocationCode, parseCityLocationCode } from "@/lib/catalog/search-places";
+import { normalizeLocationCode } from "@/lib/catalog/search-places";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import { listDeliveryLocations } from "@/lib/server/delivery-locations";
 import { isPublicFileCar, listFileCars, type FileCarListing } from "@/lib/server/partner-cars-store";
@@ -108,21 +108,12 @@ function toSearchCar(car: FileCarListing, byId: Map<string, DeliveryLocationView
 }
 
 export function fileSearchCarMatchesPickup(car: FileSearchCar, pickup: string) {
-  const code = pickup.trim();
+  const code = normalizeLocationCode(pickup).toUpperCase();
   if (!code) return true;
-  const rows = car.deliveryPrices ?? [];
-  if (isCityLocationCode(code)) {
-    const iso2 = parseCityLocationCode(code)?.iso2?.toUpperCase();
-    if (!iso2) return false;
-    return rows.some((row) => {
-      const loc = row.deliveryLocation;
-      return Boolean(loc?.isActive && loc.airport?.city?.country?.iso2?.toUpperCase() === iso2);
-    });
-  }
-  const iata = code.toUpperCase();
-  return rows.some((row) => {
+  return (car.deliveryPrices ?? []).some((row) => {
     const loc = row.deliveryLocation;
-    return Boolean(loc?.isActive && loc.airport?.iata?.toUpperCase() === iata);
+    if (!loc?.isActive || !loc.airport?.iata) return false;
+    return normalizeLocationCode(loc.airport.iata).toUpperCase() === code;
   });
 }
 

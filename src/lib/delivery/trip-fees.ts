@@ -3,7 +3,7 @@ import {
   hasDeliveryPriceLimit,
   type PartnerDeliveryInput,
 } from "@/lib/delivery/pricing";
-import { isCityLocationCode, parseCityLocationCode } from "@/lib/catalog/search-places";
+import { normalizeLocationCode } from "@/lib/catalog/search-places";
 import { toNumber } from "@/lib/utils";
 import type { PartnerDeliveryPref } from "@/lib/server/partner-delivery-prefs-store";
 
@@ -43,11 +43,9 @@ function rowCountry(row: DeliveryPriceRowLike): string {
 }
 
 /**
- * The partner's "City delivery" price for a city applies to every listing the
- * partner offers in that country, so a city search charges that exact price.
- * Cities a listing marks itself count even when it has no airport row in that
- * country (e.g. a partner in a newly added country delivering only to cities);
- * without a Delivery-page price such a city is free.
+ * A saved city delivery price is copied onto listings that already serve that
+ * country, or that list the city themselves. A city without a saved price is
+ * not added for free.
  */
 function cityRowsFromPrefs(
   rows: DeliveryPriceRowLike[],
@@ -78,20 +76,12 @@ function cityRowsFromPrefs(
       },
     });
   };
-  const prefIds = new Set<string>();
   for (const pref of prefs) {
-    prefIds.add(pref.deliveryLocationId);
     if (pref.enabled === false || present.has(pref.deliveryLocationId)) continue;
     const place = cityPlaces.get(pref.deliveryLocationId);
     if (!place || !place.isActive) continue;
     if (!countries.has(place.countryIso2.toUpperCase()) && !listingPlaceIds?.has(place.id)) continue;
     add(place, pref);
-  }
-  for (const id of listingPlaceIds ?? []) {
-    if (present.has(id) || prefIds.has(id)) continue;
-    const place = cityPlaces.get(id);
-    if (!place?.isActive) continue;
-    add(place, { priceEur: 0, freeAfterDays: null, travelTimeMinutes: 0 });
   }
   return extra;
 }
@@ -123,33 +113,19 @@ export function mergeDeliveryPrefsIntoRows<T extends DeliveryPriceRowLike>(
   return [...merged, ...cityRows];
 }
 
-function cityNameSlug(name: unknown): string {
-  const text =
-    typeof name === "string"
-      ? name
-      : name && typeof name === "object" && "en" in name
-        ? String((name as { en?: unknown }).en || "")
-        : "";
-  return text.trim().toLowerCase().replace(/\s+/g, "-");
-}
-
+/** Fee rows for this exact place. Another city or airport in the same country does not count. */
 export function matchDeliveryRowsForPlace(
   rows: DeliveryPriceRowLike[] | undefined,
   placeCode: string | undefined,
 ): DeliveryPriceRowLike[] {
   if (!placeCode || !rows?.length) return [];
-  const code = placeCode.toUpperCase();
-  const active = rows.filter((row) => row.deliveryLocation?.airport && row.deliveryLocation.isActive !== false);
-  const exact = active.filter((row) => row.deliveryLocation?.airport?.iata?.toUpperCase() === code);
-  const city = isCityLocationCode(placeCode) ? parseCityLocationCode(placeCode) : null;
-  if (!city || exact.length) return exact;
-
-  // No price for this city itself: use the airport in the same city, then the country.
-  const inCountry = active.filter((row) => rowCountry(row) === city.iso2.toUpperCase());
-  const sameCity = inCountry.filter((row) => {
-    return cityNameSlug(row.deliveryLocation?.airport?.city?.name) === city.slug;
+  const code = normalizeLocationCode(placeCode).toUpperCase();
+  return rows.filter((row) => {
+    if (!row.deliveryLocation?.airport || row.deliveryLocation.isActive === false) return false;
+    const iata = normalizeLocationCode(row.deliveryLocation.airport.iata || "").toUpperCase();
+    const id = normalizeLocationCode(row.deliveryLocationId || row.deliveryLocation.id || "").toUpperCase();
+    return iata === code || id === code;
   });
-  return sameCity.length ? sameCity : inCountry;
 }
 
 function legFeeFromRows(rows: DeliveryPriceRowLike[], rentalDays: number): number {
