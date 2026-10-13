@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { listDeliveryLocations } from "@/lib/server/delivery-locations";
+import { listSearchableDeliveryLocations } from "@/lib/server/delivery-locations";
 import { groupActiveLocationsByCountry } from "@/lib/locations/group-active-countries";
 import { LocationsBrowser } from "@/components/locations/locations-browser";
 import { readPreferences } from "@/lib/server/preferences";
@@ -19,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function LocationsPage() {
-  const active = await listDeliveryLocations({ activeOnly: true });
+  const active = await listSearchableDeliveryLocations();
   const countries = groupActiveLocationsByCountry(active);
 
   return <LocationsBrowser countries={countries} />;

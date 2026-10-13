@@ -17,8 +17,7 @@ import { resolvePartnerDeliveryPrices } from "@/lib/delivery/pricing";
 import { listPartnerScopedDeliveryLocations, persistableCarDeliveryRows } from "@/lib/server/delivery-locations";
 import { withPartnerDeliveryPrices } from "@/lib/server/partner-delivery-listing-sync";
 import { ensureExtrasExistInDb, extrasRowsForCarFk, listExtraServices } from "@/lib/server/extras-store";
-import { normalizeLocationCode } from "@/lib/catalog/search-places";
-import { loadSearchCabinet, partnerIdsForPlace, scopeCarsToPersonalPlaces } from "@/lib/server/search-cabinet-scope";
+import { isCityLocationCode, parseCityLocationCode } from "@/lib/catalog/search-places";
 import {
   isValidRegistrationNumber,
   normalizeRegistrationNumber,
@@ -148,10 +147,29 @@ export async function GET(req: Request) {
     partner: publicPartnerWhere,
   };
 
-  const cabinet = await loadSearchCabinet();
   if (pickup) {
-    const ids = partnerIdsForPlace(cabinet, pickup);
-    where.partnerId = { in: ids.length ? ids : ["__none__"] };
+    if (isCityLocationCode(pickup)) {
+      const iso2 = parseCityLocationCode(pickup)?.iso2;
+      if (iso2) {
+        where.deliveryPrices = {
+          some: {
+            deliveryLocation: {
+              isActive: true,
+              airport: { city: { country: { iso2 } } },
+            },
+          },
+        };
+      }
+    } else {
+      where.deliveryPrices = {
+        some: {
+          deliveryLocation: {
+            isActive: true,
+            airport: { iata: pickup.toUpperCase() },
+          },
+        },
+      };
+    }
   }
 
   if (category) {
@@ -196,7 +214,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const fileCars = await loadPublicFileSearchCars();
+    const fileCars = await loadPublicFileSearchCars({ pickup });
     const seen = new Set(
       cars.map((car) => (car && typeof car === "object" && "id" in car ? String((car as { id: string }).id) : "")),
     );
@@ -208,68 +226,57 @@ export async function GET(req: Request) {
     /* file catalog optional */
   }
 
-  {
-    const { readPartnerDeliveryPrefsMap } = await import("@/lib/server/partner-delivery-prefs-store");
-    const { loadCityDeliveryPlaces } = await import("@/lib/server/city-delivery-places");
-    const { mergeDeliveryPrefsIntoRows } = await import("@/lib/delivery/trip-fees");
-    const { listingPickupPlaceIds } = await import("@/lib/cars/listing-place-ids");
-    const partnerIds = [
-      ...new Set(
-        cars
-          .map((raw) => {
-            const car = raw as { partnerId?: string; partner?: { id?: string } };
-            return String(car.partnerId || car.partner?.id || "");
-          })
-          .filter(Boolean),
-      ),
-    ];
-    const prefsByPartner = await readPartnerDeliveryPrefsMap(partnerIds).catch(
-      () => new Map<string, import("@/lib/server/partner-delivery-prefs-store").PartnerDeliveryPref[]>(),
-    );
-    const cityPlaces = await loadCityDeliveryPlaces();
-    cars = cars.map((raw) => {
-      const car = raw as {
-        partnerId?: string;
-        partner?: { id?: string };
-        description?: string | null;
-        deliveryPrices?: Parameters<typeof mergeDeliveryPrefsIntoRows>[0];
-      };
-      const pid = String(car.partnerId || car.partner?.id || "");
-      return {
-        ...(raw as object),
-        deliveryPrices: mergeDeliveryPrefsIntoRows(
-          car.deliveryPrices,
-          prefsByPartner.get(pid) || [],
-          cityPlaces,
-          listingPickupPlaceIds(car.description),
-        ),
-      };
-    });
-    cars = scopeCarsToPersonalPlaces(cars as Array<{ id?: string; partnerId?: string; deliveryPrices?: never[] }>, cabinet, {
-      pickup,
-      prefsByPartner,
-    }).cars as unknown[];
-  }
-
   if (startDate && pickup) {
     const pickupAt = new Date(startDate);
     if (!Number.isNaN(pickupAt.getTime())) {
       const minutesUntilPickup = Math.max(0, Math.floor((pickupAt.getTime() - Date.now()) / 60000));
-      const code = normalizeLocationCode(pickup).toUpperCase();
+      const code = pickup.toUpperCase();
+      const cityIso2 = isCityLocationCode(pickup)
+        ? parseCityLocationCode(pickup)?.iso2?.toUpperCase()
+        : null;
       const { meetsBookingLeadTime } = await import("@/lib/delivery/booking-lead");
+      const { mergeDeliveryPrefsIntoRows } = await import("@/lib/delivery/trip-fees");
+      const { listingPickupPlaceIds } = await import("@/lib/cars/listing-place-ids");
+      const { readPartnerDeliveryPrefsMap } = await import(
+        "@/lib/server/partner-delivery-prefs-store"
+      );
+      const partnerIds = [
+        ...new Set(
+          cars
+            .map((raw) => {
+              const car = raw as { partnerId?: string; partner?: { id?: string } };
+              return String(car.partnerId || car.partner?.id || "");
+            })
+            .filter(Boolean),
+        ),
+      ];
+      const prefsCache = await readPartnerDeliveryPrefsMap(partnerIds);
+      const { loadCityDeliveryPlaces } = await import("@/lib/server/city-delivery-places");
+      const cityPlaces = await loadCityDeliveryPlaces();
       cars = cars.filter((raw) => {
         const car = raw as {
+          partnerId?: string;
+          partner?: { id?: string };
+          description?: string | null;
           deliveryPrices?: Array<{
             travelTimeMinutes?: number | null;
-            deliveryLocation?: { isActive?: boolean; airport?: { iata?: string } | null } | null;
+            deliveryLocation?: {
+              isActive?: boolean;
+              airport?: { iata?: string; city?: { country?: { iso2?: string } } } | null;
+            } | null;
           }>;
         };
-        const matching = (car.deliveryPrices ?? []).filter((row) => {
+        const pid = String(car.partnerId || car.partner?.id || "");
+        let rows = car.deliveryPrices ?? [];
+        const prefs = prefsCache.get(pid);
+        rows = mergeDeliveryPrefsIntoRows(rows, prefs, cityPlaces, listingPickupPlaceIds(car.description));
+        const matching = rows.filter((row) => {
           const loc = row.deliveryLocation;
           if (!loc?.isActive || !loc.airport) return false;
-          return normalizeLocationCode(loc.airport.iata || "").toUpperCase() === code;
+          if (cityIso2) return loc.airport.city?.country?.iso2?.toUpperCase() === cityIso2;
+          return loc.airport.iata?.toUpperCase() === code;
         });
-        if (!matching.length) return true;
+        if (!matching.length) return false;
         return matching.some((row) => meetsBookingLeadTime(row.travelTimeMinutes, minutesUntilPickup));
       });
     }

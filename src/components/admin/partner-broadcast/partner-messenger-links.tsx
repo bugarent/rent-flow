@@ -1,12 +1,23 @@
 "use client";
 
-import { useState } from "react";
-import { cn } from "@/lib/utils";
-import { partnerPhoneDigits } from "@/lib/partners/messenger-chat-link";
+import { useMemo, useState } from "react";
+import { ChevronRight } from "lucide-react";
+import {
+  broadcastMessengerLines,
+  broadcastProgressKey,
+  viberMessageHref,
+  whatsappMessageHref,
+  type BroadcastMessenger,
+  type BroadcastMessengerLine,
+} from "@/lib/partners/broadcast-messenger";
 import type { PartnerBroadcastContact } from "@/lib/partners/broadcast-types";
 import type { PartnerBroadcastCopy } from "@/components/admin/partner-broadcast/partner-broadcast-copy";
+import { PartnerMessengerRow } from "@/components/admin/partner-broadcast/partner-messenger-row";
 
-/** One chat link per partner; the admin presses send in WhatsApp / Viber themselves. */
+/**
+ * One chat per selected number; the admin presses send inside WhatsApp / Viber.
+ * Browsers allow one window per click, so "next" opens exactly one chat each time.
+ */
 export function PartnerMessengerLinks({
   contacts,
   text,
@@ -18,13 +29,17 @@ export function PartnerMessengerLinks({
 }) {
   const [opened, setOpened] = useState<Set<string>>(() => new Set());
   const [copiedNote, setCopiedNote] = useState(false);
+  const lines = useMemo(() => broadcastMessengerLines(contacts), [contacts]);
+  const reachable = lines.filter((line) => line.digits);
 
-  const markOpened = (key: string) =>
-    setOpened((prev) => {
-      const next = new Set(prev);
-      next.add(key);
-      return next;
-    });
+  const pending = (messenger: BroadcastMessenger) =>
+    reachable.filter((line) => !opened.has(broadcastProgressKey(line.key, messenger)));
+  const waLeft = pending("wa");
+  const viberLeft = pending("viber");
+  const allContacted = reachable.every(
+    (line) =>
+      opened.has(broadcastProgressKey(line.key, "wa")) || opened.has(broadcastProgressKey(line.key, "viber")),
+  );
 
   const copyText = async () => {
     try {
@@ -36,63 +51,83 @@ export function PartnerMessengerLinks({
     }
   };
 
+  const markOpened = (line: BroadcastMessengerLine, messenger: BroadcastMessenger) => {
+    if (messenger === "viber") void copyText();
+    setOpened((prev) => new Set(prev).add(broadcastProgressKey(line.key, messenger)));
+  };
+
+  const openNext = (messenger: BroadcastMessenger) => {
+    const line = (messenger === "wa" ? waLeft : viberLeft)[0];
+    if (!line || !text) return;
+    markOpened(line, messenger);
+    if (messenger === "wa") window.open(whatsappMessageHref(line.digits, text), "_blank", "noopener,noreferrer");
+    else window.location.href = viberMessageHref(line.digits, text);
+  };
+
+  const nextButton = "inline-flex min-h-10 flex-1 items-center justify-center gap-1 rounded-lg px-3 text-sm font-bold text-white disabled:opacity-40 sm:flex-none";
+
   return (
     <div className="rounded-lg border border-slate-200">
-      <div className="border-b border-slate-100 bg-slate-50 px-3 py-2">
-        <p className="text-sm font-bold text-slate-800">{copy.messengersTitle}</p>
-        <p className="text-xs text-slate-500">{copy.messengersHint}</p>
-        {copiedNote ? <p className="mt-1 text-xs font-semibold text-emerald-700">{copy.copied}</p> : null}
+      <div className="space-y-2 border-b border-slate-100 bg-slate-50 px-3 py-2">
+        <div>
+          <p className="text-sm font-bold text-slate-800">{copy.messengersTitle}</p>
+          <p className="text-xs leading-5 text-slate-500">{text ? copy.messengersHint : copy.writeFirst}</p>
+        </div>
+        {reachable.length ? (
+          <>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => openNext("wa")}
+                disabled={!text || !waLeft.length}
+                className={`${nextButton} bg-[#25d366]`}
+              >
+                {copy.nextWhatsapp.replace("{n}", String(waLeft.length))}
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => openNext("viber")}
+                disabled={!text || !viberLeft.length}
+                className={`${nextButton} bg-[#7360f2]`}
+              >
+                {copy.nextViber.replace("{n}", String(viberLeft.length))}
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
+              <span className="font-semibold text-slate-700">
+                {allContacted ? `${copy.allOpened} · ` : ""}
+                {copy.progress
+                  .replace("{wa}", String(reachable.length - waLeft.length))
+                  .replace("{viber}", String(reachable.length - viberLeft.length))
+                  .replace(/\{total\}/g, String(reachable.length))}
+              </span>
+              {opened.size ? (
+                <button
+                  type="button"
+                  onClick={() => setOpened(new Set())}
+                  className="min-h-8 font-semibold text-slate-500 underline-offset-2 hover:underline"
+                >
+                  {copy.resetProgress}
+                </button>
+              ) : null}
+            </div>
+          </>
+        ) : null}
+        {copiedNote ? <p className="text-xs font-semibold text-emerald-700">{copy.copied}</p> : null}
       </div>
-      <ul className="divide-y divide-slate-100">
-        {contacts.flatMap((contact) => {
-          const numbers = contact.phones.length ? contact.phones : [contact.phone];
-          return numbers.filter(Boolean).map((phone) => {
-            const digits = partnerPhoneDigits(phone);
-            const wa = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
-            const viber = `viber://chat?number=%2B${digits}`;
-            const has = (platform: string) => contact.messengers.includes(platform);
-            const lineKey = `${contact.id}:${digits}`;
-            return (
-              <li key={lineKey} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-800">{contact.name}</p>
-                  <p className="text-xs text-slate-500">{phone || copy.noPhone}</p>
-                </div>
-                {digits ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    <a
-                      href={wa}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={() => markOpened(`${lineKey}:wa`)}
-                      className={cn(
-                        "inline-flex min-h-9 items-center rounded-md px-3 text-xs font-bold",
-                        has("WHATSAPP") ? "bg-[#25d366] text-white" : "border border-[#25d366] text-[#128c4a]",
-                        opened.has(`${lineKey}:wa`) && "opacity-60",
-                      )}
-                    >
-                      WhatsApp{opened.has(`${lineKey}:wa`) ? " ✓" : ""}
-                    </a>
-                    <a
-                      href={viber}
-                      onClick={() => {
-                        void copyText();
-                        markOpened(`${lineKey}:viber`);
-                      }}
-                      className={cn(
-                        "inline-flex min-h-9 items-center rounded-md px-3 text-xs font-bold",
-                        has("VIBER") ? "bg-[#7360f2] text-white" : "border border-[#7360f2] text-[#5b48d6]",
-                        opened.has(`${lineKey}:viber`) && "opacity-60",
-                      )}
-                    >
-                      Viber{opened.has(`${lineKey}:viber`) ? " ✓" : ""}
-                    </a>
-                  </div>
-                ) : null}
-              </li>
-            );
-          });
-        })}
+      <ul className="max-h-[45dvh] divide-y divide-slate-100 overflow-y-auto sm:max-h-72">
+        {lines.map((line) => (
+          <PartnerMessengerRow
+            key={line.key}
+            line={line}
+            text={text}
+            opened={opened}
+            onOpen={markOpened}
+            copy={copy}
+          />
+        ))}
       </ul>
     </div>
   );

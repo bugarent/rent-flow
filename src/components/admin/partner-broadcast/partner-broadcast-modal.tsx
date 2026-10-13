@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Send, X } from "lucide-react";
-import { cn } from "@/lib/utils";
 import {
   PARTNER_BROADCAST_MAX_TEXT,
   type PartnerBroadcastChannel,
@@ -12,6 +11,11 @@ import {
 } from "@/lib/partners/broadcast-types";
 import { partnerBroadcastCopy } from "@/components/admin/partner-broadcast/partner-broadcast-copy";
 import { PartnerMessengerLinks } from "@/components/admin/partner-broadcast/partner-messenger-links";
+import {
+  PartnerAutoChannels,
+  partnerAutoChannelRows,
+} from "@/components/admin/partner-broadcast/partner-auto-channels";
+import { PartnerBroadcastResults } from "@/components/admin/partner-broadcast/partner-broadcast-results";
 
 export default function PartnerBroadcastModal({
   targets,
@@ -51,13 +55,6 @@ export default function PartnerBroadcastModal({
         }));
         setContacts(loaded);
         setSmsConfigured(Boolean(data.smsConfigured));
-        if (data.smsConfigured) {
-          setChannels((prev) => {
-            const next = new Set(prev);
-            next.add("sms");
-            return next;
-          });
-        }
       } catch {
         if (!cancelled) {
           setContacts([]);
@@ -79,16 +76,12 @@ export default function PartnerBroadcastModal({
   }, [onClose, sending]);
 
   const list = contacts ?? [];
+  const trimmed = text.trim();
   const phoneTotal = list.reduce((sum, contact) => sum + contact.phones.length, 0);
   const recipientTotal =
     contacts === null
       ? targets.reduce((sum, target) => sum + Math.max(target.slots.length, 1), 0)
       : list.reduce((sum, contact) => sum + Math.max(contact.phones.length, 1), 0);
-  const numberLines = list.flatMap((contact) =>
-    contact.phones.length
-      ? contact.phones.map((phone) => ({ key: `${contact.id}:${phone}`, name: contact.name, phone }))
-      : [{ key: contact.id, name: contact.name, phone: "" }],
-  );
   const reach: Record<PartnerBroadcastChannel, number> = {
     telegram: list.filter((c) => c.hasTelegram).length,
     email: list.filter((c) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)).length,
@@ -97,6 +90,12 @@ export default function PartnerBroadcastModal({
       0,
     ),
   };
+  const totals: Record<PartnerBroadcastChannel, number> = {
+    telegram: list.length,
+    email: list.length,
+    sms: phoneTotal,
+  };
+  const channelRows = partnerAutoChannelRows(copy, smsConfigured);
 
   const toggleChannel = (channel: PartnerBroadcastChannel) =>
     setChannels((prev) => {
@@ -108,8 +107,7 @@ export default function PartnerBroadcastModal({
 
   const send = async () => {
     setError("");
-    const body = text.trim();
-    if (!body || body.length > PARTNER_BROADCAST_MAX_TEXT) {
+    if (!trimmed || trimmed.length > PARTNER_BROADCAST_MAX_TEXT) {
       setError(copy.errorText);
       return;
     }
@@ -123,7 +121,7 @@ export default function PartnerBroadcastModal({
       const res = await fetch("/api/admin/partners/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "send", targets, text: body, channels: picked }),
+        body: JSON.stringify({ action: "send", targets, text: trimmed, channels: picked }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "send");
@@ -134,26 +132,6 @@ export default function PartnerBroadcastModal({
       setSending(false);
     }
   };
-
-  const channelRows: Array<{ key: PartnerBroadcastChannel; label: string; disabled: boolean; note?: string }> = [
-    { key: "telegram", label: copy.telegram, disabled: false },
-    { key: "email", label: copy.email, disabled: false },
-    { key: "sms", label: copy.sms, disabled: !smsConfigured, note: smsConfigured ? undefined : copy.smsOff },
-  ];
-
-  const summary = results
-    ? (["telegram", "email", "sms"] as const)
-        .filter((key) => results.some((r) => r[key] !== undefined))
-        .map((key) => ({
-          key,
-          label: channelRows.find((row) => row.key === key)?.label ?? key,
-          sent: results.filter((r) => r[key] === true).length,
-          total: results.filter((r) => r[key] !== undefined).length,
-        }))
-    : [];
-  const unreached = results
-    ? results.filter((r) => !r.telegram && !r.email && !r.sms).map((r) => r.name)
-    : [];
 
   return (
     <div
@@ -190,45 +168,14 @@ export default function PartnerBroadcastModal({
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
           {contacts === null ? (
             <p className="text-sm text-slate-500">{copy.loading}</p>
-          ) : results ? (
-            <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-950">
-              <p className="font-extrabold">{copy.doneTitle}</p>
-              {summary.map((row) => (
-                <p key={row.key}>
-                  {copy.sentOf
-                    .replace("{channel}", row.label)
-                    .replace("{sent}", String(row.sent))
-                    .replace("{total}", String(row.total))}
-                </p>
-              ))}
-              {unreached.length ? (
-                <p className="text-amber-900">
-                  <span className="font-bold">{copy.failedFor}</span> {unreached.join(", ")}
-                </p>
-              ) : null}
-            </div>
           ) : (
             <>
-              {numberLines.length ? (
-                <ul className="max-h-36 overflow-y-auto rounded-lg border border-slate-200">
-                  {numberLines.map((line) => (
-                    <li
-                      key={line.key}
-                      className="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 last:border-0"
-                    >
-                      <span className="min-w-0 truncate text-sm font-semibold text-slate-800">{line.name}</span>
-                      <span className="shrink-0 font-mono text-xs text-slate-600">{line.phone || copy.noPhone}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-
               <label className="block">
                 <span className="mb-1 block text-sm font-bold text-slate-800">{copy.textLabel}</span>
                 <textarea
                   value={text}
                   onChange={(e) => setText(e.target.value.slice(0, PARTNER_BROADCAST_MAX_TEXT))}
-                  rows={5}
+                  rows={4}
                   placeholder={copy.textPlaceholder}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-[#0b1f4b] focus:ring-2 focus:ring-[#0b1f4b]/15 sm:text-sm"
                 />
@@ -237,45 +184,20 @@ export default function PartnerBroadcastModal({
                 </span>
               </label>
 
-              <fieldset>
-                <legend className="mb-1.5 text-sm font-bold text-slate-800">{copy.channels}</legend>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  {channelRows.map((row) => (
-                    <label
-                      key={row.key}
-                      className={cn(
-                        "flex min-h-11 cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm",
-                        row.disabled
-                          ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
-                          : channels.has(row.key)
-                            ? "border-[#0b1f4b] bg-[#eef3ff]"
-                            : "border-slate-200",
-                      )}
-                    >
-                      <input
-                        type="checkbox"
-                        disabled={row.disabled}
-                        checked={!row.disabled && channels.has(row.key)}
-                        onChange={() => toggleChannel(row.key)}
-                        className="mt-0.5 h-4 w-4 shrink-0 accent-[#0b1f4b]"
-                      />
-                      <span className="min-w-0">
-                        <span className="block font-semibold">{row.label}</span>
-                        <span className="block text-xs text-slate-500">
-                          {row.note ??
-                            copy.reachable
-                              .replace("{n}", String(reach[row.key]))
-                              .replace("{total}", String(row.key === "sms" ? phoneTotal : list.length))}
-                        </span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
+              {list.length ? <PartnerMessengerLinks contacts={list} text={trimmed} copy={copy} /> : null}
 
-              {text.trim() && list.length ? (
-                <PartnerMessengerLinks contacts={list} text={text.trim()} copy={copy} />
-              ) : null}
+              {results ? (
+                <PartnerBroadcastResults results={results} rows={channelRows} copy={copy} />
+              ) : (
+                <PartnerAutoChannels
+                  rows={channelRows}
+                  channels={channels}
+                  reach={reach}
+                  totals={totals}
+                  onToggle={toggleChannel}
+                  copy={copy}
+                />
+              )}
             </>
           )}
           {error ? <p className="text-sm font-semibold text-red-700">{error}</p> : null}

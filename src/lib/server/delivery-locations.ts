@@ -952,18 +952,24 @@ function locationOffersPickup(loc: DeliveryLocationView, pickupCodes: Set<string
 }
 
 /**
- * Search widget options: a place is offered to customers only when the admin
- * has activated it, an approved partner has it in their operating locations,
- * and one of that partner's live listings delivers there.
+ * Places customers may see: the admin has activated it, an approved partner has
+ * it in their personal info, and one of that partner's live listings has it
+ * checked. A place that is only in personal info stays private to the partner.
  */
+export async function listSearchableDeliveryLocations(): Promise<DeliveryLocationView[]> {
+  const all = await listDeliveryLocations();
+  const locations = all.filter((loc) => loc.isActive);
+  if (!locations.length) return [];
+  const { bookablePlaceKeys } = await import("@/lib/server/search-place-coverage");
+  const partnerCodes = await bookablePlaceKeys(all);
+  return locations.filter((loc) => locationOffersPickup(loc, partnerCodes));
+}
+
 export async function getSearchDeliveryAirports(): Promise<SearchAirportOption[]> {
   const hit = searchAirportsCache.get();
   if (hit) return hit;
 
-  const all = await listDeliveryLocations();
-  const locations = all.filter((loc) => loc.isActive);
-  const { bookablePlaceKeys } = await import("@/lib/server/search-place-coverage");
-  const partnerCodes = locations.length ? await bookablePlaceKeys(all) : new Set<string>();
+  const locations = await listSearchableDeliveryLocations();
 
   const toOption = (loc: {
     iata: string;
@@ -991,9 +997,7 @@ export async function getSearchDeliveryAirports(): Promise<SearchAirportOption[]
     };
   };
 
-  const result = locations
-    .filter((loc) => locationOffersPickup(loc, partnerCodes))
-    .map(toOption);
+  const result = locations.map(toOption);
 
   searchAirportsCache.set(result);
   return result;

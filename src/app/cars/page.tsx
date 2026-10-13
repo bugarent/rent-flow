@@ -4,8 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { readPreferences } from "@/lib/server/preferences";
 import { toNumber } from "@/lib/utils";
 import { getDictionary } from "@/lib/i18n/dictionaries";
-import { normalizeLocationCode } from "@/lib/catalog/search-places";
-import { loadSearchCabinet, partnerIdsForPlace, scopeCarsToPersonalPlaces } from "@/lib/server/search-cabinet-scope";
+import { isCityLocationCode, parseCityLocationCode } from "@/lib/catalog/search-places";
 import { loadPublicFileSearchCars } from "@/lib/server/public-file-cars";
 import { filterExtrasByCarOffers, parseCarDetails } from "@/lib/cars/car-details";
 import { listingPickupPlaceIds } from "@/lib/cars/listing-place-ids";
@@ -214,8 +213,7 @@ export default async function CarsPage({
 
   // Independent reads start together instead of one after another.
   const expiredIdsPromise = loadExpiredInsuranceIds();
-  const fileCarsPromise = loadPublicFileSearchCars().catch(() => []);
-  const cabinetPromise = loadSearchCabinet();
+  const fileCarsPromise = loadPublicFileSearchCars({ pickup: pickupCode }).catch(() => []);
   const extrasCatalogPromise = listExtraServices({ activeOnly: true }).catch(() => null);
   const searchOptionsPromise = getSearchDeliveryAirports().catch(() => []);
   const siteDiscountPromise = loadSiteDiscountPercent();
@@ -234,15 +232,30 @@ export default async function CarsPage({
     .catch(() => null);
 
   const pickupIata = pickup?.trim();
-  const cabinet = await cabinetPromise;
   if (pickupIata) {
-    let ids = partnerIdsForPlace(cabinet, pickupIata);
-    const dropoffCode = dropoff?.trim();
-    if (dropoffCode && normalizeLocationCode(dropoffCode) !== normalizeLocationCode(pickupIata)) {
-      const returns = new Set(partnerIdsForPlace(cabinet, dropoffCode));
-      ids = ids.filter((id) => returns.has(id));
+    if (isCityLocationCode(pickupIata)) {
+      const iso2 = parseCityLocationCode(pickupIata)?.iso2;
+      if (iso2) {
+        where.deliveryPrices = {
+          some: {
+            deliveryLocation: {
+              isActive: true,
+              airport: { city: { country: { iso2 } } },
+            },
+          },
+        };
+      }
+    } else {
+      const code = pickupIata.toUpperCase();
+      where.deliveryPrices = {
+        some: {
+          deliveryLocation: {
+            isActive: true,
+            airport: { iata: code },
+          },
+        },
+      };
     }
-    where.partnerId = { in: ids.length ? ids : ["__none__"] };
   }
 
   let categoryName: string | null = null;
@@ -465,21 +478,6 @@ export default async function CarsPage({
       ),
     };
   });
-  {
-    const scoped = scopeCarsToPersonalPlaces(cars, cabinet, {
-      pickup: pickupIata,
-      dropoff,
-      countryIso2,
-      prefsByPartner,
-    });
-    if (traceEnabled) {
-      for (const row of scoped.rejected) {
-        const car = cars.find((item) => item.id === row.id);
-        trace.push({ id: row.id, label: car ? carLabel(car) : row.id, reason: row.reason });
-      }
-    }
-    cars = scoped.cars;
-  }
 
   if (startDate && pickupIata) {
     const pickupAt = new Date(startDate);
@@ -490,35 +488,46 @@ export default async function CarsPage({
         rows: NonNullable<(typeof cars)[number]["deliveryPrices"]>,
         placeCode: string,
       ) => {
-        const code = normalizeLocationCode(placeCode).toUpperCase();
+        const code = placeCode.toUpperCase();
+        const cityIso2 = isCityLocationCode(placeCode)
+          ? parseCityLocationCode(placeCode)?.iso2?.toUpperCase()
+          : null;
         return (rows ?? []).filter((row) => {
           const loc = row.deliveryLocation;
           if (!loc?.isActive || !loc.airport) return false;
-          return normalizeLocationCode(loc.airport.iata || "").toUpperCase() === code;
+          if (cityIso2) return loc.airport.city?.country?.iso2?.toUpperCase() === cityIso2;
+          return loc.airport.iata?.toUpperCase() === code;
         });
       };
       cars = keepCars(cars, (car) => {
         const rows = car.deliveryPrices ?? [];
         const pickupMatching = placeMatches(rows, pickupIata);
-        if (!pickupMatching.length) return true;
+        if (!pickupMatching.length) return `no active delivery at ${pickupIata}`;
         if (!pickupMatching.some((row) => meetsBookingLeadTime(row.travelTimeMinutes, minutesUntilPickup))) {
           const required = Math.min(
             ...pickupMatching.map((row) => resolveBookingLeadMinutes(toNumber(row.travelTimeMinutes, 0))),
           );
           return `lead time: needs ${required} min before pickup, only ${minutesUntilPickup} min left`;
         }
-        if (dropoffCode && normalizeLocationCode(dropoffCode) !== normalizeLocationCode(pickupIata)) {
-          const returning = placeMatches(rows, dropoffCode);
-          if (
-            returning.length &&
-            !returning.some((row) => meetsBookingLeadTime(row.travelTimeMinutes, minutesUntilPickup))
-          ) {
-            return `lead time: return at ${dropoffCode} is not ready`;
-          }
+        // One-way return must also be offered when dropoff differs from pickup.
+        if (dropoffCode && dropoffCode.toUpperCase() !== pickupIata.toUpperCase()) {
+          if (!placeMatches(rows, dropoffCode).length) return `no return at ${dropoffCode}`;
         }
         return true;
       });
     }
+  }
+
+  if (countryIso2) {
+    cars = keepCars(
+      cars,
+      (car) =>
+        (car.deliveryPrices ?? []).some(
+          (row) =>
+            row.deliveryLocation?.isActive &&
+            row.deliveryLocation.airport?.city?.country?.iso2?.toUpperCase() === countryIso2,
+        ) || `no active delivery in ${countryIso2}`,
+    );
   }
 
   if (unavailable.size) {

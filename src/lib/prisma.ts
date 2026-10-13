@@ -21,8 +21,17 @@ function offlineError() {
   return error;
 }
 
-function markDbOffline(error?: unknown) {
+/**
+ * While the circuit is open every query rejects with `offlineError()`, and store
+ * catch blocks report that back here. Extending the cooldown on those would keep
+ * the circuit closed forever under steady traffic, so only arm it when it is shut.
+ */
+function armDbCircuit() {
+  if (isDbCircuitOpen()) return;
   globalForPrisma.dbOfflineUntil = Date.now() + DB_COOLDOWN_MS;
+}
+
+function markDbOffline(error?: unknown) {
   noteDbOfflineOnce("pool", error);
 }
 
@@ -42,7 +51,6 @@ export function reopenDbCircuit() {
  * keeps every request hammering a dead DB (AggregateError / hung navigations).
  */
 export function markDbCircuitOpen(context: string, error?: unknown) {
-  globalForPrisma.dbOfflineUntil = Date.now() + DB_COOLDOWN_MS;
   noteDbOfflineOnce(context, error);
 }
 
@@ -199,7 +207,7 @@ let dbOfflineLogged = false;
 export function noteDbOfflineOnce(context: string, error?: unknown) {
   // Always open the circuit — callers historically only logged, which left pages
   // hammering a dead Postgres and hanging navigations.
-  globalForPrisma.dbOfflineUntil = Date.now() + DB_COOLDOWN_MS;
+  armDbCircuit();
   if (dbOfflineLogged) return;
   dbOfflineLogged = true;
   const msg = error instanceof Error ? error.message : String(error || "");

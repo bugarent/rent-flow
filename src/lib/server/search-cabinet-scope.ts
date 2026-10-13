@@ -1,5 +1,6 @@
 import "server-only";
 
+import { listingPickupPlaceIds } from "@/lib/cars/listing-place-ids";
 import { findSearchPlace, normalizeLocationCode } from "@/lib/catalog/search-places";
 import { capFreeAfterDays, normalizeDeliveryPrice, type DeliveryLocationView } from "@/lib/delivery/pricing";
 import type { DeliveryPriceRowLike } from "@/lib/delivery/trip-fees";
@@ -158,13 +159,54 @@ type ScopedCar = {
   id?: string;
   partnerId?: string;
   partner?: { id?: string };
+  description?: string | null;
   deliveryPrices?: DeliveryPriceRowLike[];
 };
 
+/** Place ids a listing itself offers: checked pickup places and its own delivery rows. */
+export function listingOfferedPlaceIds(car: {
+  description?: string | null;
+  deliveryPrices?: DeliveryPriceRowLike[];
+}): string[] {
+  return [
+    ...listingPickupPlaceIds(car.description),
+    ...(car.deliveryPrices || []).flatMap((row) => [
+      String(row.deliveryLocationId || row.deliveryLocation?.id || ""),
+      String(row.deliveryLocation?.airport?.iata || ""),
+    ]),
+  ].filter(Boolean);
+}
+
+function offeredPlaces(cabinet: SearchCabinet, personal: Set<string>, rawIds: string[]) {
+  const out = new Set<string>();
+  for (const raw of rawIds) {
+    const keys = expandPlaceKeys(raw, cabinet.byKey);
+    if (!keys.some((key) => personal.has(key))) continue;
+    for (const key of keys) out.add(key);
+  }
+  return out;
+}
+
+/** Offered places that also have an enabled price saved on the partner's Delivery page (0 = free). */
+function pricedPlaces(cabinet: SearchCabinet, offered: Set<string>, prefs: PartnerDeliveryPref[]) {
+  const out = new Set<string>();
+  for (const pref of prefs) {
+    if (pref.enabled === false) continue;
+    const loc = locationFor(cabinet, pref.deliveryLocationId);
+    if (!loc || loc.isActive === false) continue;
+    const keys = expandPlaceKeys(pref.deliveryLocationId, cabinet.byKey);
+    if (!keys.some((key) => offered.has(key))) continue;
+    for (const key of keys) out.add(key);
+  }
+  return out;
+}
+
 /**
- * Keep a listing only at places the partner added in personal info.
- * Delivery-window saves outside that list do not put the car on those places.
- * A saved delivery price for an allowed place is attached so the quote includes it.
+ * A listing is shown at a place only when all three hold for that exact place:
+ * it is in the partner's personal info, it is checked on the listing itself, and
+ * the partner saved a delivery price for it on the Delivery page. A city never
+ * borrows an airport or another place in the same country.
+ * The saved delivery price for such a place is attached so the quote includes it.
  */
 export function scopeCarsToPersonalPlaces<T extends ScopedCar>(
   cars: T[],
@@ -174,6 +216,8 @@ export function scopeCarsToPersonalPlaces<T extends ScopedCar>(
     dropoff?: string;
     countryIso2?: string;
     prefsByPartner?: Map<string, PartnerDeliveryPref[]>;
+    /** Listing's own place ids, read before delivery prefs are merged in. */
+    listingPlacesByCar: Map<string, string[]>;
   },
 ): { cars: T[]; rejected: Array<{ id: string; reason: string }> } {
   const pickup = opts.pickup?.trim() || "";
@@ -186,24 +230,43 @@ export function scopeCarsToPersonalPlaces<T extends ScopedCar>(
   for (const car of cars) {
     const id = String(car.id || "");
     const pid = String(car.partnerId || car.partner?.id || "");
-    const allowed = allowedFor(cabinet, pid);
-    if (!allowed.size) {
+    const personal = allowedFor(cabinet, pid);
+    if (!personal.size) {
       rejected.push({ id, reason: "partner has no places in personal info" });
       continue;
     }
-    if (pickup && !placeAllowed(cabinet, allowed, pickup)) {
-      rejected.push({ id, reason: `personal info does not include ${pickup}` });
+    const offered = offeredPlaces(cabinet, personal, opts.listingPlacesByCar.get(id) || []);
+    if (!offered.size) {
+      rejected.push({ id, reason: "listing has no checked pickup place from personal info" });
       continue;
     }
-    if (dropoffDiffers && !placeAllowed(cabinet, allowed, dropoff)) {
-      rejected.push({ id, reason: `personal info does not include return ${dropoff}` });
+    const prefs = prefsFor(opts.prefsByPartner, pid);
+    const allowed = pricedPlaces(cabinet, offered, prefs);
+    const legs = [
+      ...(pickup ? [{ code: pickup, label: "" }] : []),
+      ...(dropoffDiffers ? [{ code: dropoff, label: "return " }] : []),
+    ];
+    const failure = legs
+      .map(({ code, label }) => {
+        if (!placeAllowed(cabinet, personal, code)) return `personal info does not include ${label}${code}`;
+        if (!placeAllowed(cabinet, offered, code)) return `listing is not offered for ${label}${code}`;
+        if (!placeAllowed(cabinet, allowed, code)) return `no delivery price saved for ${label}${code}`;
+        return "";
+      })
+      .find(Boolean);
+    if (failure) {
+      rejected.push({ id, reason: failure });
+      continue;
+    }
+    if (!allowed.size) {
+      rejected.push({ id, reason: "no delivery price saved for any of the listing's places" });
       continue;
     }
     if (country && !servesCountry(cabinet, allowed, country)) {
-      rejected.push({ id, reason: `personal info has no place in ${country}` });
+      rejected.push({ id, reason: `no priced place in ${country}` });
       continue;
     }
-    const rows = ensurePrefRows(car.deliveryPrices || [], prefsFor(opts.prefsByPartner, pid), cabinet, allowed).filter(
+    const rows = ensurePrefRows(car.deliveryPrices || [], prefs, cabinet, allowed).filter(
       (row) => row.deliveryLocation?.isActive !== false && rowKeys(row, cabinet).some((key) => allowed.has(key)),
     );
     kept.push({ ...car, deliveryPrices: rows as T["deliveryPrices"] });

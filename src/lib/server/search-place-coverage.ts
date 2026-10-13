@@ -1,10 +1,18 @@
 import "server-only";
 
-import { listingPickupPlaceIds } from "@/lib/cars/listing-place-ids";
+import { parseCarDetails } from "@/lib/cars/car-details";
 import { publicListingStatusWhere, publicPartnerWhere } from "@/lib/cars/listing-visibility";
-import { findSearchPlace, normalizeLocationCode } from "@/lib/catalog/search-places";
+import {
+  findSearchPlace,
+  normalizeLocationCode,
+  searchPlacesForCountry,
+} from "@/lib/catalog/search-places";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import { prisma } from "@/lib/prisma";
+
+function partnerKey(raw: string | null | undefined) {
+  return String(raw || "").trim().replace(/^file-partner-/, "");
+}
 
 /** Every key a place can be referenced by: location id, IATA / city code, airport id. */
 function placeKeyExpander(locations: DeliveryLocationView[]) {
@@ -34,33 +42,40 @@ function placeKeyExpander(locations: DeliveryLocationView[]) {
   };
 }
 
-function partnerAliases(partnerId: string) {
-  const bare = partnerId.trim().replace(/^file-partner-/, "");
-  return [...new Set([partnerId.trim(), bare, bare ? `file-partner-${bare}` : ""].filter(Boolean))];
+type StoredPickupPlace = { deliveryLocationId?: unknown; placeLabel?: unknown; cityKey?: unknown };
+
+/** Catalog code for a saved pick-up row, so a recreated location row does not break the link. */
+function catalogCodeForPickup(place: StoredPickupPlace): string {
+  const iso2 = String(place.cityKey || "").split("::")[0]?.trim().toUpperCase();
+  const label = String(place.placeLabel || "").trim().toLowerCase();
+  if (!iso2 || iso2.length !== 2 || !label) return "";
+  return searchPlacesForCountry(iso2).find((p) => p.label.toLowerCase() === label)?.code || "";
 }
 
-function remember(map: Map<string, Set<string>>, partnerId: string, keys: Iterable<string>) {
-  for (const id of partnerAliases(partnerId)) {
-    const set = map.get(id) ?? new Set<string>();
-    for (const key of keys) set.add(key);
-    map.set(id, set);
-  }
+/** One entry per pick-up point: its location id plus its catalog code. */
+function pickupPlaceRefs(description: string | null | undefined): string[][] {
+  const places = parseCarDetails(description)?.pickupPlaces;
+  if (!Array.isArray(places)) return [];
+  return places.flatMap((place) => {
+    if (!place || typeof place !== "object") return [];
+    const row = place as StoredPickupPlace;
+    const refs = [String(row.deliveryLocationId || ""), catalogCodeForPickup(row)].filter(Boolean);
+    return refs.length ? [refs] : [];
+  });
 }
 
-/**
- * Places a public listing offers as pickup. The delivery-price window does not
- * add a place; only the locations checked on the listing do.
- */
-async function listingPlaceKeysByPartner(
-  expand: (raw: string | null | undefined) => string[],
-): Promise<Map<string, Set<string>>> {
-  const byPartner = new Map<string, Set<string>>();
-  const add = (partnerId: string, rawIds: Iterable<string>) => {
-    const keys = new Set<string>();
-    for (const raw of rawIds) {
-      for (const key of expand(raw)) keys.add(key);
+/** Pick-up points on each partner's customer-visible listings (airport rows + city pickups). */
+async function livePickupRefsByPartner(): Promise<Map<string, string[][]>> {
+  const refs = new Map<string, string[][]>();
+  const add = (partnerId: string, points: Array<Array<string | null | undefined>>) => {
+    const key = partnerKey(partnerId);
+    if (!key) return;
+    const list = refs.get(key) ?? [];
+    for (const point of points) {
+      const values = point.filter((value): value is string => Boolean(value));
+      if (values.length) list.push(values);
     }
-    if (keys.size) remember(byPartner, partnerId, keys);
+    refs.set(key, list);
   };
 
   try {
@@ -78,60 +93,48 @@ async function listingPlaceKeysByPartner(
       },
     });
     for (const car of cars) {
-      const ids = [
-        ...listingPickupPlaceIds(car.description),
-        ...car.deliveryPrices.flatMap((row) => [row.deliveryLocationId, row.deliveryLocation?.airport?.iata || ""]),
-      ];
-      add(car.partnerId, ids);
+      add(car.partnerId, [
+        ...car.deliveryPrices.map((row) => [row.deliveryLocationId, row.deliveryLocation?.airport?.iata]),
+        ...pickupPlaceRefs(car.description),
+      ]);
     }
   } catch {
-    /* file listings below can still mark a place */
+    /* file listings below */
   }
 
   try {
     const { isPublicFileCar, listFileCars } = await import("@/lib/server/partner-cars-store");
-    const cars = await listFileCars();
-    for (const car of cars) {
+    for (const car of await listFileCars()) {
       if (!isPublicFileCar(car)) continue;
-      const ids = [
-        ...listingPickupPlaceIds(car.description),
-        ...(car.deliveryPrices || []).map((row) => row.deliveryLocationId),
-      ];
-      add(car.partnerId, ids);
+      add(car.partnerId, [
+        ...(car.deliveryPrices || []).map((row) => [row.deliveryLocationId]),
+        ...pickupPlaceRefs(car.description),
+      ]);
     }
   } catch {
     /* ignore */
   }
 
-  return byPartner;
+  return refs;
 }
 
 /**
- * Places customers may search. A country and its pickup points appear only where
- * an approved partner checked that exact place on a live car listing, and the
- * same place is in their personal info. Saving a delivery price, or adding the
- * airport in personal info alone, does not add the country.
+ * Keys of places customers may search: an approved partner has the place in their
+ * cabinet AND at least one of that same partner's live listings delivers there.
  */
 export async function bookablePlaceKeys(locations: DeliveryLocationView[]): Promise<Set<string>> {
   const { approvedPartnerPlaceGroups } = await import("@/lib/server/partner-search-coverage");
-  const groups = await approvedPartnerPlaceGroups();
+  const [groups, carRefs] = await Promise.all([approvedPartnerPlaceGroups(), livePickupRefsByPartner()]);
   const expand = placeKeyExpander(locations);
-  const cabinet = new Map<string, Set<string>>();
-  for (const group of groups) {
-    const keys = group.codes.flatMap(expand);
-    if (keys.length) remember(cabinet, group.partnerId, keys);
-  }
-
-  const offered = await listingPlaceKeysByPartner(expand);
   const bookable = new Set<string>();
-  for (const [partnerId, placeKeys] of offered) {
-    const allowed =
-      cabinet.get(partnerId) ||
-      cabinet.get(partnerId.replace(/^file-partner-/, "")) ||
-      cabinet.get(`file-partner-${partnerId.replace(/^file-partner-/, "")}`);
-    if (!allowed?.size) continue;
-    for (const key of placeKeys) {
-      if (allowed.has(key)) bookable.add(key);
+
+  for (const group of groups) {
+    const points = carRefs.get(partnerKey(group.partnerId));
+    if (!points?.length) continue;
+    const listed = new Set(group.codes.flatMap(expand));
+    for (const point of points) {
+      const keys = point.flatMap(expand);
+      if (keys.some((key) => listed.has(key))) for (const key of keys) bookable.add(key);
     }
   }
   return bookable;
