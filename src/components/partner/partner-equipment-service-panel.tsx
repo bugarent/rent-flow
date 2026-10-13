@@ -1116,26 +1116,27 @@ export function PartnerEquipmentServicePanel({
             {t.empty}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm max-md:overflow-visible max-md:border-0 max-md:bg-transparent max-md:shadow-none">
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm max-lg:overflow-visible max-lg:border-0 max-lg:bg-transparent max-lg:shadow-none">
             {phoneInsuranceRows.length > 0 ? (
               <h2
                 id="partner-insurance-services"
-                className="scroll-mt-24 px-3 pb-1 pt-3 text-sm font-extrabold text-[#0b1f4b] max-md:px-0.5"
+                className="scroll-mt-24 px-3 pb-1 pt-3 text-sm font-extrabold text-[#0b1f4b] max-lg:px-0.5"
               >
                 {t.insuranceGroup}
               </h2>
             ) : null}
             <ResponsiveDataList
+              breakpoint="lg"
               desktop={
-                <table className="min-w-full text-left text-sm">
+                <table className="w-full text-left text-sm">
                   <thead className="bg-[#e8f5e9] text-xs font-bold uppercase tracking-wide text-slate-600">
                     <tr>
-                      <th className="px-3 py-2">{t.colService}</th>
-                      <th className="px-3 py-2 whitespace-nowrap">{t.colPrice}</th>
-                      <th className="px-3 py-2 whitespace-nowrap">{t.colMin}</th>
-                      <th className="px-3 py-2 whitespace-nowrap">{t.colMax}</th>
-                      <th className="px-3 py-2">{t.colCars}</th>
-                      <th className="px-3 py-2" />
+                      <th className="px-2 py-2 xl:px-3">{t.colService}</th>
+                      <th className="px-2 py-2 xl:px-3">{t.colPrice}</th>
+                      <th className="px-2 py-2 xl:px-3">{t.colMin}</th>
+                      <th className="px-2 py-2 xl:px-3">{t.colMax}</th>
+                      <th className="px-2 py-2 xl:px-3">{t.colCars}</th>
+                      <th className="px-2 py-2 xl:px-3" />
                     </tr>
                   </thead>
                   <tbody>
@@ -1199,7 +1200,7 @@ export function PartnerEquipmentServicePanel({
                                 : "bg-[#fafbfd]",
                           )}
                         >
-                          <td className="min-w-[200px] px-3 py-1.5 align-top">
+                          <td className="min-w-[150px] px-2 xl:min-w-[200px] py-1.5 align-top xl:px-3">
                             <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                               <p
                                 className="font-bold leading-snug text-[#0b1f4b]"
@@ -1222,32 +1223,32 @@ export function PartnerEquipmentServicePanel({
                               ) : null}
                             </div>
                           </td>
-                          <td className="px-3 py-1.5 align-top font-semibold text-[#0b1f4b]">
+                          <td className="px-2 py-1.5 align-top xl:px-3 font-semibold text-[#0b1f4b]">
                             <div>{priceCell}</div>
                             {dailyCapHint ? (
-                              <p className="whitespace-nowrap text-[10px] font-medium leading-tight text-amber-800/90">
+                              <p className="text-[10px] font-medium leading-tight text-amber-800/90 xl:whitespace-nowrap">
                                 {dailyCapHint}
                               </p>
                             ) : null}
                           </td>
-                          <td className="px-3 py-1.5 align-top text-slate-600">
+                          <td className="px-2 py-1.5 align-top xl:px-3 text-slate-600">
                             <div>{row.mode === "off" ? "—" : periodCell(row.minPeriodEur)}</div>
                             {periodCapHint ? (
-                              <p className="whitespace-nowrap text-[10px] font-medium leading-tight text-amber-800/90">
+                              <p className="text-[10px] font-medium leading-tight text-amber-800/90 xl:whitespace-nowrap">
                                 {periodCapHint}
                               </p>
                             ) : null}
                           </td>
-                          <td className="px-3 py-1.5 align-top text-slate-600">
+                          <td className="px-2 py-1.5 align-top xl:px-3 text-slate-600">
                             <div>{row.mode === "off" ? "—" : periodCell(row.maxPeriodEur)}</div>
                             {periodCapHint ? (
-                              <p className="whitespace-nowrap text-[10px] font-medium leading-tight text-amber-800/90">
+                              <p className="text-[10px] font-medium leading-tight text-amber-800/90 xl:whitespace-nowrap">
                                 {periodCapHint}
                               </p>
                             ) : null}
                           </td>
-                          <td className="px-3 py-1.5 align-top text-xs leading-snug text-slate-600">
-                            <div className="w-[130px] truncate" title={carsLabel}>
+                          <td className="px-2 py-1.5 align-top xl:px-3 text-xs leading-snug text-slate-600">
+                            <div className="w-[72px] truncate xl:w-[130px]" title={carsLabel}>
                               {colon >= 0 ? (
                                 <>
                                   <span className="font-semibold text-[#0b1f4b]">
