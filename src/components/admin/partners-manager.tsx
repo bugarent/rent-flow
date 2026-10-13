@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, Fragment, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { fleetAgeLabel, localizedPartnerStatus, partnerStatusLabel, PARTNER_SOCIAL_PLATFORMS } from "@/lib/partner";
@@ -22,6 +23,12 @@ import {
   MobileDataCard,
   MobileDataRow,
 } from "@/components/ui/responsive-data-list";
+import { PartnerSelectionBar } from "@/components/admin/partner-broadcast/partner-selection-bar";
+
+const PartnerBroadcastModal = dynamic(
+  () => import("@/components/admin/partner-broadcast/partner-broadcast-modal"),
+  { ssr: false },
+);
 
 type PartnerRow = {
   id: string;
@@ -217,6 +224,8 @@ export function PartnersManager({
   const [message, setMessage] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedMessages, setExpandedMessages] = useState<PartnerApplicationMessage[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [broadcastIds, setBroadcastIds] = useState<string[] | null>(null);
 
   const t = useMemo(() => {
     if (locale === "ka") {
@@ -230,6 +239,7 @@ export function PartnersManager({
         pending: "დასამტკიცებელი პარტნიორები",
         idCol: "საიდენტიფიკაციო ნომერი",
         nameCol: "სახელი",
+        phoneCol: "ტელეფონი",
         countryCol: "ქვეყანა",
         typeCol: "ტიპი",
         fleetCol: "ფლოტი",
@@ -260,6 +270,7 @@ export function PartnersManager({
         pending: "Партнёры на одобрение",
         idCol: "Идентификационный номер",
         nameCol: "Имя",
+        phoneCol: "Телефон",
         countryCol: "Страна",
         typeCol: "Тип",
         fleetCol: "Флот",
@@ -289,6 +300,7 @@ export function PartnersManager({
       pending: "Partners pending approval",
       idCol: "Identification number",
       nameCol: "Name",
+      phoneCol: "Phone",
       countryCol: "Country",
       typeCol: "Type",
       fleetCol: "Fleet",
@@ -340,6 +352,25 @@ export function PartnersManager({
       fleet: fleetDisplay(p),
     }));
   }, [filter, initialPartners, mode, tabs]);
+
+  const selectedVisible = rows.filter((p) => selectedIds.has(p.id));
+  const togglePicked = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const toggleAllPicked = () =>
+    setSelectedIds((prev) => {
+      const allPicked = rows.length > 0 && rows.every((p) => prev.has(p.id));
+      const next = new Set(prev);
+      for (const p of rows) {
+        if (allPicked) next.delete(p.id);
+        else next.add(p.id);
+      }
+      return next;
+    });
 
   const reviewHref = (id: string) => {
     const onPartnersPage = mode === "directory" || mode === "catalog" || filter === "DIRECTORY";
@@ -555,16 +586,40 @@ export function PartnersManager({
       {showPartners ? (() => {
         const showCountry = filter === "DIRECTORY" || mode === "directory";
         const hideId = filter === "DIRECTORY";
-        const colCount = 5 + (hideId ? 0 : 1) + (showCountry ? 1 : 0);
+        const colCount = 7 + (hideId ? 0 : 1) + (showCountry ? 1 : 0);
+        const allPicked = rows.length > 0 && selectedVisible.length === rows.length;
         return (
+      <>
+      <PartnerSelectionBar
+        locale={locale}
+        total={rows.length}
+        selected={selectedVisible.length}
+        onToggleAll={toggleAllPicked}
+        onClear={() => setSelectedIds(new Set())}
+        onSend={() => setBroadcastIds(selectedVisible.map((p) => p.id))}
+      />
       <ResponsiveDataList
         desktop={
           <div className="overflow-x-auto rounded-xl border bg-white">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-100">
                 <tr>
+                  <th className="w-8 px-2 py-1">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all"
+                      checked={allPicked}
+                      ref={(el) => {
+                        if (el) el.indeterminate = selectedVisible.length > 0 && !allPicked;
+                      }}
+                      onChange={toggleAllPicked}
+                      disabled={rows.length === 0}
+                      className="h-4 w-4 align-middle accent-[#0b1f4b]"
+                    />
+                  </th>
                   {hideId ? null : <th className="whitespace-nowrap px-2 py-1">{t.idCol}</th>}
                   <th className="whitespace-nowrap px-2 py-1">{t.nameCol}</th>
+                  <th className="whitespace-nowrap px-2 py-1">{t.phoneCol}</th>
                   {showCountry ? <th className="whitespace-nowrap px-2 py-1">{t.countryCol}</th> : null}
                   <th className="whitespace-nowrap px-2 py-1">{t.typeCol}</th>
                   <th className="whitespace-nowrap px-2 py-1">{t.fleetCol}</th>
@@ -594,8 +649,18 @@ export function PartnersManager({
                               : attention > 0
                                 ? "border-l-orange-500 bg-orange-100"
                                 : "border-l-transparent bg-white",
+                            selectedIds.has(p.id) && "bg-sky-50",
                           )}
                         >
+                          <td className="px-2 py-0.5 align-middle">
+                            <input
+                              type="checkbox"
+                              aria-label={p.displayName}
+                              checked={selectedIds.has(p.id)}
+                              onChange={() => togglePicked(p.id)}
+                              className="h-4 w-4 align-middle accent-[#0b1f4b]"
+                            />
+                          </td>
                           {hideId ? null : (
                           <td
                             className={cn(
@@ -653,6 +718,9 @@ export function PartnersManager({
                                 {p.partnerCodeLabel}
                               </span>
                             ) : null}
+                          </td>
+                          <td className="whitespace-nowrap px-2 py-0.5 align-middle font-mono text-[11px] text-slate-700">
+                            {p.phone || "—"}
                           </td>
                           {showCountry ? (
                             <td className="whitespace-nowrap px-2 py-0.5 align-middle text-slate-700">
@@ -747,7 +815,7 @@ export function PartnersManager({
                         </tr>
                         {open ? (
                           <tr className="border-t bg-slate-50">
-                            <td colSpan={6} className="p-4">
+                            <td colSpan={colCount} className="p-4">
                               <div className="space-y-3">
                                 <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
                                   Application history
@@ -819,8 +887,18 @@ export function PartnersManager({
                       : attention > 0
                         ? "border-l-orange-500 bg-orange-50"
                         : "border-l-transparent",
+                    selectedIds.has(p.id) && "ring-2 ring-sky-300",
                   )}
                 >
+                  <label className="-mt-1 mb-1 flex min-h-10 cursor-pointer items-center gap-2 border-b border-slate-100 pb-1 text-sm font-semibold text-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(p.id)}
+                      onChange={() => togglePicked(p.id)}
+                      className="h-5 w-5 accent-[#0b1f4b]"
+                    />
+                    <span className="min-w-0 truncate">{p.displayName}</span>
+                  </label>
                   {showCountry && !hideId ? (
                     <MobileDataRow label={t.countryCol}>
                       <div className="text-end font-semibold text-slate-800">{p.country || "—"}</div>
@@ -879,6 +957,9 @@ export function PartnersManager({
                         {p.email}
                       </p>
                     </div>
+                  </MobileDataRow>
+                  <MobileDataRow label={t.phoneCol}>
+                    <span className="font-mono text-xs">{p.phone || "—"}</span>
                   </MobileDataRow>
                   <MobileDataRow label={t.typeCol}>
                     <span className={cn(attention > 0 && "font-semibold text-orange-950")}>
@@ -1016,8 +1097,16 @@ export function PartnersManager({
           )
         }
       />
+      </>
         );
       })() : null}
+      {broadcastIds ? (
+        <PartnerBroadcastModal
+          partnerIds={broadcastIds}
+          locale={locale}
+          onClose={() => setBroadcastIds(null)}
+        />
+      ) : null}
       {showCustomers ? (
         <div className={showPartners ? "mt-6" : undefined}>
           <BookingCustomersPanel customers={customers} />

@@ -19,7 +19,8 @@ type SendMailInput = {
     | "BOOKING_EDITED"
     | "BOOKING_CANCELLED"
     | "CONTACT_MESSAGE"
-    | "CUSTOMER_NOTICE";
+    | "CUSTOMER_NOTICE"
+    | "PARTNER_NOTICE";
   userId?: string | null;
   payload?: Record<string, unknown>;
   replyTo?: string;
