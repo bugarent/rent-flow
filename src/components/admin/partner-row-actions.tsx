@@ -164,13 +164,19 @@ export function PartnerRowActions({
 
   return (
     <>
-      <div className={cn("flex items-center justify-end", compact ? "flex-nowrap gap-1" : "flex-wrap gap-1.5", className)}>
+      <div
+        className={cn(
+          "flex",
+          compact ? "flex-col items-stretch gap-1" : "flex-wrap items-center justify-end gap-1.5",
+          className,
+        )}
+      >
         <button
           type="button"
           onClick={openDetails}
           className={cn(
             "inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white font-bold text-slate-700 hover:bg-slate-50",
-            compact ? "h-6 px-1.5 text-[11px]" : "h-8 px-2.5 text-xs",
+            compact ? "h-7 justify-center whitespace-nowrap px-1.5 text-[11px]" : "h-8 px-2.5 text-xs",
           )}
         >
           <Eye className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} />
@@ -183,7 +189,7 @@ export function PartnerRowActions({
             onClick={() => void unblock()}
             className={cn(
               "inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 font-bold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50",
-              compact ? "h-6 px-1.5 text-[11px]" : "h-8 px-2.5 text-xs",
+              compact ? "h-7 justify-center whitespace-nowrap px-1.5 text-[11px]" : "h-8 px-2.5 text-xs",
             )}
           >
             {t.unblock}
@@ -195,7 +201,7 @@ export function PartnerRowActions({
             onClick={() => setBlockOpen(true)}
             className={cn(
               "inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 font-bold text-amber-900 hover:bg-amber-100 disabled:opacity-50",
-              compact ? "h-6 px-1.5 text-[11px]" : "h-8 px-2.5 text-xs",
+              compact ? "h-7 justify-center whitespace-nowrap px-1.5 text-[11px]" : "h-8 px-2.5 text-xs",
             )}
           >
             <Ban className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} />
@@ -208,7 +214,7 @@ export function PartnerRowActions({
           onClick={() => void deletePartner()}
           className={cn(
             "inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50",
-            compact ? "h-6 px-1.5 text-[11px]" : "h-8 px-2.5 text-xs",
+            compact ? "h-7 justify-center whitespace-nowrap px-1.5 text-[11px]" : "h-8 px-2.5 text-xs",
           )}
         >
           <Trash2 className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} />

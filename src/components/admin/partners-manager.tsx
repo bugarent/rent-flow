@@ -622,9 +622,10 @@ export function PartnersManager({
         onSend={() => setBroadcastTargets(broadcastTargetsFromRows(rows, pickedKeys))}
       />
       <ResponsiveDataList
+        breakpoint="lg"
         desktop={
-          <div className="overflow-x-auto rounded-xl border bg-white">
-            <table className="w-full text-left text-xs">
+          <div className="rounded-xl border bg-white">
+            <table className="w-full table-auto text-left text-xs">
               <thead className="bg-slate-100">
                 <tr>
                   <th className="w-8 px-2 py-1">
@@ -690,22 +691,22 @@ export function PartnersManager({
                           {hideId ? null : (
                           <td
                             className={cn(
-                              "whitespace-nowrap px-2 py-0.5 align-middle font-mono font-bold leading-none",
+                              "max-w-[9rem] px-2 py-1 align-middle font-mono font-bold leading-tight",
                               attention > 0 ? "text-orange-950" : "",
                             )}
                           >
-                            <span>{p.idNumber}</span>
+                            <span className="block break-all">{p.idNumber}</span>
                             {p.partnerCodeLabel ? (
                               mode === "queue" ? (
                                 <button
                                   type="button"
                                   onClick={() => openDetail(p.id)}
-                                  className="ml-2 text-[10px] font-bold text-emerald-800 hover:underline"
+                                  className="block text-[10px] font-bold text-emerald-800 hover:underline"
                                 >
                                   {p.partnerCodeLabel}
                                 </button>
                               ) : (
-                                <span className="ml-2 text-[10px] font-semibold text-slate-500">
+                                <span className="block text-[10px] font-semibold text-slate-500">
                                   {p.partnerCodeLabel}
                                 </span>
                               )
@@ -713,19 +714,19 @@ export function PartnersManager({
                               <button
                                 type="button"
                                 onClick={() => openDetail(p.id)}
-                                className="ml-2 text-[10px] font-bold text-emerald-800 hover:underline"
+                                className="block text-[10px] font-bold text-emerald-800 hover:underline"
                               >
                                 Open review
                               </button>
                             ) : null}
                           </td>
                           )}
-                          <td className="max-w-[16rem] px-2 py-0.5 align-middle leading-none">
+                          <td className="min-w-[8rem] max-w-[13rem] px-2 py-1 align-middle leading-tight">
                             <button
                               type="button"
                               onClick={() => openDetail(p.id)}
                               className={cn(
-                                "font-semibold hover:underline",
+                                "block text-left font-semibold [overflow-wrap:anywhere] hover:underline",
                                 attention > 0 ? "font-extrabold text-orange-950" : "text-sky-800",
                               )}
                             >
@@ -733,14 +734,14 @@ export function PartnersManager({
                             </button>
                             <span
                               className={cn(
-                                "ml-2 text-[10px]",
+                                "block break-all text-[10px]",
                                 attention > 0 ? "font-semibold text-orange-900/80" : "text-slate-500",
                               )}
                             >
                               {p.email}
                             </span>
                             {hideId && p.partnerCodeLabel ? (
-                              <span className="ml-2 text-[10px] font-semibold text-slate-500">
+                              <span className="block text-[10px] font-semibold text-slate-500">
                                 {p.partnerCodeLabel}
                               </span>
                             ) : null}
@@ -755,7 +756,7 @@ export function PartnersManager({
                             />
                           </td>
                           {showCountry ? (
-                            <td className="whitespace-nowrap px-2 py-0.5 align-middle text-slate-700">
+                            <td className="max-w-[8rem] px-2 py-1 align-middle leading-tight text-slate-700">
                               {p.country || "—"}
                             </td>
                           ) : null}
@@ -791,8 +792,8 @@ export function PartnersManager({
                               ) : null}
                             </span>
                           </td>
-                          <td className="whitespace-nowrap px-2 py-0.5 align-middle">
-                            <div className="flex flex-nowrap items-center gap-1">
+                          <td className="px-2 py-1 align-middle">
+                            <div className="flex flex-col items-stretch gap-1">
                               {filter === "REJECTED" || unread > 0 ? (
                                 <button
                                   type="button"

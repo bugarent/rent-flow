@@ -1,7 +1,10 @@
 import "server-only";
 
+import { listingPickupPlaceIds } from "@/lib/cars/listing-place-ids";
+import { publicListingStatusWhere, publicPartnerWhere } from "@/lib/cars/listing-visibility";
 import { findSearchPlace, normalizeLocationCode } from "@/lib/catalog/search-places";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
+import { prisma } from "@/lib/prisma";
 
 /** Every key a place can be referenced by: location id, IATA / city code, airport id. */
 function placeKeyExpander(locations: DeliveryLocationView[]) {
@@ -31,17 +34,105 @@ function placeKeyExpander(locations: DeliveryLocationView[]) {
   };
 }
 
+function partnerAliases(partnerId: string) {
+  const bare = partnerId.trim().replace(/^file-partner-/, "");
+  return [...new Set([partnerId.trim(), bare, bare ? `file-partner-${bare}` : ""].filter(Boolean))];
+}
+
+function remember(map: Map<string, Set<string>>, partnerId: string, keys: Iterable<string>) {
+  for (const id of partnerAliases(partnerId)) {
+    const set = map.get(id) ?? new Set<string>();
+    for (const key of keys) set.add(key);
+    map.set(id, set);
+  }
+}
+
 /**
- * Places customers may search: an approved partner added the place in personal
- * info. A delivery-window save does not add a place on its own.
+ * Places a public listing offers as pickup. The delivery-price window does not
+ * add a place; only the locations checked on the listing do.
+ */
+async function listingPlaceKeysByPartner(
+  expand: (raw: string | null | undefined) => string[],
+): Promise<Map<string, Set<string>>> {
+  const byPartner = new Map<string, Set<string>>();
+  const add = (partnerId: string, rawIds: Iterable<string>) => {
+    const keys = new Set<string>();
+    for (const raw of rawIds) {
+      for (const key of expand(raw)) keys.add(key);
+    }
+    if (keys.size) remember(byPartner, partnerId, keys);
+  };
+
+  try {
+    const cars = await prisma.car.findMany({
+      where: { ...publicListingStatusWhere, partner: publicPartnerWhere },
+      select: {
+        partnerId: true,
+        description: true,
+        deliveryPrices: {
+          select: {
+            deliveryLocationId: true,
+            deliveryLocation: { select: { airport: { select: { iata: true } } } },
+          },
+        },
+      },
+    });
+    for (const car of cars) {
+      const ids = [
+        ...listingPickupPlaceIds(car.description),
+        ...car.deliveryPrices.flatMap((row) => [row.deliveryLocationId, row.deliveryLocation?.airport?.iata || ""]),
+      ];
+      add(car.partnerId, ids);
+    }
+  } catch {
+    /* file listings below can still mark a place */
+  }
+
+  try {
+    const { isPublicFileCar, listFileCars } = await import("@/lib/server/partner-cars-store");
+    const cars = await listFileCars();
+    for (const car of cars) {
+      if (!isPublicFileCar(car)) continue;
+      const ids = [
+        ...listingPickupPlaceIds(car.description),
+        ...(car.deliveryPrices || []).map((row) => row.deliveryLocationId),
+      ];
+      add(car.partnerId, ids);
+    }
+  } catch {
+    /* ignore */
+  }
+
+  return byPartner;
+}
+
+/**
+ * Places customers may search. A country and its pickup points appear only where
+ * an approved partner checked that exact place on a live car listing, and the
+ * same place is in their personal info. Saving a delivery price, or adding the
+ * airport in personal info alone, does not add the country.
  */
 export async function bookablePlaceKeys(locations: DeliveryLocationView[]): Promise<Set<string>> {
   const { approvedPartnerPlaceGroups } = await import("@/lib/server/partner-search-coverage");
   const groups = await approvedPartnerPlaceGroups();
   const expand = placeKeyExpander(locations);
-  const bookable = new Set<string>();
+  const cabinet = new Map<string, Set<string>>();
   for (const group of groups) {
-    for (const key of group.codes.flatMap(expand)) bookable.add(key);
+    const keys = group.codes.flatMap(expand);
+    if (keys.length) remember(cabinet, group.partnerId, keys);
+  }
+
+  const offered = await listingPlaceKeysByPartner(expand);
+  const bookable = new Set<string>();
+  for (const [partnerId, placeKeys] of offered) {
+    const allowed =
+      cabinet.get(partnerId) ||
+      cabinet.get(partnerId.replace(/^file-partner-/, "")) ||
+      cabinet.get(`file-partner-${partnerId.replace(/^file-partner-/, "")}`);
+    if (!allowed?.size) continue;
+    for (const key of placeKeys) {
+      if (allowed.has(key)) bookable.add(key);
+    }
   }
   return bookable;
 }

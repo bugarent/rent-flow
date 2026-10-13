@@ -21,7 +21,7 @@ const partners = [
   email,
   phone,
   secondaryPhone,
-  country: "Georgia",
+  country: i === 2 ? "Georgia, Montenegro" : "Georgia",
 }));
 
 function installBroadcastMock() {
@@ -73,7 +73,7 @@ export default function Page() {
   }, []);
   return (
     <AdminLocaleProvider initialLocale="ka">
-      <div className="mx-auto max-w-5xl p-4">
+      <div className="mx-auto max-w-6xl px-4 py-10">
         <Suspense>
           <PartnersManager initialPartners={partners} mode="directory" />
         </Suspense>
