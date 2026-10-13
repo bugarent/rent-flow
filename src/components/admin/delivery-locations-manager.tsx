@@ -14,11 +14,17 @@ import {
 } from "@/lib/utils";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { uiText } from "@/lib/i18n/ui-text";
+import { Search } from "lucide-react";
 import { CountryFlag } from "@/components/ui/country-flag";
-import { DeliveryCountryFilter } from "@/components/admin/delivery-country-filter";
-import { isCityLocationCode } from "@/lib/catalog/search-places";
 import { lookupDeliveryCount } from "@/lib/delivery/partner-counts";
 import { DeliveryLimitBadge } from "@/components/admin/delivery-limit-badge";
+import { DeliveryCountryAccordion } from "@/components/admin/delivery-country-accordion";
+import { COUNTRY_NAMES_KA } from "@/lib/catalog/country-names-ka";
+import {
+  groupDeliveryByCountry,
+  isCityLocation,
+  matchesCountryQuery,
+} from "@/components/admin/delivery-country-groups";
 import {
   ResponsiveDataList,
   MobileDataCard,
@@ -49,12 +55,6 @@ function daysDraftsFromLocations(list: DeliveryLocationView[]) {
     next[item.id] = item.maxFreeAfterDays == null ? "" : String(item.maxFreeAfterDays);
   }
   return next;
-}
-
-function isCityLocation(item: DeliveryLocationView) {
-  if (item.kind === "city") return true;
-  if (item.kind === "airport") return false;
-  return isCityLocationCode(item.iata) || isCityLocationCode(item.airportId);
 }
 
 function sortLocationsByCountry(list: DeliveryLocationView[]) {
@@ -125,68 +125,55 @@ export function DeliveryLocationsManager({
   const [message, setMessage] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
-  const [countryIso2, setCountryIso2] = useState("");
+  const [countryQuery, setCountryQuery] = useState("");
+  const [openCountries, setOpenCountries] = useState<ReadonlyMap<string, boolean>>(() => new Map());
 
   const symbol = currencySymbol(currency);
   const freeLabel = phrase("Free", "უფასო", "Бесплатно");
   const rangeLabel = phrase("Partner price", "პარტნიორის ფასი", "Цена партнёра");
 
-  const countries = useMemo(() => {
-    const map = new Map<string, { iso2: string; name: string; count: number }>();
-    for (const item of locations) {
-      const iso2 = item.countryIso2.trim().toUpperCase();
-      if (!iso2) continue;
-      const current = map.get(iso2);
-      if (current) current.count += 1;
-      else map.set(iso2, { iso2, name: item.country || iso2, count: 1 });
-    }
-    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-  }, [locations]);
-
-  const locationCounts = useMemo(() => {
-    const scoped = locations.filter(
-      (item) =>
-        item.isActive && (!countryIso2 || item.countryIso2.trim().toUpperCase() === countryIso2),
-    );
-    let cities = 0;
-    for (const item of scoped) {
-      if (isCityLocation(item)) cities += 1;
-    }
-    return { airports: scoped.length - cities, cities };
-  }, [locations, countryIso2]);
-
-  const deliveryTotals = useMemo(() => {
-    const scoped = locations.filter(
-      (item) =>
-        item.isActive && (!countryIso2 || item.countryIso2.trim().toUpperCase() === countryIso2),
-    );
-    let airports = 0;
-    let cities = 0;
-    for (const item of scoped) {
-      const count = lookupDeliveryCount(deliveryCounts, [item.iata, item.airportId, item.id]);
-      if (isCityLocation(item)) cities += count;
-      else airports += count;
-    }
-    return { airports, cities };
-  }, [locations, countryIso2, deliveryCounts]);
-  const activeLocations = useMemo(
+  /** Countries with active places that match the search, each with only its active places. */
+  const activeGroups = useMemo(
     () =>
-      sortLocationsByCountry(
-        locations.filter(
-          (item) => item.isActive && (!countryIso2 || item.countryIso2.trim().toUpperCase() === countryIso2),
-        ),
-      ),
-    [locations, countryIso2],
+      groupDeliveryByCountry(
+        locations.filter((item) => item.isActive),
+        deliveryCounts,
+      ).filter((group) => matchesCountryQuery(group, countryQuery)),
+    [locations, deliveryCounts, countryQuery],
   );
+
+  const totals = useMemo(() => {
+    const sum = { airports: 0, cities: 0, airportDeliveries: 0, cityDeliveries: 0 };
+    for (const group of activeGroups) {
+      sum.airports += group.airports;
+      sum.cities += group.cities;
+      for (const item of group.items) {
+        const count = lookupDeliveryCount(deliveryCounts, [item.iata, item.airportId, item.id]);
+        if (isCityLocation(item)) sum.cityDeliveries += count;
+        else sum.airportDeliveries += count;
+      }
+    }
+    return sum;
+  }, [activeGroups, deliveryCounts]);
+
   const inactiveLocations = useMemo(
     () =>
-      sortLocationsByCountry(
-        locations.filter(
-          (item) => !item.isActive && (!countryIso2 || item.countryIso2.trim().toUpperCase() === countryIso2),
-        ),
-      ),
-    [locations, countryIso2],
+      groupDeliveryByCountry(
+        locations.filter((item) => !item.isActive),
+        deliveryCounts,
+      )
+        .filter((group) => matchesCountryQuery(group, countryQuery))
+        .flatMap((group) => group.items),
+    [locations, deliveryCounts, countryQuery],
   );
+
+  // A search that leaves exactly one country opens it straight away.
+  const singleMatch = countryQuery.trim() && activeGroups.length === 1 ? activeGroups[0].iso2 : "";
+  const isCountryOpen = (iso2: string) => openCountries.get(iso2) ?? singleMatch === iso2;
+  const toggleCountry = (iso2: string) => {
+    const nextOpen = !isCountryOpen(iso2);
+    setOpenCountries((prev) => new Map(prev).set(iso2, nextOpen));
+  };
 
   const switchCurrency = (next: PricingCurrency) => {
     if (next === currency) return;
@@ -520,57 +507,73 @@ export function DeliveryLocationsManager({
     );
   };
 
+  const groupLabels = {
+    airports: phrase("airports", "აეროპორტი", "аэропорта"),
+    cities: phrase("cities", "ქალაქი", "города"),
+    deliveries: phrase("Deliveries", "მიწოდება", "Доставки"),
+  };
+
+  const renderTable = (items: DeliveryLocationView[]) => (
+    <ResponsiveDataList
+      desktop={
+        <div className="overflow-x-auto rounded-xl border bg-white">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-100">
+              <tr>
+                <th className="w-12 p-3">#</th>
+                <th className="w-14 p-3" aria-label="Country flag" />
+                <th className="p-3">{phrase("Airport", "აეროპორტი", "Аэропорт")}</th>
+                <th className="p-3">{phrase("Country", "ქვეყანა", "Страна")}</th>
+                <th className="p-3">{phrase("Max delivery", "მაქს. მიწოდება", "Макс. доставка")} {symbol}</th>
+                <th className="p-3">{phrase("Free after days", "უფასო დღის შემდეგ", "Бесплатно после дней")}</th>
+                <th className="p-3">{phrase("Status", "სტატუსი", "Статус")}</th>
+                <th className="p-3">{phrase("Actions", "მოქმედებები", "Действия")}</th>
+              </tr>
+            </thead>
+            <tbody>{items.map((item, index) => renderRow(item, index))}</tbody>
+          </table>
+        </div>
+      }
+      mobile={items.map((item, index) => renderMobileCard(item, index))}
+    />
+  );
+
   return (
     <div className="space-y-8">
       {error ? <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</p> : null}
       {message ? <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p> : null}
 
       <div className="space-y-3">
-        <div className="flex min-w-0 items-start gap-2">
-          <div className="shrink-0">
-            <p className="mb-1.5 select-none text-sm font-semibold text-transparent" aria-hidden>
-              {phrase("Country", "ქვეყანა", "Страна")}
-            </p>
-            <button
-              type="button"
-              aria-pressed={!countryIso2}
-              onClick={() => setCountryIso2("")}
-              className={`min-h-11 rounded-xl border px-3 text-sm font-bold sm:px-4 sm:text-base ${
-                !countryIso2
-                  ? "border-[#0b1f4b] bg-[#0b1f4b] text-white"
-                  : "border-slate-300 bg-white text-[#0b1f4b] hover:bg-slate-50"
-              }`}
-            >
-              {phrase("All", "ყველა", "Все")}
-            </button>
-          </div>
-          <DeliveryCountryFilter
-            className="min-w-[10rem] flex-1"
-            countries={countries}
-            valueIso2={countryIso2}
-            onChange={setCountryIso2}
-            label={phrase("Country", "ქვეყანა", "Страна")}
-            allLabel={phrase("All", "ყველა", "Все")}
-            searchLabel={phrase("Search country", "მოძებნეთ ქვეყანა", "Найти страну")}
-            emptyLabel={phrase("No matching country", "ქვეყანა ვერ მოიძებნა", "Страна не найдена")}
+        <label className="relative block">
+          <span className="sr-only">{phrase("Search country", "მოძებნეთ ქვეყანა", "Найти страну")}</span>
+          <Search
+            className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
+            aria-hidden
           />
-        </div>
+          <input
+            type="search"
+            value={countryQuery}
+            onChange={(e) => setCountryQuery(e.target.value)}
+            placeholder={phrase("Search country…", "მოძებნეთ ქვეყანა…", "Найти страну…")}
+            className="min-h-12 w-full rounded-xl border border-slate-300 bg-white py-2 pl-11 pr-3 text-base font-semibold text-[#0b1f4b] outline-none placeholder:font-medium placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+          />
+        </label>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3">
-            <span className="text-lg font-black tabular-nums text-[#0b1f4b] sm:text-xl">{locationCounts.airports}</span>
+            <span className="text-lg font-black tabular-nums text-[#0b1f4b] sm:text-xl">{totals.airports}</span>
             <span className="text-xs font-semibold text-slate-600 sm:text-sm">{phrase("airports", "აეროპორტი", "аэропорта")}</span>
             <span className="text-xs font-bold text-[#0b1f4b] sm:text-sm">
-              {phrase("Deliveries", "მიწოდება", "Доставки")} {deliveryTotals.airports}
+              {phrase("Deliveries", "მიწოდება", "Доставки")} {totals.airportDeliveries}
             </span>
           </div>
           <div className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3">
-            <span className="text-lg font-black tabular-nums text-[#0b1f4b] sm:text-xl">{locationCounts.cities}</span>
+            <span className="text-lg font-black tabular-nums text-[#0b1f4b] sm:text-xl">{totals.cities}</span>
             <span className="text-xs font-semibold text-slate-600 sm:text-sm">{phrase("cities", "ქალაქი", "города")}</span>
             <span className="text-xs font-bold text-[#0b1f4b] sm:text-sm">
-              {phrase("Deliveries", "მიწოდება", "Доставки")} {deliveryTotals.cities}
+              {phrase("Deliveries", "მიწოდება", "Доставки")} {totals.cityDeliveries}
             </span>
           </div>
-          <div className="ms-auto md:hidden">
+          <div className="ms-auto">
             <CurrencyToggle value={currency} onChange={switchCurrency} />
           </div>
         </div>
@@ -583,73 +586,28 @@ export function DeliveryLocationsManager({
         </p>
       </div>
 
-      <ResponsiveDataList
-        desktop={
-          <div className="overflow-x-auto rounded-2xl border bg-white">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-100">
-                <tr>
-                  <th className="w-12 p-3">#</th>
-                  <th className="w-14 p-3" aria-label="Country flag" />
-                  <th className="p-3">{phrase("Airport", "აეროპორტი", "Аэропорт")}</th>
-                  <th className="p-3">{phrase("Country", "ქვეყანა", "Страна")}</th>
-                  <th className="p-3">
-                    <span className="inline-flex items-center gap-2">
-                      {phrase("Max delivery", "მაქს. მიწოდება", "Макс. доставка")}
-                      <CurrencyToggle value={currency} onChange={switchCurrency} />
-                    </span>
-                  </th>
-                  <th className="p-3">{phrase("Free after days", "უფასო დღის შემდეგ", "Бесплатно после дней")}</th>
-                  <th className="p-3">{phrase("Status", "სტატუსი", "Статус")}</th>
-                  <th className="p-3">{phrase("Actions", "მოქმედებები", "Действия")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activeLocations.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="p-8 text-center text-slate-500">
-                      {countryIso2
-                        ? phrase(
-                            "No locations for this country.",
-                            "ამ ქვეყანაში ლოკაცია არ არის.",
-                            "Для этой страны локаций нет.",
-                          )
-                        : phrase(
-                            "No active delivery locations.",
-                            "აქტიური ლოკაცია არ არის.",
-                            "Активных локаций нет.",
-                          )}
-                    </td>
-                  </tr>
-                ) : (
-                  activeLocations.map((item, index) => renderRow(item, index))
-                )}
-              </tbody>
-            </table>
-          </div>
-        }
-        mobile={
-          <>
-            {activeLocations.length === 0 ? (
-              <p className="rounded-2xl border bg-white p-8 text-center text-sm text-slate-500">
-                {countryIso2
-                  ? phrase(
-                      "No locations for this country.",
-                      "ამ ქვეყანაში ლოკაცია არ არის.",
-                      "Для этой страны локаций нет.",
-                    )
-                  : phrase(
-                      "No active delivery locations.",
-                      "აქტიური ლოკაცია არ არის.",
-                      "Активных локаций нет.",
-                    )}
-              </p>
-            ) : (
-              activeLocations.map((item, index) => renderMobileCard(item, index))
-            )}
-          </>
-        }
-      />
+      {activeGroups.length === 0 ? (
+        <p className="rounded-2xl border bg-white p-8 text-center text-sm text-slate-500">
+          {countryQuery.trim()
+            ? phrase("No matching country.", "ქვეყანა ვერ მოიძებნა.", "Страна не найдена.")
+            : phrase("No active delivery locations.", "აქტიური ლოკაცია არ არის.", "Активных локаций нет.")}
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {activeGroups.map((group) => (
+            <DeliveryCountryAccordion
+              key={group.iso2}
+              group={group}
+              title={locale === "ka" ? (COUNTRY_NAMES_KA[group.iso2] ?? group.name) : group.name}
+              open={isCountryOpen(group.iso2)}
+              onToggle={() => toggleCountry(group.iso2)}
+              labels={groupLabels}
+            >
+              {renderTable(group.items)}
+            </DeliveryCountryAccordion>
+          ))}
+        </div>
+      )}
 
       {inactiveLocations.length > 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -663,31 +621,7 @@ export function DeliveryLocationsManager({
               : phrase("Show inactive locations", "არააქტიურის ჩვენება", "Показать неактивные")}{" "}
             ({inactiveLocations.length})
           </button>
-          {showInactive ? (
-            <ResponsiveDataList
-              className="mt-3"
-              desktop={
-                <div className="overflow-x-auto rounded-xl border bg-white">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-100">
-                      <tr>
-                        <th className="w-12 p-3">#</th>
-                        <th className="w-14 p-3" aria-label="Country flag" />
-                        <th className="p-3">{phrase("Airport", "აეროპორტი", "Аэропорт")}</th>
-                        <th className="p-3">{phrase("Country", "ქვეყანა", "Страна")}</th>
-                        <th className="p-3">{phrase("Max delivery", "მაქს. მიწოდება", "Макс. доставка")} {symbol}</th>
-                        <th className="p-3">{phrase("Free after days", "უფასო დღის შემდეგ", "Бесплатно после дней")}</th>
-                        <th className="p-3">{phrase("Status", "სტატუსი", "Статус")}</th>
-                        <th className="p-3">{phrase("Actions", "მოქმედებები", "Действия")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>{inactiveLocations.map((item, index) => renderRow(item, index))}</tbody>
-                  </table>
-                </div>
-              }
-              mobile={inactiveLocations.map((item, index) => renderMobileCard(item, index))}
-            />
-          ) : null}
+          {showInactive ? <div className="mt-3">{renderTable(inactiveLocations)}</div> : null}
         </div>
       ) : null}
     </div>
