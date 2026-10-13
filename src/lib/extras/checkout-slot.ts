@@ -1,7 +1,7 @@
 export const INSURANCE_CHECKOUT_SLOTS = ["tpl", "basic", "full", "accident", "theft", "driver"] as const;
 
-/** Protection packs shown in the checkout insurance panel (excludes additional driver). */
-export const PROTECTION_INSURANCE_SLOTS = ["tpl", "basic", "full", "accident", "theft"] as const;
+/** Protection packs shown in the checkout insurance panel (theft and additional driver are additional services). */
+export const PROTECTION_INSURANCE_SLOTS = ["tpl", "basic", "full", "accident"] as const;
 
 export type InsuranceCheckoutSlot = (typeof INSURANCE_CHECKOUT_SLOTS)[number];
 export type ProtectionInsuranceSlot = (typeof PROTECTION_INSURANCE_SLOTS)[number];
@@ -32,8 +32,7 @@ export function isProtectionInsuranceSlot(value: unknown): value is ProtectionIn
     value === "tpl" ||
     value === "basic" ||
     value === "full" ||
-    value === "accident" ||
-    value === "theft"
+    value === "accident"
   );
 }
 
@@ -92,7 +91,7 @@ export function resolveCheckoutSlot(input: {
   return inferCheckoutSlot(input);
 }
 
-/** TPL / basic / full / accident / theft — checkout insurance panel. */
+/** TPL / basic / full / accident — checkout insurance panel. */
 export function isProtectionInsuranceService(input: {
   checkoutSlot?: unknown;
   slug?: string;
@@ -100,6 +99,15 @@ export function isProtectionInsuranceService(input: {
   name?: string;
 }): boolean {
   return isProtectionInsuranceSlot(resolveCheckoutSlot(input));
+}
+
+export function isTheftProtectionService(input: {
+  checkoutSlot?: unknown;
+  slug?: string;
+  isTpl?: boolean;
+  name?: string;
+}): boolean {
+  return resolveCheckoutSlot(input) === "theft";
 }
 
 /** Insurance block on a listing and in the partner cabinet. Theft is an ordinary extra there. */

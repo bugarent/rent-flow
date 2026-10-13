@@ -9,7 +9,11 @@ import { isStudioCoverUrl } from "@/lib/cars/studio-cover-url";
 import { PARTNER_BASE } from "@/lib/routes";
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
 import { isMandatoryExtra, isMandatoryFreeExtra } from "@/lib/extras/pricing";
-import { isListingInsuranceService, isProtectionInsuranceService } from "@/lib/extras/checkout-slot";
+import {
+  isListingInsuranceService,
+  isProtectionInsuranceService,
+  isTheftProtectionService,
+} from "@/lib/extras/checkout-slot";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import {
   buildExtraSelections,
@@ -747,6 +751,7 @@ export function PartnerCreateCarForm({
               (service: ExtraServicePricing) =>
                 isMandatoryExtra(service) ||
                 isProtectionInsuranceService(service) ||
+                isTheftProtectionService(service) ||
                 carExtraIds.has(service.id) ||
                 offerIds.has(service.id),
             );
