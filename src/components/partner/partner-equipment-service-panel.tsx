@@ -252,7 +252,7 @@ function OfferModeButtons({
   layout: "grid" | "inline";
 }) {
   return (
-    <div className={layout === "grid" ? "grid grid-cols-3 gap-1" : "flex max-w-full flex-wrap justify-end gap-1"}>
+    <div className={layout === "grid" ? "grid grid-cols-3 gap-1" : "flex flex-nowrap justify-end gap-1"}>
       {(
         [
           ["on", labels.on, "green"],
@@ -266,7 +266,7 @@ function OfferModeButtons({
           onClick={() => onPick(mode)}
           className={cn(
             "inline-flex items-center justify-center rounded-md border font-bold leading-tight",
-            layout === "grid" ? "min-h-10 px-1 text-[11px]" : "min-h-10 px-2 text-[11px]",
+            layout === "grid" ? "min-h-10 px-1 text-[11px]" : "h-8 whitespace-nowrap px-1.5 text-[11px]",
             tone === "green" &&
               (active === mode
                 ? "border-emerald-600 bg-emerald-600 text-white"
@@ -1185,76 +1185,77 @@ export function PartnerEquipmentServicePanel({
                                 : "bg-[#fafbfd]",
                           )}
                         >
-                          <td className="px-3 py-3 align-top">
-                            <p className="font-bold text-[#0b1f4b]">{localizedExtraCopy(locale, row.service.name, row.service.nameI18n)}</p>
+                          <td className="min-w-[200px] px-3 py-2 align-top">
+                            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                              <p className="font-bold leading-snug text-[#0b1f4b]">
+                                {localizedExtraCopy(locale, row.service.name, row.service.nameI18n)}
+                              </p>
+                              {statusLocked ? (
+                                <span
+                                  className={cn(
+                                    "inline-block rounded px-1.5 py-0.5 text-[10px] font-bold",
+                                    mandatory || dailyIsZero
+                                      ? "bg-emerald-50 text-emerald-700"
+                                      : "bg-sky-50 text-sky-700",
+                                  )}
+                                >
+                                  {mandatory || dailyIsZero ? t.mandatoryFree : t.mandatoryPriced}
+                                </span>
+                              ) : null}
+                            </div>
                             {row.service.description ? (
-                              <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">
+                              <p
+                                className="line-clamp-1 text-xs text-slate-500"
+                                title={localizedExtraCopy(locale, row.service.description, row.service.descriptionI18n)}
+                              >
                                 {localizedExtraCopy(locale, row.service.description, row.service.descriptionI18n)}
                               </p>
                             ) : null}
-                            {statusLocked ? (
-                              <span
-                                className={cn(
-                                  "mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold",
-                                  mandatory || dailyIsZero
-                                    ? "bg-emerald-50 text-emerald-700"
-                                    : "bg-sky-50 text-sky-700",
-                                )}
-                              >
-                                {mandatory || dailyIsZero ? t.mandatoryFree : t.mandatoryPriced}
-                              </span>
-                            ) : row.mode === "forbidden" ? (
-                              <span className="mt-1 inline-block rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
-                                {t.forbidden}
-                              </span>
-                            ) : row.mode === "off" ? (
-                              <span className="mt-1 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
-                                {t.off}
-                              </span>
-                            ) : null}
                           </td>
-                          <td className="px-3 py-3 align-top font-semibold text-[#0b1f4b]">
+                          <td className="px-3 py-2 align-top font-semibold text-[#0b1f4b]">
                             <div>{priceCell}</div>
                             {dailyCapHint ? (
-                              <p className="mt-0.5 text-[10px] font-medium leading-tight text-amber-800/90">
+                              <p className="whitespace-nowrap text-[10px] font-medium leading-tight text-amber-800/90">
                                 {dailyCapHint}
                               </p>
                             ) : null}
                           </td>
-                          <td className="px-3 py-3 align-top text-slate-600">
+                          <td className="px-3 py-2 align-top text-slate-600">
                             <div>{row.mode === "off" ? "—" : periodCell(row.minPeriodEur)}</div>
                             {periodCapHint ? (
-                              <p className="mt-0.5 text-[10px] font-medium leading-tight text-amber-800/90">
+                              <p className="whitespace-nowrap text-[10px] font-medium leading-tight text-amber-800/90">
                                 {periodCapHint}
                               </p>
                             ) : null}
                           </td>
-                          <td className="px-3 py-3 align-top text-slate-600">
+                          <td className="px-3 py-2 align-top text-slate-600">
                             <div>{row.mode === "off" ? "—" : periodCell(row.maxPeriodEur)}</div>
                             {periodCapHint ? (
-                              <p className="mt-0.5 text-[10px] font-medium leading-tight text-amber-800/90">
+                              <p className="whitespace-nowrap text-[10px] font-medium leading-tight text-amber-800/90">
                                 {periodCapHint}
                               </p>
                             ) : null}
                           </td>
-                          <td className="max-w-[280px] px-3 py-3 align-top text-xs leading-snug text-slate-600">
-                            {colon >= 0 ? (
-                              <>
-                                <span className="font-semibold text-[#0b1f4b]">
-                                  {carsLabel.slice(0, colon + 1)}
-                                </span>
-                                {carsLabel.slice(colon + 1)}
-                              </>
-                            ) : (
-                              carsLabel
-                            )}
+                          <td className="px-3 py-2 align-top text-xs leading-snug text-slate-600">
+                            <div className="w-[150px] truncate" title={carsLabel}>
+                              {colon >= 0 ? (
+                                <>
+                                  <span className="font-semibold text-[#0b1f4b]">
+                                    {carsLabel.slice(0, colon + 1)}
+                                  </span>
+                                  {carsLabel.slice(colon + 1)}
+                                </>
+                              ) : (
+                                carsLabel
+                              )}
+                            </div>
                           </td>
-                          <td className="px-3 py-3 align-top text-right">
+                          <td className="py-2 pl-1 pr-3 align-top text-right">
                             {statusLocked ? (
-                              <div className="flex flex-col items-end gap-1.5">
+                              <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                                 <span
                                   title={t.mandatoryLockedTitle}
-                                  className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-extrabold text-white"
+                                  className="inline-flex h-8 items-center gap-1 rounded-md bg-emerald-600 px-2.5 text-xs font-extrabold text-white"
                                 >
                                   <Lock className="h-3.5 w-3.5" />
                                   {t.mandatoryBadge}
@@ -1263,7 +1264,7 @@ export function PartnerEquipmentServicePanel({
                                   <button
                                     type="button"
                                     onClick={() => setEditingId(row.service.id)}
-                                    className="inline-flex items-center gap-1 text-xs font-bold text-[#1d6fe8] hover:underline"
+                                    className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-bold text-[#1d6fe8] hover:bg-sky-50"
                                   >
                                     <Pencil className="h-3 w-3" />
                                     {t.setPrice}
@@ -1271,7 +1272,7 @@ export function PartnerEquipmentServicePanel({
                                 ) : null}
                               </div>
                             ) : (
-                              <div className="flex min-w-0 flex-col items-end gap-1.5">
+                              <div className="flex items-center justify-end gap-1">
                                 <OfferModeButtons
                                   active={row.mode}
                                   labels={{ on: t.on, forbidden: t.forbidden, off: t.off }}
@@ -1281,10 +1282,11 @@ export function PartnerEquipmentServicePanel({
                                 <button
                                   type="button"
                                   onClick={() => setEditingId(row.service.id)}
-                                  className="inline-flex min-h-10 items-center gap-1 text-sm font-bold text-[#1d6fe8] hover:underline"
+                                  title={t.edit}
+                                  aria-label={t.edit}
+                                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-sky-200 bg-white text-[#1d6fe8] hover:bg-sky-50"
                                 >
                                   <Pencil className="h-3.5 w-3.5" />
-                                  {t.edit}
                                 </button>
                               </div>
                             )}

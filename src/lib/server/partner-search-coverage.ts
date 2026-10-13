@@ -128,6 +128,7 @@ export async function publishPartnerSearchPlaces(partnerId: string) {
   if (!codes.length) return;
   await clearAdminDisabledPlaces(await placeKeysFor(codes));
   const ids = await activatePartnerApprovedDeliveryLocations(codes);
+  await promoteFileAirports();
   try {
     const partner = await prisma.partner.findUnique({
       where: { id: partnerId },
@@ -328,9 +329,20 @@ async function listPartnerPlaces(rawCodes: string[]): Promise<string[]> {
  * administrator turned it off by hand.
  */
 export async function syncListedPartnerDeliveryLocations(): Promise<void> {
+  await promoteFileAirports();
   const groups = await listedPartnerPlaceGroups();
   if (!groups.length) return;
   await listPartnerPlaces(groups.flatMap((group) => group.codes));
+}
+
+/** New-country airports become database rows so their listings can store delivery prices. */
+async function promoteFileAirports() {
+  try {
+    const { promoteFileOnlyAirportLocations } = await import("@/lib/server/promote-file-airport-locations");
+    await promoteFileOnlyAirportLocations();
+  } catch (error) {
+    console.warn("[partner-search-coverage] airport promotion skipped", error);
+  }
 }
 
 /** How many partners deliver to each place code (id, IATA, and city code). */

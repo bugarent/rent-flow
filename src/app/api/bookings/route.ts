@@ -13,6 +13,7 @@ import {
   roundMoney,
 } from "@/lib/cars/reserve-pricing";
 import { parseCarDetails } from "@/lib/cars/car-details";
+import { listingPickupPlaceIds } from "@/lib/cars/listing-place-ids";
 import { extraPeriodCharge } from "@/lib/extras/pricing";
 import { parsePartnerMessengers } from "@/lib/partner";
 import { isValidEmail } from "@/lib/crypto";
@@ -598,7 +599,12 @@ export async function POST(req: Request) {
             prefs = await readPartnerDeliveryPrefs(key);
             if (prefs.length) break;
           }
-          rows = mergeDeliveryPrefsIntoRows(rows, prefs, await loadCityDeliveryPlaces());
+          rows = mergeDeliveryPrefsIntoRows(
+            rows,
+            prefs,
+            await loadCityDeliveryPlaces(),
+            listingPickupPlaceIds(pricedFileCar.description),
+          );
           const { evaluatePickupLeadTime } = await import("@/lib/delivery/booking-lead");
           const lead = evaluatePickupLeadTime({
             pickupAt,
@@ -954,6 +960,7 @@ export async function POST(req: Request) {
         })),
         prefs,
         await (await import("@/lib/server/city-delivery-places")).loadCityDeliveryPlaces(),
+        listingPickupPlaceIds(pricedCar.description),
       );
       const { evaluatePickupLeadTime } = await import("@/lib/delivery/booking-lead");
       const lead = evaluatePickupLeadTime({

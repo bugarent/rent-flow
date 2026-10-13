@@ -1,7 +1,29 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { CATALOG_AIRPORTS } from "@/lib/catalog/airports";
+import { CATALOG_AIRPORTS, type CatalogAirport } from "@/lib/catalog/airports";
+import { findSearchPlace, placeSlug } from "@/lib/catalog/search-places";
+import { worldCountryName } from "@/lib/catalog/world-countries";
+import { primaryTimezoneForCountry } from "@/lib/catalog/country-timezones";
+
+/** Catalog data for an airport: the curated list first, then the per-country place seeds. */
+function airportSeed(iata: string): CatalogAirport | null {
+  const catalog = CATALOG_AIRPORTS.find((a) => a.iata === iata);
+  if (catalog) return catalog;
+  const place = findSearchPlace(iata);
+  if (place?.kind !== "airport" || !place.countryIso2) return null;
+  const iso2 = place.countryIso2.toUpperCase();
+  return {
+    iata,
+    citySlug: placeSlug(place.cityName),
+    countryIso2: iso2,
+    name: { en: place.name },
+    cityName: { en: place.cityName },
+    countryName: { en: worldCountryName(iso2) },
+    isHub: false,
+    timezone: primaryTimezoneForCountry(iso2),
+  };
+}
 
 /** Ensure catalog airports exist in Postgres so PartnerAirport FKs resolve. */
 export async function ensureAirportsByIata(iatas: string[]): Promise<Array<{ id: string; iata: string }>> {
@@ -16,8 +38,10 @@ export async function ensureAirportsByIata(iatas: string[]): Promise<Array<{ id:
   const missing = wanted.filter((i) => !have.has(i));
 
   for (const iata of missing) {
-    const catalog = CATALOG_AIRPORTS.find((a) => a.iata === iata);
+    const catalog = airportSeed(iata);
     if (!catalog) continue;
+    // Seed names are English-only: never let them replace translated names already saved.
+    const curated = CATALOG_AIRPORTS.some((a) => a.iata === iata);
 
     const country = await prisma.country.upsert({
       where: { iso2: catalog.countryIso2 },
@@ -26,7 +50,7 @@ export async function ensureAirportsByIata(iatas: string[]): Promise<Array<{ id:
         name: catalog.countryName,
         sortOrder: catalog.isHub ? 0 : 50,
       },
-      update: { name: catalog.countryName },
+      update: curated ? { name: catalog.countryName } : {},
     });
 
     const city = await prisma.city.upsert({
@@ -36,7 +60,7 @@ export async function ensureAirportsByIata(iatas: string[]): Promise<Array<{ id:
         slug: catalog.citySlug,
         name: catalog.cityName,
       },
-      update: { name: catalog.cityName },
+      update: curated ? { name: catalog.cityName } : {},
     });
 
     const airport = await prisma.airport.upsert({

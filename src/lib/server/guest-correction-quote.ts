@@ -171,6 +171,7 @@ async function liveDeliveryLegs(
         rentalDays: days,
         partnerId: car.partnerId,
         partnerUserId: car.partnerUserId,
+        listingDescription: car.description,
       });
       return legs(summary);
     }
@@ -183,6 +184,7 @@ async function liveDeliveryLegs(
       where: { id: carId },
       select: {
         partnerId: true,
+        description: true,
         deliveryPrices: {
           select: {
             deliveryLocationId: true,
@@ -205,6 +207,7 @@ async function liveDeliveryLegs(
       dropoffIata,
       rentalDays: days,
       partnerId: car.partnerId,
+      listingDescription: car.description,
     });
     return legs(summary);
   } catch {

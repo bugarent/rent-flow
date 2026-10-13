@@ -54,6 +54,11 @@ function slugify(value: string): string {
     .replace(/^-|-$/g, "");
 }
 
+/** Slug used in city place codes (`CITY-GE-tbilisi`) for a city name. */
+export function placeSlug(value: string): string {
+  return slugify(value);
+}
+
 function airportLabel(iata: string, airportName: string): string {
   return `${airportName} (${iata})`;
 }

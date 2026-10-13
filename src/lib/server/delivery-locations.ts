@@ -369,30 +369,41 @@ export async function createDeliveryLocation(input: {
   }
 
   let view: DeliveryLocationView;
+  let fileTwin: StoredDeliveryLocation | undefined;
   try {
-    const airport = await prisma.airport.findFirst({
-      where: {
-        OR: [{ id: input.airportId }, { iata: input.airportId.toUpperCase() }],
-        isActive: true,
-      },
-      include: { city: { include: { country: true } } },
-    });
+    const findAirport = (key: string) =>
+      prisma.airport.findFirst({
+        where: { OR: [{ id: key }, { iata: key.toUpperCase() }], isActive: true },
+        include: { city: { include: { country: true } } },
+      });
+    let airport = await findAirport(input.airportId);
     if (!airport) {
-      // Catalog IATA when Airport table is empty or this city is not seeded yet
-      return createInFile();
+      // Airports of a country nobody used yet: add the catalog airport so listings can store delivery prices.
+      const iata = findSearchPlace(input.airportId)?.iata ?? normalizeLocationCode(input.airportId);
+      const { ensureAirportsByIata } = await import("@/lib/server/partner-airports");
+      const [made] = await ensureAirportsByIata([iata]);
+      airport = made ? await findAirport(made.id) : null;
     }
+    if (!airport) return createInFile();
 
     const existing = await prisma.deliveryLocation.findUnique({
       where: { airportId: airport.id },
     });
     if (existing) return reuseExisting(existing.id, existing.isActive);
 
+    // A file-only row for this airport keeps its id, so partner settings and listings stay linked.
+    const iataKey = normalizeLocationCode(airport.iata);
+    fileTwin = (await readFileStore().catch(() => [] as StoredDeliveryLocation[])).find(
+      (r) => normalizeLocationCode(r.iata) === iataKey,
+    );
+
     const row = await prisma.deliveryLocation.create({
       data: {
+        ...(fileTwin ? { id: fileTwin.id } : {}),
         airportId: airport.id,
-        maxDeliveryPriceEur,
-        isActive,
-        sortOrder,
+        maxDeliveryPriceEur: fileTwin ? Math.max(0, Number(fileTwin.maxDeliveryPriceEur) || 0) : maxDeliveryPriceEur,
+        isActive: isActive || fileTwin?.isActive === true,
+        sortOrder: fileTwin?.sortOrder ?? sortOrder,
       },
       include: { airport: { include: { city: { include: { country: true } } } } },
     });
@@ -418,13 +429,14 @@ export async function createDeliveryLocation(input: {
 
   // The database row is saved; a failed mirror must not create a second row.
   const created = view;
+  const twin = fileTwin;
   try {
     await mutateFileStore((fileRows) => {
       const now = new Date().toISOString();
       return {
         rows: [
           ...fileRows.filter((r) => r.airportId !== created.airportId && r.iata !== created.iata),
-          { ...created, createdAt: now, updatedAt: now },
+          { ...twin, ...created, createdAt: twin?.createdAt || now, updatedAt: now },
         ],
         result: undefined,
       };

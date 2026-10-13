@@ -45,26 +45,31 @@ function rowCountry(row: DeliveryPriceRowLike): string {
 /**
  * The partner's "City delivery" price for a city applies to every listing the
  * partner offers in that country, so a city search charges that exact price.
+ * Cities a listing marks itself count even when it has no airport row in that
+ * country (e.g. a partner in a newly added country delivering only to cities);
+ * without a Delivery-page price such a city is free.
  */
 function cityRowsFromPrefs(
   rows: DeliveryPriceRowLike[],
   prefs: PartnerDeliveryPref[],
   cityPlaces: ReadonlyMap<string, CityDeliveryPlace>,
+  listingPlaceIds?: ReadonlySet<string>,
 ): DeliveryPriceRowLike[] {
   const present = new Set(rows.map((r) => String(r.deliveryLocationId || r.deliveryLocation?.id || "")));
   const countries = new Set(
     rows.filter((r) => r.deliveryLocation?.isActive !== false).map(rowCountry).filter(Boolean),
   );
   const extra: DeliveryPriceRowLike[] = [];
-  for (const pref of prefs) {
-    if (pref.enabled === false || present.has(pref.deliveryLocationId)) continue;
-    const place = cityPlaces.get(pref.deliveryLocationId);
-    if (!place || !place.isActive || !countries.has(place.countryIso2.toUpperCase())) continue;
+  const add = (
+    place: CityDeliveryPlace,
+    values: Pick<PartnerDeliveryPref, "priceEur" | "freeAfterDays" | "travelTimeMinutes">,
+  ) => {
+    present.add(place.id);
     extra.push({
       deliveryLocationId: place.id,
-      priceEur: pref.priceEur,
-      freeAfterDays: pref.freeAfterDays,
-      travelTimeMinutes: pref.travelTimeMinutes,
+      priceEur: values.priceEur,
+      freeAfterDays: values.freeAfterDays,
+      travelTimeMinutes: values.travelTimeMinutes,
       deliveryLocation: {
         id: place.id,
         isActive: true,
@@ -72,6 +77,21 @@ function cityRowsFromPrefs(
         airport: { iata: place.code, city: { country: { iso2: place.countryIso2.toUpperCase() } } },
       },
     });
+  };
+  const prefIds = new Set<string>();
+  for (const pref of prefs) {
+    prefIds.add(pref.deliveryLocationId);
+    if (pref.enabled === false || present.has(pref.deliveryLocationId)) continue;
+    const place = cityPlaces.get(pref.deliveryLocationId);
+    if (!place || !place.isActive) continue;
+    if (!countries.has(place.countryIso2.toUpperCase()) && !listingPlaceIds?.has(place.id)) continue;
+    add(place, pref);
+  }
+  for (const id of listingPlaceIds ?? []) {
+    if (present.has(id) || prefIds.has(id)) continue;
+    const place = cityPlaces.get(id);
+    if (!place?.isActive) continue;
+    add(place, { priceEur: 0, freeAfterDays: null, travelTimeMinutes: 0 });
   }
   return extra;
 }
@@ -81,10 +101,11 @@ export function mergeDeliveryPrefsIntoRows<T extends DeliveryPriceRowLike>(
   rows: T[] | undefined,
   prefs: PartnerDeliveryPref[] | undefined,
   cityPlaces?: ReadonlyMap<string, CityDeliveryPlace>,
+  /** Location ids on the listing's own pick-up list. */
+  listingPlaceIds?: ReadonlySet<string>,
 ): T[] {
-  if (!rows?.length) return [];
   const byId = new Map((prefs ?? []).map((p) => [p.deliveryLocationId, p]));
-  const merged = rows.map((row) => {
+  const merged = (rows ?? []).map((row) => {
     const locId = String(row.deliveryLocationId || row.deliveryLocation?.id || "");
     const pref = locId ? byId.get(locId) : undefined;
     if (!pref || pref.enabled === false) return withinAdminLimit(row);
@@ -95,8 +116,8 @@ export function mergeDeliveryPrefsIntoRows<T extends DeliveryPriceRowLike>(
       travelTimeMinutes: pref.travelTimeMinutes,
     });
   });
-  if (!cityPlaces?.size || !prefs?.length) return merged;
-  const cityRows = cityRowsFromPrefs(merged, prefs, cityPlaces).map(
+  if (!cityPlaces?.size || (!prefs?.length && !listingPlaceIds?.size)) return merged;
+  const cityRows = cityRowsFromPrefs(merged, prefs ?? [], cityPlaces, listingPlaceIds).map(
     (row) => withinAdminLimit(row) as unknown as T,
   );
   return [...merged, ...cityRows];

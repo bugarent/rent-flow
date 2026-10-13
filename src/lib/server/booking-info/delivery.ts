@@ -7,6 +7,7 @@ import {
   type DeliveryPriceRowLike,
 } from "@/lib/delivery/trip-fees";
 import { roundMoney } from "@/lib/cars/reserve-pricing";
+import { listingPickupPlaceIds } from "@/lib/cars/listing-place-ids";
 import { toNumber } from "@/lib/utils";
 import type { BookingInfoDetailPayload, BookingInfoLocationOption } from "./types";
 
@@ -51,6 +52,8 @@ export async function buildMergedDeliveryRows(input: {
   }> | null;
   partnerId?: string;
   partnerUserId?: string;
+  /** Listing description, for the city places the listing marks itself. */
+  listingDescription?: string | null;
 }): Promise<{ rows: DeliveryPriceRowLike[]; byIata: Map<string, { label: string }> }> {
   const { listDeliveryLocations } = await import("@/lib/server/delivery-locations");
   const { normalizeLocationCode } = await import("@/lib/catalog/search-places");
@@ -123,9 +126,10 @@ export async function buildMergedDeliveryRows(input: {
         if (prefs.length) break;
       }
 
-      if (rows.length && prefs.length) {
+      const listingPlaceIds = listingPickupPlaceIds(input.listingDescription);
+      if (rows.length && (prefs.length || listingPlaceIds.size)) {
         const { loadCityDeliveryPlaces } = await import("@/lib/server/city-delivery-places");
-        rows = mergeDeliveryPrefsIntoRows(rows, prefs, await loadCityDeliveryPlaces());
+        rows = mergeDeliveryPrefsIntoRows(rows, prefs, await loadCityDeliveryPlaces(), listingPlaceIds);
       } else if (!rows.length && prefs.length) {
         rows = prefs
           .filter((p) => p.enabled !== false)
@@ -196,6 +200,7 @@ export async function resolveDeliverySummary(input: {
   rentalDays: number;
   partnerId?: string;
   partnerUserId?: string;
+  listingDescription?: string | null;
 }): Promise<BookingInfoDetailPayload["delivery"]> {
   const pickupIata = String(input.pickupIata || "").toUpperCase();
   const dropoffIata = String(input.dropoffIata || "").toUpperCase() || pickupIata;
@@ -223,6 +228,7 @@ export async function resolveDeliverySummary(input: {
       deliveryPrices: input.deliveryPrices,
       partnerId: input.partnerId,
       partnerUserId: input.partnerUserId,
+      listingDescription: input.listingDescription,
     });
     const fees = computeTripDeliveryFees({
       rows,

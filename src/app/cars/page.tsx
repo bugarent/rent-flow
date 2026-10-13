@@ -7,6 +7,7 @@ import { getDictionary } from "@/lib/i18n/dictionaries";
 import { isCityLocationCode, parseCityLocationCode } from "@/lib/catalog/search-places";
 import { loadPublicFileSearchCars } from "@/lib/server/public-file-cars";
 import { filterExtrasByCarOffers, parseCarDetails } from "@/lib/cars/car-details";
+import { listingPickupPlaceIds } from "@/lib/cars/listing-place-ids";
 import { listingDailyWithDeliveryEur, rentalDayCount } from "@/lib/cars/reserve-pricing";
 import { clampSiteDiscountPercent } from "@/lib/pricing/booking-discount";
 import {
@@ -469,7 +470,12 @@ export default async function CarsPage({
     const prefs = prefsByPartner.get(pid) || [];
     return {
       ...car,
-      deliveryPrices: mergeDeliveryPrefsIntoRows(car.deliveryPrices, prefs, cityPlaces),
+      deliveryPrices: mergeDeliveryPrefsIntoRows(
+        car.deliveryPrices,
+        prefs,
+        cityPlaces,
+        listingPickupPlaceIds(car.description),
+      ),
     };
   });
 

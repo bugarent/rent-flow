@@ -236,6 +236,7 @@ export async function GET(req: Request) {
         : null;
       const { meetsBookingLeadTime } = await import("@/lib/delivery/booking-lead");
       const { mergeDeliveryPrefsIntoRows } = await import("@/lib/delivery/trip-fees");
+      const { listingPickupPlaceIds } = await import("@/lib/cars/listing-place-ids");
       const { readPartnerDeliveryPrefsMap } = await import(
         "@/lib/server/partner-delivery-prefs-store"
       );
@@ -256,6 +257,7 @@ export async function GET(req: Request) {
         const car = raw as {
           partnerId?: string;
           partner?: { id?: string };
+          description?: string | null;
           deliveryPrices?: Array<{
             travelTimeMinutes?: number | null;
             deliveryLocation?: {
@@ -267,7 +269,7 @@ export async function GET(req: Request) {
         const pid = String(car.partnerId || car.partner?.id || "");
         let rows = car.deliveryPrices ?? [];
         const prefs = prefsCache.get(pid);
-        rows = mergeDeliveryPrefsIntoRows(rows, prefs, cityPlaces);
+        rows = mergeDeliveryPrefsIntoRows(rows, prefs, cityPlaces, listingPickupPlaceIds(car.description));
         const matching = rows.filter((row) => {
           const loc = row.deliveryLocation;
           if (!loc?.isActive || !loc.airport) return false;
