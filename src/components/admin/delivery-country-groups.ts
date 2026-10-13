@@ -50,14 +50,20 @@ export function matchesCountryQuery(group: Pick<DeliveryCountryGroup, "iso2" | "
   return countrySearchText(group.iso2, group.name).includes(q);
 }
 
-/** Airports before cities, then alphabetical by label. */
-export function compareDeliveryPlaces(a: DeliveryLocationView, b: DeliveryLocationView) {
+/** Places with listing delivery first, then airports before cities, then alphabetical by label. */
+export function compareDeliveryPlaces(
+  a: DeliveryLocationView,
+  b: DeliveryLocationView,
+  deliverableKeys: ReadonlySet<string>,
+) {
+  const delivery = Number(hasListingDelivery(b, deliverableKeys)) - Number(hasListingDelivery(a, deliverableKeys));
+  if (delivery !== 0) return delivery;
   const kind = Number(isCityLocation(a)) - Number(isCityLocation(b));
   if (kind !== 0) return kind;
   return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
 }
 
-/** One group per country, alphabetical; inside, airports first and then cities. */
+/** One group per country, alphabetical; inside, delivering places first (airports, then cities). */
 export function groupDeliveryByCountry(
   items: DeliveryLocationView[],
   deliverableKeys: ReadonlySet<string>,
@@ -90,7 +96,7 @@ export function groupDeliveryByCountry(
   }
   const groups = [...map.values()];
   for (const group of groups) {
-    group.items.sort(compareDeliveryPlaces);
+    group.items.sort((a, b) => compareDeliveryPlaces(a, b, deliverableKeys));
   }
   return groups.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
 }

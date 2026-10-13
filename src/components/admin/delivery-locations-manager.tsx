@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import type { FxRates } from "@/lib/fx";
 import { DEFAULT_FX_RATES } from "@/lib/fx";
@@ -14,12 +14,12 @@ import {
 } from "@/lib/utils";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { uiText } from "@/lib/i18n/ui-text";
-import { Search } from "lucide-react";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { DeliveryLimitBadge } from "@/components/admin/delivery-limit-badge";
 import { DeliveryCountryAccordion } from "@/components/admin/delivery-country-accordion";
 import { DeliveryCountRatio } from "@/components/admin/delivery-count-ratio";
 import { DeliveryListingBadge } from "@/components/admin/delivery-listing-badge";
+import { DeliveryCountryPicker } from "@/components/admin/delivery-country-picker";
 import { COUNTRY_NAMES_KA } from "@/lib/catalog/country-names-ka";
 import { cn } from "@/lib/utils";
 import {
@@ -128,6 +128,7 @@ export function DeliveryLocationsManager({
   const [savingId, setSavingId] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
   const [countryQuery, setCountryQuery] = useState("");
+  const [pickedCountry, setPickedCountry] = useState("");
   const [openCountries, setOpenCountries] = useState<ReadonlyMap<string, boolean>>(() => new Map());
 
   const symbol = currencySymbol(currency);
@@ -137,15 +138,30 @@ export function DeliveryLocationsManager({
 
   const deliverableSet = useMemo(() => new Set(deliverableKeys), [deliverableKeys]);
 
-  /** Countries with active places that match the search, each with only its active places. */
-  const activeGroups = useMemo(
-    () =>
-      groupDeliveryByCountry(
-        locations.filter((item) => item.isActive),
-        deliverableSet,
-      ).filter((group) => matchesCountryQuery(group, countryQuery)),
-    [locations, deliverableSet, countryQuery],
+  const countryTitle = (group: { iso2: string; name: string }) =>
+    locale === "ka" ? (COUNTRY_NAMES_KA[group.iso2] ?? group.name) : group.name;
+
+  const matchesCountryFilter = useCallback(
+    (group: { iso2: string; name: string }) =>
+      pickedCountry ? group.iso2 === pickedCountry : matchesCountryQuery(group, countryQuery),
+    [pickedCountry, countryQuery],
   );
+
+  /** Every country with active places, each with only its active places. */
+  const allActiveGroups = useMemo(
+    () => groupDeliveryByCountry(locations.filter((item) => item.isActive), deliverableSet),
+    [locations, deliverableSet],
+  );
+
+  const activeGroups = useMemo(
+    () => allActiveGroups.filter(matchesCountryFilter),
+    [allActiveGroups, matchesCountryFilter],
+  );
+
+  const countryOptions = (pickedCountry
+    ? allActiveGroups
+    : allActiveGroups.filter((group) => matchesCountryQuery(group, countryQuery))
+  ).map((group) => ({ iso2: group.iso2, title: countryTitle(group) }));
 
   const totals = useMemo(() => {
     const sum = { airports: 0, cities: 0, activeAirports: 0, activeCities: 0 };
@@ -164,13 +180,14 @@ export function DeliveryLocationsManager({
         locations.filter((item) => !item.isActive),
         deliverableSet,
       )
-        .filter((group) => matchesCountryQuery(group, countryQuery))
+        .filter(matchesCountryFilter)
         .flatMap((group) => group.items),
-    [locations, deliverableSet, countryQuery],
+    [locations, deliverableSet, matchesCountryFilter],
   );
 
-  // A search that leaves exactly one country opens it straight away.
-  const singleMatch = countryQuery.trim() && activeGroups.length === 1 ? activeGroups[0].iso2 : "";
+  // A search or pick that leaves exactly one country opens it straight away.
+  const filtering = Boolean(pickedCountry || countryQuery.trim());
+  const singleMatch = filtering && activeGroups.length === 1 ? activeGroups[0].iso2 : "";
   const isCountryOpen = (iso2: string) => openCountries.get(iso2) ?? singleMatch === iso2;
   const toggleCountry = (iso2: string) => {
     const nextOpen = !isCountryOpen(iso2);
@@ -573,20 +590,27 @@ export function DeliveryLocationsManager({
       {message ? <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p> : null}
 
       <div className="space-y-3">
-        <label className="relative block">
-          <span className="sr-only">{phrase("Search country", "მოძებნეთ ქვეყანა", "Найти страну")}</span>
-          <Search
-            className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
-            aria-hidden
-          />
-          <input
-            type="search"
-            value={countryQuery}
-            onChange={(e) => setCountryQuery(e.target.value)}
-            placeholder={phrase("Search country…", "მოძებნეთ ქვეყანა…", "Найти страну…")}
-            className="min-h-12 w-full rounded-xl border border-slate-300 bg-white py-2 pl-11 pr-3 text-base font-semibold text-[#0b1f4b] outline-none placeholder:font-medium placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
-          />
-        </label>
+        <DeliveryCountryPicker
+          options={countryOptions}
+          query={countryQuery}
+          selectedIso2={pickedCountry}
+          onQueryChange={(text) => {
+            setCountryQuery(text);
+            setPickedCountry("");
+          }}
+          onSelect={(iso2) => {
+            setPickedCountry(iso2);
+            setCountryQuery("");
+          }}
+          labels={{
+            search: phrase("Search country", "მოძებნეთ ქვეყანა", "Найти страну"),
+            placeholder: phrase("Choose a country…", "აირჩიეთ ქვეყანა…", "Выберите страну…"),
+            all: phrase("All countries", "ყველა ქვეყანა", "Все страны"),
+            empty: phrase("No matching country.", "ქვეყანა ვერ მოიძებნა.", "Страна не найдена."),
+            clear: phrase("Clear", "გასუფთავება", "Очистить"),
+            toggle: phrase("Show countries", "ქვეყნების ჩვენება", "Показать страны"),
+          }}
+        />
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex min-h-11 min-w-0 items-center rounded-xl border border-slate-200 bg-white px-3 text-sm sm:text-base">
             <DeliveryCountRatio
@@ -612,7 +636,7 @@ export function DeliveryLocationsManager({
 
       {activeGroups.length === 0 ? (
         <p className="rounded-2xl border bg-white p-8 text-center text-sm text-slate-500">
-          {countryQuery.trim()
+          {filtering
             ? phrase("No matching country.", "ქვეყანა ვერ მოიძებნა.", "Страна не найдена.")
             : phrase("No active delivery locations.", "აქტიური ლოკაცია არ არის.", "Активных локаций нет.")}
         </p>
@@ -622,7 +646,7 @@ export function DeliveryLocationsManager({
             <DeliveryCountryAccordion
               key={group.iso2}
               group={group}
-              title={locale === "ka" ? (COUNTRY_NAMES_KA[group.iso2] ?? group.name) : group.name}
+              title={countryTitle(group)}
               open={isCountryOpen(group.iso2)}
               onToggle={() => toggleCountry(group.iso2)}
               labels={groupLabels}
