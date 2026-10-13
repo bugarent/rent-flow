@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { CheckoutCopy } from "@/lib/i18n/checkout-copy";
 import { knownText } from "@/lib/i18n/known-record-text";
+import { localizedExtraCopy } from "@/lib/extras/localized-copy";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { CARD_PICKUP_SURCHARGE_PERCENT } from "@/lib/cars/reserve-pricing";
 import { extraPeriodCharge } from "@/lib/extras/pricing";
@@ -27,6 +28,7 @@ export type PickupPaymentMethod = "card" | "cash";
 function resolveInsuranceDetail(
   pack: ReservePaidExtra,
   copy: CheckoutCopy,
+  locale: string,
 ): {
   title: string;
   body: string;
@@ -35,6 +37,7 @@ function resolveInsuranceDetail(
   recommend: string | null;
 } {
   const slot = pack.checkoutSlot;
+  const about = localizedExtraCopy(locale, pack.description || "", pack.descriptionI18n);
   if (slot === "tpl") {
     return {
       title: copy.tplTitle,
@@ -65,15 +68,15 @@ function resolveInsuranceDetail(
   if (slot === "driver") {
     return {
       title: copy.additionalDriverTitle,
-      body: copy.additionalDriverBody || pack.description || "",
+      body: copy.additionalDriverBody || about,
       includes: [],
       warns: [],
       recommend: null,
     };
   }
   return {
-    title: pack.name,
-    body: pack.description || "",
+    title: localizedExtraCopy(locale, pack.name, pack.nameI18n),
+    body: about,
     includes: [],
     warns: [],
     recommend: null,
@@ -105,7 +108,7 @@ export function CheckoutInsurancePanel({
   const enabledCount = packs.filter((pack) => selectedIds.has(pack.id)).length;
   const dayCount = Math.max(1, days || 1);
   const detailPack = packs.find((pack) => pack.id === detailId) ?? null;
-  const detail = detailPack ? resolveInsuranceDetail(detailPack, copy) : null;
+  const detail = detailPack ? resolveInsuranceDetail(detailPack, copy, locale) : null;
 
   useEffect(() => {
     if (!detailId) return;
@@ -147,7 +150,7 @@ export function CheckoutInsurancePanel({
             return (
               <InsuranceToggleRow
                 key={pack.id}
-                title={knownText(locale, pack.name)}
+                title={localizedExtraCopy(locale, pack.name, pack.nameI18n)}
                 selected={selected}
                 locked={locked}
                 onToggle={() => {
@@ -356,7 +359,7 @@ function InsuranceDetailModal({
 
         <div className="max-h-[min(64dvh,460px)] space-y-3.5 overflow-y-auto px-4 py-4">
           {body ? (
-            <p className="text-[15px] leading-relaxed text-slate-700">{body}</p>
+            <p className="whitespace-pre-line text-[15px] leading-relaxed text-slate-700">{body}</p>
           ) : null}
 
           {includes.length > 0 ? (
