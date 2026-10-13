@@ -1116,12 +1116,12 @@ export function PartnerEquipmentServicePanel({
                 <table className="min-w-full text-left text-sm">
                   <thead className="bg-[#e8f5e9] text-xs font-bold uppercase tracking-wide text-slate-600">
                     <tr>
-                      <th className="px-3 py-2.5">{t.colService}</th>
-                      <th className="px-3 py-2.5 whitespace-nowrap">{t.colPrice}</th>
-                      <th className="px-3 py-2.5 whitespace-nowrap">{t.colMin}</th>
-                      <th className="px-3 py-2.5 whitespace-nowrap">{t.colMax}</th>
-                      <th className="px-3 py-2.5">{t.colCars}</th>
-                      <th className="px-3 py-2.5" />
+                      <th className="px-3 py-2">{t.colService}</th>
+                      <th className="px-3 py-2 whitespace-nowrap">{t.colPrice}</th>
+                      <th className="px-3 py-2 whitespace-nowrap">{t.colMin}</th>
+                      <th className="px-3 py-2 whitespace-nowrap">{t.colMax}</th>
+                      <th className="px-3 py-2">{t.colCars}</th>
+                      <th className="px-3 py-2" />
                     </tr>
                   </thead>
                   <tbody>
@@ -1185,34 +1185,26 @@ export function PartnerEquipmentServicePanel({
                                 : "bg-[#fafbfd]",
                           )}
                         >
-                          <td className="min-w-[200px] px-3 py-2 align-top">
+                          <td className="min-w-[200px] px-3 py-1.5 align-top">
                             <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                              <p className="font-bold leading-snug text-[#0b1f4b]">
+                              <p
+                                className="font-bold leading-snug text-[#0b1f4b]"
+                                title={
+                                  row.service.description
+                                    ? localizedExtraCopy(locale, row.service.description, row.service.descriptionI18n)
+                                    : undefined
+                                }
+                              >
                                 {localizedExtraCopy(locale, row.service.name, row.service.nameI18n)}
                               </p>
-                              {statusLocked ? (
-                                <span
-                                  className={cn(
-                                    "inline-block rounded px-1.5 py-0.5 text-[10px] font-bold",
-                                    mandatory || dailyIsZero
-                                      ? "bg-emerald-50 text-emerald-700"
-                                      : "bg-sky-50 text-sky-700",
-                                  )}
-                                >
-                                  {mandatory || dailyIsZero ? t.mandatoryFree : t.mandatoryPriced}
+                              {statusLocked && (mandatory || dailyIsZero) ? (
+                                <span className="inline-block rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                                  {t.free}
                                 </span>
                               ) : null}
                             </div>
-                            {row.service.description ? (
-                              <p
-                                className="line-clamp-1 text-xs text-slate-500"
-                                title={localizedExtraCopy(locale, row.service.description, row.service.descriptionI18n)}
-                              >
-                                {localizedExtraCopy(locale, row.service.description, row.service.descriptionI18n)}
-                              </p>
-                            ) : null}
                           </td>
-                          <td className="px-3 py-2 align-top font-semibold text-[#0b1f4b]">
+                          <td className="px-3 py-1.5 align-top font-semibold text-[#0b1f4b]">
                             <div>{priceCell}</div>
                             {dailyCapHint ? (
                               <p className="whitespace-nowrap text-[10px] font-medium leading-tight text-amber-800/90">
@@ -1220,7 +1212,7 @@ export function PartnerEquipmentServicePanel({
                               </p>
                             ) : null}
                           </td>
-                          <td className="px-3 py-2 align-top text-slate-600">
+                          <td className="px-3 py-1.5 align-top text-slate-600">
                             <div>{row.mode === "off" ? "—" : periodCell(row.minPeriodEur)}</div>
                             {periodCapHint ? (
                               <p className="whitespace-nowrap text-[10px] font-medium leading-tight text-amber-800/90">
@@ -1228,7 +1220,7 @@ export function PartnerEquipmentServicePanel({
                               </p>
                             ) : null}
                           </td>
-                          <td className="px-3 py-2 align-top text-slate-600">
+                          <td className="px-3 py-1.5 align-top text-slate-600">
                             <div>{row.mode === "off" ? "—" : periodCell(row.maxPeriodEur)}</div>
                             {periodCapHint ? (
                               <p className="whitespace-nowrap text-[10px] font-medium leading-tight text-amber-800/90">
@@ -1236,7 +1228,7 @@ export function PartnerEquipmentServicePanel({
                               </p>
                             ) : null}
                           </td>
-                          <td className="px-3 py-2 align-top text-xs leading-snug text-slate-600">
+                          <td className="px-3 py-1.5 align-top text-xs leading-snug text-slate-600">
                             <div className="w-[150px] truncate" title={carsLabel}>
                               {colon >= 0 ? (
                                 <>
@@ -1250,7 +1242,7 @@ export function PartnerEquipmentServicePanel({
                               )}
                             </div>
                           </td>
-                          <td className="py-2 pl-1 pr-3 align-top text-right">
+                          <td className="py-1.5 pl-1 pr-3 align-top text-right">
                             {statusLocked ? (
                               <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                                 <span
@@ -1380,16 +1372,17 @@ export function PartnerEquipmentServicePanel({
                             {localizedExtraCopy(locale, row.service.name, row.service.nameI18n)}
                           </span>
                           <span className="shrink-0 text-xs font-semibold text-slate-400">{priceCell}</span>
+                          {statusLocked ? (
+                            <span
+                              title={t.mandatoryLockedTitle}
+                              className="inline-flex shrink-0 items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700"
+                            >
+                              <Lock className="h-3 w-3" />
+                              {t.mandatoryBadge}
+                            </span>
+                          ) : null}
                         </button>
-                        {statusLocked ? (
-                          <span
-                            title={t.mandatoryLockedTitle}
-                            className="mb-0.5 inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700"
-                          >
-                            <Lock className="h-3 w-3" />
-                            {t.mandatoryBadge}
-                          </span>
-                        ) : (
+                        {statusLocked ? null : (
                           <OfferModeButtons
                             active={row.mode}
                             labels={{ on: t.on, forbidden: t.forbidden, off: t.off }}
