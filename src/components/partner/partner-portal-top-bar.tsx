@@ -111,15 +111,15 @@ export function PartnerPortalTopBar({
       mode: "prefix" as const,
     },
     {
-      href: `${PARTNER_BASE}/discounts`,
-      label: t.discounts,
-      mode: "prefix" as const,
-    },
-    {
       href: `${PARTNER_BASE}/equipment-service`,
       label: t.equipmentService,
       mode: "prefix" as const,
       truncate: true,
+    },
+    {
+      href: `${PARTNER_BASE}/discounts`,
+      label: t.discounts,
+      mode: "prefix" as const,
     },
     {
       href: `${PARTNER_BASE}/integration`,
