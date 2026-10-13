@@ -10,7 +10,12 @@ import {
 } from "@/lib/auth/portals";
 
 /** Partner cabinet auto sign-out after this much idle time. */
-export const PARTNER_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+export const PARTNER_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+
+/** Shared by every open cabinet tab, so work in one tab keeps the others signed in. */
+const LAST_ACTIVITY_KEY = "rac.partner.lastActivityAt";
+const CHECK_EVERY_MS = 15_000;
+const WRITE_EVERY_MS = 5_000;
 
 const ACTIVITY_EVENTS = [
   "mousemove",
@@ -19,7 +24,26 @@ const ACTIVITY_EVENTS = [
   "scroll",
   "touchstart",
   "click",
+  "input",
+  "wheel",
 ] as const;
+
+function readLastActivity(fallback: number): number {
+  try {
+    const stored = Number(window.localStorage.getItem(LAST_ACTIVITY_KEY));
+    return Number.isFinite(stored) && stored > 0 ? Math.max(stored, fallback) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeLastActivity(at: number) {
+  try {
+    window.localStorage.setItem(LAST_ACTIVITY_KEY, String(at));
+  } catch {
+    /* private mode: this tab's own time is still used */
+  }
+}
 
 function expireCookie(name: string, secure: boolean) {
   const secureFlag = secure ? "; Secure" : "";
@@ -39,25 +63,23 @@ function clearPartnerCookiesClient() {
 }
 
 /**
- * Signs the partner out after 5 minutes without interaction.
+ * Signs the partner out after 10 minutes without interaction in any cabinet tab.
+ * Elapsed time is measured from the last activity, so a sleeping laptop or a
+ * background tab (where timers are delayed) is signed out as soon as it wakes.
  * Only mounts on authenticated cabinet pages (not login/register).
  */
 export function PartnerIdleLogout() {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const signingOutRef = useRef(false);
 
   useEffect(() => {
-    const clearTimer = () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-    };
+    let localLastActivity = Date.now();
+    let lastWrite = 0;
+    let interval: ReturnType<typeof setInterval> | null = null;
 
     const logout = () => {
       if (signingOutRef.current) return;
       signingOutRef.current = true;
-      clearTimer();
+      if (interval) clearInterval(interval);
       const loginUrl = AUTH_SIGNOUT_PAGES.partner;
       const basePath = AUTH_BASE_PATHS.partner;
       void (async () => {
@@ -93,21 +115,40 @@ export function PartnerIdleLogout() {
       })();
     };
 
-    const arm = () => {
-      clearTimer();
-      timerRef.current = setTimeout(logout, PARTNER_IDLE_TIMEOUT_MS);
+    const markActive = () => {
+      const now = Date.now();
+      localLastActivity = now;
+      if (now - lastWrite >= WRITE_EVERY_MS) {
+        lastWrite = now;
+        writeLastActivity(now);
+      }
     };
 
-    arm();
+    const checkIdle = () => {
+      if (signingOutRef.current) return;
+      const last = readLastActivity(localLastActivity);
+      if (Date.now() - last >= PARTNER_IDLE_TIMEOUT_MS) logout();
+    };
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") checkIdle();
+    };
+
+    markActive();
+    interval = setInterval(checkIdle, CHECK_EVERY_MS);
     for (const event of ACTIVITY_EVENTS) {
-      window.addEventListener(event, arm, { passive: true });
+      window.addEventListener(event, markActive, { passive: true, capture: true });
     }
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", checkIdle);
 
     return () => {
-      clearTimer();
+      if (interval) clearInterval(interval);
       for (const event of ACTIVITY_EVENTS) {
-        window.removeEventListener(event, arm);
+        window.removeEventListener(event, markActive, { capture: true });
       }
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", checkIdle);
     };
   }, []);
 
