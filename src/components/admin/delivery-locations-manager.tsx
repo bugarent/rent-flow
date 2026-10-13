@@ -19,8 +19,14 @@ import { CountryFlag } from "@/components/ui/country-flag";
 import { DeliveryLimitBadge } from "@/components/admin/delivery-limit-badge";
 import { DeliveryCountryAccordion } from "@/components/admin/delivery-country-accordion";
 import { DeliveryCountRatio } from "@/components/admin/delivery-count-ratio";
+import { DeliveryListingBadge } from "@/components/admin/delivery-listing-badge";
 import { COUNTRY_NAMES_KA } from "@/lib/catalog/country-names-ka";
-import { groupDeliveryByCountry, matchesCountryQuery } from "@/components/admin/delivery-country-groups";
+import { cn } from "@/lib/utils";
+import {
+  groupDeliveryByCountry,
+  hasListingDelivery,
+  matchesCountryQuery,
+} from "@/components/admin/delivery-country-groups";
 import {
   ResponsiveDataList,
   MobileDataCard,
@@ -126,6 +132,7 @@ export function DeliveryLocationsManager({
 
   const symbol = currencySymbol(currency);
   const freeLabel = phrase("No limit", "ლიმიტის გარეშე", "Без лимита");
+  const deliveryBadgeLabel = phrase("Delivery active", "მიწოდება აქტიურია", "Доставка активна");
   const rangeLabel = phrase("Partner price", "პარტნიორის ფასი", "Цена партнёра");
 
   const deliverableSet = useMemo(() => new Set(deliverableKeys), [deliverableKeys]);
@@ -305,15 +312,27 @@ export function DeliveryLocationsManager({
     const storedDays = item.maxFreeAfterDays == null ? "" : String(item.maxFreeAfterDays);
     const dirty = Number(draft) !== storedDisplay || daysDraft.trim() !== storedDays;
     const busy = savingId === item.id;
+    const deliverable = hasListingDelivery(item, deliverableSet);
     return (
-      <tr key={item.id} className="border-t align-middle">
+      <tr
+        key={item.id}
+        className={cn(
+          "border-t align-middle",
+          deliverable ? "bg-emerald-50 shadow-[inset_4px_0_0_#059669]" : "bg-white",
+        )}
+      >
         <td className="p-3 font-mono text-sm font-bold text-slate-500">{index + 1}</td>
         <td className="p-3">
           <CountryFlag iso2={item.countryIso2} className="h-4 w-6 rounded-sm shadow-sm" />
         </td>
         <td className="p-3">
-          <p className="font-semibold text-[#0b1f4b]">{item.label}</p>
+          <p className={cn("font-semibold", deliverable ? "text-[#0b1f4b]" : "text-slate-500")}>{item.label}</p>
           <p className="text-xs text-slate-500">{item.iata}</p>
+          {deliverable ? (
+            <div className="mt-1">
+              <DeliveryListingBadge label={deliveryBadgeLabel} />
+            </div>
+          ) : null}
         </td>
         <td className="p-3">{item.country}</td>
         <td className="p-3">
@@ -406,17 +425,28 @@ export function DeliveryLocationsManager({
     const storedDays = item.maxFreeAfterDays == null ? "" : String(item.maxFreeAfterDays);
     const dirty = Number(draft) !== storedDisplay || daysDraft.trim() !== storedDays;
     const busy = savingId === item.id;
+    const deliverable = hasListingDelivery(item, deliverableSet);
     return (
-      <MobileDataCard key={item.id}>
+      <MobileDataCard
+        key={item.id}
+        className={deliverable ? "border-emerald-300 bg-emerald-50 shadow-[inset_4px_0_0_#059669]" : undefined}
+      >
         <MobileDataRow label="#">
           <span className="font-mono text-sm font-bold text-slate-500">{index + 1}</span>
         </MobileDataRow>
         <MobileDataRow label={phrase("Airport", "აეროპორტი", "Аэропорт")}>
           <div className="flex items-center justify-end gap-2 text-end">
-            <CountryFlag iso2={item.countryIso2} className="h-4 w-6 rounded-sm shadow-sm" />
-            <div>
-              <p className="font-semibold text-[#0b1f4b]">{item.label}</p>
+            <CountryFlag iso2={item.countryIso2} className="h-4 w-6 shrink-0 rounded-sm shadow-sm" />
+            <div className="min-w-0">
+              <p className={cn("break-words font-semibold", deliverable ? "text-[#0b1f4b]" : "text-slate-500")}>
+                {item.label}
+              </p>
               <p className="text-xs font-medium text-slate-500">{item.iata}</p>
+              {deliverable ? (
+                <div className="mt-1">
+                  <DeliveryListingBadge label={deliveryBadgeLabel} />
+                </div>
+              ) : null}
             </div>
           </div>
         </MobileDataRow>
