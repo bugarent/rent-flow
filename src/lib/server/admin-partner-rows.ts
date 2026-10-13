@@ -5,6 +5,7 @@ import { dbOfflineMessage, isDbOfflineError, shortPrismaError } from "@/lib/serv
 import { listFilePartnerApplications } from "@/lib/server/partner-applications-store";
 import { listFileCarsForPartner } from "@/lib/server/partner-cars-store";
 import { TEST_PARTNER_EMAIL, LOCAL_PARTNER_ID } from "@/lib/auth/local-partner-store";
+import { listedPartnerPhones } from "@/lib/partners/partner-phones";
 
 function isSeedTestPartner(row: { id: string; email: string; displayName: string }) {
   const email = row.email.trim().toLowerCase();
@@ -26,6 +27,7 @@ export type AdminPartnerRow = {
   carCount: number;
   email: string;
   phone: string;
+  secondaryPhone: string;
   country: string;
   hasUser: boolean;
   unreadReapplyCount: number;
@@ -112,7 +114,11 @@ export async function loadAdminPartnerRows(): Promise<{
         fleetSize: p.fleetSize,
         carCount: p._count.cars,
         email: p.email,
-        phone: p.phone,
+        ...listedPartnerPhones({
+          phone: p.phone,
+          secondaryPhone: p.secondaryPhone,
+          companySettings: p.companySettings,
+        }),
         country: countryNames(p.operatingCountryIso2s),
         hasUser: Boolean(p.userId),
         unreadReapplyCount: unreadReapply,
@@ -146,7 +152,10 @@ export async function loadAdminPartnerRows(): Promise<{
         fleetSize: p.fleetSize,
         carCount: 0,
         email: p.email,
-        phone: p.phone,
+        ...listedPartnerPhones({
+          phone: p.phone,
+          secondaryPhone: p.secondaryPhone,
+        }),
         country: countryNames(p.operatingCountryIso2s),
         hasUser: false,
         unreadReapplyCount: unreadReapply,
@@ -218,7 +227,10 @@ export async function loadAdminPartnerRows(): Promise<{
         fleetSize: 0,
         carCount: 0,
         email,
-        phone: settings?.primaryPhone || "",
+        ...listedPartnerPhones({
+          phone: settings?.primaryPhone || "",
+          secondaryPhone: settings?.secondaryPhone || "",
+        }),
         country: countryNames(settings?.deliveryCountryIso2s),
         hasUser: false,
         unreadReapplyCount: row.moderation.unreadCount || 1,

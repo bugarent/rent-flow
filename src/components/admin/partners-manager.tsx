@@ -24,6 +24,9 @@ import {
   MobileDataRow,
 } from "@/components/ui/responsive-data-list";
 import { PartnerSelectionBar } from "@/components/admin/partner-broadcast/partner-selection-bar";
+import { PartnerPhoneChecks } from "@/components/admin/partner-broadcast/partner-phone-checks";
+import type { PartnerBroadcastTarget } from "@/lib/partners/broadcast-types";
+import { broadcastTargetsFromRows, selectionKeys } from "@/lib/partners/partner-phones";
 
 const PartnerBroadcastModal = dynamic(
   () => import("@/components/admin/partner-broadcast/partner-broadcast-modal"),
@@ -43,6 +46,7 @@ type PartnerRow = {
   carCount: number;
   email: string;
   phone: string;
+  secondaryPhone?: string | null;
   country?: string;
   hasUser?: boolean;
   unreadReapplyCount?: number;
@@ -224,8 +228,8 @@ export function PartnersManager({
   const [message, setMessage] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedMessages, setExpandedMessages] = useState<PartnerApplicationMessage[]>([]);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
-  const [broadcastIds, setBroadcastIds] = useState<string[] | null>(null);
+  const [pickedKeys, setPickedKeys] = useState<Set<string>>(() => new Set());
+  const [broadcastTargets, setBroadcastTargets] = useState<PartnerBroadcastTarget[] | null>(null);
 
   const t = useMemo(() => {
     if (locale === "ka") {
@@ -353,21 +357,40 @@ export function PartnersManager({
     }));
   }, [filter, initialPartners, mode, tabs]);
 
-  const selectedVisible = rows.filter((p) => selectedIds.has(p.id));
-  const togglePicked = (id: string) =>
-    setSelectedIds((prev) => {
+  const visibleKeys = useMemo(() => rows.flatMap((partner) => selectionKeys(partner)), [rows]);
+  const selectedVisibleCount = visibleKeys.filter((key) => pickedKeys.has(key)).length;
+  const isPicked = (partner: (typeof rows)[number]) =>
+    selectionKeys(partner).some((key) => pickedKeys.has(key));
+  const partnerCheckState = (partner: (typeof rows)[number]) => {
+    const keys = selectionKeys(partner);
+    const count = keys.filter((key) => pickedKeys.has(key)).length;
+    return { checked: count > 0 && count === keys.length, indeterminate: count > 0 && count < keys.length };
+  };
+  const toggleKey = (key: string) =>
+    setPickedKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  const togglePartnerKeys = (partner: (typeof rows)[number]) =>
+    setPickedKeys((prev) => {
+      const keys = selectionKeys(partner);
+      const all = keys.every((key) => prev.has(key));
+      const next = new Set(prev);
+      for (const key of keys) {
+        if (all) next.delete(key);
+        else next.add(key);
+      }
       return next;
     });
   const toggleAllPicked = () =>
-    setSelectedIds((prev) => {
-      const allPicked = rows.length > 0 && rows.every((p) => prev.has(p.id));
+    setPickedKeys((prev) => {
+      const allPicked = visibleKeys.length > 0 && visibleKeys.every((key) => prev.has(key));
       const next = new Set(prev);
-      for (const p of rows) {
-        if (allPicked) next.delete(p.id);
-        else next.add(p.id);
+      for (const key of visibleKeys) {
+        if (allPicked) next.delete(key);
+        else next.add(key);
       }
       return next;
     });
@@ -587,16 +610,16 @@ export function PartnersManager({
         const showCountry = filter === "DIRECTORY" || mode === "directory";
         const hideId = filter === "DIRECTORY";
         const colCount = 7 + (hideId ? 0 : 1) + (showCountry ? 1 : 0);
-        const allPicked = rows.length > 0 && selectedVisible.length === rows.length;
+        const allPicked = visibleKeys.length > 0 && selectedVisibleCount === visibleKeys.length;
         return (
       <>
       <PartnerSelectionBar
         locale={locale}
-        total={rows.length}
-        selected={selectedVisible.length}
+        total={visibleKeys.length}
+        selected={selectedVisibleCount}
         onToggleAll={toggleAllPicked}
-        onClear={() => setSelectedIds(new Set())}
-        onSend={() => setBroadcastIds(selectedVisible.map((p) => p.id))}
+        onClear={() => setPickedKeys(new Set())}
+        onSend={() => setBroadcastTargets(broadcastTargetsFromRows(rows, pickedKeys))}
       />
       <ResponsiveDataList
         desktop={
@@ -610,7 +633,7 @@ export function PartnersManager({
                       aria-label="Select all"
                       checked={allPicked}
                       ref={(el) => {
-                        if (el) el.indeterminate = selectedVisible.length > 0 && !allPicked;
+                        if (el) el.indeterminate = selectedVisibleCount > 0 && !allPicked;
                       }}
                       onChange={toggleAllPicked}
                       disabled={rows.length === 0}
@@ -649,15 +672,18 @@ export function PartnersManager({
                               : attention > 0
                                 ? "border-l-orange-500 bg-orange-100"
                                 : "border-l-transparent bg-white",
-                            selectedIds.has(p.id) && "bg-sky-50",
+                            isPicked(p) && "bg-sky-50",
                           )}
                         >
                           <td className="px-2 py-0.5 align-middle">
                             <input
                               type="checkbox"
                               aria-label={p.displayName}
-                              checked={selectedIds.has(p.id)}
-                              onChange={() => togglePicked(p.id)}
+                              checked={partnerCheckState(p).checked}
+                              ref={(el) => {
+                                if (el) el.indeterminate = partnerCheckState(p).indeterminate;
+                              }}
+                              onChange={() => togglePartnerKeys(p)}
                               className="h-4 w-4 align-middle accent-[#0b1f4b]"
                             />
                           </td>
@@ -719,8 +745,14 @@ export function PartnersManager({
                               </span>
                             ) : null}
                           </td>
-                          <td className="whitespace-nowrap px-2 py-0.5 align-middle font-mono text-[11px] text-slate-700">
-                            {p.phone || "—"}
+                          <td className="whitespace-nowrap px-2 py-0.5 align-middle">
+                            <PartnerPhoneChecks
+                              partnerId={p.id}
+                              phone={p.phone}
+                              secondaryPhone={p.secondaryPhone}
+                              picked={pickedKeys}
+                              onToggle={toggleKey}
+                            />
                           </td>
                           {showCountry ? (
                             <td className="whitespace-nowrap px-2 py-0.5 align-middle text-slate-700">
@@ -887,14 +919,17 @@ export function PartnersManager({
                       : attention > 0
                         ? "border-l-orange-500 bg-orange-50"
                         : "border-l-transparent",
-                    selectedIds.has(p.id) && "ring-2 ring-sky-300",
+                    isPicked(p) && "ring-2 ring-sky-300",
                   )}
                 >
                   <label className="-mt-1 mb-1 flex min-h-10 cursor-pointer items-center gap-2 border-b border-slate-100 pb-1 text-sm font-semibold text-slate-800">
                     <input
                       type="checkbox"
-                      checked={selectedIds.has(p.id)}
-                      onChange={() => togglePicked(p.id)}
+                      checked={partnerCheckState(p).checked}
+                      ref={(el) => {
+                        if (el) el.indeterminate = partnerCheckState(p).indeterminate;
+                      }}
+                      onChange={() => togglePartnerKeys(p)}
                       className="h-5 w-5 accent-[#0b1f4b]"
                     />
                     <span className="min-w-0 truncate">{p.displayName}</span>
@@ -959,7 +994,14 @@ export function PartnersManager({
                     </div>
                   </MobileDataRow>
                   <MobileDataRow label={t.phoneCol}>
-                    <span className="font-mono text-xs">{p.phone || "—"}</span>
+                    <PartnerPhoneChecks
+                      partnerId={p.id}
+                      phone={p.phone}
+                      secondaryPhone={p.secondaryPhone}
+                      picked={pickedKeys}
+                      onToggle={toggleKey}
+                      align="end"
+                    />
                   </MobileDataRow>
                   <MobileDataRow label={t.typeCol}>
                     <span className={cn(attention > 0 && "font-semibold text-orange-950")}>
@@ -1100,11 +1142,11 @@ export function PartnersManager({
       </>
         );
       })() : null}
-      {broadcastIds ? (
+      {broadcastTargets ? (
         <PartnerBroadcastModal
-          partnerIds={broadcastIds}
+          targets={broadcastTargets}
           locale={locale}
-          onClose={() => setBroadcastIds(null)}
+          onClose={() => setBroadcastTargets(null)}
         />
       ) : null}
       {showCustomers ? (

@@ -8,16 +8,17 @@ import {
   type PartnerBroadcastChannel,
   type PartnerBroadcastContact,
   type PartnerBroadcastResult,
+  type PartnerBroadcastTarget,
 } from "@/lib/partners/broadcast-types";
 import { partnerBroadcastCopy } from "@/components/admin/partner-broadcast/partner-broadcast-copy";
 import { PartnerMessengerLinks } from "@/components/admin/partner-broadcast/partner-messenger-links";
 
 export default function PartnerBroadcastModal({
-  partnerIds,
+  targets,
   locale,
   onClose,
 }: {
-  partnerIds: string[];
+  targets: PartnerBroadcastTarget[];
   locale: string;
   onClose: () => void;
 }) {
@@ -39,13 +40,24 @@ export default function PartnerBroadcastModal({
         const res = await fetch("/api/admin/partners/broadcast", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "contacts", partnerIds }),
+          body: JSON.stringify({ action: "contacts", targets }),
         });
         const data = await res.json();
         if (cancelled) return;
         if (!res.ok) throw new Error(data.error || "contacts");
-        setContacts(data.contacts as PartnerBroadcastContact[]);
+        const loaded = (data.contacts as PartnerBroadcastContact[]).map((contact) => ({
+          ...contact,
+          phones: Array.isArray(contact.phones) ? contact.phones : contact.phone ? [contact.phone] : [],
+        }));
+        setContacts(loaded);
         setSmsConfigured(Boolean(data.smsConfigured));
+        if (data.smsConfigured) {
+          setChannels((prev) => {
+            const next = new Set(prev);
+            next.add("sms");
+            return next;
+          });
+        }
       } catch {
         if (!cancelled) {
           setContacts([]);
@@ -56,7 +68,7 @@ export default function PartnerBroadcastModal({
     return () => {
       cancelled = true;
     };
-  }, [partnerIds, copy.errorGeneric]);
+  }, [targets, copy.errorGeneric]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -67,10 +79,23 @@ export default function PartnerBroadcastModal({
   }, [onClose, sending]);
 
   const list = contacts ?? [];
+  const phoneTotal = list.reduce((sum, contact) => sum + contact.phones.length, 0);
+  const recipientTotal =
+    contacts === null
+      ? targets.reduce((sum, target) => sum + Math.max(target.slots.length, 1), 0)
+      : list.reduce((sum, contact) => sum + Math.max(contact.phones.length, 1), 0);
+  const numberLines = list.flatMap((contact) =>
+    contact.phones.length
+      ? contact.phones.map((phone) => ({ key: `${contact.id}:${phone}`, name: contact.name, phone }))
+      : [{ key: contact.id, name: contact.name, phone: "" }],
+  );
   const reach: Record<PartnerBroadcastChannel, number> = {
     telegram: list.filter((c) => c.hasTelegram).length,
     email: list.filter((c) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)).length,
-    sms: list.filter((c) => c.phone.replace(/\D/g, "").length >= 9).length,
+    sms: list.reduce(
+      (sum, contact) => sum + contact.phones.filter((phone) => phone.replace(/\D/g, "").length >= 9).length,
+      0,
+    ),
   };
 
   const toggleChannel = (channel: PartnerBroadcastChannel) =>
@@ -98,7 +123,7 @@ export default function PartnerBroadcastModal({
       const res = await fetch("/api/admin/partners/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "send", partnerIds, text: body, channels: picked }),
+        body: JSON.stringify({ action: "send", targets, text: body, channels: picked }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "send");
@@ -149,7 +174,7 @@ export default function PartnerBroadcastModal({
             <h2 id="partner-broadcast-title" className="text-base font-extrabold text-[#0b1f4b]">
               {copy.title}
             </h2>
-            <p className="text-xs text-slate-500">{copy.recipients.replace("{n}", String(partnerIds.length))}</p>
+            <p className="text-xs text-slate-500">{copy.recipients.replace("{n}", String(recipientTotal))}</p>
           </div>
           <button
             type="button"
@@ -184,6 +209,20 @@ export default function PartnerBroadcastModal({
             </div>
           ) : (
             <>
+              {numberLines.length ? (
+                <ul className="max-h-36 overflow-y-auto rounded-lg border border-slate-200">
+                  {numberLines.map((line) => (
+                    <li
+                      key={line.key}
+                      className="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 last:border-0"
+                    >
+                      <span className="min-w-0 truncate text-sm font-semibold text-slate-800">{line.name}</span>
+                      <span className="shrink-0 font-mono text-xs text-slate-600">{line.phone || copy.noPhone}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+
               <label className="block">
                 <span className="mb-1 block text-sm font-bold text-slate-800">{copy.textLabel}</span>
                 <textarea
@@ -224,7 +263,9 @@ export default function PartnerBroadcastModal({
                         <span className="block font-semibold">{row.label}</span>
                         <span className="block text-xs text-slate-500">
                           {row.note ??
-                            copy.reachable.replace("{n}", String(reach[row.key])).replace("{total}", String(list.length))}
+                            copy.reachable
+                              .replace("{n}", String(reach[row.key]))
+                              .replace("{total}", String(row.key === "sms" ? phoneTotal : list.length))}
                         </span>
                       </span>
                     </label>

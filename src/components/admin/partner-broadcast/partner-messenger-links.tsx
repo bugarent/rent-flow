@@ -44,50 +44,54 @@ export function PartnerMessengerLinks({
         {copiedNote ? <p className="mt-1 text-xs font-semibold text-emerald-700">{copy.copied}</p> : null}
       </div>
       <ul className="divide-y divide-slate-100">
-        {contacts.map((contact) => {
-          const digits = partnerPhoneDigits(contact.phone);
-          const wa = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
-          const viber = `viber://chat?number=%2B${digits}`;
-          const has = (platform: string) => contact.messengers.includes(platform);
-          return (
-            <li key={contact.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-slate-800">{contact.name}</p>
-                <p className="text-xs text-slate-500">{contact.phone || copy.noPhone}</p>
-              </div>
-              {digits ? (
-                <div className="flex flex-wrap gap-1.5">
-                  <a
-                    href={wa}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={() => markOpened(`${contact.id}:wa`)}
-                    className={cn(
-                      "inline-flex min-h-9 items-center rounded-md px-3 text-xs font-bold",
-                      has("WHATSAPP") ? "bg-[#25d366] text-white" : "border border-[#25d366] text-[#128c4a]",
-                      opened.has(`${contact.id}:wa`) && "opacity-60",
-                    )}
-                  >
-                    WhatsApp{opened.has(`${contact.id}:wa`) ? " ✓" : ""}
-                  </a>
-                  <a
-                    href={viber}
-                    onClick={() => {
-                      void copyText();
-                      markOpened(`${contact.id}:viber`);
-                    }}
-                    className={cn(
-                      "inline-flex min-h-9 items-center rounded-md px-3 text-xs font-bold",
-                      has("VIBER") ? "bg-[#7360f2] text-white" : "border border-[#7360f2] text-[#5b48d6]",
-                      opened.has(`${contact.id}:viber`) && "opacity-60",
-                    )}
-                  >
-                    Viber{opened.has(`${contact.id}:viber`) ? " ✓" : ""}
-                  </a>
+        {contacts.flatMap((contact) => {
+          const numbers = contact.phones.length ? contact.phones : [contact.phone];
+          return numbers.filter(Boolean).map((phone) => {
+            const digits = partnerPhoneDigits(phone);
+            const wa = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+            const viber = `viber://chat?number=%2B${digits}`;
+            const has = (platform: string) => contact.messengers.includes(platform);
+            const lineKey = `${contact.id}:${digits}`;
+            return (
+              <li key={lineKey} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-800">{contact.name}</p>
+                  <p className="text-xs text-slate-500">{phone || copy.noPhone}</p>
                 </div>
-              ) : null}
-            </li>
-          );
+                {digits ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    <a
+                      href={wa}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => markOpened(`${lineKey}:wa`)}
+                      className={cn(
+                        "inline-flex min-h-9 items-center rounded-md px-3 text-xs font-bold",
+                        has("WHATSAPP") ? "bg-[#25d366] text-white" : "border border-[#25d366] text-[#128c4a]",
+                        opened.has(`${lineKey}:wa`) && "opacity-60",
+                      )}
+                    >
+                      WhatsApp{opened.has(`${lineKey}:wa`) ? " ✓" : ""}
+                    </a>
+                    <a
+                      href={viber}
+                      onClick={() => {
+                        void copyText();
+                        markOpened(`${lineKey}:viber`);
+                      }}
+                      className={cn(
+                        "inline-flex min-h-9 items-center rounded-md px-3 text-xs font-bold",
+                        has("VIBER") ? "bg-[#7360f2] text-white" : "border border-[#7360f2] text-[#5b48d6]",
+                        opened.has(`${lineKey}:viber`) && "opacity-60",
+                      )}
+                    >
+                      Viber{opened.has(`${lineKey}:viber`) ? " ✓" : ""}
+                    </a>
+                  </div>
+                ) : null}
+              </li>
+            );
+          });
         })}
       </ul>
     </div>

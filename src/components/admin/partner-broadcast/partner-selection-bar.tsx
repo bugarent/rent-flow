@@ -21,7 +21,8 @@ export function PartnerSelectionBar({
   const copy = partnerBroadcastCopy(locale);
   const all = total > 0 && selected === total;
   return (
-    <div className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+    <div className="mb-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2">
       <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-sm font-semibold text-slate-800">
         <input
           type="checkbox"
@@ -56,6 +57,8 @@ export function PartnerSelectionBar({
           {copy.sendMessage}
         </button>
       </div>
+      </div>
+      <p className="mt-1 text-xs leading-5 text-slate-500">{copy.hint}</p>
     </div>
   );
 }

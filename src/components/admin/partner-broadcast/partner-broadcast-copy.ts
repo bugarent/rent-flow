@@ -1,6 +1,7 @@
 export type PartnerBroadcastCopy = {
   selectAll: string;
   selected: string;
+  hint: string;
   sendMessage: string;
   clear: string;
   title: string;
@@ -30,12 +31,13 @@ export type PartnerBroadcastCopy = {
 };
 
 const ka: PartnerBroadcastCopy = {
-  selectAll: "ყველას მონიშვნა",
-  selected: "მონიშნულია {n}",
+  selectAll: "ყველა ნომრის მონიშვნა",
+  selected: "მონიშნულია {n} ნომერი",
+  hint: "მონიშნეთ ტელეფონის ნომრები სიაში. ერთი ტექსტი თითოეულ მონიშნულ ნომერზე ცალ-ცალკე გაიგზავნება.",
   sendMessage: "შეტყობინების გაგზავნა",
   clear: "მოხსნა",
-  title: "შეტყობინება მონიშნულ პარტნიორებს",
-  recipients: "მიმღები: {n} პარტნიორი — თითოეულს ცალ-ცალკე მიუვა",
+  title: "შეტყობინება მონიშნულ ნომრებზე",
+  recipients: "მიმღები: {n} ნომერი — თითოეულს ცალ-ცალკე მიუვა",
   textLabel: "ტექსტი",
   textPlaceholder: "ჩაწერეთ შეტყობინება…",
   channels: "გაგზავნის არხები",
@@ -61,12 +63,13 @@ const ka: PartnerBroadcastCopy = {
 };
 
 const ru: PartnerBroadcastCopy = {
-  selectAll: "Выбрать всех",
-  selected: "Выбрано: {n}",
+  selectAll: "Выбрать все номера",
+  selected: "Выбрано номеров: {n}",
+  hint: "Отметьте номера в списке. Один текст уйдёт каждому выбранному номеру отдельно.",
   sendMessage: "Отправить сообщение",
   clear: "Снять",
-  title: "Сообщение выбранным партнёрам",
-  recipients: "Получатели: {n} — каждому отдельно",
+  title: "Сообщение на выбранные номера",
+  recipients: "Получатели: {n} номеров — каждому отдельно",
   textLabel: "Текст",
   textPlaceholder: "Введите сообщение…",
   channels: "Каналы отправки",
@@ -92,12 +95,13 @@ const ru: PartnerBroadcastCopy = {
 };
 
 const en: PartnerBroadcastCopy = {
-  selectAll: "Select all",
-  selected: "{n} selected",
+  selectAll: "Select all numbers",
+  selected: "{n} numbers selected",
+  hint: "Check the phone numbers in the list. One text is sent separately to each selected number.",
   sendMessage: "Send message",
   clear: "Clear",
-  title: "Message selected partners",
-  recipients: "Recipients: {n} partners — each gets an individual message",
+  title: "Message the selected numbers",
+  recipients: "Recipients: {n} numbers — each gets its own message",
   textLabel: "Text",
   textPlaceholder: "Write your message…",
   channels: "Channels",

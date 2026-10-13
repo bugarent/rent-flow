@@ -13,13 +13,15 @@ import type {
   PartnerBroadcastChannel,
   PartnerBroadcastContact,
   PartnerBroadcastResult,
+  PartnerBroadcastTarget,
 } from "@/lib/partners/broadcast-types";
+import { uniquePhones } from "@/lib/partners/partner-phones";
 
 type ResolvedContact = PartnerBroadcastContact & { chatIds: string[] };
 
 /** Contacts are read on the server so the browser cannot redirect a broadcast to other numbers. */
-export async function resolveBroadcastContacts(partnerIds: string[]): Promise<ResolvedContact[]> {
-  const wanted = new Set(partnerIds);
+export async function resolveBroadcastContacts(targets: PartnerBroadcastTarget[]): Promise<ResolvedContact[]> {
+  const wanted = new Map(targets.map((target) => [target.id, target.slots]));
   const { partners } = await loadAdminPartnerRows();
   const rows = partners.filter((p) => wanted.has(p.id));
   if (!rows.length) return [];
@@ -48,10 +50,16 @@ export async function resolveBroadcastContacts(partnerIds: string[]): Promise<Re
       const messengers = db
         ? parsePartnerMessengers(db.messengers, db.messenger)
         : parsePartnerMessengers(file?.messengers ?? []);
+      const slots = new Set(wanted.get(row.id) ?? []);
+      const phones = uniquePhones([
+        slots.has("primary") ? row.phone : "",
+        slots.has("secondary") ? row.secondaryPhone : "",
+      ]);
       return {
         id: row.id,
         name: row.displayName,
-        phone: String(row.phone || "").trim(),
+        phone: phones[0] || "",
+        phones,
         email: String(row.email || "").trim(),
         messengers,
         hasTelegram: chatIds.size > 0,
@@ -91,8 +99,12 @@ async function sendOne(
     });
     result.email = mail.sent;
   }
-  if (channels.has("sms") && contact.phone) {
-    result.sms = (await sendSms(contact.phone, text)).ok;
+  if (channels.has("sms") && contact.phones.length) {
+    let ok = true;
+    for (const phone of contact.phones) {
+      ok = (await sendSms(phone, text)).ok && ok;
+    }
+    result.sms = ok;
   }
   return result;
 }
