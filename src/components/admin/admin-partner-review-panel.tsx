@@ -20,6 +20,7 @@ import {
 } from "@/lib/partners/company-settings";
 import { adminBackLabel, uiText, type AdminBackTarget } from "@/lib/i18n/ui-text";
 import { ADMIN_BASE } from "@/lib/routes";
+import { displayImageUrl } from "@/lib/media/display-image";
 import { cn } from "@/lib/utils";
 import { ListingModerationActions } from "@/components/admin/listing-moderation-actions";
 
@@ -1609,7 +1610,13 @@ export function AdminPartnerReviewPanel({
                       >
                         {car.photoUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={car.photoUrl} alt="" className="h-full w-full object-cover" />
+                          <img
+                            src={displayImageUrl(car.photoUrl, 128)}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                          />
                         ) : (
                           <div className="flex h-full items-center justify-center text-[10px] text-slate-400">
                             —

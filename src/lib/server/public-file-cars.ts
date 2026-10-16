@@ -112,8 +112,10 @@ export function fileSearchCarMatchesPickup(car: FileSearchCar, pickup: string) {
   if (!code) return true;
   return (car.deliveryPrices ?? []).some((row) => {
     const loc = row.deliveryLocation;
-    if (!loc?.isActive || !loc.airport?.iata) return false;
-    return normalizeLocationCode(loc.airport.iata).toUpperCase() === code;
+    if (!loc?.isActive) return false;
+    const iata = normalizeLocationCode(loc.airport?.iata || "").toUpperCase();
+    const id = normalizeLocationCode(row.deliveryLocationId || loc.id || "").toUpperCase();
+    return iata === code || id === code;
   });
 }
 

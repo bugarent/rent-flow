@@ -357,6 +357,7 @@ export function PartnersManager({
     }));
   }, [filter, initialPartners, mode, tabs]);
 
+  const noPhoneLabel = uiText(locale, "No phone", "ნომერი არ არის", "Нет номера");
   const visibleKeys = useMemo(() => rows.flatMap((partner) => selectionKeys(partner)), [rows]);
   const selectedVisibleCount = visibleKeys.filter((key) => pickedKeys.has(key)).length;
   const isPicked = (partner: (typeof rows)[number]) =>
@@ -753,6 +754,7 @@ export function PartnersManager({
                               secondaryPhone={p.secondaryPhone}
                               picked={pickedKeys}
                               onToggle={toggleKey}
+                              emptyLabel={noPhoneLabel}
                             />
                           </td>
                           {showCountry ? (
@@ -1001,6 +1003,7 @@ export function PartnersManager({
                       secondaryPhone={p.secondaryPhone}
                       picked={pickedKeys}
                       onToggle={toggleKey}
+                      emptyLabel={noPhoneLabel}
                       align="end"
                     />
                   </MobileDataRow>
@@ -1140,6 +1143,7 @@ export function PartnersManager({
           )
         }
       />
+      {selectedVisibleCount > 0 ? <div aria-hidden className="h-24" /> : null}
       </>
         );
       })() : null}

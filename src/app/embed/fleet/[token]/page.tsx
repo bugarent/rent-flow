@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { displayImageUrl } from "@/lib/media/display-image";
 import { getPartnerIdByWebsiteToken } from "@/lib/server/partner-integration-store";
 import { isPublicFileCar, listFileCarsForPartner } from "@/lib/server/partner-cars-store";
 
@@ -38,7 +39,13 @@ export default async function EmbedFleetPage({
               >
                 {photo ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={photo} alt="" className="h-16 w-24 rounded-lg object-cover bg-slate-100" />
+                  <img
+                    src={displayImageUrl(photo, 128)}
+                    alt=""
+                    className="h-16 w-24 rounded-lg object-cover bg-slate-100"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 ) : null}
                 <span>
                   <span className="block font-bold text-[#0b1f4b]">{label}</span>

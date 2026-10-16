@@ -15,6 +15,7 @@ import {
 import { ListingModerationActions } from "@/components/admin/listing-moderation-actions";
 import { ModerationProfilesPanel } from "@/components/admin/moderation-profiles-panel";
 import { PartnersManager } from "@/components/admin/partners-manager";
+import { displayImageUrl } from "@/lib/media/display-image";
 import { cn } from "@/lib/utils";
 import {
   ResponsiveDataList,
@@ -386,7 +387,13 @@ export function ModerationHub({
                 <div className="h-16 w-24 shrink-0 overflow-hidden rounded-md bg-white ring-1 ring-red-200">
                   {car.photos[0]?.url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={car.photos[0].url} alt="" className="h-full w-full object-cover" />
+                    <img
+                      src={displayImageUrl(car.photos[0].url, 128)}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
                   ) : (
                     <div className="flex h-full items-center justify-center text-[10px] text-slate-400">—</div>
                   )}

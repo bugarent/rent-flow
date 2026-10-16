@@ -982,7 +982,7 @@ export function PartnerCreateCarForm({
             );
           }
         }
-        if (meRes.ok && Array.isArray(me.deliveryCatalog) && me.deliveryCatalog.length) {
+        if (meRes.ok && Array.isArray(me.deliveryCatalog)) {
           const delivery = (me.deliveryCatalog as DeliveryLocationView[]).map((loc) => {
             const airport = Array.isArray(me.airports)
               ? me.airports.find(
@@ -998,7 +998,9 @@ export function PartnerCreateCarForm({
               cityName: loc.cityName || cityFromAirport,
             };
           });
+          // Strictly Delivery-page ON locations only (empty list is intentional).
           setDeliveryCatalog(delivery);
+          setSelectedLocationIds((prev) => prev.filter((id) => delivery.some((l) => l.id === id)));
           setDeliverySelections(
             buildDeliverySelections(delivery).map((row) => ({
               ...row,
@@ -1264,9 +1266,10 @@ export function PartnerCreateCarForm({
             }
           }
           const carDeliveries = Array.isArray(car.deliveryPrices) ? car.deliveryPrices : [];
+          const catalogIdSet = new Set(deliveryList.map((l) => l.id));
           const selectedIds = carDeliveries
             .map((d: { deliveryLocationId?: string }) => String(d.deliveryLocationId || ""))
-            .filter(Boolean);
+            .filter((id: string) => Boolean(id) && catalogIdSet.has(id));
           const detailPlaces = Array.isArray(details?.pickupPlaces)
             ? (details.pickupPlaces as Array<{
                 deliveryLocationId?: string;
@@ -1280,7 +1283,10 @@ export function PartnerCreateCarForm({
             : [];
           for (const p of detailPlaces) {
             const id = String(p.deliveryLocationId || "");
-            if (id && !selectedIds.includes(id) && !isSyntheticDeliveryId(id)) selectedIds.push(id);
+            // Only keep places that are still ON in Delivery settings (in catalog).
+            if (id && catalogIdSet.has(id) && !selectedIds.includes(id) && !isSyntheticDeliveryId(id)) {
+              selectedIds.push(id);
+            }
           }
           setSelectedLocationIds(selectedIds);
           const placeRows = buildPlaceRowsForLocations(deliveryList, selectedIds, []).map((row) => {

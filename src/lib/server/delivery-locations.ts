@@ -775,64 +775,189 @@ export async function retireUnusedPartnerPlaces(partnerId: string, listed: strin
   clearSearchAirportsCache();
 }
 
-/**
- * Delivery locations for create-car = locations saved in partner personal info
- * (companySettings.deliveryLocationIds). Same set the partner sees in operating countries.
- */
-export async function listPartnerScopedDeliveryLocations(
-  partnerId: string,
-): Promise<DeliveryLocationView[]> {
+async function readPartnerDeliverySettings(partnerId: string): Promise<{
+  deliveryCountryIso2s: string[];
+  deliveryLocationIds: string[];
+}> {
   const { resolveCompanySettings, readCompanySettingsFile } = await import(
     "@/lib/server/partner-company-settings-store"
   );
   const { prisma } = await import("@/lib/prisma");
   const { LOCAL_PARTNER_ID, loadLocalPartner } = await import("@/lib/auth/local-partner-store");
 
-  let rawIds: string[] = [];
+  let deliveryCountryIso2s: string[] = [];
+  let deliveryLocationIds: string[] = [];
+
   try {
     const partner = await prisma.partner.findUnique({ where: { id: partnerId } });
     if (partner) {
       const settings = await resolveCompanySettings(partner);
-      rawIds = settings.deliveryLocationIds || [];
+      deliveryCountryIso2s = settings.deliveryCountryIso2s || [];
+      deliveryLocationIds = settings.deliveryLocationIds || [];
+      if (!deliveryCountryIso2s.length) {
+        const fromDb = parseIso2List(partner.operatingCountryIso2s);
+        if (fromDb.length) deliveryCountryIso2s = fromDb;
+      }
     }
   } catch {
     /* db offline — fall through to file */
   }
-  if (!rawIds.length) {
+
+  if (!deliveryLocationIds.length || !deliveryCountryIso2s.length) {
     const file = await readCompanySettingsFile(partnerId);
-    rawIds = file?.deliveryLocationIds || [];
+    if (file) {
+      if (!deliveryLocationIds.length) deliveryLocationIds = file.deliveryLocationIds || [];
+      if (!deliveryCountryIso2s.length) deliveryCountryIso2s = file.deliveryCountryIso2s || [];
+    }
   }
+
   // Local partner alias: settings are often stored under LOCAL_PARTNER_ID
-  if (!rawIds.length && partnerId !== LOCAL_PARTNER_ID) {
+  if ((!deliveryLocationIds.length || !deliveryCountryIso2s.length) && partnerId !== LOCAL_PARTNER_ID) {
     const local = loadLocalPartner();
     if (local && (partnerId === local.id || partnerId === local.email)) {
       const file = await readCompanySettingsFile(LOCAL_PARTNER_ID);
-      rawIds = file?.deliveryLocationIds || [];
-    }
-  }
-  if (!rawIds.length) {
-    const file = await readCompanySettingsFile(LOCAL_PARTNER_ID);
-    if (partnerId === LOCAL_PARTNER_ID || loadLocalPartner()?.id === partnerId) {
-      rawIds = file?.deliveryLocationIds || [];
+      if (file) {
+        if (!deliveryLocationIds.length) deliveryLocationIds = file.deliveryLocationIds || [];
+        if (!deliveryCountryIso2s.length) deliveryCountryIso2s = file.deliveryCountryIso2s || [];
+      }
     }
   }
 
-  if (!rawIds.length) return [];
+  return {
+    deliveryCountryIso2s: [...new Set(deliveryCountryIso2s.map((c) => c.toUpperCase()).filter(Boolean))],
+    deliveryLocationIds: [...new Set(deliveryLocationIds.map((id) => String(id || "").trim()).filter(Boolean))],
+  };
+}
 
-  // Resolve against existing catalog only — never create locations on GET/list.
+/**
+ * Delivery locations for create-car / pick-up options = partner Delivery page ON
+ * locations only (prefs.enabled). Falls back to companySettings.deliveryLocationIds
+ * when a location has no pref row yet (legacy personal-info selection).
+ */
+export async function listPartnerScopedDeliveryLocations(
+  partnerId: string,
+): Promise<DeliveryLocationView[]> {
+  const { locations, selectedIds } = await listPartnerCountryDeliveryLocations(partnerId);
+  if (!locations.length) return [];
+
+  let prefs: Array<{ deliveryLocationId: string; enabled: boolean }> = [];
+  try {
+    const { readPartnerDeliveryPrefs } = await import("@/lib/server/partner-delivery-prefs-store");
+    prefs = await readPartnerDeliveryPrefs(partnerId);
+  } catch {
+    prefs = [];
+  }
+  const prefById = new Map(prefs.map((p) => [p.deliveryLocationId, p]));
+  const selected = new Set(selectedIds);
+
+  return locations
+    .filter((loc) => {
+      if (!loc.isActive) return false;
+      const pref = prefById.get(loc.id);
+      // Explicit OFF on Delivery page → hide from car form.
+      if (pref) return pref.enabled !== false;
+      // No pref yet: only show if still listed as selected (legacy / synced ON ids).
+      return selected.has(loc.id);
+    })
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.iata.localeCompare(b.iata));
+}
+
+/**
+ * All active delivery catalog locations in the partner's operating countries,
+ * plus any of their currently selected location ids (so legacy picks stay visible).
+ */
+export async function listPartnerCountryDeliveryLocations(
+  partnerId: string,
+): Promise<{ countries: string[]; locations: DeliveryLocationView[]; selectedIds: string[] }> {
+  const { deliveryCountryIso2s, deliveryLocationIds } = await readPartnerDeliverySettings(partnerId);
+  const countries = deliveryCountryIso2s;
   const all = await listDeliveryLocations({ activeOnly: false });
   const byIata = new Map(all.map((d) => [normalizeLocationCode(d.iata).toUpperCase(), d]));
   const byId = new Map(all.map((d) => [d.id, d]));
+  const countrySet = new Set(countries);
   const result = new Map<string, DeliveryLocationView>();
 
-  for (const raw of rawIds) {
-    const id = String(raw || "").trim();
-    if (!id) continue;
-    const existing = byId.get(id) || byIata.get(normalizeLocationCode(id).toUpperCase());
-    if (existing?.isActive) result.set(existing.id, existing);
+  for (const loc of all) {
+    if (!loc.isActive) continue;
+    const iso = (loc.countryIso2 || "").toUpperCase();
+    if (countrySet.size && iso && countrySet.has(iso)) {
+      result.set(loc.id, loc);
+    }
   }
 
-  return [...result.values()].sort((a, b) => a.sortOrder - b.sortOrder || a.iata.localeCompare(b.iata));
+  // Keep partner-selected places visible even if catalog row is temporarily inactive.
+  for (const raw of deliveryLocationIds) {
+    const existing = byId.get(raw) || byIata.get(normalizeLocationCode(raw).toUpperCase());
+    if (existing) result.set(existing.id, existing);
+  }
+
+  const locations = [...result.values()].sort(
+    (a, b) =>
+      (a.countryIso2 || "").localeCompare(b.countryIso2 || "") ||
+      a.sortOrder - b.sortOrder ||
+      a.iata.localeCompare(b.iata),
+  );
+
+  const selectedIds = deliveryLocationIds
+    .map((raw) => {
+      const existing = byId.get(raw) || byIata.get(normalizeLocationCode(raw).toUpperCase());
+      return existing?.id || "";
+    })
+    .filter(Boolean);
+
+  return { countries, locations, selectedIds: [...new Set(selectedIds)] };
+}
+
+/** Persist which delivery locations are ON for the partner (search + listings). */
+export async function syncPartnerEnabledDeliveryLocationIds(
+  partnerId: string,
+  enabledLocationIds: string[],
+): Promise<string[]> {
+  const { resolveCompanySettings, readCompanySettingsFile, writeCompanySettingsFile } = await import(
+    "@/lib/server/partner-company-settings-store"
+  );
+  const { parseCompanySettings } = await import("@/lib/partners/company-settings");
+  const { prisma } = await import("@/lib/prisma");
+
+  const uniqueIds = [...new Set(enabledLocationIds.map((id) => String(id || "").trim()).filter(Boolean))];
+
+  let current = null as Awaited<ReturnType<typeof resolveCompanySettings>> | null;
+  try {
+    const partner = await prisma.partner.findUnique({ where: { id: partnerId } });
+    if (partner) current = await resolveCompanySettings(partner);
+  } catch {
+    /* file */
+  }
+  if (!current) {
+    current = (await readCompanySettingsFile(partnerId)) || parseCompanySettings({});
+  }
+
+  const next = parseCompanySettings({
+    ...current,
+    deliveryLocationIds: uniqueIds,
+  });
+
+  try {
+    await prisma.partner.update({
+      where: { id: partnerId },
+      data: {
+        companySettings: next as object,
+        operatingCountryIso2s: next.deliveryCountryIso2s,
+      },
+    });
+  } catch (error) {
+    console.warn("[delivery-locations] syncPartnerEnabledDeliveryLocationIds db", error);
+  }
+  await writeCompanySettingsFile(partnerId, next);
+
+  try {
+    const { publishPartnerSearchPlaces } = await import("@/lib/server/partner-search-coverage");
+    await publishPartnerSearchPlaces(partnerId);
+  } catch (error) {
+    console.warn("[delivery-locations] publishPartnerSearchPlaces", error);
+  }
+
+  return uniqueIds;
 }
 
 /**

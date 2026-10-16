@@ -17,7 +17,8 @@ import { resolvePartnerDeliveryPrices } from "@/lib/delivery/pricing";
 import { listPartnerScopedDeliveryLocations, persistableCarDeliveryRows } from "@/lib/server/delivery-locations";
 import { withPartnerDeliveryPrices } from "@/lib/server/partner-delivery-listing-sync";
 import { ensureExtrasExistInDb, extrasRowsForCarFk, listExtraServices } from "@/lib/server/extras-store";
-import { isCityLocationCode, parseCityLocationCode } from "@/lib/catalog/search-places";
+import { loadSearchCabinet } from "@/lib/server/search-cabinet-scope";
+import { partnerIdsForTrip, scopeSearchCars } from "@/lib/server/search-results-scope";
 import {
   isValidRegistrationNumber,
   normalizeRegistrationNumber,
@@ -139,6 +140,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const category = searchParams.get("category")?.trim();
   const pickup = searchParams.get("pickup")?.trim();
+  const dropoff = searchParams.get("dropoff")?.trim() || undefined;
   const startDate = searchParams.get("startDate")?.trim();
   const endDate = searchParams.get("endDate")?.trim();
 
@@ -147,29 +149,13 @@ export async function GET(req: Request) {
     partner: publicPartnerWhere,
   };
 
+  const cabinet = await loadSearchCabinet();
   if (pickup) {
-    if (isCityLocationCode(pickup)) {
-      const iso2 = parseCityLocationCode(pickup)?.iso2;
-      if (iso2) {
-        where.deliveryPrices = {
-          some: {
-            deliveryLocation: {
-              isActive: true,
-              airport: { city: { country: { iso2 } } },
-            },
-          },
-        };
-      }
-    } else {
-      where.deliveryPrices = {
-        some: {
-          deliveryLocation: {
-            isActive: true,
-            airport: { iata: pickup.toUpperCase() },
-          },
-        },
-      };
-    }
+    const ids = partnerIdsForTrip(cabinet, pickup, dropoff);
+    where.partnerId = { in: ids.length ? ids : ["__none__"] };
+    const { carAssignedToPlaceWhere } = await import("@/lib/server/car-location-assignment");
+    const assigned = await carAssignedToPlaceWhere(pickup);
+    if (assigned) Object.assign(where, assigned);
   }
 
   if (category) {
@@ -177,11 +163,11 @@ export async function GET(req: Request) {
     const homepageCategory = (await listHomepageCategories()).find((c) => c.slug === category);
     if (homepageCategory) {
       const modelFilter = prismaWhereForMappedModels(homepageCategory.mappedModels);
-      if (modelFilter) {
-        Object.assign(where, modelFilter);
-      } else {
-        where.id = "__none__";
-      }
+      // Keep partner-assigned categorySlug results even when mappedModels is empty
+      // or incomplete after a Neon migration (matches /cars page behaviour).
+      where.OR = modelFilter
+        ? [modelFilter, { categorySlug: category }]
+        : [{ categorySlug: category }];
     } else {
       where.categorySlug = category;
     }
@@ -226,58 +212,24 @@ export async function GET(req: Request) {
     /* file catalog optional */
   }
 
+  cars = (
+    await scopeSearchCars(cars as Array<{ id?: string; partnerId?: string; deliveryPrices?: never[] }>, cabinet, {
+      pickup,
+      dropoff,
+    })
+  ).cars as unknown[];
+
   if (startDate && pickup) {
     const pickupAt = new Date(startDate);
     if (!Number.isNaN(pickupAt.getTime())) {
       const minutesUntilPickup = Math.max(0, Math.floor((pickupAt.getTime() - Date.now()) / 60000));
-      const code = pickup.toUpperCase();
-      const cityIso2 = isCityLocationCode(pickup)
-        ? parseCityLocationCode(pickup)?.iso2?.toUpperCase()
-        : null;
       const { meetsBookingLeadTime } = await import("@/lib/delivery/booking-lead");
-      const { mergeDeliveryPrefsIntoRows } = await import("@/lib/delivery/trip-fees");
-      const { listingPickupPlaceIds } = await import("@/lib/cars/listing-place-ids");
-      const { readPartnerDeliveryPrefsMap } = await import(
-        "@/lib/server/partner-delivery-prefs-store"
-      );
-      const partnerIds = [
-        ...new Set(
-          cars
-            .map((raw) => {
-              const car = raw as { partnerId?: string; partner?: { id?: string } };
-              return String(car.partnerId || car.partner?.id || "");
-            })
-            .filter(Boolean),
-        ),
-      ];
-      const prefsCache = await readPartnerDeliveryPrefsMap(partnerIds);
-      const { loadCityDeliveryPlaces } = await import("@/lib/server/city-delivery-places");
-      const cityPlaces = await loadCityDeliveryPlaces();
+      const { matchDeliveryRowsForPlace } = await import("@/lib/delivery/trip-fees");
       cars = cars.filter((raw) => {
-        const car = raw as {
-          partnerId?: string;
-          partner?: { id?: string };
-          description?: string | null;
-          deliveryPrices?: Array<{
-            travelTimeMinutes?: number | null;
-            deliveryLocation?: {
-              isActive?: boolean;
-              airport?: { iata?: string; city?: { country?: { iso2?: string } } } | null;
-            } | null;
-          }>;
-        };
-        const pid = String(car.partnerId || car.partner?.id || "");
-        let rows = car.deliveryPrices ?? [];
-        const prefs = prefsCache.get(pid);
-        rows = mergeDeliveryPrefsIntoRows(rows, prefs, cityPlaces, listingPickupPlaceIds(car.description));
-        const matching = rows.filter((row) => {
-          const loc = row.deliveryLocation;
-          if (!loc?.isActive || !loc.airport) return false;
-          if (cityIso2) return loc.airport.city?.country?.iso2?.toUpperCase() === cityIso2;
-          return loc.airport.iata?.toUpperCase() === code;
-        });
-        if (!matching.length) return false;
-        return matching.some((row) => meetsBookingLeadTime(row.travelTimeMinutes, minutesUntilPickup));
+        const car = raw as { deliveryPrices?: Parameters<typeof matchDeliveryRowsForPlace>[0] };
+        return matchDeliveryRowsForPlace(car.deliveryPrices, pickup).some((row) =>
+          meetsBookingLeadTime(Number(row.travelTimeMinutes) || 0, minutesUntilPickup),
+        );
       });
     }
   }

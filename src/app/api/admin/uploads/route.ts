@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { getAdminSession } from "@/lib/auth/sessions";
+import { uploadImageToCloudinary } from "@/lib/server/cloudinary-upload";
 import { persistUploadedFile } from "@/lib/server/persist-upload";
 
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -44,13 +45,28 @@ export async function POST(req: Request) {
     const filename = `${Date.now()}-${randomBytes(6).toString("hex")}.${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
     const contentType = ext === "pdf" ? "application/pdf" : ext === "jpg" ? "image/jpeg" : `image/${ext}`;
+
+    if (ext !== "pdf") {
+      const uploaded = await uploadImageToCloudinary({
+        bytes: buffer,
+        folder: "partner-cars",
+        publicId: filename.replace(/\.[^.]+$/, ""),
+      });
+      return NextResponse.json({ url: uploaded.secureUrl });
+    }
+
     await persistUploadedFile(["partner-cars", filename], buffer, contentType);
     return NextResponse.json({ url: `/uploads/partner-cars/${filename}` });
   } catch (error) {
     console.error("[admin/uploads]", error);
     const message = error instanceof Error ? error.message : "Upload failed";
     return NextResponse.json(
-      { error: message === "Could not save the image" ? message : "Upload failed" },
+      {
+        error:
+          message === "Could not save the image" || message === "Cloudinary is not configured"
+            ? message
+            : "Upload failed",
+      },
       { status: 500 },
     );
   }

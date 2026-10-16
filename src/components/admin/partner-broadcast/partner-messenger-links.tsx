@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import {
   broadcastMessengerLines,
@@ -28,6 +28,7 @@ export function PartnerMessengerLinks({
   copy: PartnerBroadcastCopy;
 }) {
   const [opened, setOpened] = useState<Set<string>>(() => new Set());
+  const openedRef = useRef<Set<string>>(new Set());
   const [copiedNote, setCopiedNote] = useState(false);
   const lines = useMemo(() => broadcastMessengerLines(contacts), [contacts]);
   const reachable = lines.filter((line) => line.digits);
@@ -53,18 +54,24 @@ export function PartnerMessengerLinks({
 
   const markOpened = (line: BroadcastMessengerLine, messenger: BroadcastMessenger) => {
     if (messenger === "viber") void copyText();
-    setOpened((prev) => new Set(prev).add(broadcastProgressKey(line.key, messenger)));
+    openedRef.current.add(broadcastProgressKey(line.key, messenger));
+    setOpened(new Set(openedRef.current));
+  };
+
+  const resetProgress = () => {
+    openedRef.current = new Set();
+    setOpened(new Set());
   };
 
   const openNext = (messenger: BroadcastMessenger) => {
-    const line = (messenger === "wa" ? waLeft : viberLeft)[0];
+    const line = reachable.find((item) => !openedRef.current.has(broadcastProgressKey(item.key, messenger)));
     if (!line || !text) return;
     markOpened(line, messenger);
     if (messenger === "wa") window.open(whatsappMessageHref(line.digits, text), "_blank", "noopener,noreferrer");
     else window.location.href = viberMessageHref(line.digits, text);
   };
 
-  const nextButton = "inline-flex min-h-10 flex-1 items-center justify-center gap-1 rounded-lg px-3 text-sm font-bold text-white disabled:opacity-40 sm:flex-none";
+  const nextButton = "inline-flex min-h-10 items-center justify-center gap-1 rounded-lg px-3 text-sm font-bold text-white disabled:opacity-40";
 
   return (
     <div className="rounded-lg border border-slate-200">
@@ -75,7 +82,7 @@ export function PartnerMessengerLinks({
         </div>
         {reachable.length ? (
           <>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
               <button
                 type="button"
                 onClick={() => openNext("wa")}
@@ -106,7 +113,7 @@ export function PartnerMessengerLinks({
               {opened.size ? (
                 <button
                   type="button"
-                  onClick={() => setOpened(new Set())}
+                  onClick={resetProgress}
                   className="min-h-8 font-semibold text-slate-500 underline-offset-2 hover:underline"
                 >
                   {copy.resetProgress}

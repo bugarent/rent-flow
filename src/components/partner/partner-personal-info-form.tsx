@@ -743,12 +743,6 @@ export function PartnerPersonalInfoForm({
     );
   };
 
-  const countryHasSelectedLocation = (iso2: string, locationIds: string[]) => {
-    const locs = locationsForCountry(iso2);
-    if (!locs.length) return false;
-    return locs.some((l) => isLocationSelected(l, locationIds));
-  };
-
   const saveDeliveryCountries = () => {
     const next = [
       ...committedCountries.filter((iso) => !pendingCountryRemoves.includes(iso)),
@@ -760,21 +754,7 @@ export function PartnerPersonalInfoForm({
       return;
     }
 
-    const missing = new Set(
-      unique.filter((iso) => !countryHasSelectedLocation(iso, selectedLocationIds)),
-    );
-    if (missing.size) {
-      setInvalidLocationCountries(missing);
-      setCountryNotice(pi.countriesNeedLocation);
-      const first = [...missing][0];
-      const el = document.querySelector(`[data-country-locations="${first}"]`);
-      if (el instanceof HTMLElement) {
-        const top = el.getBoundingClientRect().top + window.scrollY - 96;
-        window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-      }
-      return;
-    }
-
+    // Locations are optional here — partners turn them ON/OFF on the Delivery page.
     const nextLocationIds = pruneLocationsForCountries(unique, selectedLocationIds);
     setInvalidLocationCountries(new Set());
     patch({ deliveryCountryIso2s: unique, deliveryLocationIds: nextLocationIds });
@@ -847,17 +827,7 @@ export function PartnerPersonalInfoForm({
         scrollToFirstInvalid(new Set(["deliveryCountries"]));
         throw new Error(pi.countriesNeedOne);
       }
-      const locMissing = new Set(
-        uniqueCountries.filter((iso) => !countryHasSelectedLocation(iso, selectedLocationIds)),
-      );
-      if (locMissing.size || countriesDirty) {
-        if (locMissing.size) {
-          setInvalidLocationCountries(locMissing);
-          setInvalidFields((prev) => new Set([...prev, "deliveryCountries"]));
-          setCountryNotice(pi.countriesNeedLocation);
-          scrollToFirstInvalid(new Set(["deliveryCountries"]));
-          throw new Error(pi.countriesNeedLocation);
-        }
+      if (countriesDirty) {
         const nextLocationIds = pruneLocationsForCountries(uniqueCountries, selectedLocationIds);
         patch({ deliveryCountryIso2s: uniqueCountries, deliveryLocationIds: nextLocationIds });
         setPendingCountryAdds([]);

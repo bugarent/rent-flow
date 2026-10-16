@@ -29,7 +29,7 @@ function withinAdminLimit<T extends DeliveryPriceRowLike>(row: T): T {
   return { ...row, priceEur: max };
 }
 
-/** City delivery places by location id (city places are not stored on listings). */
+/** City delivery places by location id (only attached when the listing selected them). */
 export type CityDeliveryPlace = {
   id: string;
   code: string;
@@ -38,14 +38,9 @@ export type CityDeliveryPlace = {
   maxDeliveryPriceEur: number;
 };
 
-function rowCountry(row: DeliveryPriceRowLike): string {
-  return String(row.deliveryLocation?.airport?.city?.country?.iso2 || "").toUpperCase();
-}
-
 /**
- * A saved city delivery price is copied onto listings that already serve that
- * country, or that list the city themselves. A city without a saved price is
- * not added for free.
+ * A saved city delivery price is copied onto listings that explicitly list that
+ * city. A city without a saved price is not added for free.
  */
 function cityRowsFromPrefs(
   rows: DeliveryPriceRowLike[],
@@ -54,9 +49,6 @@ function cityRowsFromPrefs(
   listingPlaceIds?: ReadonlySet<string>,
 ): DeliveryPriceRowLike[] {
   const present = new Set(rows.map((r) => String(r.deliveryLocationId || r.deliveryLocation?.id || "")));
-  const countries = new Set(
-    rows.filter((r) => r.deliveryLocation?.isActive !== false).map(rowCountry).filter(Boolean),
-  );
   const extra: DeliveryPriceRowLike[] = [];
   const add = (
     place: CityDeliveryPlace,
@@ -80,7 +72,9 @@ function cityRowsFromPrefs(
     if (pref.enabled === false || present.has(pref.deliveryLocationId)) continue;
     const place = cityPlaces.get(pref.deliveryLocationId);
     if (!place || !place.isActive) continue;
-    if (!countries.has(place.countryIso2.toUpperCase()) && !listingPlaceIds?.has(place.id)) continue;
+    // Only attach a city when the listing explicitly selected it — never borrow
+    // every city in the same country from a single airport assignment.
+    if (!listingPlaceIds?.has(place.id)) continue;
     add(place, pref);
   }
   return extra;

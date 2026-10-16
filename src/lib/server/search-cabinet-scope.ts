@@ -1,8 +1,7 @@
 import "server-only";
 
-import { listingPickupPlaceIds } from "@/lib/cars/listing-place-ids";
 import { findSearchPlace, normalizeLocationCode } from "@/lib/catalog/search-places";
-import { capFreeAfterDays, normalizeDeliveryPrice, type DeliveryLocationView } from "@/lib/delivery/pricing";
+import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import type { DeliveryPriceRowLike } from "@/lib/delivery/trip-fees";
 import { listDeliveryLocations } from "@/lib/server/delivery-locations";
 import { approvedPartnerPlaceGroups } from "@/lib/server/partner-search-coverage";
@@ -111,39 +110,11 @@ function locationFor(cabinet: SearchCabinet, raw: string) {
 function prefsFor(map: Map<string, PartnerDeliveryPref[]> | undefined, partnerId: string) {
   if (!map) return [];
   const bare = partnerKey(partnerId);
-  return map.get(partnerId) || map.get(bare) || map.get(`file-partner-${bare}`) || [];
-}
-
-/** Saved delivery price for a personal-info place, even when the listing itself has no row yet. */
-function ensurePrefRows(
-  rows: DeliveryPriceRowLike[],
-  prefs: PartnerDeliveryPref[],
-  cabinet: SearchCabinet,
-  allowed: Set<string>,
-) {
-  const present = new Set(rows.flatMap((row) => rowKeys(row, cabinet)));
-  const extra: DeliveryPriceRowLike[] = [];
-  for (const pref of prefs) {
-    if (pref.enabled === false) continue;
-    const keys = expandPlaceKeys(pref.deliveryLocationId, cabinet.byKey);
-    if (!keys.some((key) => allowed.has(key)) || keys.some((key) => present.has(key))) continue;
-    const loc = locationFor(cabinet, pref.deliveryLocationId);
-    if (!loc || loc.isActive === false) continue;
-    for (const key of keys) present.add(key);
-    extra.push({
-      deliveryLocationId: loc.id,
-      priceEur: normalizeDeliveryPrice(loc.maxDeliveryPriceEur, pref.priceEur).priceEur,
-      freeAfterDays: capFreeAfterDays(loc.maxFreeAfterDays, pref.freeAfterDays).freeAfterDays,
-      travelTimeMinutes: pref.travelTimeMinutes,
-      deliveryLocation: {
-        id: loc.id,
-        isActive: true,
-        maxDeliveryPriceEur: loc.maxDeliveryPriceEur,
-        airport: { iata: loc.iata, city: { country: { iso2: loc.countryIso2 } } },
-      },
-    });
+  for (const id of [partnerId, bare, `file-partner-${bare}`]) {
+    const prefs = map.get(id);
+    if (prefs?.length) return prefs;
   }
-  return extra.length ? [...rows, ...extra] : rows;
+  return [];
 }
 
 function servesCountry(cabinet: SearchCabinet, allowed: Set<string>, iso2: string) {
@@ -163,18 +134,20 @@ type ScopedCar = {
   deliveryPrices?: DeliveryPriceRowLike[];
 };
 
-/** Place ids a listing itself offers: checked pickup places and its own delivery rows. */
+/**
+ * Place ids from the car↔location assignment rows only (CarDeliveryPrice / file
+ * deliveryPrices). Description pickupPlaces alone never qualifies a listing for search.
+ */
 export function listingOfferedPlaceIds(car: {
   description?: string | null;
   deliveryPrices?: DeliveryPriceRowLike[];
 }): string[] {
-  return [
-    ...listingPickupPlaceIds(car.description),
-    ...(car.deliveryPrices || []).flatMap((row) => [
+  return (car.deliveryPrices || [])
+    .flatMap((row) => [
       String(row.deliveryLocationId || row.deliveryLocation?.id || ""),
       String(row.deliveryLocation?.airport?.iata || ""),
-    ]),
-  ].filter(Boolean);
+    ])
+    .filter(Boolean);
 }
 
 function offeredPlaces(cabinet: SearchCabinet, personal: Set<string>, rawIds: string[]) {
@@ -203,10 +176,9 @@ function pricedPlaces(cabinet: SearchCabinet, offered: Set<string>, prefs: Partn
 
 /**
  * A listing is shown at a place only when all three hold for that exact place:
- * it is in the partner's personal info, it is checked on the listing itself, and
- * the partner saved a delivery price for it on the Delivery page. A city never
- * borrows an airport or another place in the same country.
- * The saved delivery price for such a place is attached so the quote includes it.
+ * it is in the partner's personal info, the car has an active CarDeliveryPrice
+ * (or file) assignment for it, and the partner enabled a delivery price for it
+ * on the Delivery page. Prefs never invent a location the car did not select.
  */
 export function scopeCarsToPersonalPlaces<T extends ScopedCar>(
   cars: T[],
@@ -216,7 +188,7 @@ export function scopeCarsToPersonalPlaces<T extends ScopedCar>(
     dropoff?: string;
     countryIso2?: string;
     prefsByPartner?: Map<string, PartnerDeliveryPref[]>;
-    /** Listing's own place ids, read before delivery prefs are merged in. */
+    /** Listing's own assigned place ids (from deliveryPrices only). */
     listingPlacesByCar: Map<string, string[]>;
   },
 ): { cars: T[]; rejected: Array<{ id: string; reason: string }> } {
@@ -237,7 +209,7 @@ export function scopeCarsToPersonalPlaces<T extends ScopedCar>(
     }
     const offered = offeredPlaces(cabinet, personal, opts.listingPlacesByCar.get(id) || []);
     if (!offered.size) {
-      rejected.push({ id, reason: "listing has no checked pickup place from personal info" });
+      rejected.push({ id, reason: "listing has no car-location assignment in personal scope" });
       continue;
     }
     const prefs = prefsFor(opts.prefsByPartner, pid);
@@ -249,7 +221,7 @@ export function scopeCarsToPersonalPlaces<T extends ScopedCar>(
     const failure = legs
       .map(({ code, label }) => {
         if (!placeAllowed(cabinet, personal, code)) return `personal info does not include ${label}${code}`;
-        if (!placeAllowed(cabinet, offered, code)) return `listing is not offered for ${label}${code}`;
+        if (!placeAllowed(cabinet, offered, code)) return `listing is not assigned to ${label}${code}`;
         if (!placeAllowed(cabinet, allowed, code)) return `no delivery price saved for ${label}${code}`;
         return "";
       })
@@ -266,9 +238,14 @@ export function scopeCarsToPersonalPlaces<T extends ScopedCar>(
       rejected.push({ id, reason: `no priced place in ${country}` });
       continue;
     }
-    const rows = ensurePrefRows(car.deliveryPrices || [], prefs, cabinet, allowed).filter(
+    // Keep only real car↔location rows for allowed places — never invent from prefs.
+    const rows = (car.deliveryPrices || []).filter(
       (row) => row.deliveryLocation?.isActive !== false && rowKeys(row, cabinet).some((key) => allowed.has(key)),
     );
+    if (!rows.length) {
+      rejected.push({ id, reason: "no car-location rows for allowed places" });
+      continue;
+    }
     kept.push({ ...car, deliveryPrices: rows as T["deliveryPrices"] });
   }
   return { cars: kept, rejected };

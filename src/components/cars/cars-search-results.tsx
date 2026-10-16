@@ -32,6 +32,7 @@ import { parseCarDetails } from "@/lib/cars/car-details";
 import { listingDailyWithDeliveryEur, rentalDayCount } from "@/lib/cars/reserve-pricing";
 import { findSearchPlace, isCityLocationCode } from "@/lib/catalog/search-places";
 import type { MappedCarModel } from "@/lib/catalog/car-models";
+import { displayImageUrl } from "@/lib/media/display-image";
 import {
   countListingsForBrand,
   countListingsForCategory,
@@ -1393,9 +1394,11 @@ export function CarsSearchResults({
                               {cat.imageUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
-                                  src={cat.imageUrl}
+                                  src={displayImageUrl(cat.imageUrl, 128)}
                                   alt={cat.name}
                                   className="h-full w-full object-cover"
+                                  loading="lazy"
+                                  decoding="async"
                                 />
                               ) : (
                                 <div className="flex h-full items-center justify-center text-slate-300">
@@ -1958,15 +1961,16 @@ function CarResultCard({
 
   return (
     <article className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="relative w-full overflow-hidden rounded-t-xl bg-slate-100 pb-[56.25%]">
+      <div className="relative w-full overflow-hidden rounded-t-xl bg-slate-50 pb-[56.25%]">
         {photos[photoIndex] ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={photos[photoIndex]}
+            src={displayImageUrl(photos[photoIndex], 640)}
             alt={`${car.make} ${car.model}${car.year ? ` ${car.year}` : ""} — airport car rental`}
-            className="absolute inset-0 h-full w-full object-cover object-center"
+            className="absolute inset-0 h-full w-full object-contain object-center p-1.5"
             loading="lazy"
             decoding="async"
+            fetchPriority="low"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-slate-300">
@@ -2016,8 +2020,8 @@ function CarResultCard({
                 aria-label={`Photo ${i + 1}`}
                 onClick={() => setPhotoIndex(i)}
                 className={cn(
-                  "h-1.5 w-1.5 rounded-full",
-                  i === photoIndex ? "bg-white" : "bg-white/50",
+                  "h-1.5 w-1.5 rounded-full ring-1 ring-black/15",
+                  i === photoIndex ? "bg-slate-700" : "bg-slate-400/70",
                 )}
               />
             ))}

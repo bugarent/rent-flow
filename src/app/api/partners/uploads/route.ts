@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { requirePartnerApi } from "@/lib/auth/sessions";
+import { uploadImageToCloudinary } from "@/lib/server/cloudinary-upload";
 import { persistUploadedFile } from "@/lib/server/persist-upload";
 
 export const maxDuration = 60;
@@ -45,6 +46,18 @@ export async function POST(req: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const contentType = ext === "pdf" ? "application/pdf" : ext === "jpg" ? "image/jpeg" : `image/${ext}`;
     const originalName = `${Date.now()}-${randomBytes(6).toString("hex")}.${ext}`;
+
+    // Car / gallery images → Cloudinary (DB stores only the secure URL).
+    // PDFs (passport, docs) stay on HostedFile for private serving.
+    if (ext !== "pdf") {
+      const uploaded = await uploadImageToCloudinary({
+        bytes: buffer,
+        folder: "partner-cars",
+        publicId: originalName.replace(/\.[^.]+$/, ""),
+      });
+      return NextResponse.json({ url: uploaded.secureUrl, styled: false });
+    }
+
     await persistUploadedFile(["partner-cars", originalName], buffer, contentType);
     return NextResponse.json({ url: `/uploads/partner-cars/${originalName}`, styled: false });
   } catch (error) {
@@ -54,7 +67,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: message }, { status: message === "cover_identity" ? 400 : 502 });
     }
     return NextResponse.json(
-      { error: message === "Could not save the image" ? message : "Upload failed" },
+      {
+        error:
+          message === "Could not save the image" || message === "Cloudinary is not configured"
+            ? message
+            : "Upload failed",
+      },
       { status: 500 },
     );
   }

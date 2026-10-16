@@ -13,6 +13,7 @@ import {
 } from "@/lib/bookings/table-filters";
 import { cn, formatMoneyAmount } from "@/lib/utils";
 import { isCurrency, type Currency } from "@/lib/i18n/config";
+import { displayImageUrl } from "@/lib/media/display-image";
 import { getBookingsTableCopy, type BookingsTableCopy } from "@/components/bookings/bookings-table-copy";
 
 export type BookingsTableRow = {
@@ -479,7 +480,13 @@ export function BookingsTable({
                   <span className="h-12 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
                     {row.carImageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={row.carImageUrl} alt="" className="h-full w-full object-cover" />
+                      <img
+                        src={displayImageUrl(row.carImageUrl, 128)}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
                     ) : (
                       <span className="flex h-full w-full items-center justify-center text-[10px] font-bold text-slate-400">
                         CAR

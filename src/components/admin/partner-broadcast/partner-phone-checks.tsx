@@ -9,6 +9,7 @@ export function PartnerPhoneChecks({
   secondaryPhone,
   picked,
   onToggle,
+  emptyLabel = "—",
   align = "start",
 }: {
   partnerId: string;
@@ -16,10 +17,17 @@ export function PartnerPhoneChecks({
   secondaryPhone?: string | null;
   picked: Set<string>;
   onToggle: (key: string) => void;
+  emptyLabel?: string;
   align?: "start" | "end";
 }) {
   const entries = partnerPhoneSlots(phone, secondaryPhone);
-  if (!entries.length) return <span className="text-slate-400">—</span>;
+  if (!entries.length) {
+    return (
+      <span className="inline-flex rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">
+        {emptyLabel}
+      </span>
+    );
+  }
   return (
     <div className={cn("flex flex-col gap-0.5", align === "end" && "items-end")}>
       {entries.map((entry) => {

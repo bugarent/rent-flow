@@ -166,27 +166,31 @@ async function createInFileStore(input: {
 }
 
 export async function listHomepageCategories(): Promise<StoredHomepageCategory[]> {
-  const published = await readFileStore();
-  if (published.length) return published;
-
   const { isDbCircuitOpen, markDbCircuitOpen } = await import("@/lib/prisma");
-  if (isDbCircuitOpen()) return published;
-
   const db = getDbDelegate();
-  if (!db) return readFileStore();
 
-  try {
-    const rows = await db.findMany({ orderBy: { sortOrder: "asc" } });
-    return rows.map(toStored);
-  } catch (error) {
-    const { isDbOfflineError } = await import("@/lib/server/db-errors");
-    if (isDbOfflineError(error)) {
-      markDbCircuitOpen("homepage-categories", error);
-    } else {
-      console.warn("[homepage-categories] DB list failed, using file store:", error);
+  // Prefer the HomepageCategory table when reachable — JsonStore/file mirrors can
+  // lag after a Neon migration and showed broken slugs (e.g. "jjjj") on disk.
+  if (db && !isDbCircuitOpen()) {
+    try {
+      const rows = await db.findMany({ orderBy: { sortOrder: "asc" } });
+      if (rows.length) {
+        const stored = rows.map(toStored);
+        // Keep the published file mirror aligned without blocking the response.
+        void writeFileStore(stored).catch(() => undefined);
+        return stored;
+      }
+    } catch (error) {
+      const { isDbOfflineError } = await import("@/lib/server/db-errors");
+      if (isDbOfflineError(error)) {
+        markDbCircuitOpen("homepage-categories", error);
+      } else {
+        console.warn("[homepage-categories] DB list failed, using file store:", error);
+      }
     }
-    return readFileStore();
   }
+
+  return readFileStore();
 }
 
 export async function createHomepageCategory(input: {

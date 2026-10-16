@@ -55,6 +55,7 @@ export default function PartnerBroadcastModal({
         }));
         setContacts(loaded);
         setSmsConfigured(Boolean(data.smsConfigured));
+        if (data.smsConfigured) setChannels((prev) => new Set(prev).add("sms"));
       } catch {
         if (!cancelled) {
           setContacts([]);
@@ -135,7 +136,7 @@ export default function PartnerBroadcastModal({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-900/50 sm:items-center sm:p-4"
+      className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-900/50 sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="partner-broadcast-title"

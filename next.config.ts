@@ -26,11 +26,13 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  serverExternalPackages: ["@prisma/client", "prisma", "sharp", "nodemailer"],
+  serverExternalPackages: ["@prisma/client", "prisma", "sharp", "nodemailer", "cloudinary"],
   images: {
     formats: ["image/avif", "image/webp"],
+    localPatterns: [{ pathname: "/uploads/**" }, { pathname: "/images/**" }],
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "res.cloudinary.com" },
     ],
   },
 };

@@ -1,7 +1,6 @@
 import "server-only";
 
 import { normalizeLocationCode } from "@/lib/catalog/search-places";
-import { listingPickupPlaceIds } from "@/lib/cars/listing-place-ids";
 import { mergeDeliveryPrefsIntoRows, type DeliveryPriceRowLike } from "@/lib/delivery/trip-fees";
 import { loadCityDeliveryPlaces } from "@/lib/server/city-delivery-places";
 import {
@@ -40,9 +39,10 @@ export function partnerIdsForTrip(cabinet: SearchCabinet, pickup: string, dropof
 }
 
 /**
- * Search results for a place: only listings whose partner has the place in personal
- * info, checked it on the listing, and saved a delivery price for it. Delivery-page
- * prices are applied to the kept rows so the shown fee is the saved one.
+ * Search results for a place: only listings with an explicit car↔location
+ * assignment for that place (plus partner personal info + Delivery ON price).
+ * Delivery-page prices overlay the kept assignment rows; prefs never add a place
+ * the car did not select.
  */
 export async function scopeSearchCars<T extends SearchCar>(
   cars: T[],
@@ -70,15 +70,20 @@ export async function scopeSearchCars<T extends SearchCar>(
   };
 
   const cityPlaces = await loadCityDeliveryPlaces();
-  const priced = cars.map((car) => ({
-    ...car,
-    deliveryPrices: mergeDeliveryPrefsIntoRows(
-      car.deliveryPrices,
-      prefsFor(String(car.partnerId || car.partner?.id || "")),
-      cityPlaces,
-      listingPickupPlaceIds(car.description),
-    ),
-  }));
+  const priced = cars.map((car) => {
+    const assigned = new Set(
+      listingOfferedPlaceIds(car).map((id) => String(id || "").trim()).filter(Boolean),
+    );
+    return {
+      ...car,
+      deliveryPrices: mergeDeliveryPrefsIntoRows(
+        car.deliveryPrices,
+        prefsFor(String(car.partnerId || car.partner?.id || "")),
+        cityPlaces,
+        assigned,
+      ),
+    };
+  });
 
   return scopeCarsToPersonalPlaces(priced, cabinet, {
     pickup: opts.pickup,

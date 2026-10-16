@@ -5,6 +5,7 @@ import {
   ensureAirportPrefaceTranslations,
   listHomepageAirports,
 } from "@/lib/server/homepage-airports-store";
+import { displayImageUrl } from "@/lib/media/display-image";
 import { readPreferences } from "@/lib/server/preferences";
 
 export const dynamic = "force-dynamic";
@@ -53,9 +54,11 @@ export default async function AirportInfoPage({
       {airport.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={airport.imageUrl}
+          src={displayImageUrl(airport.imageUrl, 1080)}
           alt={title}
           className="mb-6 h-52 w-full rounded-2xl object-cover sm:h-72"
+          loading="eager"
+          decoding="async"
         />
       ) : null}
       <h1 className="text-2xl font-extrabold text-[#0b1f4b] sm:text-3xl">{title}</h1>

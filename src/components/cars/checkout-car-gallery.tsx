@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type MouseEvent } from "react";
 import { Car as CarIcon, ChevronLeft, ChevronRight, Minus, Plus, X } from "lucide-react";
+import { displayImageUrl } from "@/lib/media/display-image";
 import { cn } from "@/lib/utils";
 
 const ZOOM_MIN = 0.5;
@@ -50,9 +51,11 @@ export function CheckoutCarGallery({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={current}
+              src={displayImageUrl(current, 828)}
               alt={title}
               className="absolute inset-0 h-full w-full object-cover object-center"
+              loading="eager"
+              decoding="async"
             />
           </button>
         ) : (
@@ -230,11 +233,12 @@ function GalleryLightbox({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={src}
+              src={displayImageUrl(src, 1200)}
               alt={title}
               draggable={false}
               className="absolute inset-0 h-full w-full select-none object-cover object-center transition-transform duration-150"
               style={{ transform: `scale(${zoom})` }}
+              decoding="async"
             />
 
             {canNavigate ? (

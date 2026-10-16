@@ -5,8 +5,11 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
 import { uploadRoot } from "@/lib/persistent-paths";
+import {
+  findCloudinaryImageUrl,
+  uploadImageToCloudinary,
+} from "@/lib/server/cloudinary-upload";
 import { readHostedFile } from "@/lib/server/durable-fs";
-import { persistUploadedFile } from "@/lib/server/persist-upload";
 import { getPlatformSettings } from "@/lib/server/platform-settings-store";
 
 const CANVAS_W = 1536;
@@ -30,9 +33,17 @@ function uploadKey(url: string): string | null {
   return key;
 }
 
-/** Bytes of a gallery photo saved by our upload route (disk first, then the hosted copy). Only `/uploads/…`. */
+/** Bytes of a gallery photo: Cloudinary HTTPS, legacy `/uploads/…` disk, or HostedFile. */
 async function loadPhotoBytes(photoUrl: string): Promise<Buffer> {
-  const key = uploadKey(photoUrl);
+  const trimmed = photoUrl.trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    const image = await fetch(trimmed, { signal: AbortSignal.timeout(30_000) });
+    if (!image.ok) throw new Error("cover_source");
+    const bytes = Buffer.from(await image.arrayBuffer());
+    if (!bytes.length || bytes.length > MAX_SOURCE_BYTES) throw new Error("cover_source");
+    return bytes;
+  }
+  const key = uploadKey(trimmed);
   if (key) {
     try {
       const disk = await readFile(join(uploadRoot(), ...key.split("/")));
@@ -46,18 +57,24 @@ async function loadPhotoBytes(photoUrl: string): Promise<Buffer> {
   throw new Error("cover_source");
 }
 
-async function coverExists(filename: string): Promise<boolean> {
+async function existingCoverUrl(filename: string): Promise<string | null> {
+  const publicId = filename.replace(/\.[^.]+$/, "");
+  const fromCloud = await findCloudinaryImageUrl("partner-cars", publicId);
+  if (fromCloud) return fromCloud;
   try {
     await readFile(join(uploadRoot(), "partner-cars", filename));
-    return true;
+    return `/uploads/partner-cars/${filename}`;
   } catch {
     /* check hosted copy */
   }
   try {
-    return Boolean((await readHostedFile(`partner-cars/${filename}`))?.bytes?.length);
+    if ((await readHostedFile(`partner-cars/${filename}`))?.bytes?.length) {
+      return `/uploads/partner-cars/${filename}`;
+    }
   } catch {
-    return false;
+    /* missing */
   }
+  return null;
 }
 
 async function readOpenAiKey(): Promise<string | null> {
@@ -176,7 +193,7 @@ async function fitCanvas(bytes: Buffer): Promise<Buffer> {
     .toBuffer();
 }
 
-async function createCover(photoUrl: string, hint: PhotoCoverHint, filename: string): Promise<void> {
+async function createCover(photoUrl: string, hint: PhotoCoverHint, filename: string): Promise<string> {
   const source = await loadPhotoBytes(photoUrl);
   let cover: Buffer | null = null;
   const key = await readOpenAiKey();
@@ -189,7 +206,13 @@ async function createCover(photoUrl: string, hint: PhotoCoverHint, filename: str
     }
   }
   if (!cover) cover = await studioLocally(source);
-  await persistUploadedFile(["partner-cars", filename], cover, "image/jpeg");
+  const uploaded = await uploadImageToCloudinary({
+    bytes: cover,
+    folder: "partner-cars",
+    publicId: filename.replace(/\.[^.]+$/, ""),
+    overwrite: true,
+  });
+  return uploaded.secureUrl;
 }
 
 /** Studio-style cover built from the first gallery photo; cached per photo URL. */
@@ -197,13 +220,11 @@ export async function ensureStudioCoverFromPhoto(photoUrl: string, hint: PhotoCo
   const source = String(photoUrl || "").trim();
   if (!source || source.startsWith("blob:")) throw new Error("cover_source");
   const filename = coverFilename(source);
-  const url = `/uploads/partner-cars/${filename}`;
-  if (await coverExists(filename)) return url;
+  const cached = await existingCoverUrl(filename);
+  if (cached) return cached;
   const existing = inflight.get(filename);
   if (existing) return existing;
-  const job = createCover(source, hint, filename)
-    .then(() => url)
-    .finally(() => inflight.delete(filename));
+  const job = createCover(source, hint, filename).finally(() => inflight.delete(filename));
   inflight.set(filename, job);
   return job;
 }

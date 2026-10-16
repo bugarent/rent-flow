@@ -257,9 +257,17 @@ export async function mkdir(path: string, options?: { recursive?: boolean }): Pr
   }
 }
 
+/**
+ * Prefer Neon JsonStore over local `.data` files whenever DATABASE_URL is set.
+ * After a DB migration the on-disk copies are often stale (wrong categories,
+ * empty delivery prefs) and would hide partners/cars while Postgres is correct.
+ * Serverless /tmp hosts already required this; local/Cloudways with a live DB
+ * need the same rule so the migrated database is the source of truth.
+ */
 function preferDatabaseCopy(path: string): boolean {
   const normalized = path.replace(/\\/g, "/");
-  return isServerlessHost() || normalized.startsWith("/tmp/rentairportcars");
+  if (isServerlessHost() || normalized.startsWith("/tmp/rentairportcars")) return true;
+  return Boolean(databaseUrl());
 }
 
 function textFromDbPayload(fromDb: string, encoding?: BufferEncoding): string | Buffer {

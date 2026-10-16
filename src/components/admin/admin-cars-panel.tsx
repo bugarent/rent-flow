@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { uiText } from "@/lib/i18n/ui-text";
+import { displayImageUrl } from "@/lib/media/display-image";
 import { ADMIN_BASE } from "@/lib/routes";
 import type { AdminCarRow } from "@/lib/server/load-admin-cars";
 
@@ -245,7 +246,13 @@ export function AdminCarsPanel({
             <div className="h-12 w-[4.5rem] shrink-0 overflow-hidden rounded bg-slate-100 ring-1 ring-slate-200">
               {car.photoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={car.photoUrl} alt="" className="h-full w-full object-cover" />
+                <img
+                  src={displayImageUrl(car.photoUrl, 128)}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                />
               ) : (
                 <div className="flex h-full items-center justify-center text-[10px] text-slate-400">
                   —

@@ -6,6 +6,7 @@ import { roundMoney } from "@/lib/cars/reserve-pricing";
 import { extraPeriodCharge } from "@/lib/extras/pricing";
 import { pickServiceLabel } from "@/lib/extras/service-label";
 import { knownText } from "@/lib/i18n/known-record-text";
+import { displayImageUrl } from "@/lib/media/display-image";
 import { cn } from "@/lib/utils";
 import { usePartnerMoneyOptional } from "@/components/providers/partner-money-context";
 import { fuelLabel, transmissionLabel, daysBetween } from "../helpers";
@@ -83,9 +84,11 @@ export function CarAside({
               {booking.car.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={booking.car.imageUrl}
+                  src={displayImageUrl(booking.car.imageUrl, 160)}
                   alt=""
                   className="h-full w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
                 />
               ) : (
                 <div className="flex h-full items-center justify-center text-slate-400">
@@ -100,9 +103,11 @@ export function CarAside({
               {booking.car.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={booking.car.imageUrl}
+                  src={displayImageUrl(booking.car.imageUrl, 256)}
                   alt=""
                   className="h-full w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
                 />
               ) : (
                 <div className="flex h-full items-center justify-center text-slate-400">
@@ -116,9 +121,11 @@ export function CarAside({
             {booking.car.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={booking.car.imageUrl}
+                src={displayImageUrl(booking.car.imageUrl, 640)}
                 alt=""
                 className="h-full w-full object-cover"
+                loading="lazy"
+                decoding="async"
               />
             ) : (
               <div className="flex h-full items-center justify-center text-slate-400">

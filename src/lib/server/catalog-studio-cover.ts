@@ -5,7 +5,10 @@ import { access } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
 import { uploadDir } from "@/lib/persistent-paths";
-import { persistUploadedFile } from "@/lib/server/persist-upload";
+import {
+  findCloudinaryImageUrl,
+  uploadImageToCloudinary,
+} from "@/lib/server/cloudinary-upload";
 import { getPlatformSettings } from "@/lib/server/platform-settings-store";
 
 const CANVAS_W = 1536;
@@ -151,7 +154,7 @@ async function placeOnWhite(bytes: Buffer): Promise<Buffer> {
     .toBuffer();
 }
 
-async function createCoverFile(identity: StudioCoverIdentity, filename: string): Promise<void> {
+async function createCoverFile(identity: StudioCoverIdentity, filename: string): Promise<string> {
   const prompt = coverPrompt(identity);
   const seed = Number.parseInt(filename.slice(7, 15), 16) || 1;
   let source: Buffer | null = null;
@@ -165,7 +168,13 @@ async function createCoverFile(identity: StudioCoverIdentity, filename: string):
   }
   if (!source || source.length < 8_000) source = await generateWithCatalog(prompt, seed);
   const plate = await placeOnWhite(source);
-  await persistUploadedFile(["partner-cars", filename], plate, "image/jpeg");
+  const uploaded = await uploadImageToCloudinary({
+    bytes: plate,
+    folder: "partner-cars",
+    publicId: filename.replace(/\.[^.]+$/, ""),
+    overwrite: true,
+  });
+  return uploaded.secureUrl;
 }
 
 /** Find a saved studio cover for this car, or create one and store it as the listing cover. */
@@ -173,21 +182,22 @@ export async function ensureCatalogStudioCover(input: StudioCoverIdentity): Prom
   const identity = normalizeStudioCoverIdentity(input);
   if (!identity) throw new Error("cover_identity");
   const filename = `studio-${identityKey(identity)}.jpg`;
-  const url = `/uploads/partner-cars/${filename}`;
+  const publicId = filename.replace(/\.[^.]+$/, "");
+  const fromCloud = await findCloudinaryImageUrl("partner-cars", publicId);
+  if (fromCloud) return fromCloud;
+  const legacyUrl = `/uploads/partner-cars/${filename}`;
   const disk = join(uploadDir("partner-cars"), filename);
   try {
     await access(disk);
-    return url;
+    return legacyUrl;
   } catch {
     /* not saved yet */
   }
   const existing = inflight.get(filename);
   if (existing) return existing;
-  const job = createCoverFile(identity, filename)
-    .then(() => url)
-    .finally(() => {
-      inflight.delete(filename);
-    });
+  const job = createCoverFile(identity, filename).finally(() => {
+    inflight.delete(filename);
+  });
   inflight.set(filename, job);
   return job;
 }

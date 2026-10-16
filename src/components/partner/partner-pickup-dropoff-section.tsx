@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import { isSyntheticDeliveryId } from "@/lib/delivery/pricing";
 import { cn } from "@/lib/utils";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { worldCountryName } from "@/lib/catalog/world-countries";
+import { PARTNER_BASE } from "@/lib/routes";
 
 export type PickupPlaceKind = "city" | "airport" | "office";
 
@@ -170,6 +172,9 @@ export function PartnerPickupDropoffSection({
       >
         {pickup.addLocation} <span className="text-[#e11d48]">*</span>
       </p>
+      {pickup.pickLocationsHelp ? (
+        <p className="text-[11px] leading-snug text-slate-500">{pickup.pickLocationsHelp}</p>
+      ) : null}
 
       {!catalogReady && !catalog.length ? (
         <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
@@ -178,7 +183,7 @@ export function PartnerPickupDropoffSection({
           ))}
         </div>
       ) : !catalog.length ? (
-        <p
+        <div
           className={cn(
             "rounded-lg border border-dashed p-4 text-sm",
             invalid
@@ -186,8 +191,14 @@ export function PartnerPickupDropoffSection({
               : "border-amber-300 bg-amber-50 text-amber-900",
           )}
         >
-          {pickup.emptyPickup}
-        </p>
+          <p>{pickup.emptyPickup}</p>
+          <Link
+            href={`${PARTNER_BASE}/delivery`}
+            className="mt-2 inline-block text-sm font-bold text-[#1d6fe8] hover:underline"
+          >
+            Delivery →
+          </Link>
+        </div>
       ) : (
         <div
           className={cn(
@@ -201,7 +212,7 @@ export function PartnerPickupDropoffSection({
               <label
                 key={loc.id}
                 className={cn(
-                  "relative flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition",
+                  "relative flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition",
                   checked
                     ? "border-2 border-[#1f8f3a] bg-emerald-100 shadow-[0_0_0_1px_rgba(40,167,69,0.35)] ring-2 ring-emerald-400/50"
                     : "border border-[#c5ced8] bg-white hover:border-[#28a745]/50 hover:bg-slate-50",
@@ -211,7 +222,7 @@ export function PartnerPickupDropoffSection({
                   type="checkbox"
                   checked={checked}
                   onChange={() => toggleLocation(loc.id)}
-                  className="h-3.5 w-3.5 shrink-0 accent-[#28a745]"
+                  className="h-4 w-4 shrink-0 accent-[#28a745]"
                 />
                 {loc.countryIso2 ? (
                   <CountryFlag iso2={loc.countryIso2} className="h-3.5 w-5 shrink-0" />
