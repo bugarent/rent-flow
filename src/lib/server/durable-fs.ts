@@ -441,6 +441,20 @@ export async function saveHostedFile(key: string, contentType: string, bytes: Bu
   }
 }
 
+/** Existence check without pulling the bytes over the network. */
+export async function hostedFileExists(key: string): Promise<boolean> {
+  const pool = storePool();
+  if (!pool) return false;
+  try {
+    await ensureFileTable(pool);
+    const result = await pool.query(`SELECT 1 FROM "HostedFile" WHERE "key" = $1 LIMIT 1`, [key]);
+    return result.rows.length > 0;
+  } catch (error) {
+    noteStoreError(error);
+    return false;
+  }
+}
+
 export async function readHostedFile(
   key: string,
 ): Promise<{ contentType: string; bytes: Buffer } | null> {

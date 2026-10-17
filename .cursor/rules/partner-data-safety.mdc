@@ -9,7 +9,8 @@ Partner data lives in Neon: Prisma tables (`Partner`, `User`, `Car`, `CarPhoto`,
 
 ## Before moving or restructuring partner cabinet / listing features
 
-- Run `npm run backup:partners` first (writes `.backups/partners-<time>/` with a full `pg_dump`, one JSON per partner, every JsonStore document and referenced files). Check the printed totals.
+- Run `npm run backup:partners` first (writes `.backups/partners-<time>/` with a `pg_dump`, one JSON per partner, every JsonStore document and referenced files). Check the printed totals.
+- Neon meters network transfer (free plan). The backup downloads only new/changed images into `.backups/_hosted-files/`; do not add `--with-images` or bulk-read `HostedFile` bytes unless needed, and never in a loop.
 - Moving a section to another tab/page/component must keep the same fields, API endpoint and stored shape. Move UI, not data.
 
 ## When saving

@@ -14,7 +14,8 @@
     "db:seed": "prisma db seed",
     "db:push": "prisma db push",
     "db:up": "powershell -ExecutionPolicy Bypass -File ./scripts/start-db.ps1",
-    "backup:partners": "node --env-file=.env scripts/backup-partners.mjs"
+    "backup:partners": "node --env-file=.env scripts/backup-partners.mjs",
+    "restore:hosted-files": "node --env-file=.env scripts/restore-hosted-files.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

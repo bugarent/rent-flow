@@ -2,22 +2,29 @@
  * Full snapshot of every partner's data (DB rows + JsonStore + referenced uploads).
  *
  * Output: .backups/partners-<timestamp>/
- *   neon-full.dump         pg_dump -Fc of the whole database (restore: pg_restore --clean --no-owner)
+ *   neon-full.dump         pg_dump -Fc of the whole database, HostedFile rows without bytes
+ *                          (restore: pg_restore --clean --no-owner, then restore-hosted-files.mjs)
  *   partners/<id>.json     one readable file per partner with every related row
  *   jsonstore/<key>.json   every JsonStore document as saved
  *   files/<key>            HostedFile bytes referenced by partner data
  *   manifest.json          counts + anything that could not be saved
+ * Shared: .backups/_hosted-files/<key>  every HostedFile, downloaded only when new or changed.
  *
- * Usage: node --env-file=.env scripts/backup-partners.mjs [--no-dump] [--no-files]
+ * Neon meters network transfer, so image bytes leave the database once and later runs reuse
+ * the shared copy. --with-images puts the bytes into the dump as well (about 200 MB of transfer).
+ *
+ * Usage: node --env-file=.env scripts/backup-partners.mjs [--no-dump] [--no-files] [--with-images]
  */
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import pg from "pg";
 
 const NO_DUMP = process.argv.includes("--no-dump");
 const NO_FILES = process.argv.includes("--no-files");
+const WITH_IMAGES = process.argv.includes("--with-images");
+const FILE_CACHE = join(process.cwd(), ".backups", "_hosted-files");
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -134,7 +141,9 @@ function runPgDump() {
   // pg_dump needs the direct host; the -pooler endpoint runs in transaction mode.
   const direct = databaseUrl.replace("-pooler.", ".");
   const dest = join(outDir, "neon-full.dump");
-  const result = spawnSync(bin, ["--format=custom", "--no-owner", "--no-acl", `--file=${dest}`, `--dbname=${direct}`], {
+  const args = ["--format=custom", "--no-owner", "--no-acl", `--file=${dest}`, `--dbname=${direct}`];
+  if (!WITH_IMAGES) args.push('--exclude-table-data=public."HostedFile"');
+  const result = spawnSync(bin, args, {
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
   });
@@ -265,19 +274,35 @@ async function main() {
   }
 
   let filesSaved = 0;
+  let filesDownloaded = 0;
   const filesMissing = [];
-  if (!NO_FILES && uploadKeys.size) {
-    for (const key of uploadKeys) {
+  if (!NO_FILES) {
+    // Sizes are a cheap metadata query; only new or changed blobs are pulled from Neon.
+    const sizes = new Map(
+      (await q(`SELECT "key", octet_length("bytes")::int AS size FROM "HostedFile"`)).map((r) => [r.key, r.size]),
+    );
+    const cachePath = (key) => join(FILE_CACHE, ...key.split("/").filter(Boolean));
+    for (const [key, size] of sizes) {
+      const path = cachePath(key);
+      const have = await stat(path).then((s) => s.size).catch(() => -1);
+      if (have === size) continue;
       const rows = await q(`SELECT "bytes" FROM "HostedFile" WHERE "key" = $1 LIMIT 1`, [key]);
-      if (!rows[0]) {
+      if (!rows[0]) continue;
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, rows[0].bytes);
+      filesDownloaded += 1;
+    }
+    for (const key of uploadKeys) {
+      if (!sizes.has(key)) {
         filesMissing.push(key);
         continue;
       }
       const dest = join(outDir, "files", ...key.split("/").filter(Boolean));
       await mkdir(dirname(dest), { recursive: true });
-      await writeFile(dest, rows[0].bytes);
+      await copyFile(cachePath(key), dest);
       filesSaved += 1;
     }
+    console.log(`Hosted files: ${sizes.size} total, ${filesDownloaded} downloaded from Neon this run.`);
   }
 
   const manifest = {
@@ -292,6 +317,8 @@ async function main() {
     jsonStoreDocuments: jsonStore.length,
     uploadFilesReferenced: uploadKeys.size,
     uploadFilesSaved: filesSaved,
+    hostedFilesDownloadedThisRun: filesDownloaded,
+    dumpIncludesImageBytes: WITH_IMAGES,
     uploadFilesNotInHostedFile: filesMissing,
     problems,
     perPartner: summary,
@@ -302,6 +329,9 @@ async function main() {
     [
       "Full restore (whole database, overwrites current rows):",
       '  pg_restore --clean --if-exists --no-owner --no-acl --dbname="<DIRECT_DATABASE_URL>" neon-full.dump',
+      WITH_IMAGES
+        ? "  (this dump already contains the image bytes)"
+        : "  then put the images back: node --env-file=.env scripts/restore-hosted-files.mjs",
       "",
       "Single partner: open partners/<id>.json — it holds every row for that partner",
       "(Partner, User, cars, photos, passport, extras, delivery prices, bookings, reviews,",

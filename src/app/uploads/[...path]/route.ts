@@ -1,8 +1,8 @@
-import { readFile, stat } from "node:fs/promises";
-import { extname, join, normalize, resolve, sep } from "node:path";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { dirname, extname, join, normalize, resolve, sep } from "node:path";
 import { NextResponse } from "next/server";
 import sharp from "sharp";
-import { uploadRoot } from "@/lib/persistent-paths";
+import { isServerlessHost, uploadRoot } from "@/lib/persistent-paths";
 import { readHostedFile } from "@/lib/server/durable-fs";
 
 export const maxDuration = 60;
@@ -84,10 +84,24 @@ function imageResponse(bytes: Buffer, contentType: string, width: number | null)
       "Content-Type": contentType,
       "Cache-Control": width
         ? "public, max-age=86400, stale-while-revalidate=604800"
-        : "public, max-age=3600",
+        : "public, max-age=86400",
+      // Upload keys are unique per file, so the Netlify edge may keep them; each image
+      // then leaves Neon once instead of on every visit (Neon network transfer is metered).
+      "Netlify-CDN-Cache-Control": "public, durable, s-maxage=31536000, stale-while-revalidate=604800",
       "X-Image-Optimized": width ? "1" : "0",
     },
   });
+}
+
+/** Local/Cloudways disk: keep a copy so the next request does not read the blob from Neon again. */
+async function keepLocalCopy(file: string, bytes: Buffer) {
+  if (isServerlessHost()) return;
+  try {
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, bytes);
+  } catch {
+    /* read-only disk — serving still works from Neon */
+  }
 }
 
 /**
@@ -129,6 +143,7 @@ export async function GET(
   } catch {
     const hosted = await readHostedFile(rel.replace(/\\/g, "/"));
     if (!hosted) return new NextResponse("Not found", { status: 404 });
+    await keepLocalCopy(file, hosted.bytes);
     const resized = await maybeResize(hosted.bytes, hosted.contentType || type, width);
     if (width) cacheSet(cacheKey, resized);
     return imageResponse(resized.bytes, resized.contentType, width);

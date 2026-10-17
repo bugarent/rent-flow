@@ -9,7 +9,7 @@ import {
   findCloudinaryImageUrl,
   uploadImageToCloudinary,
 } from "@/lib/server/cloudinary-upload";
-import { readHostedFile } from "@/lib/server/durable-fs";
+import { hostedFileExists, readHostedFile } from "@/lib/server/durable-fs";
 import { getPlatformSettings } from "@/lib/server/platform-settings-store";
 
 const CANVAS_W = 1536;
@@ -68,7 +68,7 @@ async function existingCoverUrl(filename: string): Promise<string | null> {
     /* check hosted copy */
   }
   try {
-    if ((await readHostedFile(`partner-cars/${filename}`))?.bytes?.length) {
+    if (await hostedFileExists(`partner-cars/${filename}`)) {
       return `/uploads/partner-cars/${filename}`;
     }
   } catch {
