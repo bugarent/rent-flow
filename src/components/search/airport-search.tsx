@@ -40,7 +40,26 @@ export type SearchAirportOption = {
   kind?: "airport" | "city";
   /** Homepage individual-booking banner for this pickup. */
   individualBookingEnabled?: boolean;
+  /** Live cars offered at this place; cities list by it, largest fleet first. */
+  carCount?: number;
 };
+
+/** Airports first (popular rank, then name); cities after, largest fleet first. */
+export function compareSearchPlaces(
+  a: { label: string; isCity: boolean; rank?: number; carCount?: number },
+  b: { label: string; isCity: boolean; rank?: number; carCount?: number },
+) {
+  if (a.isCity !== b.isCity) return a.isCity ? 1 : -1;
+  if (a.isCity) {
+    const diff = (b.carCount ?? 0) - (a.carCount ?? 0);
+    if (diff) return diff;
+  } else {
+    const ar = a.rank ?? Number.POSITIVE_INFINITY;
+    const br = b.rank ?? Number.POSITIVE_INFINITY;
+    if (ar !== br) return ar - br;
+  }
+  return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
+}
 
 export function toSearchOptions(
   airports: CatalogAirport[],
@@ -324,13 +343,15 @@ export type LocationChoice = {
   country?: string;
   /** Lower ranks list first within their group (popular airports); unranked sort by label. */
   rank?: number;
+  carCount?: number;
 };
 
+function isCityChoice(option: LocationChoice) {
+  return option.kind === "city" || isCityLocationCode(option.value);
+}
+
 function compareLocationChoices(a: LocationChoice, b: LocationChoice) {
-  const ar = a.rank ?? Number.POSITIVE_INFINITY;
-  const br = b.rank ?? Number.POSITIVE_INFINITY;
-  if (ar !== br) return ar - br;
-  return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
+  return compareSearchPlaces({ ...a, isCity: isCityChoice(a) }, { ...b, isCity: isCityChoice(b) });
 }
 
 function locationMatchesQuery(option: LocationChoice, query: string) {
@@ -391,7 +412,7 @@ function groupLocationsByCountry(options: LocationChoice[]): {
       byIso.set(iso2, group);
       countryOrder.push(iso2);
     }
-    if (option.kind === "city" || isCityLocationCode(option.value)) {
+    if (isCityChoice(option)) {
       group.cities.push(option);
     } else {
       group.airports.push(option);
@@ -703,15 +724,13 @@ export function AirportSearch({
       : options;
     const rankOf = (o: SearchAirportOption) =>
       popularRank.get(String(o.iata || "").toUpperCase()) ?? Number.POSITIVE_INFINITY;
-    return [...filtered].sort((a, b) => {
-      const aCity = a.kind === "city" || isCityLocationCode(a.iata) ? 1 : 0;
-      const bCity = b.kind === "city" || isCityLocationCode(b.iata) ? 1 : 0;
-      if (aCity !== bCity) return aCity - bCity;
-      const ar = rankOf(a);
-      const br = rankOf(b);
-      if (ar !== br) return ar - br;
-      return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
+    const place = (o: SearchAirportOption) => ({
+      label: o.label,
+      isCity: o.kind === "city" || isCityLocationCode(o.iata),
+      rank: rankOf(o),
+      carCount: o.carCount,
     });
+    return [...filtered].sort((a, b) => compareSearchPlaces(place(a), place(b)));
   }, [options, countryIso2, popularRank]);
 
   const [pickup, setPickup] = useState("");
@@ -793,6 +812,7 @@ export function AirportSearch({
       countryIso2: o.countryIso2,
       country: regionName(locale, o.countryIso2, o.country || worldCountryName(o.countryIso2)),
       rank: isCityLocationCode(o.iata) ? undefined : popularRank.get(String(o.iata || "").toUpperCase()),
+      carCount: o.carCount,
     });
     return locations.map(mapOption);
   }, [locations, locale, popularRank]);

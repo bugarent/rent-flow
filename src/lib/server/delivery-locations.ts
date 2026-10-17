@@ -1105,28 +1105,45 @@ function locationOffersPickup(loc: DeliveryLocationView, pickupCodes: Set<string
  * checked. A place that is only in personal info stays private to the partner.
  */
 export async function listSearchableDeliveryLocations(): Promise<DeliveryLocationView[]> {
+  return (await searchableLocationsWithCarCounts()).map(({ loc }) => loc);
+}
+
+/** Searchable places with the number of live cars offered at each (always above 0). */
+async function searchableLocationsWithCarCounts(): Promise<Array<{ loc: DeliveryLocationView; carCount: number }>> {
   const all = await listDeliveryLocations();
   const locations = all.filter((loc) => loc.isActive);
   if (!locations.length) return [];
-  const { bookablePlaceKeys } = await import("@/lib/server/search-place-coverage");
-  const partnerCodes = await bookablePlaceKeys(all);
-  return locations.filter((loc) => locationOffersPickup(loc, partnerCodes));
+  const { bookablePlaceCarCounts } = await import("@/lib/server/search-place-coverage");
+  const counts = await bookablePlaceCarCounts(all);
+  const carCountOf = (loc: DeliveryLocationView) =>
+    Math.max(
+      0,
+      ...[loc.iata, loc.airportId, loc.id].map(
+        (raw) => counts.get(normalizeLocationCode(raw || "").toUpperCase()) ?? 0,
+      ),
+    );
+  return locations
+    .map((loc) => ({ loc, carCount: carCountOf(loc) }))
+    .filter((row) => row.carCount > 0);
 }
 
 export async function getSearchDeliveryAirports(): Promise<SearchAirportOption[]> {
   const hit = searchAirportsCache.get();
   if (hit) return hit;
 
-  const locations = await listSearchableDeliveryLocations();
+  const rows = await searchableLocationsWithCarCounts();
 
-  const toOption = (loc: {
-    iata: string;
-    label: string;
-    country: string;
-    countryIso2: string;
-    kind?: "airport" | "city";
-    individualBookingEnabled?: boolean;
-  }): SearchAirportOption => {
+  const toOption = (
+    loc: {
+      iata: string;
+      label: string;
+      country: string;
+      countryIso2: string;
+      kind?: "airport" | "city";
+      individualBookingEnabled?: boolean;
+    },
+    carCount: number,
+  ): SearchAirportOption => {
     const place = findSearchPlace(loc.iata);
     const iso2 =
       loc.countryIso2?.toUpperCase() ||
@@ -1142,10 +1159,11 @@ export async function getSearchDeliveryAirports(): Promise<SearchAirportOption[]
       isHub: true,
       kind,
       individualBookingEnabled: loc.individualBookingEnabled === true,
+      carCount,
     };
   };
 
-  const result = locations.map(toOption);
+  const result = rows.map(({ loc, carCount }) => toOption(loc, carCount));
 
   searchAirportsCache.set(result);
   return result;

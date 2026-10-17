@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Car, MapPin } from "lucide-react";
 import {
+  compareSearchPlaces,
   LocationPicker,
   type LocationChoice,
   type SearchAirportOption,
@@ -236,6 +237,7 @@ export function CarsSearchTripEditor({
         kind: o.kind ?? (isCityLocationCode(o.iata) ? "city" : "airport"),
         countryIso2: o.countryIso2,
         country: o.country,
+        carCount: o.carCount,
       });
     }
     const ensure = (code: string) => {
@@ -262,12 +264,9 @@ export function CarsSearchTripEditor({
     if (dropoff !== SAME_AS_PICKUP) ensure(dropoff);
     ensure(initialDropoff);
 
-    const all = [...map.values()].sort((a, b) => {
-      const aCity = a.kind === "city" ? 1 : 0;
-      const bCity = b.kind === "city" ? 1 : 0;
-      if (aCity !== bCity) return aCity - bCity;
-      return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
-    });
+    const all = [...map.values()].sort((a, b) =>
+      compareSearchPlaces({ ...a, isCity: a.kind === "city" }, { ...b, isCity: b.kind === "city" }),
+    );
     const airports = all.filter((o) => o.kind === "airport");
     const cities = all.filter((o) => o.kind === "city");
     const grouped = airports.length > 0 && cities.length > 0;
