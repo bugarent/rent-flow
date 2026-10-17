@@ -147,10 +147,25 @@ export async function PATCH(req: Request) {
       ? settings.deliveryCountryIso2s
       : parseIso2List(partner.operatingCountryIso2s);
 
-    const { resolvePartnerDeliveryLocationIds } = await import("@/lib/server/delivery-locations");
-    const resolvedLocationIds = await resolvePartnerDeliveryLocationIds(
-      settings.deliveryLocationIds || [],
+    const rawSettings = (body?.settings ?? body) as Record<string, unknown> | null;
+    const { resolvePartnerDeliveryLocationIds, keepLocationIdsForCountries } = await import(
+      "@/lib/server/delivery-locations"
     );
+    // Personal info only picks countries; locations come from the Delivery page and stay as saved.
+    // A country that comes back gets its still-ON Delivery places back.
+    let resolvedLocationIds: string[];
+    if (Array.isArray(rawSettings?.deliveryLocationIds)) {
+      resolvedLocationIds = await resolvePartnerDeliveryLocationIds(settings.deliveryLocationIds || []);
+    } else {
+      const { readPartnerDeliveryPrefs } = await import("@/lib/server/partner-delivery-prefs-store");
+      const enabledPrefIds = (await readPartnerDeliveryPrefs(partner.id).catch(() => []))
+        .filter((pref) => pref.enabled !== false)
+        .map((pref) => pref.deliveryLocationId);
+      resolvedLocationIds = await keepLocationIdsForCountries(
+        [...(previous.deliveryLocationIds || []), ...enabledPrefIds],
+        countryIso2s,
+      );
+    }
     if (partner.status === "PENDING" && resolvedLocationIds.length) {
       const { activatePartnerApprovedDeliveryLocations } = await import("@/lib/server/delivery-locations");
       await activatePartnerApprovedDeliveryLocations(resolvedLocationIds);

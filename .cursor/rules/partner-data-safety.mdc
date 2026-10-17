@@ -1,0 +1,20 @@
+---
+description: Never lose partner data when moving or refactoring partner cabinet / car listing features
+alwaysApply: true
+---
+
+# Partner data safety (rentairportcars.com)
+
+Partner data lives in Neon: Prisma tables (`Partner`, `User`, `Car`, `CarPhoto`, `CarPassport`, `CarExtra`, `CarDeliveryPrice`, `PartnerAirport`, …), `JsonStore` documents (`partner-company-settings`, `partner-delivery-prefs`, `partner-extras-prefs`, `partner-cars`, `partner-credentials`, `partner-profile-moderation`, …) and `HostedFile` (uploaded images/docs). Some partners and cars exist only in `JsonStore`.
+
+## Before moving or restructuring partner cabinet / listing features
+
+- Run `npm run backup:partners` first (writes `.backups/partners-<time>/` with a full `pg_dump`, one JSON per partner, every JsonStore document and referenced files). Check the printed totals.
+- Moving a section to another tab/page/component must keep the same fields, API endpoint and stored shape. Move UI, not data.
+
+## When saving
+
+- Partner/car saves merge into the existing record (`{ ...existing, ...patch }`); never replace a whole JsonStore document or settings object with only the fields the current form shows.
+- Read stores with `readFileForUpdate` + `withStoreLock` before writing; if the read fails, save nothing.
+- Do not delete `CarDeliveryPrice`, `CarPhoto`, `CarExtra` rows or JsonStore keys as a side effect of a layout change. Deletions only on an explicit user action.
+- Keep file-backed partners (`file-partner-*` ids) working when changing lookups.

@@ -681,6 +681,29 @@ export async function resolvePartnerDeliveryLocationIds(rawIds: string[]): Promi
   return [...new Set(out)];
 }
 
+/**
+ * Saved location ids that still belong to one of the operating countries.
+ * Ids whose country cannot be resolved are kept, so a catalog read problem never drops data.
+ */
+export async function keepLocationIdsForCountries(ids: string[], countryIso2s: string[]): Promise<string[]> {
+  const countries = new Set(countryIso2s.map((c) => c.toUpperCase()));
+  const unique = [...new Set(ids.map((id) => String(id || "").trim()).filter(Boolean))];
+  if (!unique.length || !countries.size) return unique;
+  let all: DeliveryLocationView[] = [];
+  try {
+    all = await listDeliveryLocations({ activeOnly: false });
+  } catch {
+    return unique;
+  }
+  return unique.filter((id) => {
+    const loc =
+      all.find((l) => l.id === id) ||
+      all.find((l) => locationCodesEqual(l.iata, id) || locationCodesEqual(l.airportId, id));
+    const iso = (loc?.countryIso2 || findSearchPlace(id)?.countryIso2 || "").toUpperCase();
+    return !iso || countries.has(iso);
+  });
+}
+
 /** After admin confirms a partner's operating places, enable them for homepage search. */
 export async function activatePartnerApprovedDeliveryLocations(rawIds: string[]): Promise<string[]> {
   const ids = await resolvePartnerDeliveryLocationIds(rawIds);

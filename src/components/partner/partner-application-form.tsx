@@ -1,14 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { createPortal } from "react-dom";
+import { useRef, useState } from "react";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { ResidenceCountrySelect } from "@/components/cars/residence-country-select";
 import { PhoneMessengerIcons } from "@/components/partner/phone-messenger-icons";
 import { DialCodeSelect } from "@/components/partner/phone-country-field";
 import { useSurfaceDictionary } from "@/components/providers/use-surface-dictionary";
 import { dialCodeForIso2, nationalDigits } from "@/lib/catalog/dial-codes";
-import { normalizeLocationCode, searchPlacesForCountry } from "@/lib/catalog/search-places";
 import { WORLD_COUNTRIES, worldCountryName } from "@/lib/catalog/world-countries";
 import { LOCALES, LOCALE_LABELS, type Locale } from "@/lib/i18n/config";
 import { PARTNER_LOGIN } from "@/lib/routes";
@@ -33,9 +31,8 @@ function copyFor(locale: string) {
       selectCountry: "აირჩიეთ ქვეყანა",
       add: "დამატება",
       remove: "წაშლა",
-      selectPlace: "აირჩიეთ ლოკაცია",
-      locationsDone: "არჩევა",
-      noPlaces: "ლოკაციები არ არის",
+      countriesHelp:
+        "აირჩიეთ ქვეყნები, სადაც მუშაობთ. აეროპორტებს და ქალაქებს დამტკიცების შემდეგ დაამატებთ კაბინეტის „მიწოდების“ გვერდზე.",
       noCountries: "ოპერირების ქვეყანა არ არის მითითებული",
       primaryPhone: "ძირითადი მობილური ტელეფონის ნომერი",
       managerPhone: "მეორე ტელეფონი",
@@ -73,9 +70,8 @@ function copyFor(locale: string) {
       selectCountry: "Выберите страну",
       add: "Добавить",
       remove: "Удалить",
-      selectPlace: "Выберите локацию",
-      locationsDone: "Готово",
-      noPlaces: "Локации отсутствуют",
+      countriesHelp:
+        "Выберите страны, где вы работаете. Аэропорты и города добавляются после одобрения на странице «Доставка» в кабинете.",
       noCountries: "Страны операций не указаны",
       primaryPhone: "Основной мобильный",
       managerPhone: "Второй телефон",
@@ -112,9 +108,8 @@ function copyFor(locale: string) {
     selectCountry: "Select country",
     add: "Add",
     remove: "Remove",
-    selectPlace: "Select location",
-    locationsDone: "Done",
-    noPlaces: "No locations",
+    countriesHelp:
+      "Select the countries where you operate. After approval you add airports and cities on the Delivery page of your cabinet.",
     noCountries: "No operating countries set",
     primaryPhone: "Primary mobile phone",
     managerPhone: "Secondary phone",
@@ -134,13 +129,6 @@ function copyFor(locale: string) {
     loginPrompt: "Already approved?",
     loginLink: "Partner login",
   };
-}
-
-function placesForCountry(iso2: string) {
-  return searchPlacesForCountry(iso2).map((place) => ({
-    code: normalizeLocationCode(place.code),
-    label: place.label,
-  }));
 }
 
 function emailOk(value: string) {
@@ -196,7 +184,6 @@ export function PartnerApplicationForm({
   const [countryIso2s, setCountryIso2s] = useState<string[]>(
     initialCountry && /^[A-Za-z]{2}$/.test(initialCountry) ? [initialCountry.toUpperCase()] : [],
   );
-  const [locationCodes, setLocationCodes] = useState<string[]>([]);
   const [addCountry, setAddCountry] = useState("");
   const [primaryPhone, setPrimaryPhone] = useState("");
   const [primaryIso2, setPrimaryIso2] = useState(defaultIso2);
@@ -220,9 +207,6 @@ export function PartnerApplicationForm({
     PARTNER_SOCIAL_PLATFORMS.map((item) => [item.value, item.label]),
   ) as Record<PartnerSocialPlatform, string>;
 
-  const countryMissingPlace = (iso2: string) =>
-    !placesForCountry(iso2).some((place) => locationCodes.includes(place.code));
-
   const invalid = {
     firstName: !firstName.trim(),
     lastName: !lastName.trim(),
@@ -230,7 +214,7 @@ export function PartnerApplicationForm({
     applicantKind: applicantKind !== "COMPANY" && applicantKind !== "PRIVATE",
     address: !address.trim(),
     languages: languages.length === 0,
-    countries: countryIso2s.length === 0 || countryIso2s.some(countryMissingPlace),
+    countries: countryIso2s.length === 0,
     primaryPhone: !phoneOk(primaryPhone) || primaryMessengers.length === 0,
     managerPhone: !phoneOk(managerPhone) || managerMessengers.length === 0,
     website: !noWebsite && !websiteOk(website),
@@ -248,9 +232,7 @@ export function PartnerApplicationForm({
   };
 
   const removeOperatingCountry = (iso2: string) => {
-    const codes = new Set(placesForCountry(iso2).map((place) => place.code));
     setCountryIso2s((current) => current.filter((item) => item !== iso2));
-    setLocationCodes((current) => current.filter((code) => !codes.has(code)));
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -289,7 +271,6 @@ export function PartnerApplicationForm({
           fleetSize: 1,
           fleetAgeRange: "AGE_0_5",
           countryIso2s,
-          locationCodes,
           officeCountry: officeCountry.trim(),
           centralOffice: "",
           address: address.trim(),
@@ -430,6 +411,7 @@ export function PartnerApplicationForm({
                     <p className={cn("mb-1.5 text-sm font-semibold", mark("countries") ? "text-red-700" : "text-[#3a4553]")}>
                       {t.countries} <span className="text-[#e11d48]">*</span>
                     </p>
+                    <p className="mb-2 text-xs text-slate-500">{t.countriesHelp}</p>
                     <div
                       className={cn(
                         "rounded-md",
@@ -464,70 +446,25 @@ export function PartnerApplicationForm({
                         </p>
                       ) : (
                         <ul className="space-y-2">
-                          {countryIso2s.map((iso2) => {
-                            const places = placesForCountry(iso2);
-                            const selected = places.filter((place) => locationCodes.includes(place.code));
-                            const missing = showErrors && selected.length === 0;
-                            return (
-                              <li
-                                key={iso2}
-                                data-invalid={missing ? "true" : undefined}
-                                className={cn(
-                                  "rounded-md border bg-white px-3 py-2",
-                                  missing ? "border-red-500 bg-red-50" : "border-slate-200",
-                                )}
+                          {countryIso2s.map((iso2) => (
+                            <li
+                              key={iso2}
+                              className="flex min-h-11 items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2"
+                            >
+                              <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-800">
+                                <CountryFlag iso2={iso2} />
+                                <span className="truncate">{worldCountryName(iso2)}</span>
+                                <span className="text-xs font-medium text-slate-400">({iso2})</span>
+                              </div>
+                              <button
+                                type="button"
+                                className="min-h-10 shrink-0 text-xs font-semibold text-red-700"
+                                onClick={() => removeOperatingCountry(iso2)}
                               >
-                                <div className="flex items-center justify-between gap-2">
-                                  <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-800">
-                                    <CountryFlag iso2={iso2} />
-                                    <span className="truncate">{worldCountryName(iso2)}</span>
-                                    <span className="text-xs font-medium text-slate-400">({iso2})</span>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    className="min-h-10 shrink-0 text-xs font-semibold text-red-700"
-                                    onClick={() => removeOperatingCountry(iso2)}
-                                  >
-                                    {t.remove}
-                                  </button>
-                                </div>
-                                <LocationMultiSelect
-                                  places={places}
-                                  selectedCodes={selected.map((place) => place.code)}
-                                  placeholder={places.length ? t.selectPlace : t.noPlaces}
-                                  doneLabel={t.locationsDone}
-                                  invalid={missing}
-                                  disabled={places.length === 0}
-                                  onCommit={(codes) => {
-                                    const countryCodes = new Set(places.map((place) => place.code));
-                                    setLocationCodes((current) => [
-                                      ...current.filter((code) => !countryCodes.has(code)),
-                                      ...codes,
-                                    ]);
-                                  }}
-                                />
-                                <ul className="mt-2 space-y-1">
-                                  {selected.map((place) => (
-                                    <li
-                                      key={place.code}
-                                      className="flex items-center justify-between gap-2 rounded border border-slate-100 bg-slate-50 px-2 py-1.5 text-xs"
-                                    >
-                                      <span className="min-w-0 break-words font-semibold text-slate-800">{place.label}</span>
-                                      <button
-                                        type="button"
-                                        className="min-h-10 shrink-0 font-semibold text-red-700"
-                                        onClick={() =>
-                                          setLocationCodes((current) => current.filter((code) => code !== place.code))
-                                        }
-                                      >
-                                        {t.remove}
-                                      </button>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </li>
-                            );
-                          })}
+                                {t.remove}
+                              </button>
+                            </li>
+                          ))}
                         </ul>
                       )}
                     </div>
@@ -647,146 +584,6 @@ export function PartnerApplicationForm({
           </form>
         )}
       </div>
-    </div>
-  );
-}
-
-function LocationMultiSelect({
-  places,
-  selectedCodes,
-  placeholder,
-  doneLabel,
-  invalid,
-  disabled,
-  onCommit,
-}: {
-  places: Array<{ code: string; label: string }>;
-  selectedCodes: string[];
-  placeholder: string;
-  doneLabel: string;
-  invalid?: boolean;
-  disabled?: boolean;
-  onCommit: (codes: string[]) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState<string[]>(selectedCodes);
-  const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  const placePanel = () => {
-    const rect = buttonRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const width = Math.min(rect.width, window.innerWidth - 24);
-    const left = Math.min(Math.max(12, rect.left), window.innerWidth - width - 12);
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const maxHeight = Math.min(360, Math.max(220, spaceBelow > 220 ? spaceBelow - 12 : rect.top - 12));
-    const openUp = spaceBelow < 220 && rect.top > spaceBelow;
-    setPanelStyle({
-      position: "fixed",
-      left,
-      width,
-      maxHeight,
-      top: openUp ? undefined : rect.bottom + 6,
-      bottom: openUp ? window.innerHeight - rect.top + 6 : undefined,
-      zIndex: 260,
-    });
-  };
-
-  const openPanel = () => {
-    setDraft(selectedCodes);
-    placePanel();
-    setOpen(true);
-  };
-
-  const closePanel = () => {
-    onCommit(draft);
-    setOpen(false);
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    placePanel();
-    const onLayout = () => placePanel();
-    window.addEventListener("resize", onLayout);
-    window.addEventListener("scroll", onLayout, true);
-    const onDoc = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (buttonRef.current?.contains(target) || panelRef.current?.contains(target)) return;
-      closePanel();
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => {
-      window.removeEventListener("resize", onLayout);
-      window.removeEventListener("scroll", onLayout, true);
-      document.removeEventListener("mousedown", onDoc);
-    };
-  }, [open, draft]);
-
-  const toggle = (code: string) => {
-    setDraft((current) => (current.includes(code) ? current.filter((item) => item !== code) : [...current, code]));
-  };
-
-  const panel =
-    open && typeof document !== "undefined"
-      ? createPortal(
-          <div
-            ref={panelRef}
-            style={panelStyle}
-            className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-900 shadow-xl"
-          >
-            <div className="min-h-0 flex-1 overflow-y-auto p-1">
-              {places.map((place) => {
-                const checked = draft.includes(place.code);
-                return (
-                  <label
-                    key={place.code}
-                    className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50"
-                  >
-                    <input
-                      type="checkbox"
-                      className="h-5 w-5 shrink-0 accent-sky-600"
-                      checked={checked}
-                      onChange={() => toggle(place.code)}
-                    />
-                    <span className="min-w-0 break-words font-medium text-slate-800">{place.label}</span>
-                  </label>
-                );
-              })}
-            </div>
-            <div className="border-t border-slate-100 p-2">
-              <button
-                type="button"
-                className="min-h-11 w-full rounded-lg bg-[#1d6fe8] px-3 text-sm font-bold text-white"
-                onClick={closePanel}
-              >
-                {doneLabel}
-              </button>
-            </div>
-          </div>,
-          document.body,
-        )
-      : null;
-
-  return (
-    <div className="mt-2">
-      <button
-        ref={buttonRef}
-        type="button"
-        disabled={disabled}
-        aria-expanded={open}
-        onClick={() => (open ? closePanel() : openPanel())}
-        className={cn(
-          "flex h-11 w-full items-center justify-between rounded-md border bg-white px-3 text-start text-base disabled:opacity-60",
-          invalid ? "border-red-500" : "border-[#c5ced8]",
-        )}
-      >
-        <span className="truncate text-slate-700">{placeholder}</span>
-        <span className="text-xs text-slate-400" aria-hidden>
-          {open ? "▴" : "▾"}
-        </span>
-      </button>
-      {panel}
     </div>
   );
 }

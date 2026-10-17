@@ -4,9 +4,11 @@ import { prisma } from "@/lib/prisma";
 import { LOCAL_PARTNER_ID, loadLocalPartner } from "@/lib/auth/local-partner-store";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import {
+  ensureDeliveryLocationByCode,
   listPartnerCountryDeliveryLocations,
   syncPartnerEnabledDeliveryLocationIds,
 } from "@/lib/server/delivery-locations";
+import { deliveryAddOptionsByCountry } from "@/lib/server/partner-delivery-options";
 import {
   capFreeAfterDays,
   hasDeliveryPriceLimit,
@@ -100,6 +102,7 @@ export async function GET() {
         pricingCurrency,
         countries: scoped.countries,
         items: panelItems(scoped.locations, prefs, scoped.selectedIds),
+        options: await deliveryAddOptionsByCountry(scoped.countries),
         crossBorderEnabled,
       },
       { headers: { "Cache-Control": "no-store" } },
@@ -155,19 +158,46 @@ export async function PUT(req: Request) {
       });
     }
 
+    // Places picked with "+" on the Delivery page: create the catalog row if needed and switch it ON.
+    // A place that was added before keeps its saved price and times.
+    const countrySet = new Set(scoped.countries.map((c) => c.toUpperCase()));
+    const addedIds: string[] = [];
+    const addRaw: unknown[] = Array.isArray(body?.add) ? body.add : [];
+    for (const raw of addRaw.slice(0, 100)) {
+      const loc = await ensureDeliveryLocationByCode(String(raw || ""), { isActive: false });
+      if (!loc || !countrySet.has((loc.countryIso2 || "").toUpperCase())) continue;
+      const prior = next.find((p) => p.deliveryLocationId === loc.id) || previousById.get(loc.id);
+      const pref: PartnerDeliveryPref = {
+        deliveryLocationId: loc.id,
+        enabled: true,
+        priceEur: normalizeDeliveryPrice(loc.maxDeliveryPriceEur, prior?.priceEur ?? 0).priceEur,
+        freeAfterDays: capFreeAfterDays(loc.maxFreeAfterDays, prior?.freeAfterDays ?? 0).freeAfterDays,
+        travelTimeMinutes: prior?.travelTimeMinutes ?? 0,
+      };
+      const index = next.findIndex((p) => p.deliveryLocationId === loc.id);
+      if (index >= 0) next[index] = pref;
+      else next.push(pref);
+      addedIds.push(loc.id);
+    }
+
     // Locations not in this payload keep prior prefs (writePartnerDeliveryPrefs merges).
     const saved = await writePartnerDeliveryPrefs(partnerId, next);
 
     // Search coverage follows ON locations for this partner's operating countries.
     const submittedById = new Map(next.map((p) => [p.deliveryLocationId, p]));
-    const syncedIds = catalog
-      .filter((loc) => {
-        const submitted = submittedById.get(loc.id);
-        if (submitted) return submitted.enabled !== false;
-        const pref = saved.find((p) => p.deliveryLocationId === loc.id);
-        return pref ? pref.enabled !== false : false;
-      })
-      .map((loc) => loc.id);
+    const syncedIds = [
+      ...new Set([
+        ...catalog
+          .filter((loc) => {
+            const submitted = submittedById.get(loc.id);
+            if (submitted) return submitted.enabled !== false;
+            const pref = saved.find((p) => p.deliveryLocationId === loc.id);
+            return pref ? pref.enabled !== false : false;
+          })
+          .map((loc) => loc.id),
+        ...addedIds,
+      ]),
+    ];
 
     await syncPartnerEnabledDeliveryLocationIds(partnerId, syncedIds);
 
@@ -191,6 +221,7 @@ export async function PUT(req: Request) {
         prefs: saved,
         countries: refreshed.countries,
         items: panelItems(refreshed.locations, saved, refreshed.selectedIds),
+        options: await deliveryAddOptionsByCountry(refreshed.countries),
         listingsUpdated,
         crossBorderEnabled,
       },

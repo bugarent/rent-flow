@@ -45,7 +45,8 @@ const applicationSchema = z
     fleetSize: z.number().int().min(1).max(10000),
     fleetAgeRange: z.enum(fleetAgeValues),
     countryIso2s: z.array(z.string().length(2)).min(1),
-    locationCodes: z.array(z.string().trim().min(2).max(80)).min(1).max(400),
+    // Applications pick countries only; places are added later on the Delivery page.
+    locationCodes: z.array(z.string().trim().min(2).max(80)).max(400).default([]),
     title: z.string().trim().max(120).optional(),
     officeCountry: z.string().trim().max(80).optional(),
     centralOffice: z.string().trim().max(80).optional(),
@@ -147,12 +148,6 @@ export async function POST(req: Request) {
     const email = body.email.toLowerCase().trim();
     const countryIso2s = [...new Set(body.countryIso2s.map((c) => c.toUpperCase()))];
     const locationCodes = normalizeRequestedLocationCodes(countryIso2s, body.locationCodes);
-    if (!locationCodes.length) {
-      return NextResponse.json(
-        { error: "Select at least one airport or pickup place in the chosen countries." },
-        { status: 400 },
-      );
-    }
     const messengers = [...new Set(body.messengers)];
     const phone = formatInternationalPhone(body.phoneCountryIso2, body.phone);
     const secondaryPhone = body.secondaryPhone

@@ -41,6 +41,9 @@ yarn-error.log*
 # local credential fallback when Postgres is offline
 .data/
 
+# partner data backups (personal data, password hashes)
+/.backups/
+
 # admin homepage uploads
 /public/uploads/
 /public/uploads.kept

@@ -23,27 +23,19 @@ import {
 } from "@/lib/partners/company-settings";
 import { partnerCurrencySymbol, rebasePartnerAmount } from "@/lib/partners/pricing-currency";
 import { DEFAULT_FX_RATES, type FxRates } from "@/lib/fx";
-import { CountryFlag } from "@/components/ui/country-flag";
-import { worldCountryName, WORLD_COUNTRIES } from "@/lib/catalog/world-countries";
+import { WORLD_COUNTRIES } from "@/lib/catalog/world-countries";
 import {
   majorCitiesForCountryIso2,
   resolveOfficeCountryIso2,
 } from "@/lib/catalog/office-locations";
 import { LOCALES, LOCALE_LABELS, type Locale } from "@/lib/i18n/config";
-import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import { CREATE_AUTO_BACKDROP_URL } from "@/lib/brand";
 import { PartnerTelegramVerifyBanner } from "@/components/partner/partner-telegram-verify-banner";
 import { publishPartnerChromeSettings } from "@/components/partner/partner-chrome-settings";
 import { PartnerMessengerLinks, PartnerPhoneChat } from "@/components/admin/partner-phone-chat";
 import { PhoneMessengerIcons } from "@/components/partner/phone-messenger-icons";
-import { PartnerLocationMultiPicker } from "@/components/partner/partner-location-multi-picker";
-import { locationCodesEqual, normalizeLocationCode } from "@/lib/catalog/search-places";
-import {
-  countryLocationOptions,
-  fetchPartnerDeliveryRows,
-  requestableCountryOptions,
-  type CountryLocationOption,
-} from "@/components/partner/personal-info-locations";
+import { PartnerOperatingCountriesField } from "@/components/partner/partner-operating-countries-field";
+import { requestableCountryOptions } from "@/components/partner/personal-info-locations";
 import type { PartnerSocialPlatform } from "@/lib/partner";
 
 async function uploadPartnerFile(file: File): Promise<string> {
@@ -241,8 +233,6 @@ export function PartnerPersonalInfoForm({
   const [pendingCountryAdds, setPendingCountryAdds] = useState<string[]>([]);
   const [pendingCountryRemoves, setPendingCountryRemoves] = useState<string[]>([]);
   const [countryNotice, setCountryNotice] = useState("");
-  const [activeDeliveryLocations, setActiveDeliveryLocations] = useState<DeliveryLocationView[]>([]);
-  const [invalidLocationCountries, setInvalidLocationCountries] = useState<Set<string>>(new Set());
   const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
   const [lastAdminNote, setLastAdminNote] = useState(lastAdminNoteInitial);
 
@@ -321,7 +311,6 @@ export function PartnerPersonalInfoForm({
   const countryOptions = useMemo(() => requestableCountryOptions(), []);
 
   const committedCountries = settings.deliveryCountryIso2s ?? [];
-  const visibleCommitted = committedCountries.filter((iso) => !pendingCountryRemoves.includes(iso));
   const countriesDirty = pendingCountryAdds.length > 0 || pendingCountryRemoves.length > 0;
 
   const officeCountryOptions = useMemo(
@@ -358,16 +347,6 @@ export function PartnerPersonalInfoForm({
       return next;
     });
   };
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetchPartnerDeliveryRows().then((rows) => {
-      if (!cancelled && rows) setActiveDeliveryLocations(rows);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     const nodes = PERSONAL_INFO_SECTIONS.map((s) => document.getElementById(s.id)).filter(Boolean) as HTMLElement[];
@@ -473,9 +452,7 @@ export function PartnerPersonalInfoForm({
           ? pi.invalidPhone
           : pi.fieldRequired;
       case "deliveryCountries":
-        return (settings.deliveryCountryIso2s?.length ?? 0) > 0
-          ? pi.countriesNeedLocation
-          : pi.countriesNeedOne;
+        return pi.countriesNeedOne;
       case "clientLanguages":
         return pi.fieldRequired;
       case "messengers":
@@ -665,84 +642,6 @@ export function PartnerPersonalInfoForm({
     setPendingCountryRemoves((prev) => (prev.includes(iso2) ? prev : [...prev, iso2]));
   };
 
-  const selectedLocationIds = settings.deliveryLocationIds ?? [];
-
-  const locationsForCountry = (iso2: string): CountryLocationOption[] =>
-    countryLocationOptions(iso2, activeDeliveryLocations, selectedLocationIds);
-
-  const isLocationSelected = (loc: CountryLocationOption, selected: string[]) => {
-    const selectedSet = new Set(selected);
-    if (selectedSet.has(loc.id)) return true;
-    const code = normalizeLocationCode(loc.iata);
-    return selected.some((id) => {
-      if (locationCodesEqual(id, code)) return true;
-      const known = activeDeliveryLocations.find((l) => l.id === id);
-      return known ? locationCodesEqual(known.iata || known.airportId || "", code) : false;
-    });
-  };
-
-  const toggleDeliveryLocation = (locationId: string, countryIso2?: string) => {
-    setSettings((prev) => {
-      const list = prev.deliveryLocationIds ?? [];
-      const locs = countryIso2 ? locationsForCountry(countryIso2) : [];
-      const target = locs.find((l) => l.id === locationId) || {
-        id: locationId,
-        iata: locationId,
-        label: locationId,
-        countryIso2: countryIso2 || "",
-        isActive: true,
-        approved: false,
-      };
-      const selected = isLocationSelected(target, list);
-      const next = selected
-        ? list.filter((id) => {
-            if (id === target.id) return false;
-            if (locationCodesEqual(id, target.iata)) return false;
-            const known = activeDeliveryLocations.find((l) => l.id === id);
-            if (known && locationCodesEqual(known.iata || known.airportId || "", target.iata)) {
-              return false;
-            }
-            return true;
-          })
-        : [...list, target.id];
-      return { ...prev, deliveryLocationIds: next };
-    });
-    const iso = (countryIso2 || "").toUpperCase();
-    if (iso) {
-      setInvalidLocationCountries((prev) => {
-        if (!prev.has(iso)) return prev;
-        const next = new Set(prev);
-        next.delete(iso);
-        return next;
-      });
-    }
-    setInvalidFields((prev) => {
-      if (!prev.has("deliveryCountries")) return prev;
-      const next = new Set(prev);
-      next.delete("deliveryCountries");
-      return next;
-    });
-    setCountryNotice("");
-  };
-
-  const pruneLocationsForCountries = (countryIso2s: string[], locationIds: string[]) => {
-    const allowed = new Set(countryIso2s.map((c) => c.toUpperCase()));
-    return locationIds.filter((id) =>
-      [...allowed].some((iso) => {
-        const locs = locationsForCountry(iso);
-        return locs.some(
-          (l) =>
-            l.id === id ||
-            locationCodesEqual(l.iata, id) ||
-            (() => {
-              const known = activeDeliveryLocations.find((x) => x.id === id);
-              return known ? locationCodesEqual(known.iata || known.airportId || "", l.iata) : false;
-            })(),
-        );
-      }),
-    );
-  };
-
   const saveDeliveryCountries = () => {
     const next = [
       ...committedCountries.filter((iso) => !pendingCountryRemoves.includes(iso)),
@@ -754,10 +653,7 @@ export function PartnerPersonalInfoForm({
       return;
     }
 
-    // Locations are optional here — partners turn them ON/OFF on the Delivery page.
-    const nextLocationIds = pruneLocationsForCountries(unique, selectedLocationIds);
-    setInvalidLocationCountries(new Set());
-    patch({ deliveryCountryIso2s: unique, deliveryLocationIds: nextLocationIds });
+    patch({ deliveryCountryIso2s: unique });
     setPendingCountryAdds([]);
     setPendingCountryRemoves([]);
     setCountryNotice(pi.countriesSavedLocal);
@@ -823,17 +719,14 @@ export function PartnerPersonalInfoForm({
       const uniqueCountries = [...new Set(draftCountries.map((c) => c.toUpperCase()))];
       if (!uniqueCountries.length) {
         setInvalidFields(new Set(["deliveryCountries"]));
-        setInvalidLocationCountries(new Set());
         scrollToFirstInvalid(new Set(["deliveryCountries"]));
         throw new Error(pi.countriesNeedOne);
       }
       if (countriesDirty) {
-        const nextLocationIds = pruneLocationsForCountries(uniqueCountries, selectedLocationIds);
-        patch({ deliveryCountryIso2s: uniqueCountries, deliveryLocationIds: nextLocationIds });
+        patch({ deliveryCountryIso2s: uniqueCountries });
         setPendingCountryAdds([]);
         setPendingCountryRemoves([]);
         setCountryNotice("");
-        setInvalidLocationCountries(new Set());
       }
 
       const settingsForSave: PartnerCompanySettings = {
@@ -844,10 +737,6 @@ export function PartnerPersonalInfoForm({
           useSiteContract: Boolean(settings.useSiteContract),
         }),
         deliveryCountryIso2s: uniqueCountries,
-        deliveryLocationIds: pruneLocationsForCountries(
-          uniqueCountries,
-          settings.deliveryLocationIds ?? selectedLocationIds,
-        ),
       };
 
       const missing = (() => {
@@ -884,7 +773,6 @@ export function PartnerPersonalInfoForm({
         throw new Error(common.requiredFields);
       }
       setInvalidFields(new Set());
-      setInvalidLocationCountries(new Set());
       const changingPassword = Boolean(newPassword.trim() || confirmPassword.trim());
       if (changingPassword) {
         if (newPassword !== confirmPassword) {
@@ -900,8 +788,10 @@ export function PartnerPersonalInfoForm({
           return;
         }
       }
-      const payload: PartnerCompanySettings = {
-        ...settingsForSave,
+      // Locations belong to the Delivery page; leaving them out makes the server keep the saved list.
+      const { deliveryLocationIds: _deliveryLocationIds, ...settingsWithoutLocations } = settingsForSave;
+      const payload: Omit<PartnerCompanySettings, "deliveryLocationIds"> = {
+        ...settingsWithoutLocations,
         primaryMessengers: settingsForSave.primaryMessengers ?? [],
         secondaryMessengers: settingsForSave.secondaryMessengers ?? [],
         website: settingsForSave.website.trim(),
@@ -955,8 +845,6 @@ export function PartnerPersonalInfoForm({
         throw new Error(detail && /failed to save/i.test(errMsg) ? `${friendly} (${detail})` : friendly);
       }
       if (data.settings) {
-        const rows = await fetchPartnerDeliveryRows();
-        if (rows) setActiveDeliveryLocations(rows);
         setSettings({
           ...data.settings,
           tariffs: normalizeTariffIntervals(data.settings.tariffs ?? [], MAX_TARIFF_INTERVALS),
@@ -1399,218 +1287,28 @@ export function PartnerPersonalInfoForm({
                   isChanged("deliveryLocationIds") && wrapChanged("deliveryLocationIds"),
                 )}
               >
-                <p
-                  className={cn(
-                    "mb-1.5 text-sm font-semibold",
-                    invalidFields.has("deliveryCountries") ||
-                      isChanged("deliveryCountries") ||
-                      isChanged("deliveryCountryIso2s") ||
-                      isChanged("deliveryLocationIds")
-                      ? "text-red-700"
-                      : "text-[#3a4553]",
-                  )}
-                >
-                  {pi.deliveryCountries} <span className="text-[#e11d48]">*</span>
-                </p>
-                {pi.deliveryHelp ? (
-                  <p className="mb-2 text-[11px] text-slate-500">{pi.deliveryHelp}</p>
-                ) : null}
-                <div
-                  className={cn(
-                    "relative",
-                    invalidFields.has("deliveryCountries") && "rounded-lg border border-red-500 bg-red-50 p-2",
-                  )}
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <select
-                      className={cn(inputClass, "min-w-[200px] flex-1")}
-                      value=""
-                      onChange={(e) => {
-                        queueDeliveryCountryAdd(e.target.value);
-                        e.target.value = "";
-                      }}
-                    >
-                      <option value="">{pi.selectCountry}</option>
-                      {countryOptions
-                        .filter(
-                          (c) =>
-                            !visibleCommitted.includes(c.iso2) && !pendingCountryAdds.includes(c.iso2),
-                        )
-                        .map((c) => (
-                          <option key={c.iso2} value={c.iso2}>
-                            {c.name}
-                          </option>
-                        ))}
-                    </select>
-                    <button
-                      type="button"
-                      disabled={!countriesDirty}
-                      onClick={saveDeliveryCountries}
-                      className="inline-flex items-center gap-1.5 rounded-md px-3 py-2.5 text-xs font-bold text-white disabled:opacity-45"
-                      style={{ backgroundColor: ACCENT }}
-                    >
-                      <Check className="h-3.5 w-3.5" /> {common.save}
-                    </button>
-                  </div>
-                </div>
-                {pendingCountryAdds.length ? (
-                  <ul className="mt-2 space-y-2">
-                    {pendingCountryAdds.map((iso2) => {
-                      const locs = locationsForCountry(iso2);
-                      return (
-                        <li
-                          key={`pending-${iso2}`}
-                          className="rounded-md border border-dashed border-emerald-300 bg-emerald-50/70 px-3 py-2"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-900">
-                              <CountryFlag iso2={iso2} />
-                              {worldCountryName(iso2)}
-                              <span className="text-xs font-medium text-emerald-700/80">{pi.pendingSave}</span>
-                            </span>
-                            <button
-                              type="button"
-                              className="text-xs font-semibold text-red-700"
-                              onClick={() => queueDeliveryCountryRemove(iso2)}
-                            >
-                              {common.cancel}
-                            </button>
-                          </div>
-                          <div className="mt-2 space-y-1.5" data-country-locations={iso2}>
-                            <PartnerLocationMultiPicker
-                              locations={locs}
-                              isSelected={(loc) => isLocationSelected(loc, selectedLocationIds)}
-                              onToggle={(loc) => toggleDeliveryLocation(loc.id, iso2)}
-                              invalid={invalidLocationCountries.has(iso2)}
-                              copy={pi}
-                            />
-                            {invalidLocationCountries.has(iso2) ? (
-                              <p className="text-[11px] font-semibold text-red-700">
-                                {pi.locationRequired}
-                              </p>
-                            ) : null}
-                            <ul className="space-y-1">
-                              {locs
-                                .filter((loc) => isLocationSelected(loc, selectedLocationIds))
-                                .map((loc) => (
-                                  <li
-                                    key={loc.id}
-                                    className="flex items-center justify-between gap-2 rounded border border-emerald-200 bg-white px-2 py-1.5 text-xs"
-                                  >
-                                    <span className="min-w-0 break-words font-semibold text-slate-800">
-                                      {loc.label}
-                                      {!loc.approved ? (
-                                        <span className="ms-1.5 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-900">
-                                          {pi.locationAwaitingApproval}
-                                        </span>
-                                      ) : null}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      className="font-semibold text-red-700"
-                                      onClick={() => toggleDeliveryLocation(loc.id, iso2)}
-                                    >
-                                      {common.remove}
-                                    </button>
-                                  </li>
-                                ))}
-                            </ul>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : null}
-                {countryNotice ? (
-                  <p className="mt-1.5 text-xs font-semibold text-slate-700">{countryNotice}</p>
-                ) : null}
-                {invalidFields.has("deliveryCountries") ? (
-                  <p className="mt-1.5 text-xs font-semibold text-red-700">{fieldError("deliveryCountries")}</p>
-                ) : null}
-                <ul className="mt-3 space-y-2">
-                  {visibleCommitted.map((iso2) => {
-                    const locs = locationsForCountry(iso2);
-                    return (
-                      <li key={iso2} className="rounded-md border border-slate-200 bg-white px-3 py-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-800">
-                            <CountryFlag iso2={iso2} />
-                            {worldCountryName(iso2)}
-                            <span className="text-xs font-medium text-slate-400">({iso2})</span>
-                          </span>
-                          <button
-                            type="button"
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-red-700"
-                            onClick={() => queueDeliveryCountryRemove(iso2)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" /> {common.remove}
-                          </button>
-                        </div>
-                        <div className="mt-2 space-y-1.5" data-country-locations={iso2}>
-                          <PartnerLocationMultiPicker
-                            locations={locs}
-                            isSelected={(loc) => isLocationSelected(loc, selectedLocationIds)}
-                            onToggle={(loc) => toggleDeliveryLocation(loc.id, iso2)}
-                            invalid={invalidLocationCountries.has(iso2)}
-                            copy={pi}
-                          />
-                          {invalidLocationCountries.has(iso2) ? (
-                            <p className="text-[11px] font-semibold text-red-700">
-                              {pi.locationRequired}
-                            </p>
-                          ) : null}
-                          <ul className="space-y-1">
-                            {locs
-                              .filter((loc) => isLocationSelected(loc, selectedLocationIds))
-                              .map((loc) => (
-                                <li
-                                  key={loc.id}
-                                  className="flex items-center justify-between gap-2 rounded border border-slate-100 bg-slate-50 px-2 py-1.5 text-xs"
-                                >
-                                  <span className="min-w-0 break-words font-semibold text-slate-800">
-                                    {loc.label}
-                                    {!loc.approved ? (
-                                      <span className="ms-1.5 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-900">
-                                        {pi.locationAwaitingApproval}
-                                      </span>
-                                    ) : null}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    className="font-semibold text-red-700"
-                                    onClick={() => toggleDeliveryLocation(loc.id, iso2)}
-                                  >
-                                    {common.remove}
-                                  </button>
-                                </li>
-                              ))}
-                          </ul>
-                        </div>
-                      </li>
-                    );
-                  })}
-                  {pendingCountryRemoves.map((iso2) => (
-                    <li
-                      key={`remove-${iso2}`}
-                      className="flex items-center justify-between gap-2 rounded-md border border-dashed border-red-200 bg-red-50/60 px-3 py-2 opacity-80"
-                    >
-                      <span className="inline-flex items-center gap-2 text-sm font-semibold text-red-900 line-through">
-                        <CountryFlag iso2={iso2} />
-                        {worldCountryName(iso2)}
-                        <span className="text-xs font-medium no-underline">{pi.pendingRemove}</span>
-                      </span>
-                      <button
-                        type="button"
-                        className="text-xs font-semibold text-slate-700"
-                        onClick={() =>
-                          setPendingCountryRemoves((prev) => prev.filter((c) => c !== iso2))
-                        }
-                      >
-                        {common.cancel}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                <PartnerOperatingCountriesField
+                  committed={committedCountries}
+                  pendingAdds={pendingCountryAdds}
+                  pendingRemoves={pendingCountryRemoves}
+                  options={countryOptions}
+                  dirty={countriesDirty}
+                  notice={countryNotice}
+                  errorText={invalidFields.has("deliveryCountries") ? fieldError("deliveryCountries") : ""}
+                  invalid={invalidFields.has("deliveryCountries")}
+                  highlighted={isChanged("deliveryCountries") || isChanged("deliveryCountryIso2s")}
+                  readOnly={isAdminReview}
+                  selectClassName={inputClass}
+                  copy={pi}
+                  deliveryLinkLabel={locale === "ka" ? "მიწოდება →" : locale === "ru" ? "Доставка →" : "Delivery →"}
+                  saveLabel={common.save}
+                  removeLabel={common.remove}
+                  cancelLabel={common.cancel}
+                  onAdd={queueDeliveryCountryAdd}
+                  onRemove={queueDeliveryCountryRemove}
+                  onCancelRemove={(iso2) => setPendingCountryRemoves((prev) => prev.filter((c) => c !== iso2))}
+                  onSave={saveDeliveryCountries}
+                />
               </div>
               <div data-field="primaryPhone" className={wrapChanged("primaryPhone")}>
                 <Field
