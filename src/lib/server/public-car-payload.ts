@@ -27,22 +27,20 @@ async function periodDiscount(carId: string, base: unknown, range: PublicCarRang
   }
 }
 
-async function deliveryRows(partnerId: string, rows: unknown, description: unknown) {
-  if (!partnerId || !Array.isArray(rows)) return undefined;
+async function deliveryRows(partnerId: string, rows: unknown) {
+  if (!partnerId) return undefined;
   try {
     const { readPartnerDeliveryPrefs } = await import("@/lib/server/partner-delivery-prefs-store");
     const { mergeDeliveryPrefsIntoRows } = await import("@/lib/delivery/trip-fees");
-    const { loadCityDeliveryPlaces } = await import("@/lib/server/city-delivery-places");
-    const { listingPickupPlaceIds } = await import("@/lib/cars/listing-place-ids");
+    const { loadDeliveryPlaces } = await import("@/lib/server/delivery-places");
     let prefs = await readPartnerDeliveryPrefs(partnerId);
     if (!prefs.length && partnerId.startsWith("file-partner-")) {
       prefs = await readPartnerDeliveryPrefs(partnerId.slice("file-partner-".length));
     }
     return mergeDeliveryPrefsIntoRows(
-      rows as Array<Record<string, unknown>>,
+      Array.isArray(rows) ? (rows as Array<Record<string, unknown>>) : [],
       prefs,
-      await loadCityDeliveryPlaces(),
-      listingPickupPlaceIds(typeof description === "string" ? description : ""),
+      await loadDeliveryPlaces(),
     );
   } catch {
     return undefined;
@@ -133,7 +131,7 @@ export async function enrichPublicCarPayload<T extends object>(
   const [discountPercent, deliveryPrices, hydrated, payments, partnerClientLanguages] =
     await Promise.all([
       periodDiscount(input.carId, fields.discountPercent, input),
-      deliveryRows(partnerId, fields.deliveryPrices, fields.description),
+      deliveryRows(partnerId, fields.deliveryPrices),
       input.keepStoredExtras
         ? Promise.resolve(undefined)
         : hydratedExtras(partnerId, carId, fields.extras),

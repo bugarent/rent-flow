@@ -24,15 +24,10 @@ import {
   type PartnerExtraSelection,
 } from "@/components/partner/partner-extras-fields";
 import {
-  buildDeliverySelections,
-  type PartnerDeliverySelection,
-} from "@/components/partner/partner-delivery-fields";
-import {
-  PartnerPickupDropoffSection,
   buildPlaceRowsForLocations,
   pickupPlacesToDeliveryPayload,
   type PickupPlaceRow,
-} from "@/components/partner/partner-pickup-dropoff-section";
+} from "@/components/partner/listing-pickup-places";
 import { isSyntheticDeliveryId } from "@/lib/delivery/pricing";
 import { findCarExtraOffer, parseCarDetails, readExtraOffers } from "@/lib/cars/car-details";
 import { diffCarAgainstPublished, fieldChangesMapFromRecord } from "@/lib/cars/car-published-diff";
@@ -156,7 +151,6 @@ function ratesToPartner(
 
 const SECTION_IDS = [
   "main-info",
-  "pickup-dropoff",
   "pricing",
   "mileage",
   "insurance",
@@ -171,7 +165,6 @@ type CreateCarSectionId = (typeof SECTION_IDS)[number];
 
 const SECTION_COPY_KEY: Record<CreateCarSectionId, keyof PartnerCreateCarCopy["sections"]> = {
   "main-info": "mainInfo",
-  "pickup-dropoff": "pickup",
   pricing: "pricing",
   mileage: "mileage",
   insurance: "insurance",
@@ -511,16 +504,6 @@ export function PartnerCreateCarForm({
   const [extraSelections, setExtraSelections] = useState<PartnerExtraSelection[]>(() =>
     buildExtraSelections(initialExtrasCatalog),
   );
-  const [deliveryCatalog, setDeliveryCatalog] = useState<DeliveryLocationView[]>(initialDeliveryCatalog);
-  const [locationsReady, setLocationsReady] = useState(initialDeliveryCatalog.length > 0);
-  const [deliverySelections, setDeliverySelections] = useState<PartnerDeliverySelection[]>(() =>
-    buildDeliverySelections(initialDeliveryCatalog).map((row) => ({
-      ...row,
-      enabled: false,
-      priceEur: row.priceEur || "0",
-    })),
-  );
-  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
   const [pickupPlaces, setPickupPlaces] = useState<PickupPlaceRow[]>([]);
   const [pricingCurrency, setPricingCurrency] = useState<PartnerPricingCurrency>(
     DEFAULT_PARTNER_PRICING_CURRENCY,
@@ -555,9 +538,6 @@ export function PartnerCreateCarForm({
     setDeposit((value) => rebaseMoneyField(value, from, to, rates));
     setTariffPrices((rows) => rows.map((value) => rebaseMoneyField(value, from, to, rates)));
     setExtraSelections((rows) =>
-      rows.map((row) => ({ ...row, priceEur: rebaseMoneyField(row.priceEur, from, to, rates) })),
-    );
-    setDeliverySelections((rows) =>
       rows.map((row) => ({ ...row, priceEur: rebaseMoneyField(row.priceEur, from, to, rates) })),
     );
     setPickupPlaces((rows) =>
@@ -836,7 +816,6 @@ export function PartnerCreateCarForm({
             }
             deliveryList = [...deliveryList, ...fromCar.filter((loc) => loc.isActive)];
           }
-          setDeliveryCatalog(deliveryList);
 
           const selectedIds = carDeliveries
             .map((d: { deliveryLocationId?: string }) => String(d.deliveryLocationId || ""))
@@ -856,7 +835,6 @@ export function PartnerCreateCarForm({
             const id = String(p.deliveryLocationId || "");
             if (id && !selectedIds.includes(id) && !isSyntheticDeliveryId(id)) selectedIds.push(id);
           }
-          setSelectedLocationIds(selectedIds);
           const placeRows = buildPlaceRowsForLocations(deliveryList, selectedIds, []).map((row) => {
             const fromCar = carDeliveries.find(
               (d: { deliveryLocationId: string; priceEur?: number }) =>
@@ -981,33 +959,6 @@ export function PartnerCreateCarForm({
               }),
             );
           }
-        }
-        if (meRes.ok && Array.isArray(me.deliveryCatalog)) {
-          const delivery = (me.deliveryCatalog as DeliveryLocationView[]).map((loc) => {
-            const airport = Array.isArray(me.airports)
-              ? me.airports.find(
-                  (a: { iata?: string; label?: string }) =>
-                    String(a.iata || "").toUpperCase() === loc.iata.toUpperCase(),
-                )
-              : null;
-            const cityFromAirport = airport?.label
-              ? String(airport.label).split("(")[0]?.trim()
-              : undefined;
-            return {
-              ...loc,
-              cityName: loc.cityName || cityFromAirport,
-            };
-          });
-          // Strictly Delivery-page ON locations only (empty list is intentional).
-          setDeliveryCatalog(delivery);
-          setSelectedLocationIds((prev) => prev.filter((id) => delivery.some((l) => l.id === id)));
-          setDeliverySelections(
-            buildDeliverySelections(delivery).map((row) => ({
-              ...row,
-              enabled: false,
-              priceEur: row.priceEur || "0",
-            })),
-          );
         }
         if (meRes.ok) {
           const pricing =
@@ -1257,10 +1208,7 @@ export function PartnerCreateCarForm({
                     ? (adminDel as DeliveryLocationView[])
                     : []
               ).filter((loc) => loc.isActive);
-              if (adminRows.length) {
-                deliveryList = adminRows;
-                setDeliveryCatalog(deliveryList);
-              }
+              if (adminRows.length) deliveryList = adminRows;
             } catch {
               /* optional */
             }
@@ -1288,7 +1236,6 @@ export function PartnerCreateCarForm({
               selectedIds.push(id);
             }
           }
-          setSelectedLocationIds(selectedIds);
           const placeRows = buildPlaceRowsForLocations(deliveryList, selectedIds, []).map((row) => {
             const fromCar = carDeliveries.find(
               (d: { deliveryLocationId: string; priceEur?: number }) =>
@@ -1323,23 +1270,6 @@ export function PartnerCreateCarForm({
             });
           }
           setPickupPlaces(placeRows);
-          setDeliverySelections(
-            buildDeliverySelections(
-              deliveryList,
-              carDeliveries.map((d: { deliveryLocationId: string; priceEur?: number; freeAfterDays?: number }) => ({
-                deliveryLocationId: d.deliveryLocationId,
-                priceEur: Number(d.priceEur ?? 0),
-                freeAfterDays: d.freeAfterDays,
-              })),
-            ).map((row) => ({
-              ...row,
-              enabled: selectedIds.includes(row.deliveryLocationId),
-              priceEur:
-                !row.priceEur || row.priceEur === "0"
-                  ? row.priceEur || "0"
-                  : eurToPartnerAmount(row.priceEur, nextCurrency, nextRates),
-            })),
-          );
         }
       } catch (err) {
         if (!cancelled && carId) {
@@ -1348,10 +1278,7 @@ export function PartnerCreateCarForm({
       } finally {
         // Always clear boot UI — partner APIs can hang when DB is offline; admin path must not stick.
         // A cancelled run must not flag locations as ready while the live run is still loading them.
-        if (!cancelled) {
-          setLocationsReady(true);
-          setBooting(false);
-        }
+        if (!cancelled) setBooting(false);
       }
     })();
     return () => {
@@ -1563,9 +1490,6 @@ export function PartnerCreateCarForm({
     else if (plateNormalized && !isValidRegistrationNumber(plateNormalized)) mark("main-info", ["plate"]);
 
     const pickupPayload = pickupPlacesToDeliveryPayload(pickupPlaces);
-    const hasPickup =
-      pickupPayload.length > 0 || deliverySelections.some((d) => d.enabled);
-    if (forSale && !hasPickup) mark("pickup-dropoff", ["pickup"]);
 
     if (!dailyRate) {
       const tariffKeys = [
@@ -1602,44 +1526,11 @@ export function PartnerCreateCarForm({
         else if (uniqueGroups.has("price")) message = cc.errDailyPrice;
         else if (uniqueGroups.has("photos")) message = cc.errPhotos.replace("{n}", String(MIN_PUBLIC_PHOTOS));
         else if (uniqueGroups.has("passport")) message = cc.errCertificate;
-        else if (uniqueGroups.has("pickup") && locationsReady && !deliveryCatalog.length) {
-          message = cc.errNoAirports;
-        } else if (uniqueGroups.has("pickup")) message = cc.errPickup;
       } else if (uniqueGroups.has("passport")) {
         message = cc.errCertificate;
       }
       showError(message, firstSection, fields);
       return false;
-    }
-
-    let nextDeliveries = deliverySelections;
-    if (pickupPayload.length) {
-      nextDeliveries = deliveryCatalog.map((loc) => {
-        const hit = pickupPayload.find((p) => p.deliveryLocationId === loc.id);
-        return {
-          deliveryLocationId: loc.id,
-          enabled: Boolean(hit),
-          priceEur: hit ? String(hit.priceEur) : "0",
-          freeAfterDays: hit ? String(hit.freeAfterDays ?? 0) : "0",
-          travelTimeMinutes: hit ? String(hit.travelTimeMinutes ?? 0) : "0",
-        };
-      });
-      // Ensure selected pickup ids are marked enabled even if catalog map missed a row.
-      for (const p of pickupPayload) {
-        if (!nextDeliveries.some((d) => d.deliveryLocationId === p.deliveryLocationId)) {
-          nextDeliveries = [
-            ...nextDeliveries,
-            {
-              deliveryLocationId: p.deliveryLocationId,
-              enabled: true,
-              priceEur: String(p.priceEur ?? 0),
-              freeAfterDays: "0",
-              travelTimeMinutes: "0",
-            },
-          ];
-        }
-      }
-      setDeliverySelections(nextDeliveries);
     }
 
     setLoading(true);
@@ -1757,29 +1648,6 @@ export function PartnerCreateCarForm({
                 : toEur(row.priceEur),
         };
       });
-      const deliveryPrices = (
-        pickupPayload.length
-          ? pickupPayload.map((p) => ({
-              deliveryLocationId: p.deliveryLocationId,
-              enabled: true,
-              priceEur: String(p.priceEur ?? 0),
-              freeAfterDays: "0",
-              travelTimeMinutes: "0",
-            }))
-          : nextDeliveries.filter((row) => row.enabled && !isSyntheticDeliveryId(row.deliveryLocationId))
-      ).map((row) => ({
-        deliveryLocationId: row.deliveryLocationId,
-        enabled: true,
-        priceEur: row.priceEur === "" ? null : toEur(row.priceEur),
-        freeAfterDays: 0,
-        travelTimeMinutes: 0,
-      }));
-      // Also include synthetic places metadata in description only; airport rows persist to DB.
-      const syntheticPlaces = pickupPayload.filter((p) => isSyntheticDeliveryId(p.deliveryLocationId));
-      if (syntheticPlaces.length) {
-        // already in details.pickupPlaces
-      }
-
       const res = await fetch(isEdit && carId ? `/api/cars/${carId}` : "/api/cars", {
         method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -1798,7 +1666,6 @@ export function PartnerCreateCarForm({
           passportFrontUrl: passportFront || undefined,
           passportBackUrl: passportBack || undefined,
           ...(isAdminReview && extrasCatalog.length === 0 ? {} : { extras }),
-          deliveryPrices,
           registrationNumber: plateNormalized || undefined,
           categorySlug: categorySlug.trim() || null,
           ...(isAdminReview ? { adminEdit: true, ...(opts?.publish ? { publish: true } : {}) } : {}),
@@ -1825,13 +1692,13 @@ export function PartnerCreateCarForm({
         } else if (/insurance/i.test(apiErr)) {
           showError(apiErr, "certificate", ["insurance-file"]);
         } else if (/delivery|airport|NO_DELIVERY/i.test(apiErr) || code === "NO_DELIVERY") {
-          showError(cc.errDeliveryPlace, "pickup-dropoff", ["pickup"]);
+          showError(cc.errDeliveryPlace);
         } else if (/partner profile/i.test(apiErr)) {
           showError(apiErr, "main-info");
         } else if (code === "DB_OFFLINE" || /database unavailable/i.test(apiErr)) {
           showError(common.dbOffline);
         } else if (code === "DELIVERY_FK") {
-          showError(`${cc.errUpdateFailed}. ${cc.errUpdateDelivery}`, "pickup-dropoff", ["pickup"]);
+          showError(`${cc.errUpdateFailed}. ${cc.errUpdateDelivery}`);
         } else if (code === "EXTRA_FK" || code === "FK") {
           showError(`${cc.errUpdateFailed}. ${cc.errUpdateExtra}`, "extras");
         } else if (code === "INVALID_FIELD") {
@@ -2330,23 +2197,6 @@ export function PartnerCreateCarForm({
               </Field>
             </div>
           </div>
-        </SectionCard>
-
-        <SectionCard
-          id="pickup-dropoff"
-          title={cc.sections.pickup}
-          invalid={fieldInvalid("pickup")}
-          changed={isChanged("pickupPlaces")}
-        >
-          <PartnerPickupDropoffSection
-            catalog={deliveryCatalog}
-            catalogReady={locationsReady}
-            selectedLocationIds={selectedLocationIds}
-            onSelectedLocationIdsChange={setSelectedLocationIds}
-            places={pickupPlaces}
-            onPlacesChange={setPickupPlaces}
-            invalid={fieldInvalid("pickup")}
-          />
         </SectionCard>
 
         <SectionCard

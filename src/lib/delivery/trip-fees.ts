@@ -29,8 +29,8 @@ function withinAdminLimit<T extends DeliveryPriceRowLike>(row: T): T {
   return { ...row, priceEur: max };
 }
 
-/** City delivery places by location id (only attached when the listing selected them). */
-export type CityDeliveryPlace = {
+/** Delivery catalog place (airport or city) by location id. */
+export type DeliveryPlace = {
   id: string;
   code: string;
   countryIso2: string;
@@ -38,73 +38,61 @@ export type CityDeliveryPlace = {
   maxDeliveryPriceEur: number;
 };
 
-/**
- * A saved city delivery price is copied onto listings that explicitly list that
- * city. A city without a saved price is not added for free.
- */
-function cityRowsFromPrefs(
-  rows: DeliveryPriceRowLike[],
-  prefs: PartnerDeliveryPref[],
-  cityPlaces: ReadonlyMap<string, CityDeliveryPlace>,
-  listingPlaceIds?: ReadonlySet<string>,
-): DeliveryPriceRowLike[] {
-  const present = new Set(rows.map((r) => String(r.deliveryLocationId || r.deliveryLocation?.id || "")));
-  const extra: DeliveryPriceRowLike[] = [];
-  const add = (
-    place: CityDeliveryPlace,
-    values: Pick<PartnerDeliveryPref, "priceEur" | "freeAfterDays" | "travelTimeMinutes">,
-  ) => {
-    present.add(place.id);
-    extra.push({
-      deliveryLocationId: place.id,
-      priceEur: values.priceEur,
-      freeAfterDays: values.freeAfterDays,
-      travelTimeMinutes: values.travelTimeMinutes,
-      deliveryLocation: {
-        id: place.id,
-        isActive: true,
-        maxDeliveryPriceEur: place.maxDeliveryPriceEur,
-        airport: { iata: place.code, city: { country: { iso2: place.countryIso2.toUpperCase() } } },
-      },
-    });
+function rowFromPlace(place: DeliveryPlace, pref: PartnerDeliveryPref): DeliveryPriceRowLike {
+  return {
+    deliveryLocationId: place.id,
+    priceEur: pref.priceEur,
+    freeAfterDays: pref.freeAfterDays,
+    travelTimeMinutes: pref.travelTimeMinutes,
+    deliveryLocation: {
+      id: place.id,
+      isActive: true,
+      maxDeliveryPriceEur: place.maxDeliveryPriceEur,
+      airport: { iata: place.code, city: { country: { iso2: place.countryIso2.toUpperCase() } } },
+    },
   };
-  for (const pref of prefs) {
-    if (pref.enabled === false || present.has(pref.deliveryLocationId)) continue;
-    const place = cityPlaces.get(pref.deliveryLocationId);
-    if (!place || !place.isActive) continue;
-    // Only attach a city when the listing explicitly selected it — never borrow
-    // every city in the same country from a single airport assignment.
-    if (!listingPlaceIds?.has(place.id)) continue;
-    add(place, pref);
-  }
-  return extra;
 }
 
-/** Overlay partner Delivery-page prefs onto a car's delivery price rows. */
+/**
+ * A listing is offered exactly at the partner's Delivery-page ON places, at the
+ * prices saved there. When the partner has no Delivery-page rows yet, the car's
+ * own rows are kept (only capped to the admin limit).
+ */
 export function mergeDeliveryPrefsIntoRows<T extends DeliveryPriceRowLike>(
   rows: T[] | undefined,
   prefs: PartnerDeliveryPref[] | undefined,
-  cityPlaces?: ReadonlyMap<string, CityDeliveryPlace>,
-  /** Location ids on the listing's own pick-up list. */
-  listingPlaceIds?: ReadonlySet<string>,
+  places?: ReadonlyMap<string, DeliveryPlace>,
 ): T[] {
-  const byId = new Map((prefs ?? []).map((p) => [p.deliveryLocationId, p]));
-  const merged = (rows ?? []).map((row) => {
-    const locId = String(row.deliveryLocationId || row.deliveryLocation?.id || "");
-    const pref = locId ? byId.get(locId) : undefined;
-    if (!pref || pref.enabled === false) return withinAdminLimit(row);
-    return withinAdminLimit({
-      ...row,
-      priceEur: pref.priceEur,
-      freeAfterDays: pref.freeAfterDays,
-      travelTimeMinutes: pref.travelTimeMinutes,
-    });
-  });
-  if (!cityPlaces?.size || (!prefs?.length && !listingPlaceIds?.size)) return merged;
-  const cityRows = cityRowsFromPrefs(merged, prefs ?? [], cityPlaces, listingPlaceIds).map(
-    (row) => withinAdminLimit(row) as unknown as T,
-  );
-  return [...merged, ...cityRows];
+  const carRows = rows ?? [];
+  if (!prefs?.length) return carRows.map(withinAdminLimit);
+
+  const rowById = new Map<string, T>();
+  for (const row of carRows) {
+    const id = String(row.deliveryLocationId || row.deliveryLocation?.id || "");
+    if (id && !rowById.has(id)) rowById.set(id, row);
+  }
+
+  const out: T[] = [];
+  const seen = new Set<string>();
+  for (const pref of prefs) {
+    const id = pref.deliveryLocationId;
+    if (pref.enabled === false || !id || seen.has(id)) continue;
+    const place = places?.get(id);
+    if (place && !place.isActive) continue;
+    const existing = rowById.get(id);
+    const base = existing ?? (place ? (rowFromPlace(place, pref) as T) : undefined);
+    if (!base) continue;
+    seen.add(id);
+    out.push(
+      withinAdminLimit({
+        ...base,
+        priceEur: pref.priceEur,
+        freeAfterDays: pref.freeAfterDays,
+        travelTimeMinutes: pref.travelTimeMinutes,
+      }),
+    );
+  }
+  return out;
 }
 
 /** Fee rows for this exact place. Another city or airport in the same country does not count. */

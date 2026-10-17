@@ -2,7 +2,7 @@ import "server-only";
 
 import { normalizeLocationCode } from "@/lib/catalog/search-places";
 import { mergeDeliveryPrefsIntoRows, type DeliveryPriceRowLike } from "@/lib/delivery/trip-fees";
-import { loadCityDeliveryPlaces } from "@/lib/server/city-delivery-places";
+import { loadDeliveryPlaces } from "@/lib/server/delivery-places";
 import {
   readPartnerDeliveryPrefsMap,
   type PartnerDeliveryPref,
@@ -39,10 +39,8 @@ export function partnerIdsForTrip(cabinet: SearchCabinet, pickup: string, dropof
 }
 
 /**
- * Search results for a place: only listings with an explicit car↔location
- * assignment for that place (plus partner personal info + Delivery ON price).
- * Delivery-page prices overlay the kept assignment rows; prefs never add a place
- * the car did not select.
+ * Search results for a place: every listing of a partner is offered at the
+ * partner's Delivery-page ON places (within personal info), at the prices saved there.
  */
 export async function scopeSearchCars<T extends SearchCar>(
   cars: T[],
@@ -54,8 +52,6 @@ export async function scopeSearchCars<T extends SearchCar>(
     prefsByPartner?: Map<string, PartnerDeliveryPref[]>;
   },
 ): Promise<{ cars: T[]; rejected: Array<{ id: string; reason: string }> }> {
-  const listingPlacesByCar = new Map(cars.map((car) => [String(car.id || ""), listingOfferedPlaceIds(car)]));
-
   const prefsByPartner =
     opts.prefsByPartner ??
     (await readPartnerDeliveryPrefsMap([
@@ -69,21 +65,16 @@ export async function scopeSearchCars<T extends SearchCar>(
     return [];
   };
 
-  const cityPlaces = await loadCityDeliveryPlaces();
-  const priced = cars.map((car) => {
-    const assigned = new Set(
-      listingOfferedPlaceIds(car).map((id) => String(id || "").trim()).filter(Boolean),
-    );
-    return {
-      ...car,
-      deliveryPrices: mergeDeliveryPrefsIntoRows(
-        car.deliveryPrices,
-        prefsFor(String(car.partnerId || car.partner?.id || "")),
-        cityPlaces,
-        assigned,
-      ),
-    };
-  });
+  const places = await loadDeliveryPlaces();
+  const priced = cars.map((car) => ({
+    ...car,
+    deliveryPrices: mergeDeliveryPrefsIntoRows(
+      car.deliveryPrices,
+      prefsFor(String(car.partnerId || car.partner?.id || "")),
+      places,
+    ),
+  }));
+  const listingPlacesByCar = new Map(priced.map((car) => [String(car.id || ""), listingOfferedPlaceIds(car)]));
 
   return scopeCarsToPersonalPlaces(priced, cabinet, {
     pickup: opts.pickup,

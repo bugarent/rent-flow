@@ -151,7 +151,6 @@ export async function fromFile(
     deliveryPrices: fileCar?.deliveryPrices,
     partnerId: fileCar?.partnerId ?? dbPartner?.id,
     partnerUserId: fileCar?.partnerUserId,
-    listingDescription: fileCar?.description,
   }).catch(() => ({ rows: [] as DeliveryPriceRowLike[] }));
 
   const [pickupAirport, dropoffAirport, locationOptions, extras] = await Promise.all([
@@ -203,7 +202,6 @@ export async function fromFile(
     rentalDays,
     partnerId: fileCar?.partnerId ?? dbPartner?.id,
     partnerUserId: fileCar?.partnerUserId,
-    listingDescription: fileCar?.description,
   });
 
   return {

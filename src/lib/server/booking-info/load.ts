@@ -164,7 +164,6 @@ export async function loadBookingInfoDetail(
       const { rows: feeRows } = await buildMergedDeliveryRows({
         deliveryPrices,
         partnerId: booking.car.partner?.id,
-        listingDescription: booking.car.description,
       }).catch(() => ({ rows: [] as DeliveryPriceRowLike[] }));
       try {
         const { listDeliveryLocations } = await import("@/lib/server/delivery-locations");
@@ -236,7 +235,6 @@ export async function loadBookingInfoDetail(
         rentalDays,
         partnerId: booking.car.partner?.id,
         partnerUserId: undefined,
-        listingDescription: booking.car.description,
       });
       const savedMessengers = await readBookingMessengers(booking.id);
       const guestMessengers = savedMessengers.length

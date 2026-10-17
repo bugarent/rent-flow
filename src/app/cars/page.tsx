@@ -209,7 +209,7 @@ export default async function CarsPage({
 
   // Independent reads start together instead of one after another.
   const expiredIdsPromise = loadExpiredInsuranceIds();
-  const fileCarsPromise = loadPublicFileSearchCars({ pickup: pickupCode || undefined }).catch(() => []);
+  const fileCarsPromise = loadPublicFileSearchCars().catch(() => []);
   const cabinetPromise = loadSearchCabinet();
   const extrasCatalogPromise = listExtraServices({ activeOnly: true }).catch(() => null);
   const searchOptionsPromise = getSearchDeliveryAirports().catch(() => []);
@@ -233,9 +233,6 @@ export default async function CarsPage({
   if (pickupIata) {
     const ids = partnerIdsForTrip(cabinet, pickupIata, dropoff);
     where.partnerId = { in: ids.length ? ids : ["__none__"] };
-    const { carAssignedToPlaceWhere } = await import("@/lib/server/car-location-assignment");
-    const assigned = await carAssignedToPlaceWhere(pickupIata);
-    if (assigned) Object.assign(where, assigned);
   }
 
   let categoryName: string | null = null;

@@ -107,14 +107,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       }
 
       if (status === "APPROVED") {
-        try {
-          const { sanitizeCarDeliveryAssignmentsOnApprove } = await import(
-            "@/lib/server/car-location-assignment"
-          );
-          await sanitizeCarDeliveryAssignmentsOnApprove(id);
-        } catch (error) {
-          console.warn("[cars moderate] sanitize delivery assignments", id, error);
-        }
         await acknowledgeReviewedInsuranceExpiry(id);
         await clearPublishedCarSnapshot(id);
         await clearCarRejectionNotice(id);
@@ -145,14 +137,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         hiddenReason,
       });
       if (status === "APPROVED") {
-        try {
-          const { sanitizeCarDeliveryAssignmentsOnApprove } = await import(
-            "@/lib/server/car-location-assignment"
-          );
-          await sanitizeCarDeliveryAssignmentsOnApprove(id);
-        } catch (error) {
-          console.warn("[cars moderate] sanitize delivery assignments", id, error);
-        }
         await acknowledgeReviewedInsuranceExpiry(id);
         await clearPublishedCarSnapshot(id);
         await clearCarRejectionNotice(id);

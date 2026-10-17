@@ -171,7 +171,6 @@ async function liveDeliveryLegs(
         rentalDays: days,
         partnerId: car.partnerId,
         partnerUserId: car.partnerUserId,
-        listingDescription: car.description,
       });
       return legs(summary);
     }
@@ -207,7 +206,6 @@ async function liveDeliveryLegs(
       dropoffIata,
       rentalDays: days,
       partnerId: car.partnerId,
-      listingDescription: car.description,
     });
     return legs(summary);
   } catch {

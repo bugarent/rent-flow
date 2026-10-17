@@ -7,6 +7,7 @@ import {
   type ResolvedDeliveryRow,
 } from "@/lib/delivery/pricing";
 import {
+  addMissingPartnerDeliveryPrefs,
   readPartnerDeliveryPrefs,
   type PartnerDeliveryPref,
 } from "@/lib/server/partner-delivery-prefs-store";
@@ -53,6 +54,45 @@ export async function withPartnerDeliveryPrices(
     const pref = byId.get(row.deliveryLocationId);
     return pref ? { ...row, ...listingValues(pref, locById.get(row.deliveryLocationId)) } : row;
   });
+}
+
+/**
+ * The Delivery page shows personal-info places without a saved row as ON (price 0).
+ * Store exactly those values so every listing is offered at what the partner sees there.
+ */
+export async function storeShownDeliveryPlaces(partnerId: string): Promise<number> {
+  if (!partnerId) return 0;
+  const { listPartnerCountryDeliveryLocations } = await import("@/lib/server/delivery-locations");
+  const [{ locations, selectedIds }, prefs] = await Promise.all([
+    listPartnerCountryDeliveryLocations(partnerId),
+    readPartnerDeliveryPrefs(partnerId),
+  ]);
+  const known = new Set(prefs.map((p) => p.deliveryLocationId));
+  const locById = new Map(locations.map((l) => [l.id, l]));
+  const missing = selectedIds.filter((id) => locById.has(id) && !known.has(id));
+  if (!missing.length) return 0;
+  const added = await addMissingPartnerDeliveryPrefs(
+    partnerId,
+    missing.map((id) => {
+      const loc = locById.get(id)!;
+      return {
+        deliveryLocationId: id,
+        enabled: true,
+        priceEur: normalizeDeliveryPrice(loc.maxDeliveryPriceEur, 0).priceEur,
+        freeAfterDays: capFreeAfterDays(loc.maxFreeAfterDays, 0).freeAfterDays,
+        travelTimeMinutes: 0,
+      };
+    }),
+  );
+  if (added) {
+    const [{ clearPublicCarPayloadCache }, { revalidatePublishedContent }] = await Promise.all([
+      import("@/lib/server/public-car-payload"),
+      import("@/lib/server/revalidate-public-content"),
+    ]);
+    clearPublicCarPayloadCache();
+    revalidatePublishedContent();
+  }
+  return added;
 }
 
 /**

@@ -153,9 +153,6 @@ export async function GET(req: Request) {
   if (pickup) {
     const ids = partnerIdsForTrip(cabinet, pickup, dropoff);
     where.partnerId = { in: ids.length ? ids : ["__none__"] };
-    const { carAssignedToPlaceWhere } = await import("@/lib/server/car-location-assignment");
-    const assigned = await carAssignedToPlaceWhere(pickup);
-    if (assigned) Object.assign(where, assigned);
   }
 
   if (category) {
@@ -200,7 +197,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const fileCars = await loadPublicFileSearchCars({ pickup });
+    const fileCars = await loadPublicFileSearchCars();
     const seen = new Set(
       cars.map((car) => (car && typeof car === "object" && "id" in car ? String((car as { id: string }).id) : "")),
     );
@@ -309,27 +306,6 @@ async function resolveCarExtras(rawExtras: unknown) {
   return extrasRowsForCarFk(rows, catalog);
 }
 
-function deliveryRowsFromBody(raw: unknown): FileCarDeliveryPrice[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .filter((row) => row && typeof row === "object" && (row as { enabled?: boolean }).enabled !== false)
-    .map((row) => {
-      const r = row as {
-        deliveryLocationId?: string;
-        priceEur?: number;
-        freeAfterDays?: number | null;
-        travelTimeMinutes?: number;
-      };
-      return {
-        deliveryLocationId: String(r.deliveryLocationId || ""),
-        priceEur: Number(r.priceEur) || 0,
-        freeAfterDays: r.freeAfterDays == null ? 0 : Number(r.freeAfterDays) || 0,
-        travelTimeMinutes: Number(r.travelTimeMinutes) || 0,
-      };
-    })
-    .filter((row) => row.deliveryLocationId);
-}
-
 function extraRowsFromBody(raw: unknown): FileCarExtra[] {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -375,7 +351,6 @@ export async function POST(req: Request) {
       insuranceUrl,
       insuranceExpiresAt,
       extras,
-      deliveryPrices,
       seats,
       doors,
       transmission,
@@ -444,7 +419,6 @@ export async function POST(req: Request) {
       freeAfterDays: number | null;
       travelTimeMinutes: number;
     }> = [];
-    let deliveryAdjustments: unknown[] = [];
     let categorySlug: string | null = null;
 
     try {
@@ -475,35 +449,15 @@ export async function POST(req: Request) {
         extraRows = extraRowsFromBody(extras);
       }
 
+      // Places and fees come from the partner's Delivery page, never from the listing form.
       const deliveryCatalog = await listPartnerScopedDeliveryLocations(partner.id);
       description = scopePickupPlacesInDescription(description, deliveryCatalog);
-      if (forSale && !deliveryCatalog.length && !deliveryRowsFromBody(deliveryPrices).length) {
-        return NextResponse.json(
-          { error: "No operating airports on your partner profile. Contact admin before listing." },
-          { status: 400 },
-        );
-      }
-      const resolved = deliveryCatalog.length
-        ? resolvePartnerDeliveryPrices(deliveryCatalog, deliveryPrices)
-        : {
-            rows: [] as typeof deliveryRows,
-            adjustments: [] as typeof deliveryAdjustments,
-          };
-      deliveryAdjustments = resolved.adjustments;
+      const resolved = resolvePartnerDeliveryPrices(
+        deliveryCatalog,
+        deliveryCatalog.map((loc) => ({ deliveryLocationId: loc.id, enabled: true, priceEur: 0 })),
+      );
       const pricedRows = await withPartnerDeliveryPrices(partner.id, resolved.rows, deliveryCatalog);
-      const persistable = await persistableCarDeliveryRows(pricedRows, deliveryCatalog);
-      deliveryRows = persistable ?? [];
-
-      if (forSale && !deliveryRows.length && !resolved.rows.length) {
-        return NextResponse.json(
-          {
-            error:
-              "Enable Delivery for at least one of your operating airports (locations must be active in admin catalog).",
-            code: "NO_DELIVERY",
-          },
-          { status: 400 },
-        );
-      }
+      deliveryRows = (await persistableCarDeliveryRows(pricedRows, deliveryCatalog)) ?? [];
 
       const car = await prisma.car.create({
         data: {
@@ -588,7 +542,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           ...car,
-          deliveryAdjustments,
+          deliveryAdjustments: [],
           insuranceUrl: normalizeInsuranceUrl(insuranceUrl),
           insuranceExpiresAt: normalizeInsuranceExpiresAt(insuranceExpiresAt),
           updateNotice: listingStatus === "DRAFT" ? "SAVED" : "PENDING",
@@ -598,17 +552,7 @@ export async function POST(req: Request) {
     } catch (dbError) {
       if (!isDbOfflineError(dbError)) throw dbError;
 
-      const fileDelivery = deliveryRows.length ? deliveryRows : deliveryRowsFromBody(deliveryPrices);
-      if (forSale && !fileDelivery.length) {
-        return NextResponse.json(
-          {
-            error:
-              "Enable Delivery for at least one of your operating airports (locations must be active in admin catalog).",
-            code: "NO_DELIVERY",
-          },
-          { status: 400 },
-        );
-      }
+      const fileDelivery: FileCarDeliveryPrice[] = deliveryRows;
 
       const fileCar = await createFileCar({
         partnerId: partner?.id || `file-partner-${session.user.id}`,

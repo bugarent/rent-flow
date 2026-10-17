@@ -156,6 +156,12 @@ export async function publishPartnerSearchPlaces(partnerId: string) {
       /* search uses delivery locations */
     }
   }
+  try {
+    const { storeShownDeliveryPlaces } = await import("@/lib/server/partner-delivery-listing-sync");
+    await storeShownDeliveryPlaces(partnerId);
+  } catch (error) {
+    console.warn("[partner-search-coverage] delivery places not stored", partnerId, error);
+  }
   clearSearchAirportsCache();
 }
 

@@ -107,34 +107,19 @@ function toSearchCar(car: FileCarListing, byId: Map<string, DeliveryLocationView
   };
 }
 
-export function fileSearchCarMatchesPickup(car: FileSearchCar, pickup: string) {
-  const code = normalizeLocationCode(pickup).toUpperCase();
-  if (!code) return true;
-  return (car.deliveryPrices ?? []).some((row) => {
-    const loc = row.deliveryLocation;
-    if (!loc?.isActive) return false;
-    const iata = normalizeLocationCode(loc.airport?.iata || "").toUpperCase();
-    const id = normalizeLocationCode(row.deliveryLocationId || loc.id || "").toUpperCase();
-    return iata === code || id === code;
-  });
-}
-
-export async function loadPublicFileSearchCars(opts?: {
-  pickup?: string | null;
-}): Promise<FileSearchCar[]> {
+/** Places and fees are applied later from the partner's Delivery page (scopeSearchCars). */
+export async function loadPublicFileSearchCars(): Promise<FileSearchCar[]> {
   const [stored, locations, snapshots] = await Promise.all([
     listFileCars(),
     listDeliveryLocations({ activeOnly: false }),
     readPublishedSnapshotsMap().catch(() => new Map<string, PublishedCarSnapshot>()),
   ]);
   const byId = new Map(locations.map((loc) => [loc.id, loc]));
-  const pickup = opts?.pickup?.trim() || "";
   return stored
     .filter((car) => isPublicFileCar(car))
     .map((car) => {
       const shaped = toSearchCar(car, byId);
       if (car.status !== "PENDING_REMODERATION") return shaped;
       return overlayPublishedListing({ ...shaped, status: car.status }, snapshots.get(car.id));
-    })
-    .filter((car) => (pickup ? fileSearchCarMatchesPickup(car, pickup) : true));
+    });
 }

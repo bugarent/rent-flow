@@ -7,7 +7,6 @@ import {
   type DeliveryPriceRowLike,
 } from "@/lib/delivery/trip-fees";
 import { roundMoney } from "@/lib/cars/reserve-pricing";
-import { listingPickupPlaceIds } from "@/lib/cars/listing-place-ids";
 import { toNumber } from "@/lib/utils";
 import type { BookingInfoDetailPayload, BookingInfoLocationOption } from "./types";
 
@@ -52,8 +51,6 @@ export async function buildMergedDeliveryRows(input: {
   }> | null;
   partnerId?: string;
   partnerUserId?: string;
-  /** Listing description, for the city places the listing marks itself. */
-  listingDescription?: string | null;
 }): Promise<{ rows: DeliveryPriceRowLike[]; byIata: Map<string, { label: string }> }> {
   const { listDeliveryLocations } = await import("@/lib/server/delivery-locations");
   const { normalizeLocationCode } = await import("@/lib/catalog/search-places");
@@ -126,13 +123,10 @@ export async function buildMergedDeliveryRows(input: {
         if (prefs.length) break;
       }
 
-      const listingPlaceIds = listingPickupPlaceIds(input.listingDescription);
-      if (rows.length && (prefs.length || listingPlaceIds.size)) {
-        const { loadCityDeliveryPlaces } = await import("@/lib/server/city-delivery-places");
-        rows = mergeDeliveryPrefsIntoRows(rows, prefs, await loadCityDeliveryPlaces(), listingPlaceIds);
-      } else if (!rows.length && prefs.length) {
-        rows = prefs
-          .filter((p) => p.enabled !== false)
+      if (prefs.length) {
+        const known = new Set(rows.map((r) => String(r.deliveryLocationId || "")));
+        const prefRows = prefs
+          .filter((p) => p.enabled !== false && !known.has(p.deliveryLocationId))
           .map((p) =>
             toFeeRow({
               deliveryLocationId: p.deliveryLocationId,
@@ -141,6 +135,8 @@ export async function buildMergedDeliveryRows(input: {
               travelTimeMinutes: p.travelTimeMinutes,
             }),
           );
+        const { loadDeliveryPlaces } = await import("@/lib/server/delivery-places");
+        rows = mergeDeliveryPrefsIntoRows([...rows, ...prefRows], prefs, await loadDeliveryPlaces());
       }
     } catch {
       /* keep car rows */
@@ -200,7 +196,6 @@ export async function resolveDeliverySummary(input: {
   rentalDays: number;
   partnerId?: string;
   partnerUserId?: string;
-  listingDescription?: string | null;
 }): Promise<BookingInfoDetailPayload["delivery"]> {
   const pickupIata = String(input.pickupIata || "").toUpperCase();
   const dropoffIata = String(input.dropoffIata || "").toUpperCase() || pickupIata;
@@ -228,7 +223,6 @@ export async function resolveDeliverySummary(input: {
       deliveryPrices: input.deliveryPrices,
       partnerId: input.partnerId,
       partnerUserId: input.partnerUserId,
-      listingDescription: input.listingDescription,
     });
     const fees = computeTripDeliveryFees({
       rows,

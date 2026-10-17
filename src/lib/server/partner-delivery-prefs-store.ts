@@ -135,6 +135,26 @@ export async function writePartnerDeliveryPrefs(
   return merged;
 }
 
+/** Add prefs for locations that have none yet. Saved prefs are never changed. */
+export async function addMissingPartnerDeliveryPrefs(
+  partnerId: string,
+  prefs: PartnerDeliveryPref[],
+): Promise<number> {
+  const cleaned = prefs.map(cleanPref).filter((r): r is PartnerDeliveryPref => Boolean(r));
+  if (!partnerId || !cleaned.length) return 0;
+  let added = 0;
+  await mutateStore((store) => {
+    const previous = Array.isArray(store[partnerId]) ? store[partnerId] : [];
+    const known = new Set(previous.map((p) => String(p?.deliveryLocationId || "").trim()));
+    const fresh = cleaned.filter((p) => !known.has(p.deliveryLocationId));
+    if (!fresh.length) return false;
+    store[partnerId] = [...previous, ...fresh];
+    added = fresh.length;
+    return true;
+  });
+  return added;
+}
+
 /** Rewrite every partner's free-after days for one location down to the admin maximum. */
 export async function clampAllPartnerFreeAfterDays(
   deliveryLocationId: string,

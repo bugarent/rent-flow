@@ -134,10 +134,7 @@ type ScopedCar = {
   deliveryPrices?: DeliveryPriceRowLike[];
 };
 
-/**
- * Place ids from the car↔location assignment rows only (CarDeliveryPrice / file
- * deliveryPrices). Description pickupPlaces alone never qualifies a listing for search.
- */
+/** Place ids from the listing's delivery rows (already merged with the partner's Delivery page). */
 export function listingOfferedPlaceIds(car: {
   description?: string | null;
   deliveryPrices?: DeliveryPriceRowLike[];
@@ -175,10 +172,8 @@ function pricedPlaces(cabinet: SearchCabinet, offered: Set<string>, prefs: Partn
 }
 
 /**
- * A listing is shown at a place only when all three hold for that exact place:
- * it is in the partner's personal info, the car has an active CarDeliveryPrice
- * (or file) assignment for it, and the partner enabled a delivery price for it
- * on the Delivery page. Prefs never invent a location the car did not select.
+ * A listing is shown at a place only when the place is in the partner's personal
+ * info and the partner switched it ON with a price on the Delivery page.
  */
 export function scopeCarsToPersonalPlaces<T extends ScopedCar>(
   cars: T[],
@@ -209,7 +204,7 @@ export function scopeCarsToPersonalPlaces<T extends ScopedCar>(
     }
     const offered = offeredPlaces(cabinet, personal, opts.listingPlacesByCar.get(id) || []);
     if (!offered.size) {
-      rejected.push({ id, reason: "listing has no car-location assignment in personal scope" });
+      rejected.push({ id, reason: "no Delivery-page place inside personal info" });
       continue;
     }
     const prefs = prefsFor(opts.prefsByPartner, pid);
@@ -221,7 +216,7 @@ export function scopeCarsToPersonalPlaces<T extends ScopedCar>(
     const failure = legs
       .map(({ code, label }) => {
         if (!placeAllowed(cabinet, personal, code)) return `personal info does not include ${label}${code}`;
-        if (!placeAllowed(cabinet, offered, code)) return `listing is not assigned to ${label}${code}`;
+        if (!placeAllowed(cabinet, offered, code)) return `Delivery page has ${label}${code} OFF`;
         if (!placeAllowed(cabinet, allowed, code)) return `no delivery price saved for ${label}${code}`;
         return "";
       })
@@ -238,7 +233,6 @@ export function scopeCarsToPersonalPlaces<T extends ScopedCar>(
       rejected.push({ id, reason: `no priced place in ${country}` });
       continue;
     }
-    // Keep only real car↔location rows for allowed places — never invent from prefs.
     const rows = (car.deliveryPrices || []).filter(
       (row) => row.deliveryLocation?.isActive !== false && rowKeys(row, cabinet).some((key) => allowed.has(key)),
     );
