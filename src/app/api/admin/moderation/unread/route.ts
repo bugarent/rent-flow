@@ -28,21 +28,24 @@ function partnerAttentionAmount(status: string, unread: number) {
   return reapply;
 }
 
-/** Directory list (Partners window) vs first-review queue (stays on Moderation). */
-async function countPartners(): Promise<{ directory: number; primary: number }> {
+/**
+ * Directory list (Partners window) vs first-review queue (stays on Moderation).
+ * Partners whose profile changes wait on the Moderation window are counted only there.
+ */
+async function countPartners(onModeration: Set<string>): Promise<{ directory: number; primary: number }> {
   let directory = 0;
   let primary = 0;
-  const add = (status: string, unread: number) => {
+  const add = (id: string, status: string, unread: number) => {
     const amount = partnerAttentionAmount(status, unread);
     if (!amount) return;
     if (PRIMARY_PARTNER_STATUSES.has(status)) primary += amount;
-    else directory += amount;
+    else if (status !== "PENDING_REMODERATION" && !onModeration.has(id)) directory += amount;
   };
   try {
     const partners = await prisma.partner.findMany({
-      select: { status: true, unreadReapplyCount: true },
+      select: { id: true, status: true, unreadReapplyCount: true },
     });
-    for (const partner of partners) add(partner.status, partner.unreadReapplyCount || 0);
+    for (const partner of partners) add(partner.id, partner.status, partner.unreadReapplyCount || 0);
   } catch (error) {
     if (!isDbOfflineError(error)) {
       console.warn("[admin/moderation/unread] partners", error);
@@ -51,7 +54,7 @@ async function countPartners(): Promise<{ directory: number; primary: number }> 
   try {
     const { listFilePartnerApplications } = await import("@/lib/server/partner-applications-store");
     for (const partner of await listFilePartnerApplications()) {
-      add(partner.status, partner.unreadForAdmin || 0);
+      add(partner.id, partner.status, partner.unreadForAdmin || 0);
     }
   } catch {
     /* ignore */
@@ -84,7 +87,8 @@ async function countListings(): Promise<number> {
   return ids.size;
 }
 
-async function countProfiles(): Promise<number> {
+/** Partners with profile changes waiting on the Moderation window. */
+async function profilesOnModeration(): Promise<Set<string>> {
   const ids = new Set<string>();
   try {
     const rows = await prisma.partner.findMany({
@@ -114,7 +118,7 @@ async function countProfiles(): Promise<number> {
   } catch {
     /* ignore */
   }
-  return ids.size;
+  return ids;
 }
 
 async function countReviews(): Promise<number> {
@@ -134,12 +138,13 @@ export async function GET() {
     return NextResponse.json({ error: "Admin access required" }, { status: 403 });
   }
 
-  const [partnerCounts, listings, profiles, reviews] = await Promise.all([
-    countPartners(),
+  const profileIds = await profilesOnModeration();
+  const [partnerCounts, listings, reviews] = await Promise.all([
+    countPartners(profileIds),
     countListings(),
-    countProfiles(),
     countReviews(),
   ]);
+  const profiles = profileIds.size;
 
   const partners = partnerCounts.directory + partnerCounts.primary;
   const unreadTotal = partnerCounts.primary + listings + profiles + reviews;
