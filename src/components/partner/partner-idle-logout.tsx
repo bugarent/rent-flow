@@ -10,7 +10,7 @@ import {
 } from "@/lib/auth/portals";
 
 /** Partner cabinet auto sign-out after this much idle time. */
-export const PARTNER_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+export const PARTNER_IDLE_TIMEOUT_MS = 20 * 60 * 1000;
 
 /** Shared by every open cabinet tab, so work in one tab keeps the others signed in. */
 const LAST_ACTIVITY_KEY = "rac.partner.lastActivityAt";
@@ -63,7 +63,7 @@ function clearPartnerCookiesClient() {
 }
 
 /**
- * Signs the partner out after 10 minutes without interaction in any cabinet tab.
+ * Signs the partner out after 20 minutes without interaction in any cabinet tab.
  * Elapsed time is measured from the last activity, so a sleeping laptop or a
  * background tab (where timers are delayed) is signed out as soon as it wakes.
  * Only mounts on authenticated cabinet pages (not login/register).
