@@ -160,6 +160,8 @@ export async function GET(req: Request) {
       "Cache-Control": "public, max-age=0, must-revalidate",
       // Same query within 30s is answered by the Netlify edge; bookings re-check availability.
       "Netlify-CDN-Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+      // The edge cache key ignores the query string unless told otherwise; filters must not share one entry.
+      "Netlify-Vary": "query",
     },
   });
 }

@@ -51,6 +51,8 @@ type CachedRead = { at: number; generation: number; value: unknown };
 const globalForCatalog = globalThis as typeof globalThis & {
   __searchCatalog?: {
     value: SearchCatalog | null;
+    /** Last complete catalog, kept across clears to answer while the database is failing. */
+    lastGood?: SearchCatalog | null;
     loading: Promise<SearchCatalog> | null;
     generation: number;
     reads: Map<string, CachedRead>;
@@ -59,22 +61,28 @@ const globalForCatalog = globalThis as typeof globalThis & {
 };
 const state = (globalForCatalog.__searchCatalog ??= {
   value: null,
+  lastGood: null,
   loading: null,
   generation: 0,
   reads: new Map(),
   pendingReads: new Map(),
 });
 // Dev hot reload keeps the object from an older module version; make sure every field exists.
+state.lastGood ??= null;
 state.reads ??= new Map();
 state.pendingReads ??= new Map();
 state.generation ??= 0;
 
 /** Drop the cached catalog (and every cachedSearchRead) after a listing, delivery price, partner or category change. */
 export function clearSearchCatalog() {
+  if (state.value && !state.value.degraded) state.lastGood = state.value;
   state.value = null;
+  // Old reads stay only as a fallback for a failing database; the generation bump makes them stale.
   state.generation += 1;
-  state.reads.clear();
 }
+
+const FALLBACK_MS = 30 * 60_000;
+const MAX_READS = 200;
 
 /**
  * Same 30s fresh / 5 min stale-while-refresh cache as the catalog, for other reads the
@@ -93,12 +101,30 @@ export async function cachedSearchRead<T>(
     let pending = state.pendingReads.get(key) as Promise<T> | undefined;
     if (!pending) {
       const generation = state.generation;
+      const fallback = () => {
+        const old = state.reads.get(key);
+        return old && Date.now() - old.at < FALLBACK_MS ? old : null;
+      };
       pending = loader()
         .then((value) => {
           if ((opts?.keep?.(value) ?? true) && generation === state.generation) {
+            state.reads.delete(key);
             state.reads.set(key, { at: Date.now(), generation, value });
+            while (state.reads.size > MAX_READS) {
+              const oldest = state.reads.keys().next().value;
+              if (oldest === undefined) break;
+              state.reads.delete(oldest);
+            }
+            return value;
           }
-          return value;
+          // An empty / partial read while an older good one exists: answer with the older one.
+          const old = opts?.keep && !opts.keep(value) ? fallback() : null;
+          return old ? (old.value as T) : value;
+        })
+        .catch((error: unknown) => {
+          const old = fallback();
+          if (old) return old.value as T;
+          throw error;
         })
         .finally(() => state.pendingReads.delete(key));
       state.pendingReads.set(key, pending);
@@ -289,11 +315,12 @@ function refresh(): Promise<SearchCatalog> {
   const generation = state.generation;
   state.loading = build()
     .then((value) => {
-      const previous = state.value;
-      if (value.degraded && previous && !previous.degraded && Date.now() - previous.builtAt < 30 * 60_000) {
-        console.warn("[search-catalog] database read incomplete; keeping the last good catalog");
+      const previous = state.value && !state.value.degraded ? state.value : state.lastGood;
+      if (value.degraded && previous && Date.now() - previous.builtAt < 30 * 60_000) {
+        console.warn("[search-catalog] database read incomplete; answering from the last good catalog");
         return previous;
       }
+      if (!value.degraded) state.lastGood = value;
       // A clear during the build means the data changed again; do not keep the older read.
       if (generation === state.generation) state.value = value;
       return value;
