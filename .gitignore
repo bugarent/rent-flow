@@ -44,6 +44,9 @@ yarn-error.log*
 # partner data backups (personal data, password hashes)
 /.backups/
 
+# local scratch: one-off scripts, pg binaries, database dumps
+/.tmp/
+
 # admin homepage uploads
 /public/uploads/
 /public/uploads.kept

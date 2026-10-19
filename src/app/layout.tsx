@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { RouteLoadingIndicator } from "@/components/layout/route-loading-indicator";
+import { PressFeedback } from "@/components/layout/press-feedback";
 import { Geist, Geist_Mono, Inter, Noto_Sans_Georgian, Noto_Sans_Arabic } from "next/font/google";
 import "./globals.css";
 import { AppProviders } from "@/components/providers/app-providers";
@@ -115,6 +116,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <Suspense fallback={null}>
           <RouteLoadingIndicator />
         </Suspense>
+        <PressFeedback />
       </body>
     </html>
   );

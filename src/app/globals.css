@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Scratch tools and backups (GBs of binaries/dumps) — scanning them crashes the PostCSS worker. */
+@source not "../../.tmp";
+@source not "../../.backups";
+
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
@@ -112,6 +116,34 @@ body {
       [class*="auto-cols"]
     ):not([class*="place-content"]):not([class*="justify-center"]):not([class*="justify-between"]) {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/*
+ * Pressed feedback for every button and link (data-pressed is set by PressFeedback so fast
+ * phone taps stay visible). `scale` composes with Tailwind translate/rotate transforms.
+ * Transitions sit in the base layer so a control's own transition utility still wins.
+ */
+@layer base {
+  :where(button, [role="button"], [role="switch"], [role="tab"], [role="menuitem"], [role="option"], a[href], input[type="submit"], input[type="button"], input[type="reset"], summary) {
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      scale 120ms ease-out,
+      filter 120ms ease-out;
+  }
+}
+
+:is(button, [role="button"], [role="switch"], [role="tab"], [role="menuitem"], [role="option"], a[href], input[type="submit"], input[type="button"], input[type="reset"], summary):not(
+    :disabled,
+    [aria-disabled="true"]
+  ):is(:active, [data-pressed]) {
+  scale: 0.96;
+  filter: brightness(0.85) saturate(1.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(button, [role="button"], [role="switch"], [role="tab"], [role="menuitem"], [role="option"], a[href], input[type="submit"], input[type="button"], input[type="reset"], summary):is(:active, [data-pressed]) {
+    scale: none;
   }
 }
 
