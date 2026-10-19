@@ -122,20 +122,10 @@ async function listedPlaceCodes(partnerId: string): Promise<string[]> {
   return file?.deliveryLocationIds || [];
 }
 
-/**
- * After an administrator confirms the application, show the kept places in search.
- * Countries without any Delivery-page place start with their airports ON.
- */
+/** After an administrator confirms the application, show the kept places in search. */
 export async function publishPartnerSearchPlaces(partnerId: string) {
   const codes = await listedPlaceCodes(partnerId);
   if (codes.length) await publishListedPlaces(partnerId, codes);
-  try {
-    const { seedAirportsForUntouchedCountries } = await import("@/lib/server/partner-delivery-seed");
-    // A seeded country re-enters publishPartnerSearchPlaces through the Delivery sync.
-    if (await seedAirportsForUntouchedCountries(partnerId)) return;
-  } catch (error) {
-    console.warn("[partner-search-coverage] airport seeding skipped", partnerId, error);
-  }
   try {
     const { storeShownDeliveryPlaces } = await import("@/lib/server/partner-delivery-listing-sync");
     await storeShownDeliveryPlaces(partnerId);

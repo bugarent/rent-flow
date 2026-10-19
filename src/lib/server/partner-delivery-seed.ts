@@ -8,9 +8,10 @@ import {
 } from "@/lib/server/partner-delivery-prefs-store";
 
 /**
- * An operating country with no Delivery-page place yet (none ON, none switched OFF)
- * starts with all its airports ON at price 0. The partner then switches places off or
- * adds more on the Delivery page; a country the partner already touched is never changed.
+ * Runs when the partner uploads a car listing: an operating country with no
+ * Delivery-page place yet (none ON, none switched OFF) gets all its airports ON at
+ * price 0. The partner then switches places off or adds more on the Delivery page;
+ * a country the partner already touched is never changed.
  */
 export async function seedAirportsForUntouchedCountries(partnerId: string): Promise<number> {
   if (!partnerId) return 0;

@@ -17,9 +17,7 @@ import {
 } from "@/lib/delivery/pricing";
 import { resetLegacyAutoDeliveryLimits } from "@/lib/server/delivery-price-limit";
 import { StoreUnavailableError } from "@/lib/server/durable-fs";
-import { syncPartnerDeliveryPricesToListings } from "@/lib/server/partner-delivery-listing-sync";
-import { seedAirportsForUntouchedCountries } from "@/lib/server/partner-delivery-seed";
-import {
+import { syncPartnerDeliveryPricesToListings } from "@/lib/server/partner-delivery-listing-sync";import {
   readPartnerDeliveryPrefs,
   writePartnerDeliveryPrefs,
   type PartnerDeliveryPref,
@@ -91,9 +89,6 @@ export async function GET() {
 
     const partnerId = await resolvePartnerId(session.user.id, session.user.email);
     await resetLegacyAutoDeliveryLimits();
-    await seedAirportsForUntouchedCountries(partnerId).catch((error) => {
-      console.warn("[partners/delivery-prefs GET] airport seeding", error);
-    });
     const [scoped, prefs, pricingCurrency, crossBorderEnabled] = await Promise.all([
       listPartnerCountryDeliveryLocations(partnerId),
       readPartnerDeliveryPrefs(partnerId),
