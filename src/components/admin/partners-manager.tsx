@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, Fragment, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Search } from "lucide-react";
 import { fleetAgeLabel, localizedPartnerStatus, partnerStatusLabel, PARTNER_SOCIAL_PLATFORMS } from "@/lib/partner";
 import type { PartnerApplicationMessage } from "@/lib/partner-application-messages";
 import { worldCountryName } from "@/lib/catalog/world-countries";
@@ -14,6 +14,7 @@ import { PartnerRowActions } from "@/components/admin/partner-row-actions";
 import { BookingCustomersPanel } from "@/components/admin/booking-customers-panel";
 import type { BookingCustomerRow } from "@/lib/admin/booking-customer-row";
 import { ADMIN_BASE } from "@/lib/routes";
+import { matchesPartnerSearch } from "@/lib/admin/partner-search";
 import {
   parseDirectoryPartnerTabs,
   type DirectoryPartnerTab,
@@ -53,6 +54,7 @@ type PartnerRow = {
   unreadForAdmin?: number;
   updatedAt?: string;
   source?: "db" | "file";
+  searchText?: string;
 };
 
 const PRIMARY_STATUSES = new Set([
@@ -224,6 +226,7 @@ export function PartnersManager({
     setTabQuery(partnerTabQuery);
     setTabs(parseDirectoryPartnerTabs(partnerTabQuery));
   }
+  const [query, setQuery] = useState("");
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -341,7 +344,9 @@ export function PartnersManager({
 
   const rows = useMemo(() => {
     const filtered = (mode === "directory" ? partnersInDirectoryTabs(initialPartners, tabs) : partnersInFilter(initialPartners, filter))
-      .slice()
+      .filter((p) =>
+        matchesPartnerSearch(p.searchText ?? [p.displayName, p.email, p.phone, p.secondaryPhone].join(" "), query),
+      )
       .sort((a, b) => {
         const ua = partnerAttention(a);
         const ub = partnerAttention(b);
@@ -355,7 +360,18 @@ export function PartnersManager({
       statusLabel: p.statusLabel ?? partnerStatusLabel(p.status),
       fleet: fleetDisplay(p),
     }));
-  }, [filter, initialPartners, mode, tabs]);
+  }, [filter, initialPartners, mode, tabs, query]);
+
+  const visibleCustomers = useMemo(
+    () => customers.filter((c) => matchesPartnerSearch([c.displayName, c.email, c.phone].join(" "), query)),
+    [customers, query],
+  );
+  const searchLabel = uiText(
+    locale,
+    "Search: email, phone, company, first or last name",
+    "ძებნა: მეილი, ტელეფონი, კომპანია, სახელი ან გვარი",
+    "Поиск: почта, телефон, компания, имя или фамилия",
+  );
 
   const noPhoneLabel = uiText(locale, "No phone", "ნომერი არ არის", "Нет номера");
   const visibleKeys = useMemo(() => rows.flatMap((partner) => selectionKeys(partner)), [rows]);
@@ -546,6 +562,23 @@ export function PartnersManager({
         <p className="mb-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-950">
           {message}
         </p>
+      ) : null}
+      {mode === "directory" ? (
+      <div className="relative mb-3">
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+          aria-hidden
+        />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={searchLabel}
+          aria-label={searchLabel}
+          autoComplete="off"
+          className="min-h-11 w-full rounded-xl border border-slate-300 bg-white py-2 pl-10 pr-3 text-base text-slate-900 shadow-sm outline-none focus:border-[#0b1f4b] focus:ring-2 focus:ring-[#0b1f4b]/20 sm:text-sm"
+        />
+      </div>
       ) : null}
       {mode === "directory" || filters.length > 1 ? (
       <div className="mb-4 flex flex-wrap gap-2">
@@ -1156,7 +1189,7 @@ export function PartnersManager({
       ) : null}
       {showCustomers ? (
         <div className={showPartners ? "mt-6" : undefined}>
-          <BookingCustomersPanel customers={customers} />
+          <BookingCustomersPanel customers={visibleCustomers} />
         </div>
       ) : null}
     </div>

@@ -6,6 +6,7 @@ import { listFilePartnerApplications } from "@/lib/server/partner-applications-s
 import { listFileCarsForPartner } from "@/lib/server/partner-cars-store";
 import { TEST_PARTNER_EMAIL, LOCAL_PARTNER_ID } from "@/lib/auth/local-partner-store";
 import { listedPartnerPhones } from "@/lib/partners/partner-phones";
+import { parseCompanySettings } from "@/lib/partners/company-settings";
 
 function isSeedTestPartner(row: { id: string; email: string; displayName: string }) {
   const email = row.email.trim().toLowerCase();
@@ -34,7 +35,13 @@ export type AdminPartnerRow = {
   unreadForAdmin: number;
   updatedAt: string;
   source?: "db" | "file";
+  /** Lower-case names, email, phones and codes for the admin search box. */
+  searchText: string;
 };
+
+function partnerSearchText(parts: Array<string | null | undefined>): string {
+  return [...new Set(parts.map((part) => String(part || "").trim().toLowerCase()).filter(Boolean))].join(" ");
+}
 
 export const PRIMARY_PARTNER_STATUSES = new Set([
   "PENDING",
@@ -102,8 +109,30 @@ export async function loadAdminPartnerRows(): Promise<{
       const unreadForAdmin = needsAdminAction(p.status)
         ? Math.max(1, unreadReapply)
         : unreadReapply;
+      const settings = parseCompanySettings(p.companySettings);
+      const phones = listedPartnerPhones({
+        phone: p.phone,
+        secondaryPhone: p.secondaryPhone,
+        companySettings: p.companySettings,
+      });
       return {
         id: p.id,
+        searchText: partnerSearchText([
+          p.companyName,
+          p.contactName,
+          p.user?.firstName,
+          p.user?.lastName,
+          settings.firstName,
+          settings.lastName,
+          settings.title,
+          settings.legalName,
+          p.email,
+          settings.email,
+          phones.phone,
+          phones.secondaryPhone,
+          p.personalId,
+          formatPartnerCode(p.sequentialNumber),
+        ]),
         displayName: partnerDisplayName(p),
         kind: p.kind as "COMPANY" | "PRIVATE",
         status: p.status,
@@ -114,11 +143,7 @@ export async function loadAdminPartnerRows(): Promise<{
         fleetSize: p.fleetSize,
         carCount: p._count.cars,
         email: p.email,
-        ...listedPartnerPhones({
-          phone: p.phone,
-          secondaryPhone: p.secondaryPhone,
-          companySettings: p.companySettings,
-        }),
+        ...phones,
         country: countryNames(p.operatingCountryIso2s),
         hasUser: Boolean(p.userId),
         unreadReapplyCount: unreadReapply,
@@ -142,6 +167,15 @@ export async function loadAdminPartnerRows(): Promise<{
         : p.unreadForAdmin || unreadReapply;
       return {
         id: p.id,
+        searchText: partnerSearchText([
+          p.companyName,
+          p.contactName,
+          p.email,
+          p.phone,
+          p.secondaryPhone,
+          p.personalId,
+          p.sequentialNumber ? formatPartnerCode(p.sequentialNumber) : "",
+        ]),
         displayName: p.companyName || p.contactName,
         kind: p.kind,
         status: p.status,
@@ -214,6 +248,16 @@ export async function loadAdminPartnerRows(): Promise<{
       });
       initialPartners.push({
         id: row.partnerId,
+        searchText: partnerSearchText([
+          settings?.title,
+          settings?.legalName,
+          settings?.firstName,
+          settings?.lastName,
+          email,
+          settings?.primaryPhone,
+          settings?.secondaryPhone,
+          formatPartnerCode(sequentialNumber),
+        ]),
         displayName:
           settings?.title ||
           settings?.legalName ||
