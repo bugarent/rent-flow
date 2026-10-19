@@ -164,9 +164,17 @@ export function searchPlacesForCountry(iso2: string): SearchPlace[] {
   return allSearchPlaces().filter((p) => p.countryIso2 === code);
 }
 
+let byCode: Map<string, SearchPlace> | null = null;
+
+/** Search filtering calls this per delivery row; a code index replaces a scan of every world place. */
 export function findSearchPlace(code: string): SearchPlace | undefined {
   const key = normalizeLocationCode(code);
-  return allSearchPlaces().find((p) => p.code === key);
+  if (!byCode) {
+    byCode = new Map();
+    // First match wins, same as Array.find over the sorted list.
+    for (const place of allSearchPlaces()) if (!byCode.has(place.code)) byCode.set(place.code, place);
+  }
+  return byCode.get(key);
 }
 
 export function nearestAirportCode(code: string): string {
