@@ -10,6 +10,7 @@ import { airportCarsLabel } from "@/lib/i18n/airport-cars-label";
 import { localizedAirportTitle } from "@/lib/catalog/homepage-airport-i18n";
 import { SiteImage } from "@/components/ui/site-image";
 import { useIntentPrefetch } from "@/lib/client/prefetch-route";
+import { useHomeCountry } from "@/lib/catalog/home-country-store";
 
 const AUTO_MS = 4000;
 const SLIDE_MS = 650;
@@ -61,7 +62,50 @@ function AirportCard({
   );
 }
 
+const EMPTY_COPY: Record<string, string> = {
+  ka: "ამ ქვეყნისთვის პოპულარული აეროპორტები ჯერ არ არის დამატებული.",
+  ru: "Для этой страны популярные аэропорты пока не добавлены.",
+  en: "No popular airports have been added for this country yet.",
+};
+
+/**
+ * Popular airports of the country picked in the homepage search (admin adds cards per
+ * country). Before the search box reports its country, the server's default is used.
+ */
 export function PopularAirports({
+  airports,
+  layout,
+  defaultCountryIso2 = "",
+}: {
+  airports: PopularAirportCard[];
+  layout?: PopularAirportsLayout;
+  defaultCountryIso2?: string;
+}) {
+  const { dictionary, locale } = usePreferences();
+  const country = (useHomeCountry() || defaultCountryIso2).toUpperCase();
+  const visible = country
+    ? airports.filter((airport) => (airport.countryIso2 || "").toUpperCase() === country)
+    : airports;
+
+  if (!visible.length) {
+    return (
+      <section id="airports" className="relative w-full min-w-0 bg-white px-4 py-12 sm:py-16">
+        <div className="mx-auto max-w-6xl">
+          <h2 className="mb-6 text-2xl font-extrabold text-[#0b1f4b] sm:mb-8 sm:text-3xl">
+            {dictionary.home.popularAirports}
+          </h2>
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-10 text-center text-sm text-slate-500">
+            {EMPTY_COPY[locale] ?? EMPTY_COPY.en}
+          </div>
+        </div>
+      </section>
+    );
+  }
+  // Keyed by country so the carousel position restarts when the visitor switches country.
+  return <PopularAirportsCarousel key={country || "all"} airports={visible} layout={layout} />;
+}
+
+function PopularAirportsCarousel({
   airports,
   layout: _layout = "grid",
 }: {

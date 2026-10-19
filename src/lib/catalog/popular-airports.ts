@@ -18,6 +18,8 @@ export type PopularAirportCard = {
   bookingCount?: number;
   /** Admin per-language titles for the homepage card. */
   translations?: AirportCardTranslations;
+  /** Country of the airport (from its IATA code); the homepage shows the searched country's cards. */
+  countryIso2?: string;
 };
 
 const HARDCODED_GEORGIA: PopularAirportCard[] = [

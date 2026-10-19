@@ -177,6 +177,16 @@ export function findSearchPlace(code: string): SearchPlace | undefined {
   return byCode.get(key);
 }
 
+/** Country of an airport (or any catalog place) by its code; "" when the code is unknown. */
+export function airportCountryIso2(code: string): string {
+  return findSearchPlace(code)?.countryIso2.toUpperCase() ?? "";
+}
+
+/** Airports of one country from the place catalog, for admin pickers. */
+export function airportsForCountry(iso2: string): SearchPlace[] {
+  return searchPlacesForCountry(iso2).filter((place) => place.kind === "airport");
+}
+
 export function nearestAirportCode(code: string): string {
   const place = findSearchPlace(code);
   if (!place) return "TBS";

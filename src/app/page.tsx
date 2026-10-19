@@ -19,6 +19,7 @@ import type { AirportCardTranslations } from "@/lib/catalog/homepage-airport-i18
 import { getPopularAirports as getStaticPopularAirports } from "@/lib/catalog/popular-airports";
 import { VEHICLE_CATEGORIES } from "@/lib/catalog/categories";
 import { summarizeMappedModels } from "@/lib/cars/category-mapping";
+import { airportCountryIso2 } from "@/lib/catalog/search-places";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,9 @@ export default async function Home() {
       <HowItWorksPanel content={infoContent} />
       <PopularAirports
         layout={airportsLayout}
+        defaultCountryIso2={
+          options.find((o) => o.iata === "KUT")?.countryIso2 || options[0]?.countryIso2 || ""
+        }
         airports={popularAirports.map((a, index) => ({
           iata: a.iata,
           name: a.title,
@@ -81,6 +85,7 @@ export default async function Home() {
           image: a.imageUrl,
           rank: index + 1,
           translations: "translations" in a ? (a.translations as AirportCardTranslations) : undefined,
+          countryIso2: airportCountryIso2(a.iata),
         }))}
       />
       <WhyChooseUsPanel content={infoContent} />

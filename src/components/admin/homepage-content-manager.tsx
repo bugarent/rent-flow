@@ -11,6 +11,14 @@ import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { knownText } from "@/lib/i18n/known-record-text";
 import { AirportCardTranslationsFields } from "@/components/admin/airport-card-translations-fields";
 import {
+  AirportCountrySelect,
+  CountryAirportSelect,
+  airportsCountryCopy,
+  cardsForCountry,
+  mergeCountryOrder,
+} from "@/components/admin/homepage-airports-country";
+import { airportCountryIso2 } from "@/lib/catalog/search-places";
+import {
   localizedAirportTitle,
   type AirportCardTranslations,
 } from "@/lib/catalog/homepage-airport-i18n";
@@ -72,6 +80,10 @@ export function HomepageContentManager({
   const [savingPanelCategory, setSavingPanelCategory] = useState(false);
   const [airForm, setAirForm] = useState(blankAirportForm);
   const [editingAirport, setEditingAirport] = useState<Airport | null>(null);
+  const [airportCountry, setAirportCountry] = useState(
+    () => (initialAirports[0] && airportCountryIso2(initialAirports[0].iata)) || "GE",
+  );
+  const countryAirports = cardsForCountry(airports, airportCountry);
 
   const visibleCategories = categories.filter((c) => c.isActive !== false);
 
@@ -592,7 +604,19 @@ export function HomepageContentManager({
         <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-base font-extrabold text-[#0b1f4b]">{dictionary.sections.popularAirports}</h2>
-            <p className="mt-0.5 text-xs text-slate-500">{fill(e.cardsDrag, { n: airports.length })}</p>
+            <p className="mt-0.5 text-xs text-slate-500">{fill(e.cardsDrag, { n: countryAirports.length })}</p>
+            <div className="mt-2 max-w-sm">
+              <AirportCountrySelect
+                value={airportCountry}
+                cards={airports}
+                locale={locale}
+                onChange={(iso2) => {
+                  setAirportCountry(iso2);
+                  setEditingAirport(null);
+                  setAirForm(blankAirportForm());
+                }}
+              />
+            </div>
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-2 sm:min-w-[240px]">
             <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
@@ -630,9 +654,14 @@ export function HomepageContentManager({
             </div>
           </div>
         </div>
+        {countryAirports.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-6 text-center text-xs text-slate-500">
+            {airportsCountryCopy(locale).empty}
+          </p>
+        ) : null}
         <SortableAdminGrid
-          items={airports}
-          onReorder={reorderAirports}
+          items={countryAirports}
+          onReorder={(next) => reorderAirports(mergeCountryOrder(airports, airportCountry, next))}
           className="grid max-h-[280px] gap-2 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3"
           renderItem={(a) => (
             <>
@@ -675,15 +704,14 @@ export function HomepageContentManager({
                 : setAirForm((prev) => ({ ...prev, title: e.target.value }))
             }
           />
-          <input
-            className="w-full rounded-lg border p-2 text-xs"
-            placeholder={e.iataPh}
-            required
+          <CountryAirportSelect
+            country={airportCountry}
+            locale={locale}
             value={editingAirport ? editingAirport.iata : airForm.iata}
-            onChange={(e) =>
+            onChange={(iata, label) =>
               editingAirport
-                ? setEditingAirport({ ...editingAirport, iata: e.target.value })
-                : setAirForm((prev) => ({ ...prev, iata: e.target.value }))
+                ? setEditingAirport({ ...editingAirport, iata })
+                : setAirForm((prev) => ({ ...prev, iata, title: prev.title.trim() ? prev.title : label }))
             }
           />
           <input
