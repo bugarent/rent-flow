@@ -116,7 +116,12 @@ export async function searchPublicCars(query: PublicCarsQuery, timer?: Timer): P
   const pickup = query.pickup?.trim();
   const dropoff = query.dropoff?.trim() || undefined;
   cars = (
-    await scopeSearchCars(cars, catalog.cabinet, { pickup, dropoff, prefsByPartner: catalog.prefsByPartner })
+    await scopeSearchCars(cars, catalog.cabinet, {
+      pickup,
+      dropoff,
+      prefsByPartner: catalog.prefsByPartner,
+      places: catalog.places,
+    })
   ).cars;
   timer?.mark("scope");
 

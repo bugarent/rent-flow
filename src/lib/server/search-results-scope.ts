@@ -1,7 +1,11 @@
 import "server-only";
 
 import { normalizeLocationCode } from "@/lib/catalog/search-places";
-import { mergeDeliveryPrefsIntoRows, type DeliveryPriceRowLike } from "@/lib/delivery/trip-fees";
+import {
+  mergeDeliveryPrefsIntoRows,
+  type DeliveryPlace,
+  type DeliveryPriceRowLike,
+} from "@/lib/delivery/trip-fees";
 import { loadDeliveryPlaces } from "@/lib/server/delivery-places";
 import {
   readPartnerDeliveryPrefsMap,
@@ -50,6 +54,8 @@ export async function scopeSearchCars<T extends SearchCar>(
     dropoff?: string;
     countryIso2?: string;
     prefsByPartner?: Map<string, PartnerDeliveryPref[]>;
+    /** Preloaded delivery places (the search catalog passes its copy). */
+    places?: ReadonlyMap<string, DeliveryPlace>;
   },
 ): Promise<{ cars: T[]; rejected: Array<{ id: string; reason: string }> }> {
   const prefsByPartner =
@@ -65,7 +71,7 @@ export async function scopeSearchCars<T extends SearchCar>(
     return [];
   };
 
-  const places = await loadDeliveryPlaces();
+  const places = opts.places ?? (await loadDeliveryPlaces());
   const priced = cars.map((car) => ({
     ...car,
     deliveryPrices: mergeDeliveryPrefsIntoRows(

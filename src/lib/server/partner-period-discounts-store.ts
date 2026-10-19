@@ -73,11 +73,26 @@ async function writeStore(data: StoreFile) {
 const SEARCH_READ_TTL_MS = 30_000;
 let searchRead: { at: number; store: StoreFile } | null = null;
 
+const SEARCH_READ_STALE_MS = 10 * 60_000;
+let searchRefresh: Promise<StoreFile> | null = null;
+
 async function readStoreForSearch(): Promise<StoreFile> {
-  if (searchRead && Date.now() - searchRead.at < SEARCH_READ_TTL_MS) return searchRead.store;
-  const store = await readStore();
-  searchRead = { at: Date.now(), store };
-  return store;
+  const age = searchRead ? Date.now() - searchRead.at : Infinity;
+  if (searchRead && age < SEARCH_READ_TTL_MS) return searchRead.store;
+  searchRefresh ??= readStore()
+    .then((store) => {
+      searchRead = { at: Date.now(), store };
+      return store;
+    })
+    .finally(() => {
+      searchRefresh = null;
+    });
+  // An older copy answers right away while the refresh runs.
+  if (searchRead && age < SEARCH_READ_STALE_MS) {
+    void searchRefresh.catch(() => undefined);
+    return searchRead.store;
+  }
+  return searchRefresh;
 }
 
 function normalizeItem(raw: Partial<PartnerPeriodDiscount> & { partnerId: string }): PartnerPeriodDiscount | null {

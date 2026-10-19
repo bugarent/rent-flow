@@ -451,11 +451,17 @@ export default async function CarsPage({
   }
 
   {
+    const places = await cachedSearchRead(
+      "delivery-places",
+      () => import("@/lib/server/delivery-places").then((m) => m.loadDeliveryPlaces()),
+      { keep: (map) => map.size > 0 },
+    ).catch(() => undefined);
     const scoped = await scopeSearchCars(cars, cabinet, {
       pickup: pickupIata,
       dropoff,
       countryIso2,
       prefsByPartner,
+      places,
     });
     if (traceEnabled) {
       for (const row of scoped.rejected) {

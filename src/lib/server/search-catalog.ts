@@ -1,7 +1,7 @@
 import "server-only";
 
 import { publicListingStatusWhere, publicPartnerWhere } from "@/lib/cars/listing-visibility";
-import type { DeliveryPriceRowLike } from "@/lib/delivery/trip-fees";
+import type { DeliveryPlace, DeliveryPriceRowLike } from "@/lib/delivery/trip-fees";
 import { prisma } from "@/lib/prisma";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import type { PartnerDeliveryPref } from "@/lib/server/partner-delivery-prefs-store";
@@ -38,6 +38,8 @@ export type SearchCatalog = {
   prefsByPartner: Map<string, PartnerDeliveryPref[]>;
   categories: StoredHomepageCategory[];
   ratings: Map<string, { average: number; count: number }>;
+  /** Delivery catalog places for fee rows (scopeSearchCars would otherwise re-read them per request). */
+  places: ReadonlyMap<string, DeliveryPlace>;
 };
 
 /** Fresh for 30s; an older copy (up to 5 min) answers instantly while a refresh runs in the background. */
@@ -290,11 +292,13 @@ async function build(): Promise<SearchCatalog> {
     import("@/lib/server/homepage-categories-store"),
     import("@/lib/server/partner-delivery-prefs-store"),
   ]);
-  const [db, cabinet, categories, ratings] = await Promise.all([
+  const { loadDeliveryPlaces } = await import("@/lib/server/delivery-places");
+  const [db, cabinet, categories, ratings, places] = await Promise.all([
     loadDbCars(),
     loadSearchCabinet(),
     listHomepageCategories().catch(() => [] as StoredHomepageCategory[]),
     loadRatings(),
+    loadDeliveryPlaces(),
   ]);
   const fileCars = await loadFileCars(new Set(db.cars.map((car) => car.id)));
   const cars = await withApprovedVersions([...db.cars, ...fileCars]);
@@ -306,8 +310,9 @@ async function build(): Promise<SearchCatalog> {
     return new Map<string, PartnerDeliveryPref[]>();
   });
   // Live listings always belong to approved partners with cabinet places; none means the read failed.
-  const degraded = !db.ok || !prefsOk || (db.cars.length > 0 && cabinet.byPartner.size === 0);
-  return { builtAt: Date.now(), degraded, cars, cabinet, prefsByPartner, categories, ratings };
+  const degraded =
+    !db.ok || !prefsOk || (db.cars.length > 0 && (cabinet.byPartner.size === 0 || places.size === 0));
+  return { builtAt: Date.now(), degraded, cars, cabinet, prefsByPartner, categories, ratings, places };
 }
 
 function refresh(): Promise<SearchCatalog> {
