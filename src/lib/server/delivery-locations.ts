@@ -798,7 +798,7 @@ export async function retireUnusedPartnerPlaces(partnerId: string, listed: strin
   clearSearchAirportsCache();
 }
 
-async function readPartnerDeliverySettings(partnerId: string): Promise<{
+export async function readPartnerDeliverySettings(partnerId: string): Promise<{
   deliveryCountryIso2s: string[];
   deliveryLocationIds: string[];
 }> {

@@ -450,6 +450,12 @@ export async function POST(req: Request) {
       }
 
       // Places and fees come from the partner's Delivery page, never from the listing form.
+      try {
+        const { seedAirportsForUntouchedCountries } = await import("@/lib/server/partner-delivery-seed");
+        await seedAirportsForUntouchedCountries(partner.id);
+      } catch (error) {
+        console.warn("[cars POST] airport seeding", error);
+      }
       const deliveryCatalog = await listPartnerScopedDeliveryLocations(partner.id);
       description = scopePickupPlacesInDescription(description, deliveryCatalog);
       const resolved = resolvePartnerDeliveryPrices(
