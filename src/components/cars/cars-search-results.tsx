@@ -1961,13 +1961,13 @@ function CarResultCard({
 
   return (
     <article className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="relative w-full overflow-hidden rounded-t-xl bg-slate-50 pb-[56.25%]">
+      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-t-xl bg-slate-100">
         {photos[photoIndex] ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={displayImageUrl(photos[photoIndex], 640)}
             alt={`${car.make} ${car.model}${car.year ? ` ${car.year}` : ""} — airport car rental`}
-            className="absolute inset-0 h-full w-full object-contain object-center p-1.5"
+            className="absolute inset-0 h-full w-full object-cover object-center"
             loading="lazy"
             decoding="async"
             fetchPriority="low"
