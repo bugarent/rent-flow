@@ -13,6 +13,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { prefetchFullRoute } from "@/lib/client/prefetch-route";
 import { CalendarDays, ChevronDown, Clock3, Globe, MapPin, PlaneTakeoff, BadgeCheck, ShieldCheck, Zap } from "lucide-react";
 import type { CatalogAirport } from "@/lib/catalog/airports";
 import { isCityLocationCode } from "@/lib/catalog/search-places";
@@ -833,21 +834,32 @@ export function AirportSearch({
   const ctaButtonClass =
     "flex min-h-11 min-w-0 w-full items-center justify-center rounded-lg bg-[#15803d] px-3 py-2.5 text-center text-[11px] font-extrabold uppercase leading-tight tracking-wide text-white shadow-[0_3px_10px_rgba(21,128,61,0.28)] hover:bg-[#166534] sm:min-h-9 sm:px-4 sm:text-sm";
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pickup) return;
+  /** Results URL for the current form, or null while the trip is incomplete. */
+  const searchHref = (): string | null => {
+    if (!pickup) return null;
     const safeSlot = clampPickupSelection(pickupDate, pickupTime, TIME_OPTIONS);
     const safePickupDate = safeSlot.date;
     const safeDropoffDate = clampDateToMin(dropoffDate, safePickupDate);
     const safePickupTime = safeSlot.time;
-    if (safeDropoffDate === safePickupDate && dropoffTime <= safePickupTime) return;
+    if (safeDropoffDate === safePickupDate && dropoffTime <= safePickupTime) return null;
     const drop = dropoff === SAME_AS_PICKUP ? pickup : dropoff;
     const startDate = `${safePickupDate}T${safePickupTime}`;
     const endDate = `${safeDropoffDate}T${dropoffTime}`;
     const params = new URLSearchParams({ pickup, dropoff: drop, startDate, endDate, time: safePickupTime });
     if (pickupIsCity && pickupAddress.trim()) params.set("pickupAddress", pickupAddress.trim());
     if (dropoffIsCity && dropoffAddress.trim()) params.set("dropoffAddress", dropoffAddress.trim());
-    router.push(`/cars?${params.toString()}`);
+    return `/cars?${params.toString()}`;
+  };
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const href = searchHref();
+    if (href) router.push(href);
+  };
+
+  const prefetchSearch = () => {
+    const href = searchHref();
+    if (href) prefetchFullRoute(router, href);
   };
 
   const fieldClass =
@@ -1019,6 +1031,9 @@ export function AirportSearch({
       <div className="mt-1.5 flex flex-col items-stretch justify-center gap-2 sm:flex-row sm:items-center">
         <button
           type="submit"
+          onPointerEnter={prefetchSearch}
+          onFocus={prefetchSearch}
+          onTouchStart={prefetchSearch}
           className={`${ctaButtonClass} ${showIndividualBooking ? "sm:flex-1" : "sm:max-w-[50%]"}`}
         >
           {dictionary.home.searchCta}

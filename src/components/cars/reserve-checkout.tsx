@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { loadCheckoutDeposit, loadCheckoutLegalPages } from "@/components/cars/checkout-data";
+import { useIntentPrefetch } from "@/lib/client/prefetch-route";
 import {
   Check,
   Clock,
@@ -182,6 +184,7 @@ export function ReserveCheckout({
   initialRange?: string;
 }) {
   const router = useRouter();
+  const intentPrefetch = useIntentPrefetch();
   const { data: session } = useSession();
   const { dictionary, formatPrice, locale } = usePreferences();
   const record = (value: string) => knownText(locale, value);
@@ -319,11 +322,8 @@ export function ReserveCheckout({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/legal-pages");
-        if (!res.ok || cancelled) return;
-        const data = (await res.json()) as {
-          terms?: { body?: string; fileUrl?: string };
-        };
+        const data = await loadCheckoutLegalPages();
+        if (cancelled) return;
         const body = String(data.terms?.body || "").trim();
         const fileUrl = String(data.terms?.fileUrl || "").trim();
         if (!cancelled) {
@@ -343,9 +343,8 @@ export function ReserveCheckout({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/platform/deposit");
-        if (!res.ok || cancelled) return;
-        const data = (await res.json()) as { depositPercent?: number; siteDiscountPercent?: number };
+        const data = await loadCheckoutDeposit();
+        if (cancelled) return;
         if (typeof data.depositPercent === "number" && Number.isFinite(data.depositPercent)) {
           setDepositPercent(Math.trunc(data.depositPercent));
         }
@@ -1107,6 +1106,7 @@ export function ReserveCheckout({
       <div className="mx-auto max-w-6xl px-3 py-5 sm:px-4 sm:py-6">
         <Link
           href={backHref}
+          {...intentPrefetch(backHref)}
           className="mb-4 inline-flex items-center text-sm font-semibold text-[#1d6fe8] hover:underline"
         >
           {t.backToSearch}

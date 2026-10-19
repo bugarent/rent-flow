@@ -9,6 +9,7 @@ import { usePreferences } from "@/components/providers/preferences-context";
 import { airportCarsLabel } from "@/lib/i18n/airport-cars-label";
 import { localizedAirportTitle } from "@/lib/catalog/homepage-airport-i18n";
 import { displayImageUrl } from "@/lib/media/display-image";
+import { useIntentPrefetch } from "@/lib/client/prefetch-route";
 
 const AUTO_MS = 4000;
 const SLIDE_MS = 650;
@@ -24,6 +25,7 @@ function AirportCard({
   loopCopy?: boolean;
 }) {
   const href = `/airport/${encodeURIComponent(airport.iata)}`;
+  const intentPrefetch = useIntentPrefetch();
   return (
     <article
       className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
@@ -51,6 +53,7 @@ function AirportCard({
         </h3>
         <Link
           href={href}
+          {...intentPrefetch(href)}
           tabIndex={loopCopy ? -1 : undefined}
           className="mt-auto inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#1d6fe8] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#1558c0]"
         >

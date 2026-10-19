@@ -55,6 +55,8 @@ import {
   type RentPaymentFilterOption,
 } from "@/lib/cars/listing-filter-match";
 import { cn, toNumber } from "@/lib/utils";
+import { useIntentPrefetch } from "@/lib/client/prefetch-route";
+import { warmCheckoutData } from "@/components/cars/checkout-data";
 
 export type SearchResultCar = {
   id: string;
@@ -1935,6 +1937,7 @@ function CarResultCard({
   siteDiscountPercent?: number;
 }) {
   const [photoIndex, setPhotoIndex] = useState(0);
+  const intentPrefetch = useIntentPrefetch();
   const photos = Array.isArray(car.photos) ? car.photos.filter(Boolean) : [];
   const details = parseCarDetails(car.description);
   const priced = listingDailyWithDeliveryEur({
@@ -1960,7 +1963,10 @@ function CarResultCard({
   const category = car.categoryLabel || car.categorySlug || null;
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <article
+      className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+      {...intentPrefetch(href, warmCheckoutData)}
+    >
       <div className="relative aspect-[4/3] w-full overflow-hidden rounded-t-xl bg-slate-100">
         {photos[photoIndex] ? (
           // eslint-disable-next-line @next/next/no-img-element

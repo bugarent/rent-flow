@@ -27,6 +27,11 @@ const nextConfig: NextConfig = {
     ];
   },
   serverExternalPackages: ["@prisma/client", "prisma", "sharp", "nodemailer", "cloudinary"],
+  experimental: {
+    // Hover-prefetched pages (prices, availability) are reused for at most 60 s.
+    // Dynamic pages stay uncached so partners and admins always see their saves.
+    staleTimes: { static: 60 },
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     localPatterns: [{ pathname: "/uploads/**" }, { pathname: "/images/**" }],

@@ -5,11 +5,13 @@ import { usePathname } from "next/navigation";
 import { Car, CircleHelp, Home, Search } from "lucide-react";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { requestOpenManageBooking } from "@/components/layout/open-manage-booking";
+import { useIntentPrefetch } from "@/lib/client/prefetch-route";
 import { cn } from "@/lib/utils";
 
 export function MobileBottomNav() {
   const pathname = usePathname() || "/";
   const { dictionary } = usePreferences();
+  const intentPrefetch = useIntentPrefetch();
   const hideCustomerTools =
     pathname === "/partnership" ||
     pathname.startsWith("/partnership/") ||
@@ -73,7 +75,7 @@ export function MobileBottomNav() {
           return (
             <li key={item.key} className="min-w-0">
               {item.href ? (
-                <Link href={item.href} className={className}>
+                <Link href={item.href} className={className} {...intentPrefetch(item.href)}>
                   <Icon className="h-5 w-5 shrink-0" />
                   {label}
                 </Link>

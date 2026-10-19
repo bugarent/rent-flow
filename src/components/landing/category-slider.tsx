@@ -8,6 +8,7 @@ import { knownText } from "@/lib/i18n/known-record-text";
 import { displayImageUrl } from "@/lib/media/display-image";
 import { defaultSearchDateRange } from "@/lib/catalog/default-search-dates";
 import { useHomeCountry } from "@/lib/catalog/home-country-store";
+import { useIntentPrefetch } from "@/lib/client/prefetch-route";
 
 const AUTO_MS = 4000;
 const SLIDE_MS = 600;
@@ -26,6 +27,7 @@ function CategoryCard({
 }) {
   const { locale } = usePreferences();
   const country = useHomeCountry();
+  const intentPrefetch = useIntentPrefetch();
   const { startDate, endDate } = defaultSearchDateRange();
   const name = knownText(locale, category.name);
   const href = `/cars?category=${encodeURIComponent(category.slug)}${country ? `&country=${encodeURIComponent(country)}` : ""}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
@@ -51,6 +53,7 @@ function CategoryCard({
         <h3 className="mb-3 text-lg font-bold text-[#0b1f4b]">{name}</h3>
         <Link
           href={href}
+          {...intentPrefetch(href)}
           tabIndex={loopCopy ? -1 : undefined}
           aria-label={`${viewLabel}: ${name}`}
           className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#1d6fe8] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#1558c0]"

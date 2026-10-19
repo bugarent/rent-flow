@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Car, MapPin } from "lucide-react";
+import { prefetchFullRoute } from "@/lib/client/prefetch-route";
 import {
   compareSearchPlaces,
   LocationPicker,
@@ -384,6 +385,7 @@ export function CarsSearchTripEditor({
   useEffect(() => {
     if (syncingFromUrl.current) return;
     if (!draftQuery || draftQuery === urlQuery) return;
+    prefetchFullRoute(router, `/cars?${draftQuery}`);
     const timer = window.setTimeout(() => {
       router.push(`/cars?${draftQuery}`);
     }, 350);
