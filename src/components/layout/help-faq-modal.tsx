@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ChevronDown, X } from "lucide-react";
 import type { HelpFaqItem } from "@/lib/catalog/help-faq";
 import { usePreferences } from "@/components/providers/preferences-context";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function HelpFaqModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { dictionary } = usePreferences();
@@ -81,7 +82,17 @@ export function HelpFaqModal({ open, onClose }: { open: boolean; onClose: () => 
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5 sm:px-8">
-          {loading ? <p className="py-10 text-center text-sm text-slate-500">Loading…</p> : null}
+          {loading ? (
+            <ul role="status" aria-live="polite" aria-busy="true" className="space-y-3">
+              {Array.from({ length: 6 }, (_, i) => (
+                <li key={i} className="flex items-center justify-between gap-4 rounded-xl border border-slate-200/90 px-4 py-4">
+                  <Skeleton className={i % 2 ? "h-4 w-2/3" : "h-4 w-1/2"} />
+                  <Skeleton className="h-5 w-5 rounded-full" />
+                </li>
+              ))}
+              <span className="sr-only">Loading…</span>
+            </ul>
+          ) : null}
           {error ? <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p> : null}
           {!loading && !error && items.length === 0 ? (
             <p className="py-10 text-center text-sm text-slate-500">No help articles yet.</p>

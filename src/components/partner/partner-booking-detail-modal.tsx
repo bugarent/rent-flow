@@ -6,6 +6,7 @@ import { socialLabel } from "@/components/bookings/booking-info-modal/helpers";
 import { parsePartnerMessengers } from "@/lib/partner";
 import { usePartnerMoney } from "@/components/providers/partner-money-context";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 import { clampPickupSelection, earliestPickupIsoDate, isPickupSlotAllowed } from "@/lib/bookings/lead-time";
 import { DateInput } from "@/components/ui/date-input";
 
@@ -577,7 +578,11 @@ export function PartnerBookingDetailModal({
                   <h3 className="mb-2 text-sm font-bold text-slate-900">{t.messages}</h3>
                   <div className="mb-2 max-h-48 space-y-2 overflow-y-auto rounded-lg bg-slate-50 p-2">
                     {msgLoading && !messages.length ? (
-                      <p className="text-xs text-slate-400">…</p>
+                      <div role="status" aria-busy="true" className="space-y-2">
+                        <Skeleton className="h-7 w-3/4 rounded-lg" />
+                        <Skeleton className="ml-auto h-7 w-2/3 rounded-lg" />
+                        <Skeleton className="h-7 w-1/2 rounded-lg" />
+                      </div>
                     ) : messages.length === 0 ? (
                       <p className="text-xs text-slate-400">—</p>
                     ) : (

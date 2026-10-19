@@ -1,15 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import dynamic from "next/dynamic";
 import { usePreferences } from "@/components/providers/preferences-context";
-import { RouteLoadingSpinner } from "@/components/layout/route-loading-spinner";
-
-const ContactOptionsModal = dynamic(
-  () =>
-    import("@/components/contact/contact-options-modal").then((m) => m.ContactOptionsModal),
-  { ssr: false, loading: () => <RouteLoadingSpinner /> },
-);
+import { ContactOptionsModal, loadContactOptionsModal } from "@/components/layout/lazy-modals";
+import { preloadProps, usePreloadWhenIdle } from "@/lib/client/preload";
 
 export function ContactCta({
   className = "hover:text-white",
@@ -25,12 +19,14 @@ export function ContactCta({
   const { dictionary } = usePreferences();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  usePreloadWhenIdle(loadContactOptionsModal);
 
   return (
     <>
       <button
         type="button"
         className={className}
+        {...preloadProps(loadContactOptionsModal)}
         onClick={() => {
           setMounted(true);
           setOpen(true);

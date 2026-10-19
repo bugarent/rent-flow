@@ -1,15 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import dynamic from "next/dynamic";
 import { useSurfaceDictionary } from "@/components/providers/use-surface-dictionary";
-import { RouteLoadingSpinner } from "@/components/layout/route-loading-spinner";
-
-const PartnerApplicationForm = dynamic(
-  () =>
-    import("@/components/partner/partner-application-form").then((m) => m.PartnerApplicationForm),
-  { ssr: false, loading: () => <RouteLoadingSpinner /> },
-);
+import { loadPartnerApplicationForm, PartnerApplicationForm } from "@/components/layout/lazy-modals";
+import { preloadProps } from "@/lib/client/preload";
 
 export function BecomePartnerCta({
   className = "inline-flex h-10 items-center rounded-md bg-[#22c55e] px-4 text-sm font-bold text-white hover:bg-[#16a34a]",
@@ -27,6 +21,7 @@ export function BecomePartnerCta({
       <button
         type="button"
         className={className}
+        {...preloadProps(loadPartnerApplicationForm)}
         onClick={() => {
           setMounted(true);
           setOpen(true);

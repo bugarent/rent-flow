@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -11,14 +10,9 @@ import { BrandLogo } from "@/components/brand/brand-logo";
 import { CurrencySelect, LanguageSelect, headerChipClass } from "@/components/layout/header-selects";
 import { getBusinessPartnershipCopy } from "@/lib/i18n/business-partnership-copy";
 import { BUSINESS_PARTNER_LOGIN } from "@/lib/routes";
-import { RouteLoadingSpinner } from "@/components/layout/route-loading-spinner";
 import { subscribeOpenManageBooking } from "@/components/layout/open-manage-booking";
-
-const ManageBookingModal = dynamic(
-  () =>
-    import("@/components/layout/manage-booking-modal").then((m) => m.ManageBookingModal),
-  { ssr: false, loading: () => <RouteLoadingSpinner /> },
-);
+import { loadManageBookingModal, ManageBookingModal } from "@/components/layout/lazy-modals";
+import { preloadProps, usePreloadWhenIdle } from "@/lib/client/preload";
 
 const navLinkClass = `${headerChipClass} whitespace-nowrap`;
 const mobileChipClass = "max-sm:h-9 max-sm:min-h-9 max-sm:gap-1 max-sm:px-2.5 max-sm:text-xs";
@@ -54,6 +48,7 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
   /** Hide Help / My booking on partnership & partner cabinet (customer tools only). */
   const hideCustomerNav = isPartnershipPage || isBusinessPortalPage;
   const bpCopy = isPartnershipPage ? getBusinessPartnershipCopy(locale) : null;
+  usePreloadWhenIdle(loadManageBookingModal);
 
   useEffect(() => {
     return subscribeOpenManageBooking(() => {
@@ -91,6 +86,7 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
     <button
       type="button"
       className={navLinkClass}
+      {...preloadProps(loadManageBookingModal)}
       onClick={() => {
         setOpen(false);
         setLookupRef("");

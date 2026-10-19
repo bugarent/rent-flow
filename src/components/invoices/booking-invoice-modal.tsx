@@ -4,6 +4,7 @@ import { Component, useCallback, useEffect, useState, type ReactNode } from "rea
 import { createPortal } from "react-dom";
 import { BookingInvoiceDocumentView } from "@/components/invoices/booking-invoice-document";
 import { ModalCloseButton } from "@/components/ui/modal-close-button";
+import { Skeleton, SkeletonLines } from "@/components/ui/skeleton";
 import type { BookingInvoiceDocument } from "@/lib/invoices/types";
 
 function labels(locale: string) {
@@ -248,7 +249,32 @@ export function BookingInvoiceModal({
             </p>
           ) : null}
           {loading ? (
-            <p className="text-sm text-slate-500">{t.loading}</p>
+            <div
+              role="status"
+              aria-live="polite"
+              aria-busy="true"
+              className="space-y-5 rounded-xl bg-white p-5 shadow-sm sm:p-8"
+            >
+              <div className="flex flex-col justify-between gap-4 sm:flex-row">
+                <div className="space-y-2">
+                  <Skeleton className="h-6 w-40" />
+                  <Skeleton className="h-3.5 w-56" />
+                </div>
+                <div className="space-y-2 sm:items-end">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3.5 w-24" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <SkeletonLines rows={3} />
+                <SkeletonLines rows={3} />
+              </div>
+              <Skeleton className="h-32 w-full rounded-lg" />
+              <div className="flex justify-end">
+                <Skeleton className="h-8 w-40" />
+              </div>
+              <span className="sr-only">{t.loading}</span>
+            </div>
           ) : doc ? (
             <InvoiceErrorBoundary
               resetKey={doc.invoiceNumber + doc.issuedAt}

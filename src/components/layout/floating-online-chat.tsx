@@ -1,16 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
 import { MessageCircle, X } from "lucide-react";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { subscribeLiveChatWidget } from "@/components/live-chat/live-chat-widget-bus";
-import { RouteLoadingSpinner } from "@/components/layout/route-loading-spinner";
-
-const LiveChatPanel = dynamic(
-  () => import("@/components/live-chat/live-chat-panel").then((m) => m.LiveChatPanel),
-  { ssr: false, loading: () => <RouteLoadingSpinner /> },
-);
+import { LiveChatPanel, loadLiveChatPanel } from "@/components/layout/lazy-modals";
+import { preloadProps, usePreloadWhenIdle } from "@/lib/client/preload";
 
 export function FloatingOnlineChat({
   email: _email,
@@ -23,6 +18,7 @@ export function FloatingOnlineChat({
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const label = dictionary.common.onlineChat;
+  usePreloadWhenIdle(loadLiveChatPanel);
 
   useEffect(() => {
     return subscribeLiveChatWidget(() => {
@@ -51,6 +47,7 @@ export function FloatingOnlineChat({
         type="button"
         aria-label={label}
         aria-expanded={open}
+        {...preloadProps(loadLiveChatPanel)}
         onClick={toggle}
         className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#1d6fe8] text-white shadow-xl transition hover:bg-[#1558c0] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-3"
       >

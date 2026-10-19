@@ -9,16 +9,12 @@ import type { BookingInfoData } from "@/components/bookings/booking-info-modal";
 import { MANAGE_BOOKING_BACKDROP_URL } from "@/lib/brand";
 import { BOOKING_REF_PREFIX, parseBookingRef } from "@/lib/ids";
 import { cn } from "@/lib/utils";
-import { RouteLoadingSpinner } from "@/components/layout/route-loading-spinner";
+import { BookingInfoModal, loadBookingInfoModal } from "@/components/layout/lazy-modals";
+import { usePreloadWhenIdle } from "@/lib/client/preload";
 
 const BookingsTable = dynamic(
   () => import("@/components/bookings/bookings-table").then((m) => m.BookingsTable),
   { ssr: false },
-);
-const BookingInfoModal = dynamic(
-  () =>
-    import("@/components/bookings/booking-info-modal").then((m) => m.BookingInfoModal),
-  { ssr: false, loading: () => <RouteLoadingSpinner /> },
 );
 const ChatMessageThread = dynamic(
   () => import("@/components/chat/chat-message-thread").then((m) => m.ChatMessageThread),
@@ -96,6 +92,7 @@ export function ManageBookingModal({
 }: Props) {
   const { dictionary, locale } = usePreferences();
   const t = dictionary.manageBooking;
+  usePreloadWhenIdle(loadBookingInfoModal);
   const [bookingDigits, setBookingDigits] = useState(() =>
     bookingDigitsFromInput(initialBookingNumber),
   );

@@ -12,7 +12,7 @@ import { PartnerLanguageSelect } from "@/components/partner/partner-language-sel
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { partnerLoginCopy } from "@/lib/i18n/partner-login-copy";
-import { PARTNER_BASE, safePortalCallback } from "@/lib/routes";
+import { PARTNER_BASE } from "@/lib/routes";
 import { SITE_NAME } from "@/lib/brand";
 
 const PartnerApplicationForm = dynamic(
@@ -55,7 +55,8 @@ export function PartnerCompanyAuthScreen(_props?: { initialMode?: Mode }) {
     window.history.replaceState({}, "", url.pathname + url.search);
   };
 
-  const callbackUrl = safePortalCallback(searchParams.get("callbackUrl"), "partner");
+  // The cabinet always opens on the fleet calendar, even when login was reached from a deeper page.
+  const callbackUrl = PARTNER_BASE;
   const registeredNotice = searchParams.get("registered") === "1";
 
   const onLogin = async (e: React.FormEvent) => {
@@ -105,7 +106,7 @@ export function PartnerCompanyAuthScreen(_props?: { initialMode?: Mode }) {
     } catch {
       /* admin-visible credentials are best-effort */
     }
-    router.push(callbackUrl.startsWith(PARTNER_BASE) ? callbackUrl : PARTNER_BASE);
+    router.push(PARTNER_BASE);
     router.refresh();
     setLoading(false);
   };

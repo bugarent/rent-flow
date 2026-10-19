@@ -46,6 +46,7 @@ import { GuestSection } from "./sections/guest-section";
 import { PeriodSection } from "./sections/period-section";
 import { FooterActions } from "./sections/footer-actions";
 import { PartnerPriceBar } from "./sections/partner-price-bar";
+import { BookingInfoSkeleton } from "./sections/booking-info-skeleton";
 import type {
   BookingInfoData,
   BookingInfoExtra,
@@ -67,8 +68,11 @@ export function BookingInfoModal({
   onConfirmPending,
   onDelete,
   onOpenInvoice,
+  loading = false,
 }: {
   open: boolean;
+  /** Full booking still loading: header shows the list row, body shows a skeleton, no actions. */
+  loading?: boolean;
   booking: BookingInfoData;
   locale: string;
   role: BookingInfoRole;
@@ -918,7 +922,7 @@ export function BookingInfoModal({
             ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            {canCancelGuest ? (
+            {canCancelGuest && !loading ? (
               <button
                 type="button"
                 disabled={busy}
@@ -947,6 +951,10 @@ export function BookingInfoModal({
           </div>
         </div>
 
+        {loading ? (
+          <BookingInfoSkeleton calendarView={calendarView} />
+        ) : (
+        <>
         <div
           className={cn(
             calendarView
@@ -1103,6 +1111,8 @@ export function BookingInfoModal({
           onOpenInvoice={onOpenInvoice}
           onDelete={onDelete}
         />
+        </>
+        )}
       </div>
       <GuestCancelDialog
         t={t}

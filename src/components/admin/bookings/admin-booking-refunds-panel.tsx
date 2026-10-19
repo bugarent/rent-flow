@@ -11,6 +11,7 @@ import {
   type BookingInfoData,
 } from "@/components/bookings/booking-info-modal";
 import type { RefundChangeDetail } from "@/lib/bookings/refund-change-details";
+import { useBookingDetailView } from "@/components/bookings/use-booking-detail-view";
 
 type RefundRow = {
   id: string;
@@ -107,8 +108,8 @@ export function AdminBookingRefundsPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [detailsBusyId, setDetailsBusyId] = useState<string | null>(null);
-  const [viewingBooking, setViewingBooking] = useState<BookingInfoData | null>(null);
+  const detail = useBookingDetailView();
+  const viewingBooking = detail.viewing;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -175,23 +176,27 @@ export function AdminBookingRefundsPanel() {
     }
   };
 
-  const openDetails = async (bookingId: string) => {
-    setDetailsBusyId(bookingId);
+  const openDetails = (r: RefundRow) => {
     setError("");
-    try {
-      const res = await fetch(`/api/admin/bookings/${encodeURIComponent(bookingId)}`, {
-        cache: "no-store",
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.booking) {
-        throw new Error(typeof data.error === "string" ? data.error : t.detailsFailed);
-      }
-      setViewingBooking(data.booking as BookingInfoData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.detailsFailed);
-    } finally {
-      setDetailsBusyId(null);
-    }
+    detail.open(
+      {
+        id: r.bookingId,
+        sequentialNumber: r.sequentialNumber,
+        reference: formatBookingRef(r.sequentialNumber),
+        status: "",
+        pickupAt: "",
+        dropoffAt: "",
+        totalPriceEur: 0,
+        guestFirstName: r.guestFirstName,
+        guestLastName: r.guestLastName,
+        guestEmail: r.guestEmail,
+        guestPhone: r.guestPhone,
+        extras: [],
+        car: { make: "", model: "" },
+      },
+      `/api/admin/bookings/${encodeURIComponent(r.bookingId)}`,
+      { onError: (message) => setError(message === "load failed" ? t.detailsFailed : message) },
+    );
   };
 
   return (
@@ -276,8 +281,7 @@ export function AdminBookingRefundsPanel() {
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   <button
                     type="button"
-                    disabled={detailsBusyId === r.bookingId}
-                    onClick={() => void openDetails(r.bookingId)}
+                    onClick={() => openDetails(r)}
                     className="min-h-10 rounded-lg bg-[#0b1f4b] px-3 py-2 text-sm font-bold text-white hover:bg-[#14306a] disabled:opacity-50"
                   >
                     {t.detailsBtn}
@@ -310,6 +314,7 @@ export function AdminBookingRefundsPanel() {
       {viewingBooking ? (
         <BookingInfoModal
           open
+          loading={detail.loading}
           booking={viewingBooking}
           locale={locale}
           role="admin"
@@ -320,10 +325,10 @@ export function AdminBookingRefundsPanel() {
               }
             ).catalogExtras || []
           }
-          onClose={() => setViewingBooking(null)}
+          onClose={detail.close}
           onSaved={(next) => {
-            if (next) setViewingBooking(next);
-            else setViewingBooking(null);
+            if (next) detail.setViewing(next);
+            else detail.close();
             void load();
           }}
         />

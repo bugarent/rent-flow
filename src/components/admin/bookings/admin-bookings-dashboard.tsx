@@ -7,6 +7,7 @@ import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { BookingsTable, type BookingsTableRow } from "@/components/bookings/bookings-table";
 import { BookingInfoModal, type BookingInfoData } from "@/components/bookings/booking-info-modal";
 import { BookingInvoiceModal } from "@/components/invoices/booking-invoice-modal";
+import { useBookingDetailView } from "@/components/bookings/use-booking-detail-view";
 import { formatBookingRef } from "@/lib/ids";
 import { cn, convertFromEur } from "@/lib/utils";
 import { earliestPickupLocalInput } from "@/lib/bookings/lead-time";
@@ -80,7 +81,8 @@ export function AdminBookingsDashboard({ bookings: initialBookings }: { bookings
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<AdminBookingDashRow | null>(null);
   const [draft, setDraft] = useState<EditDraft | null>(null);
-  const [viewing, setViewing] = useState<BookingInfoData | null>(null);
+  const detail = useBookingDetailView();
+  const { viewing, setViewing } = detail;
   const [invoiceBookingId, setInvoiceBookingId] = useState<string | null>(null);
   const [partnerCancelledIds, setPartnerCancelledIds] = useState<string[]>([]);
   const markedReadRef = useRef(false);
@@ -296,6 +298,36 @@ export function AdminBookingsDashboard({ bookings: initialBookings }: { bookings
   const inputClass =
     "h-9 w-full rounded-md border border-slate-200 bg-white px-2.5 text-sm text-slate-800 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100";
 
+  const openDetails = (b: AdminBookingDashRow) => {
+    acknowledgeBooking(b.id);
+    detail.open(
+      {
+        id: b.id,
+        sequentialNumber: b.sequentialNumber,
+        reference: formatBookingRef(b.sequentialNumber),
+        status: b.status,
+        pickupAt: b.pickupAt,
+        dropoffAt: b.dropoffAt,
+        totalPriceEur: b.totalPriceEur,
+        depositPaidEur: b.depositPaidEur,
+        balanceDueEur: Math.max(0, b.totalPriceEur - b.depositPaidEur),
+        guestFirstName: b.guestFirstName,
+        guestLastName: b.guestLastName,
+        guestEmail: b.guestEmail,
+        extras: [],
+        car: {
+          make: b.carLabel.split(" ")[0] || b.carLabel,
+          model: b.carLabel.split(" ").slice(1).join(" ") || "",
+          imageUrl: b.carImageUrl,
+        },
+        partner: { companyName: b.partnerLabel },
+        pickupAirport: { iata: "—", city: "—", name: "—" },
+        dropoffAirport: { iata: "—", city: "—", name: "—" },
+      },
+      `/api/admin/bookings/${encodeURIComponent(b.id)}`,
+    );
+  };
+
   return (
     <div className="space-y-3">
       {error ? (
@@ -315,40 +347,7 @@ export function AdminBookingsDashboard({ bookings: initialBookings }: { bookings
         attentionFilter="empty"
         onView={(row) => {
           const b = byId.get(row.id);
-          if (!b) return;
-          acknowledgeBooking(b.id);
-          setViewing({
-            id: b.id,
-            sequentialNumber: b.sequentialNumber,
-            reference: formatBookingRef(b.sequentialNumber),
-            status: b.status,
-            pickupAt: b.pickupAt,
-            dropoffAt: b.dropoffAt,
-            totalPriceEur: b.totalPriceEur,
-            depositPaidEur: b.depositPaidEur,
-            balanceDueEur: Math.max(0, b.totalPriceEur - b.depositPaidEur),
-            guestFirstName: b.guestFirstName,
-            guestLastName: b.guestLastName,
-            guestEmail: b.guestEmail,
-            extras: [],
-            car: {
-              make: b.carLabel.split(" ")[0] || b.carLabel,
-              model: b.carLabel.split(" ").slice(1).join(" ") || "",
-              imageUrl: b.carImageUrl,
-            },
-            partner: { companyName: b.partnerLabel },
-            pickupAirport: { iata: "—", city: "—", name: "—" },
-            dropoffAirport: { iata: "—", city: "—", name: "—" },
-          });
-          void (async () => {
-            try {
-              const res = await fetch(`/api/admin/bookings/${encodeURIComponent(b.id)}`);
-              const data = await res.json().catch(() => ({}));
-              if (res.ok && data.booking) setViewing(data.booking as BookingInfoData);
-            } catch {
-              /* keep basic view */
-            }
-          })();
+          if (b) openDetails(b);
         }}
         renderRowActions={(row) => {
           const b = byId.get(row.id);
@@ -361,41 +360,7 @@ export function AdminBookingsDashboard({ bookings: initialBookings }: { bookings
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => {
-                  acknowledgeBooking(b.id);
-                  setViewing({
-                    id: b.id,
-                    sequentialNumber: b.sequentialNumber,
-                    reference: formatBookingRef(b.sequentialNumber),
-                    status: b.status,
-                    pickupAt: b.pickupAt,
-                    dropoffAt: b.dropoffAt,
-                    totalPriceEur: b.totalPriceEur,
-                    depositPaidEur: b.depositPaidEur,
-                    balanceDueEur: Math.max(0, b.totalPriceEur - b.depositPaidEur),
-                    guestFirstName: b.guestFirstName,
-                    guestLastName: b.guestLastName,
-                    guestEmail: b.guestEmail,
-                    extras: [],
-                    car: {
-                      make: b.carLabel.split(" ")[0] || b.carLabel,
-                      model: b.carLabel.split(" ").slice(1).join(" ") || "",
-                      imageUrl: b.carImageUrl,
-                    },
-                    partner: { companyName: b.partnerLabel },
-                    pickupAirport: { iata: "—", city: "—", name: "—" },
-                    dropoffAirport: { iata: "—", city: "—", name: "—" },
-                  });
-                  void (async () => {
-                    try {
-                      const res = await fetch(`/api/admin/bookings/${encodeURIComponent(b.id)}`);
-                      const data = await res.json().catch(() => ({}));
-                      if (res.ok && data.booking) setViewing(data.booking as BookingInfoData);
-                    } catch {
-                      /* keep stub */
-                    }
-                  })();
-                }}
+                onClick={() => openDetails(b)}
                 className="inline-flex h-8 items-center rounded-lg bg-[#0b1f4b] px-2 text-[11px] font-bold text-white hover:bg-[#14306a] disabled:opacity-50"
               >
                 {detailsLabel}
@@ -407,7 +372,7 @@ export function AdminBookingsDashboard({ bookings: initialBookings }: { bookings
                   e.preventDefault();
                   e.stopPropagation();
                   // Open invoice; clear details modal so overlays don't fight.
-                  setViewing(null);
+                  detail.close();
                   setInvoiceBookingId(b.id);
                 }}
                 className="inline-flex h-8 items-center rounded-lg border border-slate-300 bg-white px-2 text-[11px] font-bold text-[#0b1f4b] hover:bg-slate-50 disabled:opacity-50"
@@ -442,6 +407,7 @@ export function AdminBookingsDashboard({ bookings: initialBookings }: { bookings
       {viewing ? (
         <BookingInfoModal
           open
+          loading={detail.loading}
           booking={viewing}
           locale={locale}
           role="admin"
@@ -449,15 +415,15 @@ export function AdminBookingsDashboard({ bookings: initialBookings }: { bookings
             (viewing as BookingInfoData & { catalogExtras?: Array<{ id: string; label: string; priceEurPerDay: number }> })
               .catalogExtras || []
           }
-          onClose={() => setViewing(null)}
+          onClose={detail.close}
           onOpenInvoice={() => {
             const id = viewing.id;
-            setViewing(null);
+            detail.close();
             setInvoiceBookingId(id);
           }}
           onSaved={(next) => {
             if (next) setViewing(next);
-            else setViewing(null);
+            else detail.close();
           }}
           onDelete={async () => {
             const res = await fetch(`/api/admin/bookings/${encodeURIComponent(viewing.id)}`, {

@@ -7,6 +7,7 @@ import { usePartnerMoney } from "@/components/providers/partner-money-context";
 import { BookingsTable, type BookingsTableRow } from "@/components/bookings/bookings-table";
 import { BookingInfoModal, type BookingInfoData } from "@/components/bookings/booking-info-modal";
 import { BookingInvoiceModal } from "@/components/invoices/booking-invoice-modal";
+import { useBookingDetailView } from "@/components/bookings/use-booking-detail-view";
 import { formatBookingRef } from "@/lib/ids";
 
 export type PartnerBookingDashRow = {
@@ -50,7 +51,8 @@ export function PartnerBookingsDashboard({
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [viewing, setViewing] = useState<BookingInfoData | null>(null);
+  const detail = useBookingDetailView();
+  const viewing = detail.viewing;
   const [invoiceId, setInvoiceId] = useState<string | null>(null);
   const [catalogExtras, setCatalogExtras] = useState<
     Array<{ id: string; label: string; priceEurPerDay: number }>
@@ -89,7 +91,7 @@ export function PartnerBookingsDashboard({
 
   const openView = (b: PartnerBookingDashRow) => {
     setError(null);
-    setViewing({
+    const stub: BookingInfoData = {
       id: b.id,
       sequentialNumber: b.sequentialNumber,
       reference: formatBookingRef(b.sequentialNumber),
@@ -108,22 +110,15 @@ export function PartnerBookingsDashboard({
         model: b.carLabel.split(" ").slice(1).join(" ") || "",
         imageUrl: b.carImageUrl,
       },
+    };
+    detail.open(stub, `/api/partners/bookings/${encodeURIComponent(b.id)}`, {
+      onLoaded: (booking) => {
+        const full = booking as BookingInfoData & {
+          catalogExtras?: Array<{ id: string; label: string; priceEurPerDay: number }>;
+        };
+        setCatalogExtras(full.catalogExtras || []);
+      },
     });
-    void (async () => {
-      try {
-        const res = await fetch(`/api/partners/bookings/${encodeURIComponent(b.id)}`);
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data.booking) {
-          const detail = data.booking as BookingInfoData & {
-            catalogExtras?: Array<{ id: string; label: string; priceEurPerDay: number }>;
-          };
-          setCatalogExtras(detail.catalogExtras || []);
-          setViewing(detail);
-        }
-      } catch {
-        /* keep basic view */
-      }
-    })();
   };
 
   const deleteBooking = async (b: PartnerBookingDashRow) => {
@@ -138,7 +133,7 @@ export function PartnerBookingsDashboard({
         setError(typeof data.error === "string" ? data.error : t.deleteFailed);
         return;
       }
-      if (viewing?.id === b.id) setViewing(null);
+      if (viewing?.id === b.id) detail.close();
       setItems((prev) =>
         prev.map((row) => (row.id === b.id ? { ...row, status: "UNFULFILLED" } : row)),
       );
@@ -205,11 +200,12 @@ export function PartnerBookingsDashboard({
       {viewing ? (
         <BookingInfoModal
           open
+          loading={detail.loading}
           booking={viewing}
           locale={locale}
           role="partner"
           catalogExtras={catalogExtras}
-          onClose={() => setViewing(null)}
+          onClose={detail.close}
         />
       ) : null}
 
