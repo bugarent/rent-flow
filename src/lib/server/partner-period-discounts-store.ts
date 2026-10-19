@@ -66,6 +66,18 @@ async function readStore(): Promise<StoreFile> {
 async function writeStore(data: StoreFile) {
   await mkdir(dataRoot(), { recursive: true });
   await writeFile(STORE, JSON.stringify(data, null, 2), "utf8");
+  searchRead = { at: Date.now(), store: data };
+}
+
+/** Search pricing reads the store on every query; a 30s copy is enough there (writes refresh it). */
+const SEARCH_READ_TTL_MS = 30_000;
+let searchRead: { at: number; store: StoreFile } | null = null;
+
+async function readStoreForSearch(): Promise<StoreFile> {
+  if (searchRead && Date.now() - searchRead.at < SEARCH_READ_TTL_MS) return searchRead.store;
+  const store = await readStore();
+  searchRead = { at: Date.now(), store };
+  return store;
 }
 
 function normalizeItem(raw: Partial<PartnerPeriodDiscount> & { partnerId: string }): PartnerPeriodDiscount | null {
@@ -169,6 +181,7 @@ export async function periodDiscountPercentByCarId(
   rangeFrom: string,
   rangeTo: string,
   carIds?: string[],
+  opts?: { fresh?: boolean },
 ): Promise<Map<string, number>> {
   // Accept ISO datetimes from search (`2026-09-15T10:00`) as well as plain days.
   const from = toDay(rangeFrom) || toDay(new Date(rangeFrom).toISOString());
@@ -180,7 +193,7 @@ export async function periodDiscountPercentByCarId(
   if (!from || !to) return map;
 
   const idFilter = carIds?.length ? new Set(carIds) : null;
-  const { items } = await readStore();
+  const { items } = opts?.fresh ? await readStore() : await readStoreForSearch();
   for (const item of items) {
     if (item.kind !== "discount") continue;
     if (!periodDaysOverlap(item.from, item.to, from, to)) continue;
@@ -207,9 +220,12 @@ export async function resolveListingDiscountPercent(input: {
   dropoffDate: string;
 }): Promise<number> {
   try {
-    const periodMap = await periodDiscountPercentByCarId(input.pickupDate, input.dropoffDate, [
-      input.carId,
-    ]);
+    const periodMap = await periodDiscountPercentByCarId(
+      input.pickupDate,
+      input.dropoffDate,
+      [input.carId],
+      { fresh: true },
+    );
     return mergeListingDiscountPercent(input.basePercent, periodMap.get(input.carId) ?? 0);
   } catch {
     return mergeListingDiscountPercent(input.basePercent, 0);

@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
 import { requirePartnerApi } from "@/lib/auth/sessions";
 import { prisma } from "@/lib/prisma";
 import { MIN_PUBLIC_PHOTOS } from "@/lib/brand";
 import {
   normalizePartnerCategorySlug,
-  prismaWhereForMappedModels,
   resolveCategorySlugForCar,
 } from "@/lib/server/category-mapping";
 import {
@@ -17,8 +15,6 @@ import { resolvePartnerDeliveryPrices } from "@/lib/delivery/pricing";
 import { listPartnerScopedDeliveryLocations, persistableCarDeliveryRows } from "@/lib/server/delivery-locations";
 import { withPartnerDeliveryPrices } from "@/lib/server/partner-delivery-listing-sync";
 import { ensureExtrasExistInDb, extrasRowsForCarFk, listExtraServices } from "@/lib/server/extras-store";
-import { loadSearchCabinet } from "@/lib/server/search-cabinet-scope";
-import { partnerIdsForTrip, scopeSearchCars } from "@/lib/server/search-results-scope";
 import {
   isValidRegistrationNumber,
   normalizeRegistrationNumber,
@@ -40,8 +36,7 @@ import {
   type FileCarExtra,
   type FileCarStatus,
 } from "@/lib/server/partner-cars-store";
-import { loadPublicFileSearchCars } from "@/lib/server/public-file-cars";
-import { publicListingStatusWhere, publicPartnerWhere } from "@/lib/cars/listing-visibility";
+import { createServerTimer, searchPublicCars } from "@/lib/server/public-cars-search";
 
 async function resolvePartnerForListing(session: {
   user: { id: string; email?: string | null };
@@ -128,157 +123,45 @@ async function resolvePartnerForListing(session: {
 }
 
 export async function GET(req: Request) {
-  try {
-    const { applyExpiredInsuranceRemoderation } = await import(
-      "@/lib/server/car-insurance-expiry"
-    );
-    await applyExpiredInsuranceRemoderation();
-  } catch (error) {
-    console.warn("[cars GET] insurance expiry", error);
-  }
-
   const { searchParams } = new URL(req.url);
-  const category = searchParams.get("category")?.trim();
-  const pickup = searchParams.get("pickup")?.trim();
-  const dropoff = searchParams.get("dropoff")?.trim() || undefined;
-  const startDate = searchParams.get("startDate")?.trim();
-  const endDate = searchParams.get("endDate")?.trim();
-
-  const where: Prisma.CarWhereInput = {
-    ...publicListingStatusWhere,
-    partner: publicPartnerWhere,
-  };
-
-  const cabinet = await loadSearchCabinet();
-  if (pickup) {
-    const ids = partnerIdsForTrip(cabinet, pickup, dropoff);
-    where.partnerId = { in: ids.length ? ids : ["__none__"] };
-  }
-
-  if (category) {
-    const { listHomepageCategories } = await import("@/lib/server/homepage-categories-store");
-    const homepageCategory = (await listHomepageCategories()).find((c) => c.slug === category);
-    if (homepageCategory) {
-      const modelFilter = prismaWhereForMappedModels(homepageCategory.mappedModels);
-      // Keep partner-assigned categorySlug results even when mappedModels is empty
-      // or incomplete after a Neon migration (matches /cars page behaviour).
-      where.OR = modelFilter
-        ? [modelFilter, { categorySlug: category }]
-        : [{ categorySlug: category }];
-    } else {
-      where.categorySlug = category;
-    }
-  }
-
-  let cars: unknown[] = [];
-  try {
-    cars = await prisma.car.findMany({
-      where,
-      include: {
-        photos: { orderBy: { sortOrder: "asc" } },
-        deliveryPrices: {
-          include: {
-            deliveryLocation: {
-              include: { airport: { include: { city: { include: { country: true } } } } },
-            },
-          },
-        },
-        partner: {
-          select: {
-            companyName: true,
-            reviews: { where: { status: "APPROVED" }, select: { averageRating: true } },
-          },
-        },
-      },
+  if (searchParams.get("__debug") === "1") {
+    const { loadSearchCatalog } = await import("@/lib/server/search-catalog");
+    const { scopeSearchCars } = await import("@/lib/server/search-results-scope");
+    const c = await loadSearchCatalog();
+    const scoped = await scopeSearchCars(c.cars, c.cabinet, {
+      pickup: searchParams.get("pickup") ?? undefined,
+      prefsByPartner: c.prefsByPartner,
     });
-  } catch (error) {
-    if (!isDbOfflineError(error)) throw error;
-    cars = [];
-  }
-
-  try {
-    const fileCars = await loadPublicFileSearchCars();
-    const seen = new Set(
-      cars.map((car) => (car && typeof car === "object" && "id" in car ? String((car as { id: string }).id) : "")),
-    );
-    for (const fileCar of fileCars) {
-      if (seen.has(fileCar.id)) continue;
-      cars.push(fileCar);
-    }
-  } catch {
-    /* file catalog optional */
-  }
-
-  cars = (
-    await scopeSearchCars(cars as Array<{ id?: string; partnerId?: string; deliveryPrices?: never[] }>, cabinet, {
-      pickup,
-      dropoff,
-    })
-  ).cars as unknown[];
-
-  if (startDate && pickup) {
-    const pickupAt = new Date(startDate);
-    if (!Number.isNaN(pickupAt.getTime())) {
-      const minutesUntilPickup = Math.max(0, Math.floor((pickupAt.getTime() - Date.now()) / 60000));
-      const { meetsBookingLeadTime } = await import("@/lib/delivery/booking-lead");
-      const { matchDeliveryRowsForPlace } = await import("@/lib/delivery/trip-fees");
-      cars = cars.filter((raw) => {
-        const car = raw as { deliveryPrices?: Parameters<typeof matchDeliveryRowsForPlace>[0] };
-        return matchDeliveryRowsForPlace(car.deliveryPrices, pickup).some((row) =>
-          meetsBookingLeadTime(Number(row.travelTimeMinutes) || 0, minutesUntilPickup),
-        );
-      });
-    }
-  }
-
-  if (startDate) {
-    const rangeStart = new Date(startDate);
-    const rangeEnd = endDate ? new Date(endDate) : new Date(rangeStart.getTime() + 24 * 60 * 60 * 1000);
-    if (!Number.isNaN(rangeStart.getTime()) && !Number.isNaN(rangeEnd.getTime())) {
-      try {
-        const { carIdsUnavailableInRange } = await import("@/lib/server/car-availability");
-        const unavailable = await carIdsUnavailableInRange(rangeStart, rangeEnd);
-        if (unavailable.size) {
-          cars = cars.filter((raw) => {
-            const id =
-              raw && typeof raw === "object" && "id" in raw ? String((raw as { id: string }).id) : "";
-            return id && !unavailable.has(id);
-          });
-        }
-      } catch {
-        /* availability optional */
-      }
-    }
-  }
-
-  try {
-    const {
-      mergeListingDiscountPercent,
-      periodDiscountPercentByCarId,
-    } = await import("@/lib/server/partner-period-discounts-store");
-    const ids = cars
-      .map((raw) =>
-        raw && typeof raw === "object" && "id" in raw ? String((raw as { id: string }).id) : "",
-      )
-      .filter(Boolean);
-    const discountFrom = startDate || new Date().toISOString();
-    const discountTo = endDate || startDate || discountFrom;
-    const periodMap = await periodDiscountPercentByCarId(discountFrom, discountTo, ids);
-    cars = cars.map((raw) => {
-      if (!raw || typeof raw !== "object" || !("id" in raw)) return raw;
-      const id = String((raw as { id: string }).id);
-      const base =
-        "discountPercent" in raw ? Number((raw as { discountPercent?: unknown }).discountPercent) || 0 : 0;
-      return {
-        ...(raw as object),
-        discountPercent: mergeListingDiscountPercent(base, periodMap.get(id) ?? 0),
-      };
+    const reasons: Record<string, number> = {};
+    for (const r of scoped.rejected) reasons[r.reason] = (reasons[r.reason] ?? 0) + 1;
+    return NextResponse.json({
+      ageMs: Date.now() - c.builtAt,
+      cars: c.cars.length,
+      cabinetPartners: c.cabinet.byPartner.size,
+      prefsPartners: [...c.prefsByPartner.values()].filter((v) => v.length).length,
+      kept: scoped.cars.length,
+      reasons,
     });
-  } catch {
-    /* period discounts optional */
   }
-
-  return NextResponse.json(cars);
+  const timer = createServerTimer();
+  const cars = await searchPublicCars(
+    {
+      category: searchParams.get("category") ?? undefined,
+      pickup: searchParams.get("pickup") ?? undefined,
+      dropoff: searchParams.get("dropoff") ?? undefined,
+      startDate: searchParams.get("startDate") ?? undefined,
+      endDate: searchParams.get("endDate") ?? undefined,
+    },
+    timer,
+  );
+  return NextResponse.json(cars, {
+    headers: {
+      "Server-Timing": timer.header(),
+      "Cache-Control": "public, max-age=0, must-revalidate",
+      // Same query within 30s is answered by the Netlify edge; bookings re-check availability.
+      "Netlify-CDN-Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+    },
+  });
 }
 
 async function resolveCarExtras(rawExtras: unknown) {

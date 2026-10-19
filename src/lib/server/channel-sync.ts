@@ -127,7 +127,7 @@ export async function carIdsBlockedByChannels(rangeStart: Date, rangeEnd: Date) 
 type ApiBlock = { carId: string; start: string; end: string };
 let apiBlockCache: { at: number; rows: ApiBlock[] } | null = null;
 
-async function apiAvailabilityBlocks(): Promise<ApiBlock[]> {
+export async function apiAvailabilityBlocks(): Promise<ApiBlock[]> {
   if (apiBlockCache && Date.now() - apiBlockCache.at < 20_000) return apiBlockCache.rows;
   const rows: ApiBlock[] = [];
   try {

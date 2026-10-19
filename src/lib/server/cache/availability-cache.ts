@@ -38,5 +38,7 @@ export async function clearAvailabilityCache() {
   const keys = [...tracked];
   memory.clear();
   tracked.clear();
+  const { clearOccupancySnapshot } = await import("@/lib/server/occupancy-snapshot");
+  clearOccupancySnapshot();
   await Promise.all(keys.map((key) => redisDel(key)));
 }

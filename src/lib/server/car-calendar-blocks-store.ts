@@ -56,6 +56,14 @@ async function readStore(): Promise<StoreFile> {
 async function writeStore(data: StoreFile) {
   await mkdir(dataRoot(), { recursive: true });
   await writeFile(STORE, JSON.stringify(data, null, 2), "utf8");
+  const { clearOccupancySnapshot } = await import("@/lib/server/occupancy-snapshot");
+  clearOccupancySnapshot();
+}
+
+/** Every calendar block (search occupancy snapshot reads them once and filters in memory). */
+export async function listAllCalendarBlocks(): Promise<CarCalendarBlock[]> {
+  const { blocks } = await readStore();
+  return blocks;
 }
 
 export async function listCalendarBlocksForCars(

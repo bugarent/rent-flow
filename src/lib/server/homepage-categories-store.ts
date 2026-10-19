@@ -70,7 +70,28 @@ async function readFileStore(): Promise<StoredHomepageCategory[]> {
 async function writeFileStore(rows: StoredHomepageCategory[]) {
   await mkdir(DATA_DIR, { recursive: true });
   await writeFile(DATA_FILE, JSON.stringify(rows, null, 2), "utf8");
+  lastMirrored = JSON.stringify(rows);
   revalidatePublishedContent();
+}
+
+/** Last list written to the file mirror by this instance. */
+let lastMirrored: string | null = null;
+
+/**
+ * Keep the file mirror aligned with the table after a read. Only writes when the
+ * list changed, and never revalidates: a read must not wipe every public cache
+ * (that rebuilt search and the homepage on each visit) or write Neon on each request.
+ */
+async function mirrorFileStore(rows: StoredHomepageCategory[]) {
+  const next = JSON.stringify(rows);
+  if (next === lastMirrored) return;
+  if (lastMirrored === null && JSON.stringify(await readFileStore()) === next) {
+    lastMirrored = next;
+    return;
+  }
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(DATA_FILE, JSON.stringify(rows, null, 2), "utf8");
+  lastMirrored = next;
 }
 
 /** Keep the saved row in the published file. Do not re-read the table — a late read puts the old cars back. */
@@ -177,7 +198,7 @@ export async function listHomepageCategories(): Promise<StoredHomepageCategory[]
       if (rows.length) {
         const stored = rows.map(toStored);
         // Keep the published file mirror aligned without blocking the response.
-        void writeFileStore(stored).catch(() => undefined);
+        void mirrorFileStore(stored).catch(() => undefined);
         return stored;
       }
     } catch (error) {

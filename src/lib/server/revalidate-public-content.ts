@@ -2,9 +2,11 @@ import "server-only";
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { PUBLIC_CONTENT_TAG } from "@/lib/server/public-data-cache";
+import { clearSearchCatalog } from "@/lib/server/search-catalog";
 
 /** Drop cached public data so the next request reads fresh content. */
 export function revalidatePublicData() {
+  clearSearchCatalog();
   try {
     revalidateTag(PUBLIC_CONTENT_TAG, { expire: 0 });
   } catch (error) {

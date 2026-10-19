@@ -66,6 +66,8 @@ async function writeStore(data: StoreFile) {
   await mkdir(dataRoot(), { recursive: true });
   await writeFile(STORE, JSON.stringify(data, null, 2), "utf8");
   lastGood = data;
+  const { clearSearchCatalog } = await import("@/lib/server/search-catalog");
+  clearSearchCatalog();
 }
 
 /**

@@ -79,6 +79,8 @@ async function writeStore(data: StoreFile) {
   lastGoodStore = data;
   await mkdir(dataRoot(), { recursive: true });
   await writeFile(STORE, JSON.stringify(data, null, 2), "utf8");
+  const { clearSearchCatalog } = await import("@/lib/server/search-catalog");
+  clearSearchCatalog();
 }
 
 /** Lower every partner's rental-maximum for one service to the admin period cap. */

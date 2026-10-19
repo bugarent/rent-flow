@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { readPreferences } from "@/lib/server/preferences";
 import { toNumber } from "@/lib/utils";
@@ -8,6 +7,7 @@ import { normalizeLocationCode } from "@/lib/catalog/search-places";
 import { loadSearchCabinet } from "@/lib/server/search-cabinet-scope";
 import { partnerIdsForTrip, scopeSearchCars } from "@/lib/server/search-results-scope";
 import { loadPublicFileSearchCars } from "@/lib/server/public-file-cars";
+import { cachedSearchRead } from "@/lib/server/search-catalog";
 import { filterExtrasByCarOffers, parseCarDetails } from "@/lib/cars/car-details";
 import { listingDailyWithDeliveryEur, rentalDayCount } from "@/lib/cars/reserve-pricing";
 import { clampSiteDiscountPercent } from "@/lib/pricing/booking-discount";
@@ -207,33 +207,32 @@ export default async function CarsPage({
   // Country-wide browse only applies until a concrete pickup is chosen.
   const countryIso2 = pickupCode ? "" : String(country || "").trim().toUpperCase().slice(0, 2);
 
-  // Independent reads start together instead of one after another.
-  const expiredIdsPromise = loadExpiredInsuranceIds();
-  const fileCarsPromise = loadPublicFileSearchCars().catch(() => []);
-  const cabinetPromise = loadSearchCabinet();
-  const extrasCatalogPromise = listExtraServices({ activeOnly: true }).catch(() => null);
+  // Independent reads start together instead of one after another; each is shared
+  // across searches for 30s (cleared on listing / delivery / category changes).
+  const nonEmpty = (value: { length: number }) => value.length > 0;
+  const expiredIdsPromise = cachedSearchRead("expired-insurance", loadExpiredInsuranceIds);
+  const fileCarsPromise = cachedSearchRead("file-cars", () => loadPublicFileSearchCars()).catch(() => []);
+  const cabinetPromise = cachedSearchRead("cabinet", loadSearchCabinet, { keep: (c) => c.byPartner.size > 0 });
+  const extrasCatalogPromise = cachedSearchRead("extras", () => listExtraServices({ activeOnly: true }), {
+    keep: nonEmpty,
+  }).catch(() => null);
   const searchOptionsPromise = getSearchDeliveryAirports().catch(() => []);
-  const siteDiscountPromise = loadSiteDiscountPercent();
-  const companyFilesPromise = loadCompanySettingsFiles();
+  const siteDiscountPromise = cachedSearchRead("site-discount", loadSiteDiscountPercent);
+  const companyFilesPromise = cachedSearchRead("company-files", loadCompanySettingsFiles, { keep: nonEmpty });
   const unavailablePromise = loadUnavailableCarIds(startDate, endDate);
-  const categoriesPromise = import("@/lib/server/homepage-categories-store").then((m) =>
-    m.listHomepageCategories(),
+  const categoriesPromise = cachedSearchRead(
+    "categories",
+    () => import("@/lib/server/homepage-categories-store").then((m) => m.listHomepageCategories()),
+    { keep: nonEmpty },
   );
 
-  const where: Prisma.CarWhereInput = {
-    ...publicListingStatusWhere,
-    partner: publicPartnerWhere,
-  };
-  const snapshotsPromise = import("@/lib/server/car-published-store")
-    .then((m) => m.readPublishedSnapshotsMap())
-    .catch(() => null);
+  const snapshotsPromise = cachedSearchRead("published-snapshots", () =>
+    import("@/lib/server/car-published-store").then((m) => m.readPublishedSnapshotsMap()),
+  ).catch(() => null);
 
   const pickupIata = pickup?.trim();
   const cabinet = await cabinetPromise;
-  if (pickupIata) {
-    const ids = partnerIdsForTrip(cabinet, pickupIata, dropoff);
-    where.partnerId = { in: ids.length ? ids : ["__none__"] };
-  }
+  const tripPartnerIds = pickupIata ? new Set(partnerIdsForTrip(cabinet, pickupIata, dropoff)) : null;
 
   let categoryName: string | null = null;
   const categoryLabels = new Map<string, string>();
@@ -302,28 +301,35 @@ export default async function CarsPage({
 
   let cars: DbCar[] = [];
   try {
-    cars = (await prisma.car.findMany({
-      where,
-      include: {
-        photos: { orderBy: { sortOrder: "asc" }, take: 5 },
-        extras: { select: { extraServiceId: true, priceEur: true } },
-        deliveryPrices: {
-          include: {
-            deliveryLocation: {
-              include: { airport: { include: { city: { include: { country: true } } } } },
+    // Every public listing once per 30s; the pickup's partner filter runs in memory.
+    const allCars = await cachedSearchRead("page-cars", async () => {
+      const { isDbCircuitOpen } = await import("@/lib/prisma");
+      if (isDbCircuitOpen()) throw new Error("database circuit open");
+      return (await prisma.car.findMany({
+        where: { ...publicListingStatusWhere, partner: publicPartnerWhere },
+        include: {
+          photos: { orderBy: { sortOrder: "asc" }, take: 5 },
+          extras: { select: { extraServiceId: true, priceEur: true } },
+          deliveryPrices: {
+            include: {
+              deliveryLocation: {
+                include: { airport: { include: { city: { include: { country: true } } } } },
+              },
+            },
+          },
+          partner: {
+            select: {
+              id: true,
+              companyName: true,
+              logoUrl: true,
+              companySettings: true,
             },
           },
         },
-        partner: {
-          select: {
-            id: true,
-            companyName: true,
-            logoUrl: true,
-            companySettings: true,
-          },
-        },
-      },
-    })) as unknown as DbCar[];
+      })) as unknown as DbCar[];
+    });
+    // Always a new array: later steps push file listings into it, and the cached list must stay intact.
+    cars = allCars.filter((car) => !tripPartnerIds || tripPartnerIds.has(String(car.partnerId || "")));
   } catch {
     cars = [];
   }
@@ -417,11 +423,14 @@ export default async function CarsPage({
   }
   const discountFrom = startDate || new Date().toISOString();
   const discountTo = endDate || startDate || discountFrom;
+  const prefIdsKey = [...extraPrefIds].sort().join(",");
   const [deliveryPrefsMap, extraPrefsMap, periodMap, unavailable, expiredIds] = await Promise.all([
-    readPartnerDeliveryPrefsMap([...extraPrefIds]).catch(
+    cachedSearchRead(`delivery-prefs:${prefIdsKey}`, () => readPartnerDeliveryPrefsMap([...extraPrefIds])).catch(
       () => new Map<string, import("@/lib/server/partner-delivery-prefs-store").PartnerDeliveryPref[]>(),
     ),
-    readPartnerExtraPrefsMap([...extraPrefIds]).catch(() => new Map<string, PartnerExtraPref[]>()),
+    cachedSearchRead(`extra-prefs:${prefIdsKey}`, () => readPartnerExtraPrefsMap([...extraPrefIds])).catch(
+      () => new Map<string, PartnerExtraPref[]>(),
+    ),
     // When search has no dates (category/airport links), still apply discounts active today.
     periodDiscountPercentByCarId(discountFrom, discountTo, cars.map((c) => c.id)).catch(
       () => new Map<string, number>(),

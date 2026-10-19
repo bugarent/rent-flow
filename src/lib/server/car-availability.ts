@@ -78,6 +78,13 @@ export async function carIdsUnavailableInRange(
   rangeStart: Date,
   rangeEnd: Date,
 ): Promise<Set<string>> {
+  try {
+    const { unavailableCarIdsFromSnapshot } = await import("@/lib/server/occupancy-snapshot");
+    const fromSnapshot = await unavailableCarIdsFromSnapshot(rangeStart, rangeEnd);
+    if (fromSnapshot) return fromSnapshot;
+  } catch (error) {
+    console.warn("[car-availability] snapshot unavailable, querying sources", error);
+  }
   const key = availabilityCacheKey(rangeStart, rangeEnd);
   const cached = await readAvailabilityCache(key);
   if (cached) return new Set(cached);
