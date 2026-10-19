@@ -24,12 +24,19 @@ import {
   Zap,
 } from "lucide-react";
 import { BirthDateSelect } from "@/components/cars/birth-date-select";
-import { GuestBookingNoticeModal } from "@/components/cars/guest-booking-notice-modal";
+import {
+  CheckoutPaypalSandbox,
+  GuestBookingNoticeModal,
+  LegalDocumentModal,
+  RentalTermsModal,
+  loadCheckoutPaypalSandbox,
+  loadGuestBookingNoticeModal,
+  loadLegalDocumentModal,
+  loadRentalTermsModal,
+} from "@/components/cars/lazy-checkout";
+import { usePreloadWhenIdle } from "@/lib/client/preload";
 import { ResidenceCountrySelect } from "@/components/cars/residence-country-select";
 import { CheckoutCarGallery } from "@/components/cars/checkout-car-gallery";
-import { CheckoutPaypalSandbox } from "@/components/cars/checkout-paypal-sandbox";
-import { RentalTermsModal } from "@/components/cars/rental-terms-modal";
-import { LegalDocumentModal } from "@/components/legal/legal-document-modal";
 import { PhoneCountryField } from "@/components/partner/phone-country-field";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { knownText } from "@/lib/i18n/known-record-text";
@@ -185,6 +192,12 @@ export function ReserveCheckout({
 }) {
   const router = useRouter();
   const intentPrefetch = useIntentPrefetch();
+  usePreloadWhenIdle(
+    loadCheckoutPaypalSandbox,
+    loadGuestBookingNoticeModal,
+    loadRentalTermsModal,
+    loadLegalDocumentModal,
+  );
   const { data: session } = useSession();
   const { dictionary, formatPrice, locale } = usePreferences();
   const record = (value: string) => knownText(locale, value);
@@ -1951,25 +1964,30 @@ export function ReserveCheckout({
         )}
       </div>
 
-      <RentalTermsModal
-        open={rentalTermsOpen}
-        onClose={() => setRentalTermsOpen(false)}
-        title={t.rentalTermsModalTitle}
-        items={rentalTermsItems}
-        disclaimer={t.rentalTermsDisclaimer}
-        closeLabel={t.rentalTermsClose}
-      />
-      <LegalDocumentModal
-        open={bookingTermsOpen}
-        onClose={() => setBookingTermsOpen(false)}
-        title={t.bookingTermsModalTitle}
-        body={bookingTermsBody || dictionary.common.termsBody}
-        fileUrl={bookingTermsFileUrl}
-        openFileLabel={t.bookingTermsOpenFile}
-        closeLabel={t.rentalTermsClose}
-      />
+      {rentalTermsOpen ? (
+        <RentalTermsModal
+          open
+          onClose={() => setRentalTermsOpen(false)}
+          title={t.rentalTermsModalTitle}
+          items={rentalTermsItems}
+          disclaimer={t.rentalTermsDisclaimer}
+          closeLabel={t.rentalTermsClose}
+        />
+      ) : null}
+      {bookingTermsOpen ? (
+        <LegalDocumentModal
+          open
+          onClose={() => setBookingTermsOpen(false)}
+          title={t.bookingTermsModalTitle}
+          body={bookingTermsBody || dictionary.common.termsBody}
+          fileUrl={bookingTermsFileUrl}
+          openFileLabel={t.bookingTermsOpenFile}
+          closeLabel={t.rentalTermsClose}
+        />
+      ) : null}
+      {guestNoticeOpen ? (
       <GuestBookingNoticeModal
-        open={guestNoticeOpen}
+        open
         title={t.guestNoticeTitle}
         body={t.guestNoticeBody}
         remember={t.guestNoticeRemember}
@@ -1981,6 +1999,7 @@ export function ReserveCheckout({
         onContinue={proceedToPaymentAfterNotice}
         onClose={() => setGuestNoticeOpen(false)}
       />
+      ) : null}
     </div>
   );
 }

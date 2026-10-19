@@ -1,6 +1,7 @@
 "use client";
 
 import { ContactCta } from "@/components/contact/contact-cta";
+import { SiteImage } from "@/components/ui/site-image";
 
 const STORY_IMAGE = "/images/about/story.jpg";
 const SUPPORT_IMAGE = "/images/about/support.jpg";
@@ -55,13 +56,13 @@ export function AboutPageView({
             <p className="text-[15px] leading-relaxed text-slate-600 sm:text-base sm:leading-7">{story}</p>
           </div>
           <div className="overflow-hidden rounded-2xl shadow-[0_16px_40px_rgba(11,31,75,0.14)] ring-1 ring-[#0b1f4b]/10">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <SiteImage
               src={STORY_IMAGE}
               alt=""
-              className="aspect-[4/3] w-full object-cover"
-              loading="lazy"
-              decoding="async"
+              width={1200}
+              height={900}
+              sizes="(max-width: 1023px) 92vw, 560px"
+              className="aspect-[4/3] h-auto w-full object-cover"
             />
           </div>
         </div>
@@ -70,13 +71,13 @@ export function AboutPageView({
       <section className="border-y border-slate-200/80 bg-white">
         <div className="mx-auto grid max-w-6xl items-center gap-8 px-4 py-12 sm:py-16 lg:grid-cols-2 lg:gap-12 about-fade-up about-fade-up-delay-2">
           <div className="order-2 overflow-hidden rounded-2xl shadow-[0_16px_40px_rgba(11,31,75,0.14)] ring-1 ring-[#0b1f4b]/10 lg:order-1">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <SiteImage
               src={SUPPORT_IMAGE}
               alt=""
-              className="aspect-[4/3] w-full object-cover"
-              loading="lazy"
-              decoding="async"
+              width={1200}
+              height={900}
+              sizes="(max-width: 1023px) 92vw, 560px"
+              className="aspect-[4/3] h-auto w-full object-cover"
             />
           </div>
           <div className="order-1 lg:order-2">

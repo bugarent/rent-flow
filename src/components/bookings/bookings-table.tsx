@@ -13,7 +13,7 @@ import {
 } from "@/lib/bookings/table-filters";
 import { cn, formatMoneyAmount } from "@/lib/utils";
 import { isCurrency, type Currency } from "@/lib/i18n/config";
-import { displayImageUrl } from "@/lib/media/display-image";
+import { SiteImage } from "@/components/ui/site-image";
 import { getBookingsTableCopy, type BookingsTableCopy } from "@/components/bookings/bookings-table-copy";
 
 export type BookingsTableRow = {
@@ -365,10 +365,11 @@ export function BookingsTable({
                       <div className="flex min-w-[10rem] items-center gap-2.5">
                         <span className="h-10 w-14 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
                           {row.carImageUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
+                            <SiteImage
                               src={row.carImageUrl}
                               alt=""
+                              width={56}
+                              height={40}
                               className="h-full w-full object-cover"
                             />
                           ) : (
@@ -479,13 +480,12 @@ export function BookingsTable({
                   ) : null}
                   <span className="h-12 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
                     {row.carImageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={displayImageUrl(row.carImageUrl, 128)}
+                      <SiteImage
+                        src={row.carImageUrl}
                         alt=""
+                        width={64}
+                        height={48}
                         className="h-full w-full object-cover"
-                        loading="lazy"
-                        decoding="async"
                       />
                     ) : (
                       <span className="flex h-full w-full items-center justify-center text-[10px] font-bold text-slate-400">

@@ -5,7 +5,7 @@ import {
   ensureAirportPrefaceTranslations,
   listHomepageAirports,
 } from "@/lib/server/homepage-airports-store";
-import { displayImageUrl } from "@/lib/media/display-image";
+import { SiteImage } from "@/components/ui/site-image";
 import { readPreferences } from "@/lib/server/preferences";
 
 export const dynamic = "force-dynamic";
@@ -52,14 +52,17 @@ export default async function AirportInfoPage({
   return (
     <article className="mx-auto w-full max-w-3xl px-4 py-10 sm:py-14">
       {airport.imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={displayImageUrl(airport.imageUrl, 1080)}
-          alt={title}
-          className="mb-6 h-52 w-full rounded-2xl object-cover sm:h-72"
-          loading="eager"
-          decoding="async"
-        />
+        <div className="relative mb-6 h-52 w-full overflow-hidden rounded-2xl sm:h-72">
+          <SiteImage
+            src={airport.imageUrl}
+            alt={title}
+            fill
+            sizes="(max-width: 800px) 100vw, 768px"
+            className="object-cover"
+            loading="eager"
+            fetchPriority="high"
+          />
+        </div>
       ) : null}
       <h1 className="text-2xl font-extrabold text-[#0b1f4b] sm:text-3xl">{title}</h1>
       <div className="mt-5 whitespace-pre-wrap text-base leading-7 text-slate-700">

@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Trash2, Upload } from "lucide-react";
 import { MIN_PUBLIC_PHOTOS } from "@/lib/brand";
 import { cn } from "@/lib/utils";
+import { SiteImage } from "@/components/ui/site-image";
 import { PartnerImageLightbox } from "@/components/partner/partner-image-lightbox";
 
 const SLOT_COUNT = MIN_PUBLIC_PHOTOS;
@@ -225,11 +226,12 @@ export function PartnerCarPhotoGallery({
               >
                 {filled ? (
                   <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <SiteImage
                       src={url}
                       alt=""
-                      className="h-full w-full cursor-zoom-in object-cover"
+                      fill
+                      sizes="(max-width: 639px) 50vw, 220px"
+                      className="cursor-zoom-in object-cover"
                       draggable={false}
                       onClick={() => {
                         if (suppressClick.current) {

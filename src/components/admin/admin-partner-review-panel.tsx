@@ -21,6 +21,7 @@ import {
 import { adminBackLabel, uiText, type AdminBackTarget } from "@/lib/i18n/ui-text";
 import { ADMIN_BASE } from "@/lib/routes";
 import { displayImageUrl } from "@/lib/media/display-image";
+import { SiteImage } from "@/components/ui/site-image";
 import { cn } from "@/lib/utils";
 import { ListingModerationActions } from "@/components/admin/listing-moderation-actions";
 
@@ -1013,10 +1014,11 @@ export function AdminPartnerReviewPanel({
                     {labels.logo}
                   </p>
                   {settings.logoUrl || detail.logoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <SiteImage
                       src={settings.logoUrl || detail.logoUrl || ""}
                       alt=""
+                      width={96}
+                      height={96}
                       className="h-[96px] w-[96px] object-cover bg-slate-50"
                     />
                   ) : (

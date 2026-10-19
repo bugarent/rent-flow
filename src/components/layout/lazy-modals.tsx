@@ -8,6 +8,7 @@ export const loadContactOptionsModal = () => import("@/components/contact/contac
 export const loadPartnerApplicationForm = () => import("@/components/partner/partner-application-form");
 export const loadLiveChatPanel = () => import("@/components/live-chat/live-chat-panel");
 export const loadBookingInfoModal = () => import("@/components/bookings/booking-info-modal");
+export const loadCustomBookingStartModal = () => import("@/components/landing/custom-booking-start-modal");
 
 export const ManageBookingModal = dynamic(
   () => loadManageBookingModal().then((m) => m.ManageBookingModal),
@@ -27,6 +28,11 @@ export const PartnerApplicationForm = dynamic(
 export const LiveChatPanel = dynamic(
   () => loadLiveChatPanel().then((m) => m.LiveChatPanel),
   { ssr: false, loading: () => <PanelSkeleton /> },
+);
+
+export const CustomBookingStartModal = dynamic(
+  () => loadCustomBookingStartModal().then((m) => m.CustomBookingStartModal),
+  { ssr: false, loading: () => <ModalSkeleton size="lg" /> },
 );
 
 export const BookingInfoModal = dynamic(

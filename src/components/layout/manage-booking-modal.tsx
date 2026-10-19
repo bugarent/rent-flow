@@ -11,6 +11,7 @@ import { BOOKING_REF_PREFIX, parseBookingRef } from "@/lib/ids";
 import { cn } from "@/lib/utils";
 import { BookingInfoModal, loadBookingInfoModal } from "@/components/layout/lazy-modals";
 import { usePreloadWhenIdle } from "@/lib/client/preload";
+import { SiteImage } from "@/components/ui/site-image";
 
 const BookingsTable = dynamic(
   () => import("@/components/bookings/bookings-table").then((m) => m.BookingsTable),
@@ -326,10 +327,11 @@ export function ManageBookingModal({
                 ) : null}
                 {foundChat.selectedCarImageUrl ? (
                   <div className="mt-3 flex items-center gap-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <SiteImage
                       src={foundChat.selectedCarImageUrl}
                       alt=""
+                      width={96}
+                      height={64}
                       className="h-16 w-24 rounded-lg object-cover"
                     />
                     <p className="text-sm text-slate-700">{foundChat.selectedCarNote || dictionary.home.customSelectedCar}</p>
@@ -351,8 +353,14 @@ export function ManageBookingModal({
                         )}
                       >
                         {m.imageUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={m.imageUrl} alt="" className="mb-2 max-h-36 w-full rounded-lg object-cover" />
+                          <SiteImage
+                            src={m.imageUrl}
+                            alt=""
+                            width={480}
+                            height={320}
+                            sizes="(max-width: 639px) 80vw, 360px"
+                            className="mb-2 h-auto max-h-36 w-full rounded-lg object-cover"
+                          />
                         ) : null}
                         {m.body}
                       </div>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { knownText } from "@/lib/i18n/known-record-text";
-import { displayImageUrl } from "@/lib/media/display-image";
+import { SiteImage } from "@/components/ui/site-image";
 import { defaultSearchDateRange } from "@/lib/catalog/default-search-dates";
 import { useHomeCountry } from "@/lib/catalog/home-country-store";
 import { useIntentPrefetch } from "@/lib/client/prefetch-route";
@@ -36,16 +36,13 @@ function CategoryCard({
       className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
       aria-hidden={loopCopy || undefined}
     >
-      <div className="h-36 bg-slate-100">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={displayImageUrl(category.imageUrl, 480)}
+      <div className="relative h-36 bg-slate-100">
+        <SiteImage
+          src={category.imageUrl}
           alt=""
-          width={480}
-          height={270}
-          className="h-full w-full object-cover"
-          loading="lazy"
-          decoding="async"
+          fill
+          sizes="(max-width: 639px) 80vw, 300px"
+          className="object-cover"
           fetchPriority="low"
         />
       </div>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { displayImageUrl } from "@/lib/media/display-image";
+import { SiteImage } from "@/components/ui/site-image";
 import { getPartnerIdByWebsiteToken } from "@/lib/server/partner-integration-store";
 import { isPublicFileCar, listFileCarsForPartner } from "@/lib/server/partner-cars-store";
 
@@ -38,13 +38,12 @@ export default async function EmbedFleetPage({
                 className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm hover:border-sky-300"
               >
                 {photo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={displayImageUrl(photo, 128)}
+                  <SiteImage
+                    src={photo}
                     alt=""
+                    width={96}
+                    height={64}
                     className="h-16 w-24 rounded-lg object-cover bg-slate-100"
-                    loading="lazy"
-                    decoding="async"
                   />
                 ) : null}
                 <span>

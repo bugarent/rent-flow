@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type MouseEvent } from "react";
 import { Car as CarIcon, ChevronLeft, ChevronRight, Minus, Plus, X } from "lucide-react";
-import { displayImageUrl } from "@/lib/media/display-image";
+import { SiteImage } from "@/components/ui/site-image";
 import { cn } from "@/lib/utils";
 
 const ZOOM_MIN = 0.5;
@@ -49,13 +49,14 @@ export function CheckoutCarGallery({
             onClick={() => setLightboxOpen(true)}
             aria-label={title}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={displayImageUrl(current, 828)}
+            <SiteImage
+              src={current}
               alt={title}
-              className="absolute inset-0 h-full w-full object-cover object-center"
+              fill
+              sizes="(max-width: 639px) 100vw, 450px"
+              className="object-cover object-center"
               loading="eager"
-              decoding="async"
+              fetchPriority="high"
             />
           </button>
         ) : (
@@ -231,14 +232,15 @@ function GalleryLightbox({
             )}
             onClick={onImageAreaClick}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={displayImageUrl(src, 1200)}
+            <SiteImage
+              src={src}
               alt={title}
+              fill
+              sizes="(max-width: 900px) 92vw, 832px"
+              loading="eager"
               draggable={false}
-              className="absolute inset-0 h-full w-full select-none object-cover object-center transition-transform duration-150"
+              className="select-none object-cover object-center transition-transform duration-150"
               style={{ transform: `scale(${zoom})` }}
-              decoding="async"
             />
 
             {canNavigate ? (

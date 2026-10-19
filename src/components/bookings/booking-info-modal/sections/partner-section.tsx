@@ -5,6 +5,7 @@ import { partnerMessengerChatHref } from "@/lib/partners/messenger-chat-link";
 import { SocialBadge } from "../social-badge";
 import { languageLabel, normalizeSocial } from "../helpers";
 import { cn } from "@/lib/utils";
+import { SiteImage } from "@/components/ui/site-image";
 import type { BookingInfoData, Copy } from "../types";
 
 const fieldTone = {
@@ -78,10 +79,11 @@ export function PartnerSection({
         )}
       >
         {booking.partner?.logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <SiteImage
             src={booking.partner.logoUrl}
             alt=""
+            width={tight ? 28 : 44}
+            height={tight ? 28 : 44}
             className={cn(
               "shrink-0 border border-slate-200 bg-white object-cover",
               tight ? "h-7 w-7 rounded-md" : "h-11 w-11 rounded-lg",

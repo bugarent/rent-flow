@@ -8,7 +8,7 @@ import type { PopularAirportsLayout } from "@/lib/catalog/popular-airports-layou
 import { usePreferences } from "@/components/providers/preferences-context";
 import { airportCarsLabel } from "@/lib/i18n/airport-cars-label";
 import { localizedAirportTitle } from "@/lib/catalog/homepage-airport-i18n";
-import { displayImageUrl } from "@/lib/media/display-image";
+import { SiteImage } from "@/components/ui/site-image";
 import { useIntentPrefetch } from "@/lib/client/prefetch-route";
 
 const AUTO_MS = 4000;
@@ -31,16 +31,13 @@ function AirportCard({
       className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
       aria-hidden={loopCopy || undefined}
     >
-      <div className="h-40 bg-slate-200 sm:h-44">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={displayImageUrl(airport.image, 640)}
+      <div className="relative h-40 bg-slate-200 sm:h-44">
+        <SiteImage
+          src={airport.image}
           alt=""
-          width={640}
-          height={360}
-          className="h-full w-full object-cover"
-          loading="lazy"
-          decoding="async"
+          fill
+          sizes="(max-width: 639px) 90vw, (max-width: 1023px) 45vw, 360px"
+          className="object-cover"
           fetchPriority="low"
         />
       </div>

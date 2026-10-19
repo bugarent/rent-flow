@@ -32,7 +32,7 @@ import { parseCarDetails } from "@/lib/cars/car-details";
 import { listingDailyWithDeliveryEur, rentalDayCount } from "@/lib/cars/reserve-pricing";
 import { findSearchPlace, isCityLocationCode } from "@/lib/catalog/search-places";
 import type { MappedCarModel } from "@/lib/catalog/car-models";
-import { displayImageUrl } from "@/lib/media/display-image";
+import { SiteImage } from "@/components/ui/site-image";
 import {
   countListingsForBrand,
   countListingsForCategory,
@@ -1392,15 +1392,14 @@ export function CarsSearchResults({
                                 : "border-sky-200/80 hover:border-[#1d6fe8]/50",
                             )}
                           >
-                            <div className="h-7 bg-slate-100 sm:h-8">
+                            <div className="relative h-7 bg-slate-100 sm:h-8">
                               {cat.imageUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={displayImageUrl(cat.imageUrl, 128)}
+                                <SiteImage
+                                  src={cat.imageUrl}
                                   alt={cat.name}
-                                  className="h-full w-full object-cover"
-                                  loading="lazy"
-                                  decoding="async"
+                                  fill
+                                  sizes="128px"
+                                  className="object-cover"
                                 />
                               ) : (
                                 <div className="flex h-full items-center justify-center text-slate-300">
@@ -1795,9 +1794,10 @@ export function CarsSearchResults({
           ref={resultsTopRef}
           className="grid scroll-mt-4 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4"
         >
-          {pageCars.map((car) => (
+          {pageCars.map((car, index) => (
             <CarResultCard
               key={car.id}
+              aboveFold={index < 4}
               car={car}
               days={days}
               href={bookHref(car.id)}
@@ -1925,10 +1925,13 @@ function CarResultCard({
   dropoff,
   referralDiscountPercent = 0,
   siteDiscountPercent = 0,
+  aboveFold = false,
 }: {
   car: SearchResultCar;
   days: number;
   href: string;
+  /** First grid row: photo loads with the page instead of lazily. */
+  aboveFold?: boolean;
   formatPrice: (n: number) => string;
   copy: (typeof COPY)["en"];
   pickup: string;
@@ -1969,14 +1972,14 @@ function CarResultCard({
     >
       <div className="relative aspect-[4/3] w-full overflow-hidden rounded-t-xl bg-slate-100">
         {photos[photoIndex] ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={displayImageUrl(photos[photoIndex], 640)}
+          <SiteImage
+            src={photos[photoIndex]}
             alt={`${car.make} ${car.model}${car.year ? ` ${car.year}` : ""} — airport car rental`}
-            className="absolute inset-0 h-full w-full object-cover object-center"
-            loading="lazy"
-            decoding="async"
-            fetchPriority="low"
+            fill
+            sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 300px"
+            className="object-cover object-center"
+            loading={aboveFold ? "eager" : "lazy"}
+            fetchPriority={aboveFold ? "high" : "low"}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-slate-300">

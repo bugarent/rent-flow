@@ -14,6 +14,7 @@ import { ImagePlus, MessageCircle, Minus, X } from "lucide-react";
 import { PhoneCountryField } from "@/components/partner/phone-country-field";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { cn } from "@/lib/utils";
+import { SiteImage } from "@/components/ui/site-image";
 import { formatInternationalPhone } from "@/lib/catalog/dial-codes";
 import { WHATSAPP_NUMBER } from "@/lib/brand";
 import {
@@ -780,10 +781,11 @@ export function CustomBookingStartModal({
                     ) : null}
                     {chat.selectedCarImageUrl ? (
                       <div className="mt-1 flex items-center gap-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
+                        <SiteImage
                           src={chat.selectedCarImageUrl}
                           alt=""
+                          width={48}
+                          height={32}
                           className="h-8 w-12 rounded object-cover"
                         />
                         <p className="truncate text-[11px] text-emerald-900">
@@ -805,11 +807,13 @@ export function CustomBookingStartModal({
                         )}
                       >
                         {m.imageUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
+                          <SiteImage
                             src={m.imageUrl}
                             alt=""
-                            className="mb-2 max-h-40 w-full rounded-lg object-cover"
+                            width={480}
+                            height={320}
+                            sizes="(max-width: 639px) 80vw, 360px"
+                            className="mb-2 h-auto max-h-40 w-full rounded-lg object-cover"
                           />
                         ) : null}
                         {m.body}

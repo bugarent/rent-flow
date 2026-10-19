@@ -38,7 +38,7 @@ import { airportLocalToUtc } from "@/lib/datetime/airport-timezone";
 import { catalogTimezoneForIata } from "@/lib/locations/booking-datetime";
 import { CATALOG_AIRPORTS } from "@/lib/catalog/airports";
 import { GuestCancelDialog } from "./guest-cancel-dialog";
-import { CheckoutPaypalSandbox } from "@/components/cars/checkout-paypal-sandbox";
+import { CheckoutPaypalSandbox } from "@/components/cars/lazy-checkout";
 import { HeaderBanners } from "./sections/header-banners";
 import { CarAside } from "./sections/car-aside";
 import { PartnerSection } from "./sections/partner-section";

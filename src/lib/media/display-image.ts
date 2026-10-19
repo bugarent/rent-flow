@@ -17,7 +17,12 @@ function looksLikeCloudinaryTransform(segment: string): boolean {
  * Insert (or replace) Cloudinary delivery transforms so the CDN serves a
  * resized modern format instead of the full original.
  */
-export function optimizeCloudinaryUrl(url: string, width = 640): string {
+export function optimizeCloudinaryUrl(
+  url: string,
+  width = 640,
+  /** srcset entries already match the screen density, so no dpr_auto on top. */
+  opts?: { forSrcset?: boolean },
+): string {
   try {
     const parsed = new URL(url);
     if (parsed.hostname !== "res.cloudinary.com") return url;
@@ -38,15 +43,30 @@ export function optimizeCloudinaryUrl(url: string, width = 640): string {
     }
 
     const w = optimizerWidth(width);
-    parsed.pathname = `${prefix}f_auto,q_auto,dpr_auto,w_${w},c_limit/${rest}`;
+    const dpr = opts?.forSrcset ? "" : "dpr_auto,";
+    parsed.pathname = `${prefix}f_auto,q_auto,${dpr}w_${w},c_limit/${rest}`;
     return parsed.toString();
   } catch {
     return url;
   }
 }
 
+/** URL types `displayImageUrl` can resize (others are served as they are). */
+export function canResizeImage(url: string): boolean {
+  if (!url || /^(blob|data):/i.test(url) || /\.svg($|\?)/i.test(url)) return false;
+  if (url.startsWith("/") && !url.startsWith("//")) {
+    return !url.startsWith("/_next/") && (url.startsWith("/uploads/") || !url.includes("?"));
+  }
+  try {
+    const host = new URL(url).hostname;
+    return host === "res.cloudinary.com" || host === "images.unsplash.com";
+  } catch {
+    return false;
+  }
+}
+
 /** Shrink card images so below-the-fold cards do not download full-size files. */
-export function displayImageUrl(url: string, width = 480): string {
+export function displayImageUrl(url: string, width = 480, opts?: { forSrcset?: boolean }): string {
   if (!url) return url;
   if (url.startsWith("/") && !url.startsWith("//")) {
     if (url.startsWith("/_next/") || /\.svg($|\?)/i.test(url)) return url;
@@ -62,7 +82,7 @@ export function displayImageUrl(url: string, width = 480): string {
   try {
     const parsed = new URL(url);
     if (parsed.hostname === "res.cloudinary.com") {
-      return optimizeCloudinaryUrl(url, width);
+      return optimizeCloudinaryUrl(url, width, opts);
     }
     if (parsed.hostname !== "images.unsplash.com") return url;
     parsed.searchParams.set("auto", "format");

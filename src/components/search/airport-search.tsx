@@ -23,7 +23,8 @@ import { worldCountryName } from "@/lib/catalog/world-countries";
 import { placeLabel, regionName } from "@/lib/i18n/place-label";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { usePreferences } from "@/components/providers/preferences-context";
-import { CustomBookingStartModal } from "@/components/landing/custom-booking-start-modal";
+import { CustomBookingStartModal, loadCustomBookingStartModal } from "@/components/layout/lazy-modals";
+import { preloadProps } from "@/lib/client/preload";
 import type { CustomBookingChannelsConfig } from "@/lib/catalog/custom-booking-channels";
 import { clampPickupSelection, earliestPickupIsoDate, isPickupSlotAllowed } from "@/lib/bookings/lead-time";
 import {
@@ -754,6 +755,7 @@ export function AirportSearch({
   const [pickupAddress, setPickupAddress] = useState("");
   const [dropoffAddress, setDropoffAddress] = useState("");
   const [customBookingOpen, setCustomBookingOpen] = useState(false);
+  const [customBookingMounted, setCustomBookingMounted] = useState(false);
   const [calendarField, setCalendarField] = useState<DateRangeField | null>(null);
 
   useEffect(() => {
@@ -1041,14 +1043,18 @@ export function AirportSearch({
         {showIndividualBooking ? (
           <button
             type="button"
-            onClick={() => setCustomBookingOpen(true)}
+            {...preloadProps(loadCustomBookingStartModal)}
+            onClick={() => {
+              setCustomBookingMounted(true);
+              setCustomBookingOpen(true);
+            }}
             className={`${ctaButtonClass} sm:flex-1`}
           >
             {dictionary.home.customCta}
           </button>
         ) : null}
       </div>
-      {customBookingChannels ? (
+      {customBookingChannels && customBookingMounted ? (
         <CustomBookingStartModal
           open={customBookingOpen}
           onClose={() => setCustomBookingOpen(false)}

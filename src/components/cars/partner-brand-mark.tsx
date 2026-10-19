@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { SiteImage } from "@/components/ui/site-image";
 
 /** Public partner brand row (logo + brand name) for car listings. */
 export function PartnerBrandMark({
@@ -21,10 +22,11 @@ export function PartnerBrandMark({
   return (
     <div className={cn("flex items-center gap-2", className)}>
       {logoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <SiteImage
           src={logoUrl}
           alt=""
+          width={size === "sm" ? 28 : 36}
+          height={size === "sm" ? 28 : 36}
           className={cn(box, "shrink-0 rounded-md border border-slate-200 bg-white object-cover")}
         />
       ) : (

@@ -6,7 +6,7 @@ import { roundMoney } from "@/lib/cars/reserve-pricing";
 import { extraPeriodCharge } from "@/lib/extras/pricing";
 import { pickServiceLabel } from "@/lib/extras/service-label";
 import { knownText } from "@/lib/i18n/known-record-text";
-import { displayImageUrl } from "@/lib/media/display-image";
+import { SiteImage } from "@/components/ui/site-image";
 import { cn } from "@/lib/utils";
 import { usePartnerMoneyOptional } from "@/components/providers/partner-money-context";
 import { fuelLabel, transmissionLabel, daysBetween } from "../helpers";
@@ -82,13 +82,12 @@ export function CarAside({
           <div className="flex justify-center bg-slate-50 px-1.5 py-1.5">
             <div className="h-12 w-[4.5rem] overflow-hidden rounded bg-slate-100 sm:h-14 sm:w-20">
               {booking.car.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={displayImageUrl(booking.car.imageUrl, 160)}
+                <SiteImage
+                  src={booking.car.imageUrl}
                   alt=""
+                  width={80}
+                  height={56}
                   className="h-full w-full object-cover"
-                  loading="lazy"
-                  decoding="async"
                 />
               ) : (
                 <div className="flex h-full items-center justify-center text-slate-400">
@@ -101,13 +100,12 @@ export function CarAside({
           <div className="flex justify-center bg-slate-50 px-2 py-2">
             <div className="h-28 w-40 overflow-hidden rounded-md bg-slate-100 sm:h-32 sm:w-44">
               {booking.car.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={displayImageUrl(booking.car.imageUrl, 256)}
+                <SiteImage
+                  src={booking.car.imageUrl}
                   alt=""
+                  width={176}
+                  height={128}
                   className="h-full w-full object-cover"
-                  loading="lazy"
-                  decoding="async"
                 />
               ) : (
                 <div className="flex h-full items-center justify-center text-slate-400">
@@ -117,15 +115,15 @@ export function CarAside({
             </div>
           </div>
         ) : (
-          <div className="aspect-[4/3] bg-slate-100">
+          <div className="relative aspect-[4/3] bg-slate-100">
             {booking.car.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={displayImageUrl(booking.car.imageUrl, 640)}
+              <SiteImage
+                src={booking.car.imageUrl}
                 alt=""
-                className="h-full w-full object-cover"
-                loading="lazy"
-                decoding="async"
+                fill
+                sizes="(max-width: 1023px) 92vw, 380px"
+                className="object-cover"
+                loading="eager"
               />
             ) : (
               <div className="flex h-full items-center justify-center text-slate-400">
