@@ -106,7 +106,7 @@ export const frAdminExtra = {
     partnerBannerOn: "La bannière partenaire est ACTIVÉE sur l’accueil.",
     partnerBannerOff: "La bannière partenaire est DÉSACTIVÉE sur l’accueil.",
     categories: "Catégories de voitures",
-    popularAirports: "Aéroports populaires",
+    popularAirports: "Aéroports et lieux populaires",
     operatingCountries: "Pays d’exploitation",
     footerContact: "Barre de contact du pied de page",
     footerContactHelp: "Téléphone, e-mail et adresse dans la bande sombre au-dessus du copyright.",

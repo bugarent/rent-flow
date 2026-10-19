@@ -106,7 +106,7 @@ export const deAdminExtra = {
     partnerBannerOn: "Partner-Banner ist auf der Startseite AN.",
     partnerBannerOff: "Partner-Banner ist auf der Startseite AUS.",
     categories: "Fahrzeugkategorien",
-    popularAirports: "Beliebte Flughäfen",
+    popularAirports: "Beliebte Flughäfen und Orte",
     operatingCountries: "Einsatzländer",
     footerContact: "Kontaktleiste in der Fußzeile",
     footerContactHelp: "Telefon, E-Mail und Adresse im dunklen Streifen über dem Copyright.",

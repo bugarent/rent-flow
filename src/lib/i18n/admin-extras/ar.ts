@@ -106,7 +106,7 @@ export const arAdminExtra = {
     partnerBannerOn: "لافتة الشريك مفعّلة في الصفحة الرئيسية.",
     partnerBannerOff: "لافتة الشريك متوقفة في الصفحة الرئيسية.",
     categories: "فئات السيارات",
-    popularAirports: "المطارات الشائعة",
+    popularAirports: "المطارات والأماكن الشائعة",
     operatingCountries: "دول التشغيل",
     footerContact: "شريط الاتصال في التذييل",
     footerContactHelp: "الهاتف والبريد والعنوان في الشريط الداكن فوق حقوق النشر.",

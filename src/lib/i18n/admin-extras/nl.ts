@@ -106,7 +106,7 @@ export const nlAdminExtra = {
     partnerBannerOn: "Partnerbanner staat AAN op de homepage.",
     partnerBannerOff: "Partnerbanner staat UIT op de homepage.",
     categories: "Autocategorieën",
-    popularAirports: "Populaire luchthavens",
+    popularAirports: "Populaire luchthavens en plaatsen",
     operatingCountries: "Werklanden",
     footerContact: "Contactbalk in de voettekst",
     footerContactHelp: "Telefoon, e-mail en adres in de donkere strook boven het copyright.",

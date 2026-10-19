@@ -106,7 +106,7 @@ export const koAdminExtra = {
     partnerBannerOn: "파트너 배너가 홈페이지에서 켜져 있습니다.",
     partnerBannerOff: "파트너 배너가 홈페이지에서 꺼져 있습니다.",
     categories: "차량 분류",
-    popularAirports: "인기 공항",
+    popularAirports: "인기 공항 및 장소",
     operatingCountries: "운영 국가",
     footerContact: "바닥글 연락처 막대",
     footerContactHelp: "저작권 위 어두운 줄의 전화, 이메일, 주소입니다.",

@@ -106,7 +106,7 @@ export const plAdminExtra = {
     partnerBannerOn: "Baner partnera jest WŁĄCZONY na stronie głównej.",
     partnerBannerOff: "Baner partnera jest WYŁĄCZONY na stronie głównej.",
     categories: "Kategorie samochodów",
-    popularAirports: "Popularne lotniska",
+    popularAirports: "Popularne lotniska i miejsca",
     operatingCountries: "Kraje działalności",
     footerContact: "Pasek kontaktu w stopce",
     footerContactHelp: "Telefon, e-mail i adres w ciemnym pasku nad prawami autorskimi.",

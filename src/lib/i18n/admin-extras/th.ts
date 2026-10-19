@@ -106,7 +106,7 @@ export const thAdminExtra = {
     partnerBannerOn: "แบนเนอร์พาร์ทเนอร์เปิดอยู่บนหน้าแรก",
     partnerBannerOff: "แบนเนอร์พาร์ทเนอร์ปิดอยู่บนหน้าแรก",
     categories: "หมวดรถยนต์",
-    popularAirports: "สนามบินยอดนิยม",
+    popularAirports: "สนามบินและสถานที่ยอดนิยม",
     operatingCountries: "ประเทศที่ให้บริการ",
     footerContact: "แถบติดต่อท้ายหน้า",
     footerContactHelp: "โทรศัพท์ อีเมล และที่อยู่ในแถบเข้มเหนือลิขสิทธิ์",

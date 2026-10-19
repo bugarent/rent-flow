@@ -488,7 +488,7 @@ const en: AdminDictionary = {
     partnerBannerOn: "Partner banner is ON on the homepage.",
     partnerBannerOff: "Partner banner is OFF on the homepage.",
     categories: "Car categories",
-    popularAirports: "Popular airports",
+    popularAirports: "Popular airports and places",
     operatingCountries: "Operating countries",
     footerContact: "Footer contact bar",
     footerContactHelp:
@@ -832,7 +832,7 @@ const ka: AdminDictionary = {
     partnerBannerOn: "პარტნიორის ბანერი ჩართულია მთავარ გვერდზე.",
     partnerBannerOff: "პარტნიორის ბანერი გამორთულია მთავარ გვერდზე.",
     categories: "მანქანის კატეგორიები",
-    popularAirports: "პოპულარული აეროპორტები",
+    popularAirports: "პოპულარული აეროპორტები და ადგილები",
     operatingCountries: "ოპერირების ქვეყნები",
     footerContact: "ფუტერის კონტაქტის ზოლი",
     footerContactHelp:
@@ -1176,7 +1176,7 @@ const ru: AdminDictionary = {
     partnerBannerOn: "Баннер партнёра включён на главной.",
     partnerBannerOff: "Баннер партнёра выключен на главной.",
     categories: "Категории авто",
-    popularAirports: "Популярные аэропорты",
+    popularAirports: "Популярные аэропорты и места",
     operatingCountries: "Страны работы",
     footerContact: "Контактная полоса в футере",
     footerContactHelp:

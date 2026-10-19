@@ -106,7 +106,7 @@ export const zhAdminExtra = {
     partnerBannerOn: "合作方横幅已在首页开启。",
     partnerBannerOff: "合作方横幅已在首页关闭。",
     categories: "车辆类别",
-    popularAirports: "热门机场",
+    popularAirports: "热门机场和地点",
     operatingCountries: "运营国家",
     footerContact: "页脚联系栏",
     footerContactHelp: "版权行上方深色条中的电话、邮箱和地址。",

@@ -149,7 +149,7 @@ export const trAdminExtra = {
     partnerBannerOn: "Ortak banner’ı ana sayfada AÇIK.",
     partnerBannerOff: "Ortak banner’ı ana sayfada KAPALI.",
     categories: "Araç kategorileri",
-    popularAirports: "Popüler havalimanları",
+    popularAirports: "Popüler havalimanları ve yerler",
     operatingCountries: "Çalışılan ülkeler",
     footerContact: "Alt bilgi iletişim şeridi",
     footerContactHelp: "Site alt bilgisinde, telif satırının üstündeki koyu şeritte görünen telefon, e-posta ve adres.",

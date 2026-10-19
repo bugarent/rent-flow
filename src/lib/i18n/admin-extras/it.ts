@@ -106,7 +106,7 @@ export const itAdminExtra = {
     partnerBannerOn: "Il banner partner è ATTIVO sulla home.",
     partnerBannerOff: "Il banner partner è DISATTIVO sulla home.",
     categories: "Categorie auto",
-    popularAirports: "Aeroporti popolari",
+    popularAirports: "Aeroporti e luoghi popolari",
     operatingCountries: "Paesi operativi",
     footerContact: "Barra contatti del piè di pagina",
     footerContactHelp: "Telefono, email e indirizzo nella fascia scura sopra il copyright.",

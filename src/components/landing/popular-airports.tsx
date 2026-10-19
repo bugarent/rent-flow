@@ -63,9 +63,9 @@ function AirportCard({
 }
 
 const EMPTY_COPY: Record<string, string> = {
-  ka: "ამ ქვეყნისთვის პოპულარული აეროპორტები ჯერ არ არის დამატებული.",
-  ru: "Для этой страны популярные аэропорты пока не добавлены.",
-  en: "No popular airports have been added for this country yet.",
+  ka: "ამ ქვეყნისთვის პოპულარული აეროპორტები და ადგილები ჯერ არ არის დამატებული.",
+  ru: "Для этой страны популярные аэропорты и места пока не добавлены.",
+  en: "No popular airports or places have been added for this country yet.",
 };
 
 /**

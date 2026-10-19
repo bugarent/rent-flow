@@ -106,7 +106,7 @@ export const esAdminExtra = {
     partnerBannerOn: "El banner de socio está ACTIVADO en inicio.",
     partnerBannerOff: "El banner de socio está DESACTIVADO en inicio.",
     categories: "Categorías de coches",
-    popularAirports: "Aeropuertos populares",
+    popularAirports: "Aeropuertos y lugares populares",
     operatingCountries: "Países de operación",
     footerContact: "Barra de contacto del pie",
     footerContactHelp: "Teléfono, correo y dirección en la franja oscura sobre el copyright.",
