@@ -19,6 +19,7 @@ import { PartnerEurMoneyInput } from "@/components/partner/partner-eur-money-inp
 import { partnerCurrencySymbol } from "@/lib/partners/pricing-currency";
 import { knownText } from "@/lib/i18n/known-record-text";
 import { localizedExtraCopy } from "@/lib/extras/localized-copy";
+import { cn } from "@/lib/utils";
 import {
   PartnerExtraCarPicker,
   type PartnerExtraCarOption,
@@ -1373,14 +1374,39 @@ export function PartnerEquipmentServicePanel({
                               });
                             }, 40);
                           }}
-                          className="flex min-h-8 w-full items-center gap-2 py-0.5 text-start disabled:cursor-default"
+                          className="flex min-h-10 w-full items-center gap-2 py-0.5 text-start disabled:cursor-default"
                           aria-expanded={canEditPrices ? open : undefined}
+                          aria-label={
+                            canEditPrices
+                              ? `${localizedExtraCopy(locale, row.service.name, row.service.nameI18n)} — ${statusLocked ? t.setPrice : t.edit}`
+                              : undefined
+                          }
                         >
                           <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-700">
                             {localizedExtraCopy(locale, row.service.name, row.service.nameI18n)}
                           </span>
                           <span className="shrink-0 text-xs font-semibold text-slate-400">{priceCell}</span>
-                          {statusLocked ? (
+                          {canEditPrices ? (
+                            <span className="inline-flex shrink-0 items-center gap-1">
+                              {statusLocked ? (
+                                <span
+                                  title={t.mandatoryLockedTitle}
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700"
+                                >
+                                  <Lock className="h-3.5 w-3.5" />
+                                </span>
+                              ) : null}
+                              <span
+                                aria-hidden
+                                className={cn(
+                                  "inline-flex h-8 w-8 items-center justify-center rounded-md border text-[#1d6fe8]",
+                                  open ? "border-[#1d6fe8] bg-sky-50" : "border-sky-200 bg-white",
+                                )}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </span>
+                            </span>
+                          ) : statusLocked ? (
                             <span
                               title={t.mandatoryLockedTitle}
                               className="inline-flex shrink-0 items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700"
