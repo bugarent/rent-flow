@@ -18,6 +18,26 @@ export async function translateAirportPreface(
   text: string,
   locales: Locale[],
 ): Promise<Partial<Record<Locale, string>>> {
+  return translateAirportText(text, locales, "introduction");
+}
+
+/** Translate a homepage airport card title (one line, keeps codes, emoji and brand). */
+export async function translateAirportTitle(
+  text: string,
+  locales: Locale[],
+): Promise<Partial<Record<Locale, string>>> {
+  const out = await translateAirportText(text, locales, "title");
+  for (const code of Object.keys(out) as Locale[]) {
+    out[code] = out[code]!.replace(/\s+/g, " ").slice(0, 120);
+  }
+  return out;
+}
+
+async function translateAirportText(
+  text: string,
+  locales: Locale[],
+  kind: "introduction" | "title",
+): Promise<Partial<Record<Locale, string>>> {
   const source = text.trim();
   const targets = [...new Set(locales)];
   if (!source || !targets.length) return {};
@@ -45,7 +65,9 @@ export async function translateAirportPreface(
           {
             role: "system",
             content:
-              "You translate airport car-rental introductions. Reply with a JSON object whose keys are the locale codes and whose values are the full translation. Keep paragraph breaks, IATA codes, place names, prices and phone numbers. Do not add a title or commentary.",
+              kind === "title"
+                ? "You translate one-line airport car-rental card titles. Reply with a JSON object whose keys are the locale codes and whose values are the translated title on one line. Keep emoji, IATA codes, place names and the brand name RentAirportCars. Do not add commentary."
+                : "You translate airport car-rental introductions. Reply with a JSON object whose keys are the locale codes and whose values are the full translation. Keep paragraph breaks, IATA codes, place names, prices and phone numbers. Do not add a title or commentary.",
           },
           {
             role: "user",

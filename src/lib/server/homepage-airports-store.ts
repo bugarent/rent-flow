@@ -9,6 +9,7 @@ import { revalidatePublishedContent } from "@/lib/server/revalidate-public-conte
 import {
   cleanAirportTranslations,
   missingAirportInfoLocales,
+  missingAirportTitleLocales,
   type AirportCardTranslations,
 } from "@/lib/catalog/homepage-airport-i18n";
 import type { Locale } from "@/lib/i18n/config";
@@ -199,16 +200,40 @@ async function fillPrefaceLocales(airport: StoredHomepageAirport, locales: Local
   return current;
 }
 
-/** Store missing preface translations. The visitor's language is written first. */
+async function fillTitleLocales(airport: StoredHomepageAirport, locales: Locale[]) {
+  if (!locales.length || !airport.title.trim()) return airport;
+  const { translateAirportTitle } = await import("@/lib/server/translate-airport-preface");
+  const translated = await translateAirportTitle(airport.title, locales);
+  if (!Object.keys(translated).length) return airport;
+  const next: AirportCardTranslations = { ...airport.translations };
+  for (const [code, title] of Object.entries(translated)) {
+    if (!title) continue;
+    next[code as Locale] = { ...next[code as Locale], title };
+  }
+  return (await persistInfoTranslations(airport.id, next)) ?? airport;
+}
+
+/** Store missing title + preface translations. The visitor's language is written first. */
 export async function ensureAirportPrefaceTranslations(
   airport: StoredHomepageAirport,
   preferLocale?: string,
   opts?: { onlyPreferred?: boolean },
 ): Promise<StoredHomepageAirport> {
-  const missing = missingAirportInfoLocales(airport);
-  if (!missing.length) return airport;
+  if (!missingAirportInfoLocales(airport).length && !missingAirportTitleLocales(airport).length) {
+    return airport;
+  }
   return enqueuePreface(airport.id, async () => {
-    const fresh = (await readFileStore()).find((row) => row.id === airport.id) ?? airport;
+    let fresh = (await readFileStore()).find((row) => row.id === airport.id) ?? airport;
+    const titles = missingAirportTitleLocales(fresh);
+    if (titles.length) {
+      // Titles are short: every missing language in one request (only the visitor's on a page view).
+      const want = opts?.onlyPreferred ? titles.filter((code) => code === preferLocale) : titles;
+      fresh = await fillTitleLocales(fresh, want);
+      if (opts?.onlyPreferred && titles.length > want.length) {
+        const saved = fresh;
+        void enqueuePreface(saved.id, () => fillTitleLocales(saved, missingAirportTitleLocales(saved)));
+      }
+    }
     const stillMissing = missingAirportInfoLocales(fresh);
     if (!stillMissing.length) return fresh;
     const preferred = stillMissing.find((code) => code === preferLocale);
@@ -322,8 +347,23 @@ export async function updateHomepageAirport(
     translations?: unknown;
   },
 ): Promise<StoredHomepageAirport> {
-  const nextTranslations =
+  const before = (await readFileStore()).find((row) => row.id === id);
+  let nextTranslations =
     input.translations === undefined ? undefined : cleanAirportTranslations(input.translations);
+  // A new base title makes the old automatic title translations wrong; titles the admin
+  // edited by hand in this save (different from the stored ones) are kept.
+  const titleChanged = Boolean(before && input.title !== undefined && input.title.trim() !== before.title.trim());
+  if (titleChanged && before) {
+    const base = nextTranslations ?? before.translations;
+    const pruned: AirportCardTranslations = {};
+    for (const [code, row] of Object.entries(base)) {
+      const lang = code as Locale;
+      const keepTitle = row?.title && row.title !== before.translations[lang]?.title;
+      const entry = { ...(keepTitle ? { title: row!.title } : {}), ...(row?.infoText ? { infoText: row.infoText } : {}) };
+      if (entry.title || entry.infoText) pruned[lang] = entry;
+    }
+    nextTranslations = pruned;
+  }
   const applyFileUpdate = async () => {
     const rows = await readFileStore();
     const index = rows.findIndex((r) => r.id === id);

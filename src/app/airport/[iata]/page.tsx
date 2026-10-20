@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { localizedAirportInfo, localizedAirportTitle } from "@/lib/catalog/homepage-airport-i18n";
+import { withAutoTitleTranslations } from "@/lib/catalog/airport-card-auto-titles";
 import {
   ensureAirportPrefaceTranslations,
   listHomepageAirports,
@@ -31,7 +32,7 @@ export async function generateMetadata({
   const { iata } = await params;
   const airport = await findAirport(iata);
   const { locale } = await readPreferences();
-  const title = airport ? localizedAirportTitle(airport, locale) : iata.toUpperCase();
+  const title = airport ? localizedAirportTitle(withAutoTitleTranslations(airport), locale) : iata.toUpperCase();
   return { title };
 }
 
@@ -46,7 +47,7 @@ export default async function AirportInfoPage({
 
   const { locale } = await readPreferences();
   const airport = await ensureAirportPrefaceTranslations(found, locale, { onlyPreferred: true });
-  const title = localizedAirportTitle(airport, locale);
+  const title = localizedAirportTitle(withAutoTitleTranslations(airport), locale);
   const text = localizedAirportInfo(airport, locale);
 
   return (

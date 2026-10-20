@@ -13,6 +13,8 @@ import { useIntentPrefetch } from "@/lib/client/prefetch-route";
 import { useHomeCountry } from "@/lib/catalog/home-country-store";
 
 const AUTO_MS = 4000;
+/** Cards visible side by side on desktop (lg grid). */
+const MAX_COLUMNS = 3;
 const SLIDE_MS = 650;
 
 function AirportCard({
@@ -118,8 +120,11 @@ function PopularAirportsCarousel({
   const [paused, setPaused] = useState(false);
   const [lead, setLead] = useState(0);
   const rtl = dir === "rtl";
-  const canLoop = airports.length > 1;
+  // Copies for the endless loop only when there are more cards than desktop columns;
+  // otherwise exactly the admin's cards show (2 cards never turn into 3).
+  const canLoop = airports.length > MAX_COLUMNS;
   const slides = canLoop ? [...airports, ...airports, ...airports] : airports;
+  const [overflowing, setOverflowing] = useState(canLoop);
 
   const metrics = useCallback(() => {
     const node = scroller.current;
@@ -166,13 +171,17 @@ function PopularAirportsCarousel({
       scrolling.current = true;
       const { step } = metrics();
       node.scrollBy({ left: step * dirStep * (rtl ? -1 : 1), behavior: "smooth" });
-      setLead((current) => (current + dirStep + airports.length) % airports.length);
+      setLead((current) =>
+        canLoop
+          ? (current + dirStep + airports.length) % airports.length
+          : Math.min(Math.max(current + dirStep, 0), airports.length - 1),
+      );
       window.setTimeout(() => {
         normalizeLoop();
         scrolling.current = false;
       }, SLIDE_MS + 50);
     },
-    [airports.length, metrics, normalizeLoop, rtl],
+    [airports.length, canLoop, metrics, normalizeLoop, rtl],
   );
 
   useLayoutEffect(() => {
@@ -180,7 +189,10 @@ function PopularAirportsCarousel({
     const node = scroller.current;
     if (!node) return;
     const raf = window.requestAnimationFrame(() => applyStart());
+    const measure = () => setOverflowing(canLoop || node.scrollWidth > node.clientWidth + 2);
+    measure();
     const ro = new ResizeObserver(() => {
+      measure();
       if (scrolling.current || !canLoop) return;
       node.scrollLeft = alignToCard(node.scrollLeft);
     });
@@ -223,7 +235,7 @@ function PopularAirportsCarousel({
           <h2 className="min-w-0 flex-1 text-2xl font-extrabold text-[#0b1f4b] sm:text-3xl">
             {dictionary.home.popularAirports}
           </h2>
-          {canLoop ? (
+          {overflowing ? (
             <div
               className="ml-auto flex shrink-0 items-center gap-2"
               role="group"
@@ -250,6 +262,14 @@ function PopularAirportsCarousel({
             onPointerDown={() => setPaused(true)}
             onPointerUp={() => setPaused(false)}
             onPointerCancel={() => setPaused(false)}
+            onScroll={
+              canLoop
+                ? undefined
+                : (event) => {
+                    const step = metrics().step;
+                    if (step > 0) setLead(Math.round(Math.abs(event.currentTarget.scrollLeft) / step));
+                  }
+            }
             className="grid grid-flow-col grid-rows-1 auto-cols-[100%] gap-4 overflow-x-auto pb-1 sm:auto-cols-[calc((100%-1.25rem)/2)] sm:gap-5 lg:auto-cols-[calc((100%-3rem)/3)] lg:gap-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {slides.map((airport, index) => (
@@ -263,7 +283,7 @@ function PopularAirportsCarousel({
           </div>
         </div>
 
-        {canLoop ? (
+        {overflowing ? (
           <p className="mt-4 text-center text-xs font-medium text-slate-500 sm:mt-5">
             {lead + 1} / {airports.length}
           </p>

@@ -20,6 +20,7 @@ import { getPopularAirports as getStaticPopularAirports } from "@/lib/catalog/po
 import { VEHICLE_CATEGORIES } from "@/lib/catalog/categories";
 import { summarizeMappedModels } from "@/lib/cars/category-mapping";
 import { airportCountryIso2 } from "@/lib/catalog/search-places";
+import { withAutoTitleTranslations } from "@/lib/catalog/airport-card-auto-titles";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +85,11 @@ export default async function Home() {
           city: a.iata,
           image: a.imageUrl,
           rank: index + 1,
-          translations: "translations" in a ? (a.translations as AirportCardTranslations) : undefined,
+          translations: withAutoTitleTranslations({
+            iata: a.iata,
+            title: a.title,
+            translations: "translations" in a ? (a.translations as AirportCardTranslations) : undefined,
+          }).translations,
           countryIso2: airportCountryIso2(a.iata),
         }))}
       />

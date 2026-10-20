@@ -36,6 +36,17 @@ const RENTAL_TITLE: Record<Locale, string> = {
   th: "เช่ารถที่{airport}",
 };
 
+/** "Car rental at {airport}" in each language (for airports outside the main catalog). */
+export function rentalTitleTemplate(locale: Locale): string {
+  return RENTAL_TITLE[locale];
+}
+
+/** Whether the built-in catalog already builds a localized title for this code. */
+export function hasCatalogAirportTitle(iata: string): boolean {
+  const code = iata.trim().toUpperCase();
+  return CATALOG_AIRPORTS.some((item) => item.iata === code);
+}
+
 export function asCardLocale(locale: string): Locale {
   return (LOCALES as readonly string[]).includes(locale) ? (locale as Locale) : "en";
 }
@@ -60,6 +71,13 @@ export function missingAirportInfoLocales(card: LocalizableAirportCard): Locale[
     if (lang === source) return false;
     return !card.translations?.[lang]?.infoText?.trim();
   });
+}
+
+/** Locales that still need a translated card title. The source language uses `title` itself. */
+export function missingAirportTitleLocales(card: LocalizableAirportCard): Locale[] {
+  if (!card.title.trim()) return [];
+  const source = sourceLocale(card);
+  return LOCALES.filter((lang) => lang !== source && !card.translations?.[lang]?.title?.trim());
 }
 
 function autoTitle(locale: Locale, iata: string): string | null {
