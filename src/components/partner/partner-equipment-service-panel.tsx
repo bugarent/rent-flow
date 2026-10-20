@@ -19,7 +19,6 @@ import { PartnerEurMoneyInput } from "@/components/partner/partner-eur-money-inp
 import { partnerCurrencySymbol } from "@/lib/partners/pricing-currency";
 import { knownText } from "@/lib/i18n/known-record-text";
 import { localizedExtraCopy } from "@/lib/extras/localized-copy";
-import { cn } from "@/lib/utils";
 import {
   PartnerExtraCarPicker,
   type PartnerExtraCarOption,
