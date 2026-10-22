@@ -348,6 +348,12 @@ export function PartnersManager({
         matchesPartnerSearch(p.searchText ?? [p.displayName, p.email, p.phone, p.secondaryPhone].join(" "), query),
       )
       .sort((a, b) => {
+        if (mode === "directory") {
+          const na = a.sequentialNumber ?? Number.POSITIVE_INFINITY;
+          const nb = b.sequentialNumber ?? Number.POSITIVE_INFINITY;
+          if (na !== nb) return na - nb;
+          return a.displayName.localeCompare(b.displayName);
+        }
         const ua = partnerAttention(a);
         const ub = partnerAttention(b);
         if (ub !== ua) return ub - ua;
@@ -643,7 +649,7 @@ export function PartnersManager({
       {showPartners ? (() => {
         const showCountry = filter === "DIRECTORY" || mode === "directory";
         const hideId = filter === "DIRECTORY";
-        const colCount = 7 + (hideId ? 0 : 1) + (showCountry ? 1 : 0);
+        const colCount = 8 + (hideId ? 0 : 1) + (showCountry ? 1 : 0);
         const allPicked = visibleKeys.length > 0 && selectedVisibleCount === visibleKeys.length;
         return (
       <>
@@ -675,6 +681,7 @@ export function PartnersManager({
                       className="h-4 w-4 align-middle accent-[#0b1f4b]"
                     />
                   </th>
+                  <th className="w-8 whitespace-nowrap px-1 py-1 text-center">#</th>
                   {hideId ? null : <th className="whitespace-nowrap px-2 py-1">{t.idCol}</th>}
                   <th className="whitespace-nowrap px-2 py-1">{t.nameCol}</th>
                   <th className="whitespace-nowrap px-2 py-1">{t.phoneCol}</th>
@@ -693,7 +700,7 @@ export function PartnersManager({
                     </td>
                   </tr>
                 ) : (
-                  rows.map((p) => {
+                  rows.map((p, index) => {
                     const unread = partnerUnread(p);
                     const attention = partnerAttention(p);
                     const open = expandedId === p.id;
@@ -721,6 +728,9 @@ export function PartnersManager({
                               onChange={() => togglePartnerKeys(p)}
                               className="h-4 w-4 align-middle accent-[#0b1f4b]"
                             />
+                          </td>
+                          <td className="px-1 py-0.5 text-center align-middle font-bold tabular-nums text-slate-500">
+                            {index + 1}
                           </td>
                           {hideId ? null : (
                           <td
@@ -941,7 +951,7 @@ export function PartnersManager({
               {t.empty}
             </p>
           ) : (
-            rows.map((p) => {
+            rows.map((p, index) => {
               const unread = partnerUnread(p);
               const attention = partnerAttention(p);
               const open = expandedId === p.id;
@@ -968,6 +978,7 @@ export function PartnersManager({
                       onChange={() => togglePartnerKeys(p)}
                       className="h-5 w-5 accent-[#0b1f4b]"
                     />
+                    <span className="shrink-0 tabular-nums text-slate-500">{index + 1}.</span>
                     <span className="min-w-0 truncate">{p.displayName}</span>
                   </label>
                   {showCountry && !hideId ? (
