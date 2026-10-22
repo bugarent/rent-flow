@@ -72,7 +72,8 @@ const EMPTY_COPY: Record<string, string> = {
 
 /**
  * Popular airports of the country picked in the homepage search (admin adds cards per
- * country). Before the search box reports its country, the server's default is used.
+ * country). Until a country is picked, every country's cards show in the server's
+ * popularity order.
  */
 export function PopularAirports({
   airports,

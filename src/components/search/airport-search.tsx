@@ -135,7 +135,7 @@ function CountryPicker({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const selected = countries.find((c) => c.iso2 === value) ?? countries[0];
+  const selected = countries.find((c) => c.iso2 === value) ?? null;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -200,7 +200,7 @@ function CountryPicker({
     };
   }, [open, locked]);
 
-  if (!selected) return null;
+  if (!countries.length) return null;
 
   const list =
     open && !locked
@@ -271,8 +271,14 @@ function CountryPicker({
       >
         <span className="flex min-w-0 flex-1 items-center justify-center gap-2">
           <Globe className="h-4 w-4 shrink-0 text-[#1A3B5D]/80" />
-          <span className="truncate">{selected.name}</span>
-          <CountryFlag iso2={selected.iso2} title={selected.name} />
+          {selected ? (
+            <>
+              <span className="truncate">{selected.name}</span>
+              <CountryFlag iso2={selected.iso2} title={selected.name} />
+            </>
+          ) : (
+            <span className="truncate text-slate-500">{dictionary.home.searchCountryPlaceholder}</span>
+          )}
         </span>
         <ChevronDown
           className={`h-5 w-5 shrink-0 transition-transform ${
@@ -715,9 +721,8 @@ export function AirportSearch({
   const { dictionary, locale } = usePreferences();
   const countries = useMemo(() => countriesFromOptions(options, locale), [options, locale]);
   const locked = countries.length <= 1;
-  const defaultCountry =
-    options.find((o) => o.iata === "KUT")?.countryIso2?.toUpperCase() || countries[0]?.iso2 || "";
-  const [countryIso2, setCountryIso2] = useState(defaultCountry);
+  // Empty until the visitor picks a country or a place; a single-country site needs no choice.
+  const [countryIso2, setCountryIso2] = useState(() => (locked ? countries[0]?.iso2 || "" : ""));
 
   const locations = useMemo(() => {
     const preferred = countryIso2?.toUpperCase() || "";
@@ -768,10 +773,19 @@ export function AirportSearch({
 
   useEffect(() => {
     if (!countries.length) return;
-    if (!countries.some((c) => c.iso2 === countryIso2)) {
+    if (locked && countryIso2 !== countries[0].iso2) {
       setCountryIso2(countries[0].iso2);
+      return;
     }
-  }, [countries, countryIso2]);
+    if (countryIso2 && !countries.some((c) => c.iso2 === countryIso2)) setCountryIso2("");
+  }, [countries, countryIso2, locked]);
+
+  // Picking a place first selects its country, so the rest of the page follows it.
+  useEffect(() => {
+    if (countryIso2 || !pickup) return;
+    const iso2 = options.find((o) => o.iata === pickup)?.countryIso2?.toUpperCase();
+    if (iso2) setCountryIso2(iso2);
+  }, [pickup, countryIso2, options]);
 
   useEffect(() => {
     setHomeCountry(countryIso2);

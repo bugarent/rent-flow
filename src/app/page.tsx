@@ -15,6 +15,7 @@ import {
 import { defaultHomepageInfoContent } from "@/lib/server/homepage-info-blocks-store";
 import { DEFAULT_CUSTOM_BOOKING_CHANNELS } from "@/lib/catalog/custom-booking-channels";
 import { softTimeout } from "@/lib/server/soft-timeout";
+import { bookingCountsByPickupIata } from "@/lib/server/airport-popularity";
 import type { AirportCardTranslations } from "@/lib/catalog/homepage-airport-i18n";
 import { getPopularAirports as getStaticPopularAirports } from "@/lib/catalog/popular-airports";
 import { VEHICLE_CATEGORIES } from "@/lib/catalog/categories";
@@ -40,16 +41,40 @@ export default async function Home() {
     imageUrl: a.image,
   }));
 
-  const [options, popularAirports, categories, airportsLayout, infoContent, googleReviews, bookingChannels] =
-    await Promise.all([
-      softTimeout(cachedSearchDeliveryAirports(), [], 6000),
-      softTimeout(cachedHomepageAirports(), airportFallback, 6000),
-      softTimeout(cachedHomepageCategories(), categoryFallback, 6000),
-      softTimeout(cachedPopularAirportsLayout(), "grid" as const, 6000),
-      softTimeout(cachedHomepageInfoContent(), defaultHomepageInfoContent(), 6000),
-      softTimeout(cachedHomepageGoogleReviews(), null, 6000),
-      softTimeout(cachedCustomBookingChannels(), DEFAULT_CUSTOM_BOOKING_CHANNELS, 6000),
-    ]);
+  const [
+    options,
+    popularAirports,
+    categories,
+    airportsLayout,
+    infoContent,
+    googleReviews,
+    bookingChannels,
+    bookingCounts,
+  ] = await Promise.all([
+    softTimeout(cachedSearchDeliveryAirports(), [], 6000),
+    softTimeout(cachedHomepageAirports(), airportFallback, 6000),
+    softTimeout(cachedHomepageCategories(), categoryFallback, 6000),
+    softTimeout(cachedPopularAirportsLayout(), "grid" as const, 6000),
+    softTimeout(cachedHomepageInfoContent(), defaultHomepageInfoContent(), 6000),
+    softTimeout(cachedHomepageGoogleReviews(), null, 6000),
+    softTimeout(cachedCustomBookingChannels(), DEFAULT_CUSTOM_BOOKING_CHANNELS, 6000),
+    softTimeout(bookingCountsByPickupIata(), new Map<string, number>(), 3000),
+  ]);
+
+  // Popular airport cards: most booked first, then the larger fleet, then the admin's order.
+  const carCountByIata = new Map(options.map((o) => [o.iata.toUpperCase(), o.carCount ?? 0]));
+  const rankedAirports = popularAirports
+    .map((airport, index) => ({ airport, index }))
+    .sort((a, b) => {
+      const iataA = a.airport.iata.toUpperCase();
+      const iataB = b.airport.iata.toUpperCase();
+      return (
+        (bookingCounts.get(iataB) ?? 0) - (bookingCounts.get(iataA) ?? 0) ||
+        (carCountByIata.get(iataB) ?? 0) - (carCountByIata.get(iataA) ?? 0) ||
+        a.index - b.index
+      );
+    })
+    .map(({ airport }) => airport);
 
   return (
     <div className="flex w-full min-w-0 flex-col overflow-x-clip">
@@ -76,10 +101,7 @@ export default async function Home() {
       <HowItWorksPanel content={infoContent} />
       <PopularAirports
         layout={airportsLayout}
-        defaultCountryIso2={
-          options.find((o) => o.iata === "KUT")?.countryIso2 || options[0]?.countryIso2 || ""
-        }
-        airports={popularAirports.map((a, index) => ({
+        airports={rankedAirports.map((a, index) => ({
           iata: a.iata,
           name: a.title,
           city: a.iata,
