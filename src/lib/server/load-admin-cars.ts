@@ -33,6 +33,8 @@ export type AdminCarRow = {
   partnerPhone: string;
   /** Site-assigned partner code from registration, e.g. PRT-1000 */
   partnerCode: string;
+  /** Partner id the admin partner detail page opens (resolved by id or email). */
+  partnerDetailId: string;
   country: string;
   bodyType: string;
   photoUrl: string;
@@ -45,6 +47,7 @@ export type AdminCarRow = {
 };
 
 type PartnerLookup = {
+  id: string;
   code: string;
   phone: string;
   email: string;
@@ -85,6 +88,7 @@ async function buildPartnerLookup(): Promise<{
       const code = formatPartnerCode(p.sequentialNumber) || "";
       if (!code && !p.phone && !p.email) continue;
       put(p.id, p.email, {
+        id: p.id,
         code,
         phone: p.phone || "",
         email: p.email || "",
@@ -107,6 +111,7 @@ async function buildPartnerLookup(): Promise<{
     });
     for (const p of partners) {
       put(p.id, p.email, {
+        id: p.id,
         code: formatPartnerCode(p.sequentialNumber) || "",
         phone: p.phone || "",
         email: p.email || "",
@@ -125,9 +130,10 @@ function resolvePartner(
   car: Pick<AdminCarRow, "partnerId" | "partnerEmail" | "partnerName" | "partnerPhone" | "partnerCode">,
   byId: Map<string, PartnerLookup>,
   byEmail: Map<string, PartnerLookup>,
-): Pick<AdminCarRow, "partnerCode" | "partnerPhone" | "partnerEmail" | "partnerName"> {
+): Pick<AdminCarRow, "partnerCode" | "partnerPhone" | "partnerEmail" | "partnerName" | "partnerDetailId"> {
   const hit = byId.get(car.partnerId) || byEmail.get(normEmail(car.partnerEmail)) || null;
   return {
+    partnerDetailId: hit?.id || car.partnerId || "",
     partnerCode: car.partnerCode || hit?.code || "",
     partnerPhone: car.partnerPhone || hit?.phone || "",
     partnerEmail: car.partnerEmail || hit?.email || "",

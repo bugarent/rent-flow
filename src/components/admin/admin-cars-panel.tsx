@@ -273,9 +273,19 @@ export function AdminCarsPanel({
               <p className="mb-0.5 text-[10px] font-bold uppercase text-slate-400 sm:hidden">
                 {labels.colPartnerNumber}
               </p>
-              <p className="truncate font-mono text-xs font-black tracking-wide text-[#0b1f4b]">
-                {car.partnerCode || "—"}
-              </p>
+              {car.partnerCode && car.partnerDetailId ? (
+                <Link
+                  href={`${ADMIN_BASE}/partners/${encodeURIComponent(car.partnerDetailId)}`}
+                  title={car.partnerName}
+                  className="inline-flex min-h-8 items-center truncate font-mono text-xs font-black tracking-wide text-[#1d6fe8] underline-offset-2 hover:underline"
+                >
+                  {car.partnerCode}
+                </Link>
+              ) : (
+                <p className="truncate font-mono text-xs font-black tracking-wide text-[#0b1f4b]">
+                  {car.partnerCode || "—"}
+                </p>
+              )}
             </div>
 
             <div className="min-w-0 leading-tight">
