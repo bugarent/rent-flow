@@ -13,6 +13,7 @@ export function FooterActions({
   canEditExtras,
   readOnly,
   busy,
+  hasChanges = true,
   hideRefundable = false,
   onSaveAdmin,
   onSubmitGuestChanges,
@@ -30,6 +31,8 @@ export function FooterActions({
   canEditExtras: boolean;
   readOnly: boolean;
   busy: boolean;
+  /** Guest save stays faded and inactive until something in the booking is edited. */
+  hasChanges?: boolean;
   /** Hide the amber refundable box (e.g. while the cancel dialog is open). */
   hideRefundable?: boolean;
   onSaveAdmin: () => void;
@@ -204,11 +207,13 @@ export function FooterActions({
               <>
                 <button
                   type="button"
-                  disabled={busy}
-                  onClick={() =>
-                    void onSubmitGuestChanges(extrasPaymentBreakdown.payNow > 0)
-                  }
-                  className="flex w-full flex-col items-center justify-center rounded-xl bg-emerald-600 px-3 py-4 text-sm font-bold leading-tight text-white disabled:opacity-50"
+                  disabled={busy || !hasChanges}
+                  aria-disabled={busy || !hasChanges}
+                  onClick={() => {
+                    if (!hasChanges) return;
+                    void onSubmitGuestChanges(extrasPaymentBreakdown.payNow > 0);
+                  }}
+                  className="flex w-full flex-col items-center justify-center rounded-xl bg-emerald-600 px-3 py-4 text-sm font-bold leading-tight text-white transition disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <span>{t.savePayment}</span>
                   {extrasPaymentBreakdown.payNow > 0 ? (

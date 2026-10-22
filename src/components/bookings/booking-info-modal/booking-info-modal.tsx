@@ -269,6 +269,50 @@ export function BookingInfoModal({
     setDriverPhone(booking.guestPhone || "");
   }, [booking.id, booking.extras, booking.pickupAt, booking.dropoffAt, booking.pickupAirport?.iata, booking.dropoffAirport?.iata, booking.pickupAirport?.timezone, booking.dropoffAirport?.timezone, booking.guestFirstName, booking.guestLastName, booking.guestEmail, booking.guestPhone, lockedExtraIds, pickupTz, dropoffTz]);
 
+  const hasChanges = useMemo(() => {
+    const baseExtras = new Set((booking.extras || []).map((e) => e.id));
+    for (const id of lockedExtraIds) baseExtras.add(id);
+    const extrasChanged =
+      baseExtras.size !== selectedExtraIds.size || [...selectedExtraIds].some((id) => !baseExtras.has(id));
+    return (
+      extrasChanged ||
+      pickupDate !== start.date ||
+      pickupTime !== start.time ||
+      dropoffDate !== end.date ||
+      dropoffTime !== end.time ||
+      pickupIata !== (booking.pickupAirport?.iata || "") ||
+      dropoffIata !== (booking.dropoffAirport?.iata || "") ||
+      driverFirst.trim() !== (booking.guestFirstName || "").trim() ||
+      driverLast.trim() !== (booking.guestLastName || "").trim() ||
+      driverEmail.trim() !== (booking.guestEmail || "").trim() ||
+      driverPhone.trim() !== (booking.guestPhone || "").trim()
+    );
+  }, [
+    booking.extras,
+    booking.pickupAirport?.iata,
+    booking.dropoffAirport?.iata,
+    booking.guestFirstName,
+    booking.guestLastName,
+    booking.guestEmail,
+    booking.guestPhone,
+    lockedExtraIds,
+    selectedExtraIds,
+    pickupDate,
+    pickupTime,
+    dropoffDate,
+    dropoffTime,
+    pickupIata,
+    dropoffIata,
+    driverFirst,
+    driverLast,
+    driverEmail,
+    driverPhone,
+    start.date,
+    start.time,
+    end.date,
+    end.time,
+  ]);
+
   useEffect(() => {
     if (!open) {
       setPaymentOpen(false);
@@ -1104,6 +1148,7 @@ export function BookingInfoModal({
           canEditExtras={canEditExtras}
           readOnly={readOnly}
           busy={busy}
+          hasChanges={hasChanges}
           hideRefundable={cancelOpen}
           onSaveAdmin={saveAdmin}
           onSubmitGuestChanges={submitGuestChanges}
