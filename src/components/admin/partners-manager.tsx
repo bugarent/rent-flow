@@ -49,6 +49,7 @@ type PartnerRow = {
   phone: string;
   secondaryPhone?: string | null;
   country?: string;
+  countryIso2s?: string[];
   hasUser?: boolean;
   unreadReapplyCount?: number;
   unreadForAdmin?: number;
@@ -218,6 +219,7 @@ export function PartnersManager({
     return "COMPANY";
   });
   const partnerTabQuery = mode === "directory" ? searchParams.get("partnerTab") : null;
+  const countryFilter = mode === "directory" ? (searchParams.get("country") || "").trim().toUpperCase() : "";
   const [tabQuery, setTabQuery] = useState(partnerTabQuery);
   const [tabs, setTabs] = useState<DirectoryPartnerTab[]>(() =>
     parseDirectoryPartnerTabs(mode === "directory" ? searchParams.get("partnerTab") : "company"),
@@ -347,6 +349,11 @@ export function PartnersManager({
       .filter((p) =>
         matchesPartnerSearch(p.searchText ?? [p.displayName, p.email, p.phone, p.secondaryPhone].join(" "), query),
       )
+      .filter(
+        (p) =>
+          !countryFilter ||
+          (p.countryIso2s || []).some((iso) => iso.trim().toUpperCase() === countryFilter),
+      )
       .sort((a, b) => {
         if (mode === "directory") {
           const na = a.sequentialNumber ?? Number.POSITIVE_INFINITY;
@@ -366,7 +373,7 @@ export function PartnersManager({
       statusLabel: p.statusLabel ?? partnerStatusLabel(p.status),
       fleet: fleetDisplay(p),
     }));
-  }, [filter, initialPartners, mode, tabs, query]);
+  }, [filter, initialPartners, mode, tabs, query, countryFilter]);
 
   const visibleCustomers = useMemo(
     () => customers.filter((c) => matchesPartnerSearch([c.displayName, c.email, c.phone].join(" "), query)),
