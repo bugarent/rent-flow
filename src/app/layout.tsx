@@ -7,6 +7,7 @@ import "./globals.css";
 import { AppProviders } from "@/components/providers/app-providers";
 import { PublicShell } from "@/components/layout/public-shell";
 import { JsonLd } from "@/components/seo/json-ld";
+import { GoogleAnalytics } from "@/components/analytics/google-analytics";
 import { SEO_SITE_NAME } from "@/lib/brand";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { readPreferences } from "@/lib/server/preferences";
@@ -97,6 +98,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       dir={dir}
       className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${notoGeorgian.variable} ${notoArabic.variable} h-full antialiased`}
     >
+      <head>
+        <GoogleAnalytics />
+      </head>
       <body className="flex min-h-full flex-col bg-slate-50 text-slate-900">
         <style>{`#nl-badge-frame,iframe[title="Powered by Netlify"],script[src*=".netlify/scripts/hud"]{display:none!important}`}</style>
         <JsonLd
