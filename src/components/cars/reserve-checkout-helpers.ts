@@ -31,7 +31,7 @@ export type ReservePaidExtra = {
   checkoutSlot?: InsuranceCheckoutSlot | "none";
   /** Partner €0 offer — optional; customer can turn on/off */
   free?: boolean;
-  /** Admin mandatory / TPL — always on, not toggled off (charged only when priced) */
+  /** Free TPL — always on, not toggled off. Other admin-mandatory packs are optional for the customer. */
   locked?: boolean;
   /** Partner forbidden territory/service notice — not purchasable */
   forbidden?: boolean;
@@ -215,7 +215,7 @@ function mapCarExtraRow(row: NonNullable<ReserveCarPayload["extras"]>[number]): 
     : Boolean(svc?.isTpl) && !freeCancel48;
   const mandatoryFree = priced
     ? isMandatoryFreeExtra({ ...priced, slug, name, id })
-    : mandatory;
+    : mandatory && String(slug || "").trim().toLowerCase() === "tpl";
   const periodFree = priced
     ? isPeriodForcedFreeExtra(priced)
     : svc?.maxPeriodEur != null && Number(svc.maxPeriodEur) === 0;
@@ -249,7 +249,7 @@ function mapCarExtraRow(row: NonNullable<ReserveCarPayload["extras"]>[number]): 
     minPeriodEur,
     checkoutSlot,
     free,
-    locked: mandatory,
+    locked: mandatoryFree,
     slug,
     sortOrder,
     nameI18n: { ...readExtraI18n(svc.name), ...(svc.nameI18n || {}), ...(priced?.nameI18n || {}) },

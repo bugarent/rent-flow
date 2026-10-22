@@ -57,7 +57,7 @@ export async function catalogExtrasForCar(carId: string): Promise<
     minPeriodEur?: number | null;
   }>
 > {
-  const { isMandatoryExtra } = await import("@/lib/extras/pricing");
+  const { isMandatoryFreeExtra } = await import("@/lib/extras/pricing");
   try {
     const fileCar = await getFileCar(carId);
     if (fileCar?.extras?.length) {
@@ -73,7 +73,7 @@ export async function catalogExtrasForCar(carId: string): Promise<
           id: e.extraServiceId,
           label: pickServiceLabel(localizedLabel(e.extraService?.name, "")),
           priceEurPerDay: Number(e.priceEur) || 0,
-          locked: e.extraService ? isMandatoryExtra(e.extraService) : false,
+          locked: e.extraService ? isMandatoryFreeExtra(e.extraService) : false,
           maxPeriodEur: e.extraService?.maxPeriodEur ?? null,
           minPeriodEur: e.extraService?.minPeriodEur ?? null,
         }));
@@ -89,6 +89,7 @@ export async function catalogExtrasForCar(carId: string): Promise<
         extraService: {
           select: {
             name: true,
+            slug: true,
             isTpl: true,
             minPriceEur: true,
             maxPriceEur: true,
@@ -130,7 +131,8 @@ export async function catalogExtrasForCar(carId: string): Promise<
         maxPeriodEur: bounds.maxPeriodEur,
         minPeriodEur: bounds.minPeriodEur,
         locked: r.extraService
-          ? isMandatoryExtra({
+          ? isMandatoryFreeExtra({
+              slug: r.extraService.slug,
               isTpl: r.extraService.isTpl,
               minPriceEur: r.extraService.minPriceEur == null ? null : Number(r.extraService.minPriceEur),
               maxPriceEur: r.extraService.maxPriceEur == null ? null : Number(r.extraService.maxPriceEur),
@@ -143,7 +145,7 @@ export async function catalogExtrasForCar(carId: string): Promise<
   }
 }
 
-/** Re-attach admin-mandatory / TPL extras if a client tried to strip them on save. */
+/** Re-attach the free TPL pack if a client tried to strip it on save. */
 export async function mergeMandatoryCatalogExtras(
   carId: string,
   proposed: Array<{ id: string; label: string; priceEur: number; qty?: number }>,
