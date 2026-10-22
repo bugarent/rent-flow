@@ -5,10 +5,15 @@ import { LOCALES, LOCALE_LABELS, type Locale } from "@/lib/i18n/config";
 import { uiText } from "@/lib/i18n/ui-text";
 import {
   asCardLocale,
+  type AirportCardTranslation,
   type AirportCardTranslations,
 } from "@/lib/catalog/homepage-airport-i18n";
 
-/** Per-language title + details for one homepage airport card. */
+function hasContent(row: AirportCardTranslation | undefined): boolean {
+  return Boolean(row && Object.values(row).some((value) => value?.trim()));
+}
+
+/** Per-language title, details and Google lines for one homepage airport card. */
 export function AirportCardTranslationsFields({
   value,
   onChange,
@@ -24,25 +29,39 @@ export function AirportCardTranslationsFields({
     heading: uiText(adminLocale, "Translations", "თარგმანები", "Переводы"),
     hint: uiText(
       adminLocale,
-      "The preface is translated automatically into the visitor's language. Fill a language here only to replace that translation.",
-      "წინასიტყვაობა ავტომატურად ითარგმნება ვიზიტორის ენაზე. აქ ენა მხოლოდ მაშინ შეავსეთ, თუ თარგმანი უნდა შეცვალოთ.",
-      "Предисловие переводится на язык посетителя автоматически. Заполняйте язык здесь только чтобы заменить перевод.",
+      "Everything is translated automatically into the visitor's language. Fill a language here only to replace that translation.",
+      "ყველაფერი ავტომატურად ითარგმნება ვიზიტორის ენაზე. აქ ენა მხოლოდ მაშინ შეავსეთ, თუ თარგმანი უნდა შეცვალოთ.",
+      "Всё переводится на язык посетителя автоматически. Заполняйте язык здесь только чтобы заменить перевод.",
     ),
     language: uiText(adminLocale, "Language", "ენა", "Язык"),
     title: uiText(adminLocale, "Title in this language", "სათაური ამ ენაზე", "Заголовок на этом языке"),
     info: uiText(adminLocale, "Details in this language", "დეტალები ამ ენაზე", "Описание на этом языке"),
+    seoTitle: uiText(
+      adminLocale,
+      "Google title in this language",
+      "Google-ის სათაური ამ ენაზე",
+      "Заголовок Google на этом языке",
+    ),
+    seoDescription: uiText(
+      adminLocale,
+      "Google description in this language",
+      "Google-ის აღწერა ამ ენაზე",
+      "Описание Google на этом языке",
+    ),
   };
 
-  const update = (patch: { title?: string; infoText?: string }) => {
+  const update = (patch: AirportCardTranslation) => {
     const nextRow = { ...row, ...patch };
     const next = { ...value };
-    if (!nextRow.title?.trim() && !nextRow.infoText?.trim()) delete next[lang];
+    if (!hasContent(nextRow)) delete next[lang];
     else next[lang] = nextRow;
     onChange(next);
   };
 
+  const inputClass = "min-h-10 w-full rounded-lg border p-2 text-base sm:text-xs";
+
   return (
-    <fieldset className="space-y-2 rounded-lg border border-slate-200 bg-white p-2.5">
+    <fieldset className="min-w-0 space-y-2 rounded-lg border border-slate-200 bg-white p-2.5">
       <legend className="px-1 text-xs font-bold text-[#0b1f4b]">{t.heading}</legend>
       <p className="text-[11px] text-slate-500">{t.hint}</p>
       <label className="block text-[11px] font-bold text-slate-600">
@@ -55,25 +74,40 @@ export function AirportCardTranslationsFields({
           {LOCALES.map((code) => (
             <option key={code} value={code}>
               {LOCALE_LABELS[code]}
-              {value[code]?.title || value[code]?.infoText ? " ✓" : ""}
+              {hasContent(value[code]) ? " ✓" : ""}
             </option>
           ))}
         </select>
       </label>
       <input
-        className="w-full rounded-lg border p-2 text-base sm:text-xs"
+        className={inputClass}
         placeholder={t.title}
         maxLength={120}
         value={row.title || ""}
         onChange={(event) => update({ title: event.target.value })}
       />
       <textarea
-        className="w-full rounded-lg border p-2 text-base sm:text-xs"
+        className={inputClass}
         rows={4}
         placeholder={t.info}
         maxLength={8000}
         value={row.infoText || ""}
         onChange={(event) => update({ infoText: event.target.value })}
+      />
+      <input
+        className={inputClass}
+        placeholder={t.seoTitle}
+        maxLength={70}
+        value={row.seoTitle || ""}
+        onChange={(event) => update({ seoTitle: event.target.value })}
+      />
+      <textarea
+        className={inputClass}
+        rows={2}
+        placeholder={t.seoDescription}
+        maxLength={170}
+        value={row.seoDescription || ""}
+        onChange={(event) => update({ seoDescription: event.target.value })}
       />
     </fieldset>
   );

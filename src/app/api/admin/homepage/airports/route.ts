@@ -18,6 +18,8 @@ const schema = z.object({
   iata: z.string().trim().min(2).max(8),
   imageUrl: z.string().trim().min(1),
   infoText: z.string().trim().max(8000).optional(),
+  seoTitle: z.string().trim().max(70).optional(),
+  seoDescription: z.string().trim().max(170).optional(),
   translations: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -61,6 +63,8 @@ export async function POST(req: Request) {
       iata: body.iata,
       imageUrl: body.imageUrl,
       infoText: body.infoText,
+      seoTitle: body.seoTitle,
+      seoDescription: body.seoDescription,
       translations: body.translations,
     });
     return NextResponse.json(row, { status: 201 });

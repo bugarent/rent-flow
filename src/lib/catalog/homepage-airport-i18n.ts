@@ -1,14 +1,24 @@
 import { CATALOG_AIRPORTS } from "@/lib/catalog/airports";
 import { LOCALES, type Locale } from "@/lib/i18n/config";
 import { placeLabel } from "@/lib/i18n/place-label";
+import { autoSeoDescription, autoSeoTitle } from "@/lib/catalog/airport-seo";
 
-export type AirportCardTranslation = { title?: string; infoText?: string };
+export type AirportCardTranslation = {
+  title?: string;
+  infoText?: string;
+  /** Google result title (meta title) in this language. */
+  seoTitle?: string;
+  /** Google result snippet (meta description) in this language. */
+  seoDescription?: string;
+};
 export type AirportCardTranslations = Partial<Record<Locale, AirportCardTranslation>>;
 
 type LocalizableAirportCard = {
   iata: string;
   title: string;
   infoText?: string;
+  seoTitle?: string;
+  seoDescription?: string;
   translations?: AirportCardTranslations;
 };
 
@@ -115,18 +125,65 @@ export function localizedAirportInfo(card: LocalizableAirportCard, locale: strin
   return card.translations?.en?.infoText?.trim() || base;
 }
 
+/** Locales that still need a translated SEO title / description (only when a base one exists). */
+export function missingAirportSeoLocales(card: LocalizableAirportCard): Locale[] {
+  const hasTitle = Boolean(card.seoTitle?.trim());
+  const hasDescription = Boolean(card.seoDescription?.trim());
+  if (!hasTitle && !hasDescription) return [];
+  const source = sourceLocale(card);
+  return LOCALES.filter((lang) => {
+    if (lang === source) return false;
+    const row = card.translations?.[lang];
+    return (hasTitle && !row?.seoTitle?.trim()) || (hasDescription && !row?.seoDescription?.trim());
+  });
+}
+
+/**
+ * Meta title + description in the visitor's language: the admin's (or translated) text,
+ * else built from the card heading and page text so every language has a good snippet.
+ */
+export function localizedAirportSeo(
+  card: LocalizableAirportCard,
+  locale: string,
+  opts: { airportName: string },
+): { title: string; description: string } {
+  const lang = asCardLocale(locale);
+  const own = card.translations?.[lang];
+  const isSource = sourceLocale(card) === lang;
+  const title =
+    own?.seoTitle?.trim() ||
+    (isSource ? card.seoTitle?.trim() : "") ||
+    autoSeoTitle(localizedAirportTitle(card, lang));
+  const description =
+    own?.seoDescription?.trim() ||
+    (isSource ? card.seoDescription?.trim() : "") ||
+    autoSeoDescription({
+      locale: lang,
+      airportName: opts.airportName,
+      code: card.iata.trim().toUpperCase(),
+      infoText: localizedAirportInfo(card, lang),
+    });
+  return { title, description };
+}
+
 /** Keep only non-empty, known-locale translation entries. */
 export function cleanAirportTranslations(raw: unknown): AirportCardTranslations {
   const out: AirportCardTranslations = {};
   if (!raw || typeof raw !== "object") return out;
+  const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
   for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
     if (!(LOCALES as readonly string[]).includes(key) || !value || typeof value !== "object") continue;
     const row = value as Record<string, unknown>;
-    const title = typeof row.title === "string" ? row.title.trim().slice(0, 120) : "";
-    const infoText = typeof row.infoText === "string" ? row.infoText.trim().slice(0, 8000) : "";
-    if (title || infoText) {
-      out[key as Locale] = { ...(title ? { title } : {}), ...(infoText ? { infoText } : {}) };
+    const entry: AirportCardTranslation = {
+      title: text(row.title, 120),
+      infoText: text(row.infoText, 8000),
+      seoTitle: text(row.seoTitle, 70),
+      seoDescription: text(row.seoDescription, 170),
+    };
+    for (const field of Object.keys(entry) as Array<keyof AirportCardTranslation>) {
+      if (!entry[field]) delete entry[field];
     }
+    if (Object.keys(entry).length) out[key as Locale] = entry;
   }
   return out;
 }

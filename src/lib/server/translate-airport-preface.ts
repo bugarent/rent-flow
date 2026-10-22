@@ -25,10 +25,11 @@ export async function translateAirportPreface(
 export async function translateAirportTitle(
   text: string,
   locales: Locale[],
+  maxLength = 120,
 ): Promise<Partial<Record<Locale, string>>> {
   const out = await translateAirportText(text, locales, "title");
   for (const code of Object.keys(out) as Locale[]) {
-    out[code] = out[code]!.replace(/\s+/g, " ").slice(0, 120);
+    out[code] = out[code]!.replace(/\s+/g, " ").slice(0, maxLength);
   }
   return out;
 }

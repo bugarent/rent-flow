@@ -9,6 +9,7 @@ import { revalidatePublishedContent } from "@/lib/server/revalidate-public-conte
 import {
   cleanAirportTranslations,
   missingAirportInfoLocales,
+  missingAirportSeoLocales,
   missingAirportTitleLocales,
   type AirportCardTranslations,
 } from "@/lib/catalog/homepage-airport-i18n";
@@ -20,7 +21,10 @@ export type StoredHomepageAirport = {
   title: string;
   imageUrl: string;
   infoText: string;
-  /** Per-language title/details; stored only in the published JSON (like infoText). */
+  /** Google meta title / description; stored only in the published JSON (like infoText). */
+  seoTitle: string;
+  seoDescription: string;
+  /** Per-language title/details/SEO; stored only in the published JSON (like infoText). */
   translations: AirportCardTranslations;
   sortOrder: number;
   createdAt: string;
@@ -46,6 +50,8 @@ function defaultAirports(): StoredHomepageAirport[] {
     title: a.name,
     imageUrl: a.image,
     infoText: "",
+    seoTitle: "",
+    seoDescription: "",
     translations: {},
     sortOrder: index,
     createdAt: now,
@@ -66,6 +72,8 @@ async function readFileStore(): Promise<StoredHomepageAirport[]> {
         title: String(item.title || "Airport"),
         imageUrl: String(item.imageUrl || ""),
         infoText: String(item.infoText || ""),
+        seoTitle: String(item.seoTitle || ""),
+        seoDescription: String(item.seoDescription || ""),
         translations: cleanAirportTranslations(item.translations),
         sortOrder: typeof item.sortOrder === "number" ? item.sortOrder : index,
         createdAt: String(item.createdAt || new Date().toISOString()),
@@ -89,7 +97,13 @@ async function publishFromDb(db: AirportDelegate, saved?: StoredHomepageAirport)
   const rows = (await db.findMany({ orderBy: { sortOrder: "asc" } })).map((row) => {
     const stored = toStored(row);
     const prev = previousById.get(stored.id);
-    return { ...stored, infoText: prev?.infoText || "", translations: prev?.translations || {} };
+    return {
+      ...stored,
+      infoText: prev?.infoText || "",
+      seoTitle: prev?.seoTitle || "",
+      seoDescription: prev?.seoDescription || "",
+      translations: prev?.translations || {},
+    };
   });
   if (saved) {
     const index = rows.findIndex((row) => row.id === saved.id);
@@ -120,6 +134,8 @@ function toStored(row: Record<string, unknown>): StoredHomepageAirport {
     title: String(row.title),
     imageUrl: String(row.imageUrl),
     infoText: String(row.infoText || ""),
+    seoTitle: String(row.seoTitle || ""),
+    seoDescription: String(row.seoDescription || ""),
     translations: cleanAirportTranslations(row.translations),
     sortOrder: typeof row.sortOrder === "number" ? row.sortOrder : 0,
     createdAt:
@@ -150,10 +166,61 @@ function mergeInfoTranslations(
 function dropInfoTranslations(current: AirportCardTranslations): AirportCardTranslations {
   const next: AirportCardTranslations = {};
   for (const [code, row] of Object.entries(current)) {
-    const title = row?.title?.trim();
-    if (title) next[code as Locale] = { title };
+    if (!row) continue;
+    const { infoText: _infoText, ...rest } = row;
+    if (Object.values(rest).some((value) => value?.trim())) next[code as Locale] = rest;
   }
   return next;
+}
+
+/** Fields whose automatic translations follow the base text (title and SEO lines). */
+const SHORT_FIELDS = ["title", "seoTitle", "seoDescription"] as const;
+type ShortField = (typeof SHORT_FIELDS)[number];
+
+/**
+ * After the base text of some short fields changed, drop their old automatic
+ * translations; a translation the admin typed differently in this save stays.
+ */
+function pruneChangedTranslations(
+  incoming: AirportCardTranslations,
+  stored: AirportCardTranslations,
+  changed: ShortField[],
+): AirportCardTranslations {
+  if (!changed.length) return incoming;
+  const out: AirportCardTranslations = {};
+  for (const [code, row] of Object.entries(incoming)) {
+    const lang = code as Locale;
+    if (!row) continue;
+    const entry = { ...row };
+    for (const field of changed) {
+      if (entry[field] && entry[field] === stored[lang]?.[field]) delete entry[field];
+    }
+    if (Object.values(entry).some((value) => value?.trim())) out[lang] = entry;
+  }
+  return out;
+}
+
+async function fillSeoLocales(airport: StoredHomepageAirport, locales: Locale[]) {
+  if (!locales.length) return airport;
+  const { translateAirportTitle } = await import("@/lib/server/translate-airport-preface");
+  const [titles, descriptions] = await Promise.all([
+    airport.seoTitle.trim() ? translateAirportTitle(airport.seoTitle, locales) : Promise.resolve({}),
+    airport.seoDescription.trim()
+      ? translateAirportTitle(airport.seoDescription, locales, 170)
+      : Promise.resolve({}),
+  ]);
+  const next: AirportCardTranslations = { ...airport.translations };
+  for (const lang of locales) {
+    const seoTitle = (titles as Partial<Record<Locale, string>>)[lang];
+    const seoDescription = (descriptions as Partial<Record<Locale, string>>)[lang];
+    if (!seoTitle && !seoDescription) continue;
+    next[lang] = {
+      ...next[lang],
+      ...(seoTitle && !next[lang]?.seoTitle ? { seoTitle } : {}),
+      ...(seoDescription && !next[lang]?.seoDescription ? { seoDescription } : {}),
+    };
+  }
+  return (await persistInfoTranslations(airport.id, next)) ?? airport;
 }
 
 const prefaceQueue = new Map<string, Promise<unknown>>();
@@ -219,11 +286,19 @@ export async function ensureAirportPrefaceTranslations(
   preferLocale?: string,
   opts?: { onlyPreferred?: boolean },
 ): Promise<StoredHomepageAirport> {
-  if (!missingAirportInfoLocales(airport).length && !missingAirportTitleLocales(airport).length) {
+  if (
+    !missingAirportInfoLocales(airport).length &&
+    !missingAirportTitleLocales(airport).length &&
+    !missingAirportSeoLocales(airport).length
+  ) {
     return airport;
   }
   return enqueuePreface(airport.id, async () => {
     let fresh = (await readFileStore()).find((row) => row.id === airport.id) ?? airport;
+    const seo = missingAirportSeoLocales(fresh);
+    if (seo.length) {
+      fresh = await fillSeoLocales(fresh, opts?.onlyPreferred ? seo.filter((code) => code === preferLocale) : seo);
+    }
     const titles = missingAirportTitleLocales(fresh);
     if (titles.length) {
       // Titles are short: every missing language in one request (only the visitor's on a page view).
@@ -254,6 +329,8 @@ async function createInFileStore(input: {
   iata: string;
   imageUrl: string;
   infoText: string;
+  seoTitle: string;
+  seoDescription: string;
   translations: AirportCardTranslations;
 }): Promise<StoredHomepageAirport> {
   const rows = await readFileStore();
@@ -264,6 +341,8 @@ async function createInFileStore(input: {
     iata: input.iata.toUpperCase(),
     imageUrl: input.imageUrl,
     infoText: input.infoText,
+    seoTitle: input.seoTitle,
+    seoDescription: input.seoDescription,
     translations: input.translations,
     sortOrder: rows.reduce((max, r) => Math.max(max, r.sortOrder), -1) + 1,
     createdAt: now,
@@ -303,6 +382,8 @@ export async function createHomepageAirport(input: {
   iata: string;
   imageUrl: string;
   infoText?: string;
+  seoTitle?: string;
+  seoDescription?: string;
   translations?: unknown;
 }): Promise<StoredHomepageAirport> {
   const payload = {
@@ -310,6 +391,8 @@ export async function createHomepageAirport(input: {
     iata: input.iata.trim().toUpperCase(),
     imageUrl: input.imageUrl.trim(),
     infoText: input.infoText?.trim() ?? "",
+    seoTitle: input.seoTitle?.trim() ?? "",
+    seoDescription: input.seoDescription?.trim() ?? "",
     translations: cleanAirportTranslations(input.translations),
   };
 
@@ -326,7 +409,13 @@ export async function createHomepageAirport(input: {
           sortOrder: (max._max.sortOrder ?? -1) + 1,
         },
       });
-      const stored = { ...toStored(row), infoText: payload.infoText, translations: payload.translations };
+      const stored = {
+        ...toStored(row),
+        infoText: payload.infoText,
+        seoTitle: payload.seoTitle,
+        seoDescription: payload.seoDescription,
+        translations: payload.translations,
+      };
       await publishFromDb(db, stored);
       return stored;
     } catch (error) {
@@ -344,25 +433,22 @@ export async function updateHomepageAirport(
     iata?: string;
     imageUrl?: string;
     infoText?: string;
+    seoTitle?: string;
+    seoDescription?: string;
     translations?: unknown;
   },
 ): Promise<StoredHomepageAirport> {
   const before = (await readFileStore()).find((row) => row.id === id);
   let nextTranslations =
     input.translations === undefined ? undefined : cleanAirportTranslations(input.translations);
-  // A new base title makes the old automatic title translations wrong; titles the admin
-  // edited by hand in this save (different from the stored ones) are kept.
-  const titleChanged = Boolean(before && input.title !== undefined && input.title.trim() !== before.title.trim());
-  if (titleChanged && before) {
-    const base = nextTranslations ?? before.translations;
-    const pruned: AirportCardTranslations = {};
-    for (const [code, row] of Object.entries(base)) {
-      const lang = code as Locale;
-      const keepTitle = row?.title && row.title !== before.translations[lang]?.title;
-      const entry = { ...(keepTitle ? { title: row!.title } : {}), ...(row?.infoText ? { infoText: row.infoText } : {}) };
-      if (entry.title || entry.infoText) pruned[lang] = entry;
+  // A new base title / SEO line makes its old automatic translations wrong.
+  if (before) {
+    const changed = SHORT_FIELDS.filter(
+      (field) => input[field] !== undefined && input[field]!.trim() !== before[field].trim(),
+    );
+    if (changed.length) {
+      nextTranslations = pruneChangedTranslations(nextTranslations ?? before.translations, before.translations, changed);
     }
-    nextTranslations = pruned;
   }
   const applyFileUpdate = async () => {
     const rows = await readFileStore();
@@ -375,6 +461,8 @@ export async function updateHomepageAirport(
       iata: input.iata ? input.iata.trim().toUpperCase() : current.iata,
       imageUrl: input.imageUrl?.trim() ?? current.imageUrl,
       infoText: input.infoText?.trim() ?? current.infoText,
+      seoTitle: input.seoTitle?.trim() ?? current.seoTitle,
+      seoDescription: input.seoDescription?.trim() ?? current.seoDescription,
       translations: nextTranslations ?? current.translations,
       updatedAt: new Date().toISOString(),
     };
@@ -400,6 +488,8 @@ export async function updateHomepageAirport(
       const stored = {
         ...toStored(row),
         infoText: input.infoText?.trim() ?? previous?.infoText ?? "",
+        seoTitle: input.seoTitle?.trim() ?? previous?.seoTitle ?? "",
+        seoDescription: input.seoDescription?.trim() ?? previous?.seoDescription ?? "",
         translations: nextTranslations ?? previous?.translations ?? {},
       };
       await publishFromDb(db, stored);

@@ -9,10 +9,9 @@ import { MakeModelMultiSelect } from "@/components/admin/make-model-multi-select
 import { SortableAdminGrid } from "@/components/admin/sortable-admin-grid";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { knownText } from "@/lib/i18n/known-record-text";
-import { AirportCardTranslationsFields } from "@/components/admin/airport-card-translations-fields";
+import { AirportCardForm, blankAirportForm } from "@/components/admin/airport-card-form";
 import {
   AirportCountrySelect,
-  CountryAirportSelect,
   airportsCountryCopy,
   cardsForCountry,
   mergeCountryOrder,
@@ -38,12 +37,10 @@ type Airport = {
   title: string;
   imageUrl: string;
   infoText: string;
+  seoTitle?: string;
+  seoDescription?: string;
   translations?: AirportCardTranslations;
 };
-
-function blankAirportForm() {
-  return { title: "", iata: "", imageUrl: "", infoText: "", translations: {} as AirportCardTranslations };
-}
 
 function blankCategoryForm() {
   return { name: "", imageUrl: "", mappedModels: [] as MappedCarModel[] };
@@ -276,6 +273,8 @@ export function HomepageContentManager({
           iata: payload.iata.trim(),
           imageUrl: payload.imageUrl.trim(),
           infoText: (payload.infoText || "").trim(),
+          seoTitle: (payload.seoTitle || "").trim(),
+          seoDescription: (payload.seoDescription || "").trim(),
           translations: payload.translations || {},
         }),
       });
@@ -691,103 +690,35 @@ export function HomepageContentManager({
           )}
         />
 
-        <form onSubmit={saveAirport} className="mt-3 space-y-2 rounded-lg border border-slate-100 bg-slate-50/50 p-2.5">
-          <h3 className="text-sm font-bold">{editingAirport ? e.updateAirportCard : e.addAirportCard}</h3>
-          <input
-            className="w-full rounded-lg border p-2 text-xs"
-            placeholder={e.airportTitlePh}
-            required
-            value={editingAirport ? editingAirport.title : airForm.title}
-            onChange={(e) =>
-              editingAirport
-                ? setEditingAirport({ ...editingAirport, title: e.target.value })
-                : setAirForm((prev) => ({ ...prev, title: e.target.value }))
-            }
-          />
-          <CountryAirportSelect
-            country={airportCountry}
-            locale={locale}
-            value={editingAirport ? editingAirport.iata : airForm.iata}
-            onChange={(iata, label) =>
-              editingAirport
-                ? setEditingAirport({ ...editingAirport, iata })
-                : setAirForm((prev) => ({ ...prev, iata, title: prev.title.trim() ? prev.title : label }))
-            }
-          />
-          <input
-            className="w-full rounded-lg border p-2 text-xs"
-            placeholder={e.imageUrl}
-            required
-            value={editingAirport ? editingAirport.imageUrl : airForm.imageUrl}
-            onChange={(e) =>
-              editingAirport
-                ? setEditingAirport({ ...editingAirport, imageUrl: e.target.value })
-                : setAirForm((prev) => ({ ...prev, imageUrl: e.target.value }))
-            }
-          />
-          <ImageCropUpload
-            aspect={16 / 9}
-            label={e.orUploadImage}
-            onUploaded={(url) => {
-              if (editingAirport) setEditingAirport((prev) => (prev ? { ...prev, imageUrl: url } : prev));
-              else setAirForm((prev) => ({ ...prev, imageUrl: url }));
-            }}
-            onError={(message) => setError(message)}
-          />
-          {(editingAirport ? editingAirport.imageUrl : airForm.imageUrl) ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={editingAirport ? editingAirport.imageUrl : airForm.imageUrl}
-              alt=""
-              className="h-16 w-full max-w-xs rounded-lg object-cover"
-            />
-          ) : null}
-          <label className="block text-xs font-bold text-[#0b1f4b]">
-            {e.airportInfoLabel}
-            <textarea
-              className="mt-1 w-full rounded-lg border bg-white p-2 text-xs font-normal"
-              rows={5}
-              placeholder={e.airportInfoPh}
-              value={editingAirport ? editingAirport.infoText || "" : airForm.infoText}
-              onChange={(event) =>
-                editingAirport
-                  ? setEditingAirport({ ...editingAirport, infoText: event.target.value })
-                  : setAirForm((prev) => ({ ...prev, infoText: event.target.value }))
-              }
-            />
-          </label>
-          <AirportCardTranslationsFields
-            key={editingAirport?.id || "new"}
-            adminLocale={locale}
-            value={(editingAirport ? editingAirport.translations : airForm.translations) || {}}
-            onChange={(translations) =>
-              editingAirport
-                ? setEditingAirport({ ...editingAirport, translations })
-                : setAirForm((prev) => ({ ...prev, translations }))
-            }
-          />
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={savingAirport}
-              className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white disabled:bg-slate-400"
-            >
-              {savingAirport ? ui.saving : editingAirport ? e.saveChanges : e.addAirport}
-            </button>
-            {editingAirport ? (
-              <button
-                type="button"
-                className="rounded-lg border px-3 py-1.5 text-xs font-semibold"
-                onClick={() => {
-                  setEditingAirport(null);
-                  setAirForm(blankAirportForm());
-                }}
-              >
-                {ui.cancel}
-              </button>
-            ) : null}
-          </div>
-        </form>
+        <AirportCardForm
+          value={
+            editingAirport
+              ? {
+                  title: editingAirport.title,
+                  iata: editingAirport.iata,
+                  imageUrl: editingAirport.imageUrl,
+                  infoText: editingAirport.infoText || "",
+                  seoTitle: editingAirport.seoTitle || "",
+                  seoDescription: editingAirport.seoDescription || "",
+                  translations: editingAirport.translations || {},
+                }
+              : airForm
+          }
+          editingId={editingAirport?.id ?? null}
+          country={airportCountry}
+          saving={savingAirport}
+          onChange={(patch) =>
+            editingAirport
+              ? setEditingAirport((prev) => (prev ? { ...prev, ...patch } : prev))
+              : setAirForm((prev) => ({ ...prev, ...patch }))
+          }
+          onSubmit={saveAirport}
+          onCancel={() => {
+            setEditingAirport(null);
+            setAirForm(blankAirportForm());
+          }}
+          onError={setError}
+        />
       </section>
     </div>
   );

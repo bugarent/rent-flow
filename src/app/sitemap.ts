@@ -19,6 +19,15 @@ async function loadApprovedCarIds(): Promise<CarSitemapRow[]> {
   }
 }
 
+async function loadAirportCards(): Promise<Array<{ iata: string; updatedAt?: string }>> {
+  try {
+    const { listHomepageAirports } = await import("@/lib/server/homepage-airports-store");
+    return (await listHomepageAirports()).filter((row) => row.iata.trim());
+  } catch {
+    return [];
+  }
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
   const staticPaths: Array<{
@@ -54,5 +63,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  return [...staticEntries, ...carEntries];
+  const airports = await softTimeout(loadAirportCards(), [], 2500);
+  const airportEntries: MetadataRoute.Sitemap = airports.map((row) => ({
+    url: `${SITE_URL}/airport/${encodeURIComponent(row.iata.toUpperCase())}`,
+    lastModified: row.updatedAt ? new Date(row.updatedAt) : now,
+    changeFrequency: "weekly",
+    priority: 0.9,
+  }));
+
+  return [...staticEntries, ...airportEntries, ...carEntries];
 }
