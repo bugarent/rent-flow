@@ -361,6 +361,29 @@ add(
     "เส้นทางเมสเทีย–อุชกูลี–เลนเตคี",
   ),
 );
+{
+  const tusheti = (ka: string) =>
+    row(
+      "Tusheti route – driving over the Abano Pass is prohibited",
+      ka,
+      "Richtung Tuschetien – Fahrten über den Abano-Pass sind verboten",
+      "Dirección Tusheti: está prohibido circular por el paso de Abano",
+      "Direction Touchétie – la circulation sur le col d'Abano est interdite",
+      "Direzione Tusheti – è vietato transitare sul passo di Abano",
+      "Richting Toesjetië – rijden over de Abano-pas is verboden",
+      "Kierunek Tuszetia – przejazd przez przełęcz Abano jest zabroniony",
+      "Tuşeti yönü – Abano Geçidi'nden geçiş yasaktır",
+      "Направление Тушети – проезд через перевал Абано запрещён",
+      "اتجاه توشيتي – يُمنع القيادة عبر ممر أبانو",
+      "图舍季方向 – 禁止驶经阿巴诺山口",
+      "투셰티 방면 – 아바노 고개 통행 금지",
+      "เส้นทางทูเชติ – ห้ามขับผ่านช่องเขาอาบาโน",
+    );
+  const saved = "თუშეთის მიმართულება - აბანოს უღელტეხილიზე გადაადგილება აკრძალულია“";
+  add(saved, tusheti(saved));
+  const clean = "თუშეთის მიმართულება - აბანოს უღელტეხილზე გადაადგილება აკრძალულია";
+  add(clean, tusheti(clean));
+}
 add(
   "Wireless hotspot on board555",
   row(

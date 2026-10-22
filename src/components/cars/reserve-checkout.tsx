@@ -41,6 +41,7 @@ import { PhoneCountryField } from "@/components/partner/phone-country-field";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { knownText } from "@/lib/i18n/known-record-text";
 import { localizedExtraCopy } from "@/lib/extras/localized-copy";
+import { extraAvailableIn, locationCountryIso2 } from "@/lib/extras/country-scope";
 import {
   formatDepositLabel,
   formatFranchiseLabel,
@@ -147,7 +148,10 @@ function carRangeKey(startDate: string, endDate: string) {
   return `${start}|${end}`;
 }
 
-function deriveCarState(payload: CarPayload, prevQty: Record<string, number>) {
+function deriveCarState(raw: CarPayload, prevQty: Record<string, number>, pickupCountry: string) {
+  const payload: CarPayload = Array.isArray(raw.extras)
+    ? { ...raw, extras: raw.extras.filter((row) => extraAvailableIn(row.extraService, [pickupCountry])) }
+    : raw;
   const paid = listPaidExtras(payload);
   const insurance = listInsuranceExtras(payload);
   const qty = { ...prevQty };
@@ -264,7 +268,7 @@ export function ReserveCheckout({
 
   const [seed] = useState(() =>
     initialCar && initialRange === carRangeKey(initialStart, initialEnd)
-      ? deriveCarState(initialCar as unknown as CarPayload, {})
+      ? deriveCarState(initialCar as unknown as CarPayload, {}, locationCountryIso2(pickup))
       : null,
   );
   const [car, setCar] = useState<CarPayload | null>(seed?.car ?? null);
@@ -386,7 +390,7 @@ export function ReserveCheckout({
         if (!carRes.ok || cancelled) return;
         const payload = (await carRes.json()) as CarPayload;
         if (cancelled) return;
-        const next = deriveCarState(payload, {});
+        const next = deriveCarState(payload, {}, locationCountryIso2(pickup));
         setCar(next.car);
         setDetails(next.details);
         setPaidExtras(next.paid);
@@ -1421,7 +1425,7 @@ export function ReserveCheckout({
                               type="button"
                               role="switch"
                               aria-checked={selected}
-                              aria-label={extra.name}
+                              aria-label={extraName(extra)}
                               disabled={locked}
                               onClick={() => {
                                 if (locked) return;

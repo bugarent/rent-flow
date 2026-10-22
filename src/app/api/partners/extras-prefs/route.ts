@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { LOCAL_PARTNER_ID, loadLocalPartner } from "@/lib/auth/local-partner-store";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import { listExtraServices } from "@/lib/server/extras-store";
+import { scopeExtrasToPartner } from "@/lib/server/extras/partner-country-scope";
 import {
   listPartnerCustomExtrasAsPricing,
 } from "@/lib/server/partner-custom-extras-store";
@@ -48,7 +49,7 @@ function periodCeiling(
   return partnerMax ?? optionalPeriodMoney(adminMax);
 }
 
-async function partnerCatalog(partnerId: string) {
+async function partnerCatalog(partnerId: string, opts: { scoped?: boolean } = {}) {
   const [global, customs] = await Promise.all([
     listExtraServices({ activeOnly: true }),
     listPartnerCustomExtrasAsPricing(partnerId, { activeOnly: true }),
@@ -57,7 +58,8 @@ async function partnerCatalog(partnerId: string) {
   for (const custom of customs) {
     if (!byId.has(custom.id)) byId.set(custom.id, custom);
   }
-  return Array.from(byId.values()).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  const sorted = Array.from(byId.values()).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  return opts.scoped === false ? sorted : scopeExtrasToPartner(sorted, partnerId);
 }
 
 async function listPartnerCarsForExtras(
@@ -237,10 +239,12 @@ export async function PUT(req: Request) {
     const partnerId = await resolvePartnerId(session.user.id, session.user.email);
     const body = await req.json();
     const raw = Array.isArray(body?.prefs) ? body.prefs : Array.isArray(body) ? body : [];
-    const [catalog, cars] = await Promise.all([
+    const [catalog, visibleCatalog, cars] = await Promise.all([
+      partnerCatalog(partnerId, { scoped: false }),
       partnerCatalog(partnerId),
       listPartnerCarsForExtras(session, partnerId),
     ]);
+    const visibleIds = new Set(visibleCatalog.map((s) => s.id));
     const byId = new Map(catalog.map((s) => [s.id, s]));
     const allowedCarIds = new Set(cars.map((c) => c.id));
 
@@ -289,11 +293,12 @@ export async function PUT(req: Request) {
       });
     }
 
-    // Keep master cross-border toggle state if the equipment panel did not include that row.
+    // Keep rows the equipment panel does not show: the cross-border master toggle and
+    // country-limited services hidden for this partner.
     const existing = await readPartnerExtraPrefs(partnerId);
     for (const pref of existing) {
       const svc = byId.get(pref.extraServiceId);
-      if (!svc || !isCrossBorderExtra(svc)) continue;
+      if (!svc || (!isCrossBorderExtra(svc) && visibleIds.has(svc.id))) continue;
       if (next.some((p) => p.extraServiceId === pref.extraServiceId)) continue;
       next.push(pref);
     }

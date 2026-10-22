@@ -4,6 +4,7 @@ import { isMandatoryExtra, type ExtraServicePricing } from "@/lib/extras/pricing
 import { LOCAL_PARTNER_ID, loadLocalPartner } from "@/lib/auth/local-partner-store";
 import { prisma } from "@/lib/prisma";
 import { listExtraServices } from "@/lib/server/extras-store";
+import { scopeExtrasToPartner } from "@/lib/server/extras/partner-country-scope";
 import { readPartnerExtraPrefs } from "@/lib/server/partner-extras-prefs-store";
 import {
   readCompanySettingsFile,
@@ -51,12 +52,13 @@ export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
     const enabledIds = new Set(
       prefs.filter((p) => p.enabled || p.forbidden).map((p) => p.extraServiceId),
     );
+    const offered = extras.filter(
+      (service) =>
+        isMandatoryExtra(service) || !isCrossBorderExtra(service) || enabledIds.has(service.id),
+    );
     return {
       initialDeliveryCatalog: delivery,
-      initialExtrasCatalog: extras.filter(
-        (service) =>
-          isMandatoryExtra(service) || !isCrossBorderExtra(service) || enabledIds.has(service.id),
-      ),
+      initialExtrasCatalog: await scopeExtrasToPartner(offered, partnerId, company?.deliveryCountryIso2s),
     };
   } catch {
     try {

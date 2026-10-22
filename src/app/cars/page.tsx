@@ -39,6 +39,7 @@ import { listExtraServices } from "@/lib/server/extras-store";
 import { localizeExtraName } from "@/lib/extras/pricing";
 import type { ExtraCopyBag } from "@/lib/extras/localized-copy";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
+import { extraAvailableIn, locationCountryIso2 } from "@/lib/extras/country-scope";
 import { getSearchDeliveryAirports } from "@/lib/server/delivery-locations";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 import { getPageSeo } from "@/lib/seo/pages";
@@ -664,8 +665,10 @@ export default async function CarsPage({
   let crossBorderFilter: { id: string; name: string; nameI18n?: ExtraCopyBag } | null = null;
   try {
     const catalog = (await extrasCatalogPromise) ?? [];
+    const searchCountry = pickupCode ? locationCountryIso2(pickupCode) : countryIso2;
     for (const service of catalog) {
       if (!service.isActive || service.isTpl) continue;
+      if (!extraAvailableIn(service, [searchCountry])) continue;
       if (isCrossBorderExtra(service)) {
         crossBorderFilter = {
           id: service.id,
