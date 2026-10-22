@@ -8,6 +8,7 @@ import { displayBookingCharges } from "@/lib/bookings/booking-money";
 import { parsePartnerMessengers } from "@/lib/partner";
 import { bookingBotMessage, reservationTelegramText, sendBookingNoticeToBot } from "@/lib/telegram/notify-booking-bot";
 import { rentalDayCount } from "@/lib/cars/reserve-pricing";
+import { knownText } from "@/lib/i18n/known-record-text";
 import { getPlatformSettings } from "@/lib/server/platform-settings-store";
 import {
   listStoredPartnerChatIds,
@@ -44,23 +45,23 @@ type NoticeSnapshot = {
 
 function messengerLabel(platform: string) {
   const key = platform.toUpperCase();
-  if (key === "VIBER") return "ვიბერი";
-  if (key === "WHATSAPP") return "ვაცაპი";
-  if (key === "TELEGRAM") return "ტელეგრამი";
+  if (key === "VIBER") return "Viber";
+  if (key === "WHATSAPP") return "WhatsApp";
+  if (key === "TELEGRAM") return "Telegram";
   return platform;
 }
 
 function noticeSubject(event: BookingNoticeEvent, reference: string | null) {
   const ref = reference ? ` · ${reference}` : "";
-  if (event === "BOOKING_EDITED") return `მოხდა ცვლილება${ref}`;
-  if (event === "BOOKING_CANCELLED") return `ჯავშანი გაუქმდა${ref}`;
-  return `ახალი ჯავშანი${ref}`;
+  if (event === "BOOKING_EDITED") return `Booking changed${ref}`;
+  if (event === "BOOKING_CANCELLED") return `Booking cancelled${ref}`;
+  return `New booking${ref}`;
 }
 
 function noticeHeadline(event: BookingNoticeEvent) {
-  if (event === "BOOKING_EDITED") return "მოხდა ცვლილება";
-  if (event === "BOOKING_CANCELLED") return "ჯავშანი გაუქმდა";
-  return "ახალი ჯავშანი";
+  if (event === "BOOKING_EDITED") return "Booking changed";
+  if (event === "BOOKING_CANCELLED") return "Booking cancelled";
+  return "New booking";
 }
 
 function noticeText(
@@ -91,19 +92,19 @@ function noticeText(
 
   return [
     facts,
-    booking.flightNumber ? `რეისი: ${booking.flightNumber}` : null,
-    `კლიენტი: ${`${booking.guestFirstName} ${booking.guestLastName}`.trim() || "—"}`,
-    `ტელეფონი: ${booking.guestPhone || "—"}`,
-    `ელფოსტა: ${booking.guestEmail || "—"}`,
-    messengerLine ? `სოციალური ქსელი: ${messengerLine}` : null,
+    booking.flightNumber ? `Flight: ${booking.flightNumber}` : null,
+    `Customer: ${`${booking.guestFirstName} ${booking.guestLastName}`.trim() || "—"}`,
+    `Phone: ${booking.guestPhone || "—"}`,
+    `Email: ${booking.guestEmail || "—"}`,
+    messengerLine ? `Messengers: ${messengerLine}` : null,
     extrasLines.length
-      ? `მომსახურება:\n${extrasLines.map((ex) => `  ${ex.label} — €${Number(ex.priceEur || 0).toFixed(2)}`).join("\n")}`
-      : "მომსახურება: არ არის არჩეული",
-    event === "BOOKING_CANCELLED" && reason ? `გაუქმების მიზეზი: ${reason}` : null,
+      ? `Services:\n${extrasLines.map((ex) => `  ${knownText("en", ex.label)} — €${Number(ex.priceEur || 0).toFixed(2)}`).join("\n")}`
+      : "Services: none selected",
+    event === "BOOKING_CANCELLED" && reason ? `Cancellation reason: ${reason}` : null,
     event === "BOOKING_CANCELLED" && refundEur > 0
-      ? `დასაბრუნებელი (საიტის საკომისიო): €${refundEur.toFixed(2)}`
+      ? `Refund (site fee): €${refundEur.toFixed(2)}`
       : event === "BOOKING_CANCELLED"
-        ? "დასაბრუნებელი: არ არის (საიტის საკომისიო არ ბრუნდება)"
+        ? "Refund: none (the site fee is not refundable)"
         : null,
   ]
     .filter(Boolean)
@@ -158,7 +159,7 @@ async function deliverBookingNotice(input: {
       cancellationReason: input.cancellationReason,
       refundEur: input.refundEur,
     }),
-    `ხანგრძლივობა: ${Math.max(1, days)} დღე`,
+    `Duration: ${Math.max(1, days)} ${Math.max(1, days) === 1 ? "day" : "days"}`,
   ].join("\n");
   const subject = noticeSubject(input.event, reference);
 

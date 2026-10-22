@@ -31,8 +31,8 @@ function placeLine(iata: string, address: string) {
   const code = String(iata || "").trim().toUpperCase();
   const airport = CATALOG_AIRPORTS.find((row) => row.iata === code);
   const place = findSearchPlace(code);
-  const name = airport?.name.ka || airport?.name.en || place?.label || code;
-  const city = airport?.cityName.ka || airport?.cityName.en || place?.cityName || "";
+  const name = airport?.name.en || place?.label || code;
+  const city = airport?.cityName.en || place?.cityName || "";
   const street = String(address || "").trim();
   const where = street ? composeLocationAddress(city || name, street) : name;
   if (!where) return code;
@@ -107,16 +107,16 @@ export function bookingBotMessage(
   notice: BookingBotNotice & { headline?: string; reference?: string },
 ) {
   return [
-    notice.headline?.trim() || "ახალი ჯავშანი",
-    notice.reference?.trim() ? `რეფერენსი: ${notice.reference.trim()}` : null,
-    `მანქანა: ${notice.carLabel.trim() || "—"}`,
-    `აღების ადგილი: ${placeLine(notice.pickupIata, notice.pickupAddress) || "—"}`,
-    `აღების თარიღი და დრო: ${whenLine(notice.pickupAt, notice.pickupIata)}`,
-    `დაბრუნების ადგილი: ${placeLine(notice.dropoffIata, notice.dropoffAddress) || "—"}`,
-    `დაბრუნების თარიღი და დრო: ${whenLine(notice.dropoffAt, notice.dropoffIata)}`,
-    `სულ ჯავშანი: ${money(notice.totalPriceEur)}`,
-    `გადახდილია: ${money(notice.paidEur)}`,
-    `ადგილზე გადასახდელი: ${money(notice.dueOnSiteEur)}`,
+    notice.headline?.trim() || "New booking",
+    notice.reference?.trim() ? `Reference: ${notice.reference.trim()}` : null,
+    `Car: ${notice.carLabel.trim() || "—"}`,
+    `Pick-up location: ${placeLine(notice.pickupIata, notice.pickupAddress) || "—"}`,
+    `Pick-up date and time: ${whenLine(notice.pickupAt, notice.pickupIata)}`,
+    `Drop-off location: ${placeLine(notice.dropoffIata, notice.dropoffAddress) || "—"}`,
+    `Drop-off date and time: ${whenLine(notice.dropoffAt, notice.dropoffIata)}`,
+    `Booking total: ${money(notice.totalPriceEur)}`,
+    `Paid: ${money(notice.paidEur)}`,
+    `Due on site: ${money(notice.dueOnSiteEur)}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -131,13 +131,13 @@ export function bookingPartyMailText(
   const days = Math.max(1, Math.round(Number(notice.days) || 1));
   return [
     car,
-    `აყვანის ადგილი: ${placeLine(notice.pickupIata, notice.pickupAddress) || "—"}, ${whenLine(notice.pickupAt, notice.pickupIata)}`,
-    `დაბრუნების ადგილი: ${placeLine(notice.dropoffIata, notice.dropoffAddress) || "—"}, ${whenLine(notice.dropoffAt, notice.dropoffIata)}`,
-    extras.length ? `დამატებითი სერვისები: ${extras.join(", ")}` : "დამატებითი სერვისები: არ არის არჩეული",
-    `ხანგრძლივობა: ${days} დღე`,
-    `სულ: ${money(notice.totalPriceEur)}`,
-    `გადახდილია: ${money(notice.paidEur)}`,
-    `ადგილზე გადასახდელი: ${money(notice.dueOnSiteEur)}`,
+    `Pick-up: ${placeLine(notice.pickupIata, notice.pickupAddress) || "—"}, ${whenLine(notice.pickupAt, notice.pickupIata)}`,
+    `Drop-off: ${placeLine(notice.dropoffIata, notice.dropoffAddress) || "—"}, ${whenLine(notice.dropoffAt, notice.dropoffIata)}`,
+    extras.length ? `Additional services: ${extras.join(", ")}` : "Additional services: none selected",
+    `Duration: ${days} ${days === 1 ? "day" : "days"}`,
+    `Total: ${money(notice.totalPriceEur)}`,
+    `Paid: ${money(notice.paidEur)}`,
+    `Due on site: ${money(notice.dueOnSiteEur)}`,
   ].join("\n");
 }
 
