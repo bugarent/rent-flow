@@ -42,10 +42,7 @@ async function translateAirportText(
   const targets = [...new Set(locales)];
   if (!source || !targets.length) return {};
   const apiKey = await openAiKey();
-  if (!apiKey) {
-    console.warn("[airport-preface] OpenAI key missing; preface stays in the original language");
-    return {};
-  }
+  if (!apiKey) return keylessTranslate(source, targets);
 
   const names = targets.map((code) => `${code} (${LOCALE_LABELS[code]})`).join(", ");
   const model = process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini";
@@ -78,7 +75,7 @@ async function translateAirportText(
     });
     if (!res.ok) {
       console.warn("[airport-preface] OpenAI", res.status, (await res.text()).slice(0, 240));
-      return {};
+      return keylessTranslate(source, targets);
     }
     const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
     const raw = data.choices?.[0]?.message?.content || "";
@@ -100,6 +97,13 @@ async function translateAirportText(
     return out;
   } catch (error) {
     console.warn("[airport-preface] translate", error);
-    return {};
+    return keylessTranslate(source, targets);
   }
+}
+
+async function keylessTranslate(source: string, targets: Locale[]): Promise<Partial<Record<Locale, string>>> {
+  const { freeTranslate } = await import("@/lib/server/free-translate");
+  const out = await freeTranslate(source, targets);
+  for (const code of Object.keys(out) as Locale[]) out[code] = out[code]!.slice(0, 8000);
+  return out;
 }
