@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { PartnerLocaleProvider } from "@/components/providers/partner-locale-context";
+import { PartnerMoneyProvider } from "@/components/providers/partner-money-context";
 import {
   PartnerPersonalInfoForm,
   type AdminProfileReviewConfig,
@@ -58,7 +59,7 @@ export function AdminProfileRemoderationPanel({
   backHref = `${ADMIN_BASE}/moderation`,
   backTarget = "profiles",
 }: Props) {
-  const { locale: adminLocale } = useAdminLocale();
+  const { locale: adminLocale, currency: adminCurrency, fxRates: adminFxRates } = useAdminLocale();
   const partnerLocale: PartnerLocale = isPartnerLocale(adminLocale) ? adminLocale : "en";
   const label = adminBackLabel(adminLocale, backTarget);
   const [loading, setLoading] = useState(true);
@@ -127,19 +128,21 @@ export function AdminProfileRemoderationPanel({
 
   return (
     <PartnerLocaleProvider initialLocale={partnerLocale} lockToInitial>
-      <PartnerPersonalInfoForm
-        initial={settings}
-        partnerStatus="PENDING_REMODERATION"
-        pendingRemoderation
-        partnerCode={partnerCode}
-        fxRates={fxRates}
-        adminReview={{
-          partnerId,
-          backHref,
-          backLabel: label,
-          changedFields,
-        }}
-      />
+      <PartnerMoneyProvider currency={adminCurrency} fxRates={adminFxRates}>
+        <PartnerPersonalInfoForm
+          initial={settings}
+          partnerStatus="PENDING_REMODERATION"
+          pendingRemoderation
+          partnerCode={partnerCode}
+          fxRates={fxRates}
+          adminReview={{
+            partnerId,
+            backHref,
+            backLabel: label,
+            changedFields,
+          }}
+        />
+      </PartnerMoneyProvider>
     </PartnerLocaleProvider>
   );
 }

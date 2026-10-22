@@ -1,9 +1,10 @@
 import type { FxRates } from "@/lib/fx";
-import {
-  DEFAULT_PARTNER_PRICING_CURRENCY,
-  type PartnerPricingCurrency,
-} from "@/lib/partners/company-settings";
+import type { Currency } from "@/lib/i18n/config";
+import { DEFAULT_PARTNER_PRICING_CURRENCY } from "@/lib/partners/company-settings";
 import { convertFromEur, convertToEur, currencySymbol, formatAmountNumber, toNumber } from "@/lib/utils";
+
+/** Currency partner amounts are shown and typed in (partner header, or admin header when admin reviews). */
+export type PartnerDisplayCurrency = Currency;
 
 /** Format a partner-entered amount for inputs (trim trailing zeros lightly). */
 export function formatPartnerAmount(amount: number): string {
@@ -13,7 +14,7 @@ export function formatPartnerAmount(amount: number): string {
 /** Convert partner-currency input → EUR for DB / public listings. */
 export function partnerAmountToEur(
   amount: string | number | null | undefined,
-  currency: PartnerPricingCurrency = DEFAULT_PARTNER_PRICING_CURRENCY,
+  currency: PartnerDisplayCurrency = DEFAULT_PARTNER_PRICING_CURRENCY,
   rates: FxRates,
 ): number {
   return convertToEur(toNumber(amount, 0), currency, rates);
@@ -22,14 +23,14 @@ export function partnerAmountToEur(
 /** Convert stored EUR → partner working currency for form fields. */
 export function eurToPartnerAmount(
   amountEur: string | number | null | undefined,
-  currency: PartnerPricingCurrency = DEFAULT_PARTNER_PRICING_CURRENCY,
+  currency: PartnerDisplayCurrency = DEFAULT_PARTNER_PRICING_CURRENCY,
   rates: FxRates,
 ): string {
   return formatPartnerAmount(convertFromEur(toNumber(amountEur, 0), currency, rates));
 }
 
 export function partnerCurrencySymbol(
-  currency: PartnerPricingCurrency = DEFAULT_PARTNER_PRICING_CURRENCY,
+  currency: PartnerDisplayCurrency = DEFAULT_PARTNER_PRICING_CURRENCY,
 ): string {
   return currencySymbol(currency);
 }
@@ -37,8 +38,8 @@ export function partnerCurrencySymbol(
 /** Re-express an amount when the partner switches working currency. */
 export function rebasePartnerAmount(
   amount: string | number,
-  from: PartnerPricingCurrency,
-  to: PartnerPricingCurrency,
+  from: PartnerDisplayCurrency,
+  to: PartnerDisplayCurrency,
   rates: FxRates,
 ): string {
   if (from === to) return formatPartnerAmount(toNumber(amount, 0));

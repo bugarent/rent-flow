@@ -21,7 +21,11 @@ import {
   normalizeTariffIntervals,
   tariffPlusFromDays,
 } from "@/lib/partners/company-settings";
-import { partnerCurrencySymbol, rebasePartnerAmount } from "@/lib/partners/pricing-currency";
+import { rebasePartnerAmount } from "@/lib/partners/pricing-currency";
+import {
+  PartnerOffHoursPriceInput,
+  useShownPartnerCurrency,
+} from "@/components/partner/partner-off-hours-price-input";
 import { DEFAULT_FX_RATES, type FxRates } from "@/lib/fx";
 import { WORLD_COUNTRIES } from "@/lib/catalog/world-countries";
 import {
@@ -391,7 +395,7 @@ export function PartnerPersonalInfoForm({
     });
   };
 
-  const moneySymbol = partnerCurrencySymbol(settings.pricingCurrency ?? "USD");
+  const shownCurrency = useShownPartnerCurrency(settings.pricingCurrency ?? "USD");
 
   const onPricingCurrencyChange = (next: PartnerPricingCurrency) => {
     setSettings((prev) => {
@@ -1597,22 +1601,18 @@ export function PartnerPersonalInfoForm({
               {settings.offHoursService ? (
                 <div data-field="offHoursPrice" className={wrapChanged("offHoursPrice")}>
                   <Field
-                    label={`${pi.offHoursPrice} (${settings.pricingCurrency})`}
+                    label={`${pi.offHoursPrice} (${shownCurrency})`}
                     changed={isChanged("offHoursPrice")}
                     previous={fieldChange("offHoursPrice")?.from}
                   >
-                    <div className="relative">
-                      <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">
-                        {moneySymbol}
-                      </span>
-                      <input
-                        className={cn(inputClass, "ps-7", isChanged("offHoursPrice") && inputErrorClass)}
-                        inputMode="decimal"
-                        value={settings.offHoursPrice}
-                        onChange={(e) => patch({ offHoursPrice: e.target.value })}
-                        readOnly={isAdminReview}
-                      />
-                    </div>
+                    <PartnerOffHoursPriceInput
+                      value={settings.offHoursPrice}
+                      storeCurrency={settings.pricingCurrency ?? "USD"}
+                      fxRates={fxRates}
+                      onChange={(offHoursPrice) => patch({ offHoursPrice })}
+                      readOnly={isAdminReview}
+                      className={cn(inputClass, isChanged("offHoursPrice") && inputErrorClass)}
+                    />
                   </Field>
                 </div>
               ) : null}

@@ -16,13 +16,14 @@ import {
   type PartnerPricingCurrency,
 } from "@/lib/partners/company-settings";
 import { PARTNER_CURRENCY_COOKIE, PARTNER_CURRENCY_STORAGE } from "@/lib/i18n/partner-config";
+import type { PartnerDisplayCurrency } from "@/lib/partners/pricing-currency";
 import { persistPref, resolveClientPref } from "@/lib/i18n/pref-storage";
 import { convertFromEur, formatMoney, roundMoney } from "@/lib/utils";
 
 export const PARTNER_CURRENCY_EVENT = "partner-pricing-currency-change";
 
 type PartnerMoneyContextValue = {
-  pricingCurrency: PartnerPricingCurrency;
+  pricingCurrency: PartnerDisplayCurrency;
   fxRates: FxRates;
   setPricingCurrency: (currency: PartnerPricingCurrency) => void;
   /** Convert stored EUR → partner display amount (number). */
@@ -37,17 +38,23 @@ export function PartnerMoneyProvider({
   children,
   initialCurrency = DEFAULT_PARTNER_PRICING_CURRENCY,
   fxRates = DEFAULT_FX_RATES,
+  currency,
 }: {
   children: React.ReactNode;
   initialCurrency?: PartnerPricingCurrency;
   fxRates?: FxRates;
+  /** Controlled display currency (admin pages follow the admin header); skips the partner cookie. */
+  currency?: PartnerDisplayCurrency;
 }) {
-  const [pricingCurrency, setPricingCurrencyState] = useState<PartnerPricingCurrency>(
+  const [storedCurrency, setPricingCurrencyState] = useState<PartnerPricingCurrency>(
     initialCurrency,
   );
+  const pricingCurrency: PartnerDisplayCurrency = currency ?? storedCurrency;
   const rates = fxRates || DEFAULT_FX_RATES;
+  const controlled = currency != null;
 
   useEffect(() => {
+    if (controlled) return;
     const next = resolveClientPref(
       PARTNER_CURRENCY_COOKIE,
       PARTNER_CURRENCY_STORAGE,
@@ -55,9 +62,10 @@ export function PartnerMoneyProvider({
       initialCurrency,
     );
     if (isPartnerPricingCurrency(next)) setPricingCurrencyState(next);
-  }, [initialCurrency]);
+  }, [initialCurrency, controlled]);
 
   useEffect(() => {
+    if (controlled) return;
     const onExternal = (event: Event) => {
       const detail = (event as CustomEvent<PartnerPricingCurrency>).detail;
       if (detail === "USD" || detail === "EUR" || detail === "GEL") {
@@ -90,9 +98,10 @@ export function PartnerMoneyProvider({
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("rac-pref-change", onPref as EventListener);
     };
-  }, []);
+  }, [controlled]);
 
   const setPricingCurrency = useCallback((next: PartnerPricingCurrency) => {
+    if (controlled) return;
     setPricingCurrencyState(next);
     persistPref(PARTNER_CURRENCY_COOKIE, PARTNER_CURRENCY_STORAGE, next);
     if (typeof window !== "undefined") {
@@ -100,7 +109,7 @@ export function PartnerMoneyProvider({
         new CustomEvent(PARTNER_CURRENCY_EVENT, { detail: next }),
       );
     }
-  }, []);
+  }, [controlled]);
 
   const fromEur = useCallback(
     (amountEur: number) => roundMoney(convertFromEur(amountEur, pricingCurrency, rates)),

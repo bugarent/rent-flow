@@ -52,7 +52,7 @@ import {
 } from "@/lib/cars/registration-number";
 import {
   DEFAULT_PARTNER_PRICING_CURRENCY,
-  type PartnerPricingCurrency,
+  isPartnerPricingCurrency,
   type TariffInterval,
   normalizeTariffIntervals,
   tariffPlusFromDays,
@@ -62,6 +62,7 @@ import {
   partnerCurrencySymbol,
   eurToPartnerAmount,
   rebasePartnerAmount,
+  type PartnerDisplayCurrency,
 } from "@/lib/partners/pricing-currency";
 import { DEFAULT_FX_RATES, type FxRates } from "@/lib/fx";
 import {
@@ -99,7 +100,7 @@ function dateInputToMd(value: string): string {
 
 function partnerMoney(
   amount: string | number | null | undefined,
-  currency: PartnerPricingCurrency,
+  currency: PartnerDisplayCurrency,
   rates: FxRates,
 ): string {
   if (amount == null || amount === "") return "";
@@ -111,8 +112,8 @@ function partnerMoney(
 /** Keep an in-progress amount when the header currency changes. Blank stays blank. */
 function rebaseMoneyField(
   amount: string,
-  from: PartnerPricingCurrency,
-  to: PartnerPricingCurrency,
+  from: PartnerDisplayCurrency,
+  to: PartnerDisplayCurrency,
   rates: FxRates,
 ): string {
   const trimmed = String(amount ?? "").trim();
@@ -138,7 +139,7 @@ function formatExtrasChange(raw: string, locale: string): string {
 
 function ratesToPartner(
   rates: Record<string, string | number> | undefined,
-  currency: PartnerPricingCurrency,
+  currency: PartnerDisplayCurrency,
   fx: FxRates,
 ): CarSeasonRates {
   return {
@@ -505,7 +506,7 @@ export function PartnerCreateCarForm({
     buildExtraSelections(initialExtrasCatalog),
   );
   const [pickupPlaces, setPickupPlaces] = useState<PickupPlaceRow[]>([]);
-  const [pricingCurrency, setPricingCurrency] = useState<PartnerPricingCurrency>(
+  const [pricingCurrency, setPricingCurrency] = useState<PartnerDisplayCurrency>(
     DEFAULT_PARTNER_PRICING_CURRENCY,
   );
   const [fxRates, setFxRates] = useState<FxRates>(DEFAULT_FX_RATES);
@@ -569,8 +570,8 @@ export function PartnerCreateCarForm({
       try {
         /** Admin remodeation: skip partner-only APIs (they hang/fail when DB is offline). */
         if (isAdminReview && carId) {
-          const nextCurrency: PartnerPricingCurrency = DEFAULT_PARTNER_PRICING_CURRENCY;
-          const nextRates: FxRates = DEFAULT_FX_RATES;
+          const nextCurrency = displayCurrencyRef.current;
+          const nextRates: FxRates = displayRatesRef.current;
           setPricingCurrency(nextCurrency);
           setFxRates(nextRates);
 
@@ -896,7 +897,7 @@ export function PartnerCreateCarForm({
           );
         }
 
-        let nextCurrency: PartnerPricingCurrency = displayCurrencyRef.current;
+        let nextCurrency: PartnerDisplayCurrency = displayCurrencyRef.current;
         let nextRates: FxRates = displayRatesRef.current;
         if (meRes.ok && me.fxRates && typeof me.fxRates === "object" && !moneyCtx) {
           nextRates = {
@@ -1582,7 +1583,7 @@ export function PartnerCreateCarForm({
           : "0",
         franchiseEnabled,
         useSeasonalPricing,
-        pricingCurrency,
+        pricingCurrency: isPartnerPricingCurrency(pricingCurrency) ? pricingCurrency : "EUR",
         pricingTiers: [
           ...tariffIntervals.map((t, i) => ({
             fromDays: t.fromDays,

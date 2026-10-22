@@ -12,7 +12,7 @@ import { PartnerLanguageSelect } from "@/components/partner/partner-language-sel
 import { PartnerCurrencySelect } from "@/components/partner/partner-currency-select";
 import { PortalSignOut } from "@/components/auth/portal-sign-out";
 import { MobileNavDrawer } from "@/components/ui/mobile-nav-drawer";
-import type { PartnerPricingCurrency } from "@/lib/partners/company-settings";
+import { isPartnerPricingCurrency, type PartnerPricingCurrency } from "@/lib/partners/company-settings";
 import { cn } from "@/lib/utils";
 
 type Variant = "dark" | "light";
@@ -214,7 +214,7 @@ export function PartnerPortalTopBar({
           compact
           symbolOnly
           variant={dark ? "dark" : "light"}
-          value={pricingCurrency}
+          value={isPartnerPricingCurrency(pricingCurrency) ? pricingCurrency : "EUR"}
           onChange={onCurrencyChange}
           label={dictionary.common.currency}
         />
