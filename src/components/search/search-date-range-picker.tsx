@@ -138,7 +138,7 @@ export function SearchDateRangePicker({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[240] flex items-center justify-center bg-slate-950/50 p-3 sm:p-4"
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/50 p-3 sm:p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
