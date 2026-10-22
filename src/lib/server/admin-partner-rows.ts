@@ -30,6 +30,8 @@ export type AdminPartnerRow = {
   phone: string;
   secondaryPhone: string;
   country: string;
+  /** Operating countries (ISO2) for the per-country summary. */
+  countryIso2s: string[];
   hasUser: boolean;
   unreadReapplyCount: number;
   unreadForAdmin: number;
@@ -145,6 +147,7 @@ export async function loadAdminPartnerRows(): Promise<{
         email: p.email,
         ...phones,
         country: countryNames(p.operatingCountryIso2s),
+        countryIso2s: parseIso2List(p.operatingCountryIso2s),
         hasUser: Boolean(p.userId),
         unreadReapplyCount: unreadReapply,
         unreadForAdmin,
@@ -191,6 +194,7 @@ export async function loadAdminPartnerRows(): Promise<{
           secondaryPhone: p.secondaryPhone,
         }),
         country: countryNames(p.operatingCountryIso2s),
+        countryIso2s: parseIso2List(p.operatingCountryIso2s),
         hasUser: false,
         unreadReapplyCount: unreadReapply,
         unreadForAdmin,
@@ -276,6 +280,7 @@ export async function loadAdminPartnerRows(): Promise<{
           secondaryPhone: settings?.secondaryPhone || "",
         }),
         country: countryNames(settings?.deliveryCountryIso2s),
+        countryIso2s: parseIso2List(settings?.deliveryCountryIso2s),
         hasUser: false,
         unreadReapplyCount: row.moderation.unreadCount || 1,
         unreadForAdmin: Math.max(1, row.moderation.unreadCount || 1),

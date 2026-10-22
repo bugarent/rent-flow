@@ -8,6 +8,9 @@ import {
   loadAdminPartnerRows,
 } from "@/lib/server/admin-partner-rows";
 import { loadBookingCustomers } from "@/lib/server/load-booking-customers";
+import { PartnerCountryStats } from "@/components/admin/partner-country-stats";
+import { partnerCountryStats } from "@/lib/admin/partner-country-stats";
+import { uiText } from "@/lib/i18n/ui-text";
 
 export default async function AdminPartnersPage() {
   await requireAdmin();
@@ -27,7 +30,10 @@ export default async function AdminPartnersPage() {
     >
       <div className="mx-auto max-w-6xl px-4 py-10">
         <h1 className="mb-2 text-3xl font-extrabold text-[#0b1f4b]">{t.pages.partners.title}</h1>
-        <p className="mb-5 text-sm text-slate-600">{t.pages.partners.body}</p>
+        <PartnerCountryStats
+          stats={partnerCountryStats(partners)}
+          hint={uiText(locale, "Partners / uploaded listings", "პარტნიორები / ატვირთული განცხადებები", "Партнёры / загруженные объявления")}
+        />
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           {(partnerRows.dbOffline || partnerRows.queryError) && (
             <div
