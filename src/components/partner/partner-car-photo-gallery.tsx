@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Trash2, Upload } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2, Upload } from "lucide-react";
+import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { MIN_PUBLIC_PHOTOS } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 import { SiteImage } from "@/components/ui/site-image";
@@ -19,6 +20,24 @@ function normalizePhotoUrl(raw: string | null | undefined): string {
   if (!s || s === "undefined" || s === "null") return "";
   return s;
 }
+
+const REORDER_COPY = {
+  en: {
+    hint: "Drag a photo (or hold it on a phone) or use the arrows to change the order. The first photo is the cover.",
+    left: "Move left",
+    right: "Move right",
+  },
+  ka: {
+    hint: "რიგის შესაცვლელად გადაათრიეთ ფოტო (ტელეფონზე ცოტა ხანს დააჭირეთ) ან გამოიყენეთ ისრები. პირველი ფოტო მთავარია.",
+    left: "მარცხნივ გადატანა",
+    right: "მარჯვნივ გადატანა",
+  },
+  ru: {
+    hint: "Перетащите фото (на телефоне удерживайте) или используйте стрелки, чтобы изменить порядок. Первое фото — обложка.",
+    left: "Сдвинуть влево",
+    right: "Сдвинуть вправо",
+  },
+} as const;
 
 function moveSlot(photos: string[], from: number, to: number): string[] {
   if (from === to || from < 0 || to < 0 || from >= SLOT_COUNT || to >= SLOT_COUNT) {
@@ -52,6 +71,8 @@ export function PartnerCarPhotoGallery({
     formats: string;
   };
 }) {
+  const { locale } = usePartnerLocale();
+  const copy = REORDER_COPY[locale as keyof typeof REORDER_COPY] || REORDER_COPY.en;
   const slots = padSlots(photos);
   const fileRefs = useRef<Array<HTMLInputElement | null>>([]);
   const [lightbox, setLightbox] = useState<string | null>(null);
@@ -183,6 +204,7 @@ export function PartnerCarPhotoGallery({
   return (
     <div className="space-y-3">
       <p className="text-xs text-slate-500">{labels.formats}</p>
+      <p className="text-xs font-semibold text-sky-800">{copy.hint}</p>
 
       <div
         className={cn(
@@ -213,6 +235,13 @@ export function PartnerCarPhotoGallery({
                   const target = e.target as HTMLElement;
                   if (target.closest("button")) return;
                   clearLongPress();
+                  if (e.pointerType === "mouse") {
+                    dragFromRef.current = index;
+                    dragOverRef.current = index;
+                    setDragFrom(index);
+                    setDragOver(index);
+                    return;
+                  }
                   longPressTimer.current = window.setTimeout(() => {
                     dragFromRef.current = index;
                     dragOverRef.current = index;
@@ -269,7 +298,17 @@ export function PartnerCarPhotoGallery({
                 )}
               </div>
 
-              <div className="flex shrink-0 items-center justify-center border-t border-slate-100 bg-white px-1 py-1.5">
+              <div className="flex shrink-0 items-center justify-between gap-1 border-t border-slate-100 bg-white px-1 py-1">
+                <button
+                  type="button"
+                  disabled={!filled || uploading || index === 0}
+                  onClick={() => commitSlots(moveSlot(photosRef.current, index, index - 1))}
+                  aria-label={copy.left}
+                  title={copy.left}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 enabled:hover:bg-slate-100 disabled:opacity-25"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
                 <button
                   type="button"
                   disabled={!filled || uploading}
@@ -282,6 +321,16 @@ export function PartnerCarPhotoGallery({
                 >
                   <Trash2 className="h-3 w-3" />
                   {labels.remove}
+                </button>
+                <button
+                  type="button"
+                  disabled={!filled || uploading || index >= SLOT_COUNT - 1 || !slots[index + 1]}
+                  onClick={() => commitSlots(moveSlot(photosRef.current, index, index + 1))}
+                  aria-label={copy.right}
+                  title={copy.right}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 enabled:hover:bg-slate-100 disabled:opacity-25"
+                >
+                  <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
 
