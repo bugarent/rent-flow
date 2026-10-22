@@ -9,7 +9,7 @@ import { normalizeRegistrationNumber } from "@/lib/cars/registration-number";
 import { bodyTypeFromCarDescription, countriesFromCarDescription } from "@/lib/cars/listing-meta";
 import { formatPartnerCode } from "@/lib/ids";
 import { listingSearchBlockers, type SearchBlocker } from "@/lib/cars/listing-visibility";
-import { normalizeLocationCode } from "@/lib/catalog/search-places";
+import { findSearchPlace, normalizeLocationCode, parseCityLocationCode } from "@/lib/catalog/search-places";
 import { listDeliveryLocations } from "@/lib/server/delivery-locations";
 import { listExpiredInsuranceCarIds } from "@/lib/server/car-insurance-store";
 
@@ -292,12 +292,70 @@ export async function loadAdminCarRows(): Promise<{
     else console.warn("[admin/cars] prisma cars", error);
   }
 
-  const cars = [...byId.values()]
-    .map((car) => ({
-      ...car,
-      ...resolvePartner(car, partnerLookup.byId, partnerLookup.byEmail),
-    }))
-    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  const resolved = [...byId.values()].map((car) => ({
+    ...car,
+    ...resolvePartner(car, partnerLookup.byId, partnerLookup.byEmail),
+  }));
+  const cars = (await withPartnerDeliveryPlaces(resolved, locationById)).sort(
+    (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
+  );
 
   return { cars, dbOffline };
+}
+
+function partnerIdCandidates(car: AdminCarRow): string[] {
+  const ids = new Set<string>();
+  for (const raw of [car.partnerId, car.partnerDetailId]) {
+    const id = String(raw || "").trim();
+    if (!id) continue;
+    const bare = id.replace(/^file-partner-/, "");
+    ids.add(id);
+    ids.add(bare);
+    ids.add(`file-partner-${bare}`);
+  }
+  return [...ids];
+}
+
+/**
+ * Search places come from the partner's Delivery page once it has saved places
+ * (same rule as `mergeDeliveryPrefsIntoRows`); the listing's own rows only count before that.
+ */
+async function withPartnerDeliveryPlaces(
+  cars: AdminCarRow[],
+  locationById: Map<string, { iata?: string | null; isActive?: boolean; cityName?: string | null }>,
+): Promise<AdminCarRow[]> {
+  let prefsById: Map<string, Array<{ deliveryLocationId: string; enabled?: boolean }>>;
+  try {
+    const { readPartnerDeliveryPrefsMap } = await import("@/lib/server/partner-delivery-prefs-store");
+    prefsById = await readPartnerDeliveryPrefsMap([...new Set(cars.flatMap(partnerIdCandidates))]);
+  } catch (error) {
+    console.warn("[admin/cars] delivery prefs", error);
+    return cars;
+  }
+  return cars.map((car) => {
+    const prefs = partnerIdCandidates(car)
+      .map((id) => prefsById.get(id) || [])
+      .find((rows) => rows.length);
+    if (!prefs) return car;
+    const searchAirports = uniqueAirports(
+      prefs.flatMap((pref) => {
+        if (pref.enabled === false) return [];
+        const loc = locationById.get(pref.deliveryLocationId);
+        if (loc && loc.isActive === false) return [];
+        const place = findSearchPlace(pref.deliveryLocationId);
+        const raw = loc?.iata || place?.iata || pref.deliveryLocationId;
+        const city = parseCityLocationCode(raw) || parseCityLocationCode(pref.deliveryLocationId);
+        const code = city
+          ? loc?.cityName || place?.cityName || city.slug.replace(/-/g, " ")
+          : normalizeLocationCode(raw);
+        return code ? [code] : [];
+      }),
+    );
+    const others = car.searchBlockers.filter((blocker) => blocker !== "noDelivery");
+    return {
+      ...car,
+      searchAirports,
+      searchBlockers: searchAirports.length ? others : [...others, "noDelivery"],
+    };
+  });
 }
