@@ -14,7 +14,11 @@ import { isCityLocationCode } from "@/lib/catalog/search-places";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { cn } from "@/lib/utils";
 import { clampPickupSelection, earliestPickupIsoDate, isPickupSlotAllowed } from "@/lib/bookings/lead-time";
-import { DateInput } from "@/components/ui/date-input";
+import {
+  SearchDateRangePicker,
+  formatRangeDay,
+  type DateRangeField,
+} from "@/components/search/search-date-range-picker";
 
 const SAME_AS_PICKUP = "SAME";
 
@@ -69,9 +73,9 @@ function ChipShell({
 const fieldClass =
   "w-full min-w-0 rounded-md border border-sky-200/70 bg-[#f4f9fd] px-2 py-1.5 text-sm font-semibold text-slate-800 outline-none focus:border-[#1d6fe8]";
 
-/** Compact date input: kill browser left padding so full MM/DD/YYYY fits. */
-const dateFieldClass =
-  "min-h-[1.875rem] w-full min-w-0 flex-1 rounded-md sm:w-auto border border-sky-200/70 bg-[#f4f9fd] py-1 pl-0.5 pr-0 text-xs font-semibold text-slate-800 outline-none focus:border-[#1d6fe8] [color-scheme:light] [&::-webkit-calendar-picker-indicator]:ms-0 [&::-webkit-calendar-picker-indicator]:scale-90 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0 [&::-webkit-datetime-edit-text]:px-0.5 [&::-webkit-datetime-edit-month-field]:p-0 [&::-webkit-datetime-edit-day-field]:p-0 [&::-webkit-datetime-edit-year-field]:p-0";
+/** Date chip that opens the shared pick-up → drop-off range calendar. */
+const dateButtonClass =
+  "inline-flex min-h-10 w-full min-w-0 flex-1 items-center justify-between gap-1 rounded-md border border-sky-200/70 bg-[#f4f9fd] px-2 py-1 text-left text-xs font-semibold text-slate-800 outline-none hover:border-[#1d6fe8]/60 focus:border-[#1d6fe8] sm:min-h-[1.875rem] sm:w-auto";
 
 const timeFieldClass =
   "h-[1.875rem] w-full shrink-0 rounded-md sm:w-[4.5rem] border border-sky-200/70 bg-[#f4f9fd] px-1 text-xs font-semibold text-slate-800 outline-none focus:border-[#1d6fe8]";
@@ -157,8 +161,9 @@ export function CarsSearchTripEditor({
   filtersSlot?: ReactNode;
 }) {
   const router = useRouter();
-  const { dictionary } = usePreferences();
+  const { dictionary, locale } = usePreferences();
   const [minPickupDate, setMinPickupDate] = useState("");
+  const [calendarField, setCalendarField] = useState<DateRangeField | null>(null);
   const start = splitDateTime(initialStart);
   const end = splitDateTime(initialEnd);
   const syncingFromUrl = useRef(false);
@@ -446,23 +451,15 @@ export function CarsSearchTripEditor({
           className="sm:min-w-[12.5rem] sm:flex-1 sm:basis-0"
         >
           <div className="flex flex-col items-stretch gap-1 sm:flex-row sm:flex-nowrap sm:items-center">
-            <DateInput
-              type="date"
-              value={pickupDate}
-              min={minPickupDate}
-              onChange={(e) => {
-                const slot = clampPickupSelection(
-                  clampDateToMin(e.target.value, minPickupDate),
-                  pickupTime,
-                  TIME_OPTIONS,
-                );
-                setPickupDate(slot.date);
-                setPickupTime(slot.time);
-                if (dropoffDate < slot.date) setDropoffDate(slot.date);
-              }}
-              className={dateFieldClass}
-              required
-            />
+            <button
+              type="button"
+              onClick={() => setCalendarField("pickup")}
+              className={dateButtonClass}
+              aria-label={dictionary.home.pickupDateShort}
+            >
+              <span className="truncate">{pickupDate ? formatRangeDay(pickupDate, locale) : "—"}</span>
+              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-[#1d6fe8]" aria-hidden />
+            </button>
             <select
               value={pickupTime}
               onChange={(e) => {
@@ -487,16 +484,15 @@ export function CarsSearchTripEditor({
           className="sm:min-w-[12.5rem] sm:flex-1 sm:basis-0"
         >
           <div className="flex flex-col items-stretch gap-1 sm:flex-row sm:flex-nowrap sm:items-center">
-            <DateInput
-              type="date"
-              value={dropoffDate}
-              min={pickupDate || minPickupDate}
-              onChange={(e) =>
-                setDropoffDate(clampDateToMin(e.target.value, pickupDate || minPickupDate))
-              }
-              className={dateFieldClass}
-              required
-            />
+            <button
+              type="button"
+              onClick={() => setCalendarField("dropoff")}
+              className={dateButtonClass}
+              aria-label={dictionary.home.dropoffDateShort}
+            >
+              <span className="truncate">{dropoffDate ? formatRangeDay(dropoffDate, locale) : "—"}</span>
+              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-[#1d6fe8]" aria-hidden />
+            </button>
             <select
               value={dropoffTime}
               onChange={(e) => setDropoffTime(e.target.value)}
@@ -550,6 +546,27 @@ export function CarsSearchTripEditor({
             </label>
           ) : null}
         </div>
+      ) : null}
+
+      {calendarField ? (
+        <SearchDateRangePicker
+          initialField={calendarField}
+          pickupDate={pickupDate}
+          dropoffDate={dropoffDate}
+          minDate={minPickupDate || earliestPickupIsoDate()}
+          locale={locale}
+          pickupLabel={dictionary.home.pickupDateShort}
+          dropoffLabel={dictionary.home.dropoffDateShort}
+          closeLabel={dictionary.common.closeMenu}
+          onClose={() => setCalendarField(null)}
+          onApply={(range) => {
+            const slot = clampPickupSelection(range.pickupDate, pickupTime, TIME_OPTIONS);
+            setPickupDate(slot.date);
+            setPickupTime(slot.time);
+            setDropoffDate(clampDateToMin(range.dropoffDate, slot.date));
+            setCalendarField(null);
+          }}
+        />
       ) : null}
     </div>
   );
