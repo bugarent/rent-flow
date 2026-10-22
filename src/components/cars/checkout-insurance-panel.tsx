@@ -453,8 +453,8 @@ function InsuranceToggleRow({
         locked || free || selected ? onGreen : offYellow,
       )}
     >
-      <div className="flex flex-nowrap items-center gap-2 sm:gap-3">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 sm:flex-nowrap sm:gap-3">
+        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-1">
           <ShieldCheck
             className={cn(
               "h-4 w-4 shrink-0",
@@ -484,7 +484,7 @@ function InsuranceToggleRow({
           </button>
         </div>
 
-        <div className="flex shrink-0 flex-nowrap items-center gap-x-1.5 whitespace-nowrap text-end sm:gap-x-2">
+        <div className="ms-auto flex min-w-0 flex-wrap items-center justify-end gap-x-1.5 text-end sm:ms-0 sm:shrink-0 sm:flex-nowrap sm:gap-x-2 sm:whitespace-nowrap">
           {free ? (
             <span
               className={cn(
