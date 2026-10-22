@@ -111,6 +111,36 @@ function noticeText(
     .join("\n");
 }
 
+function mailHtml(text: string) {
+  return `<div style="font-family:sans-serif;line-height:1.6;white-space:pre-wrap">${text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")}</div>`;
+}
+
+function guestSubject(event: BookingNoticeEvent, reference: string | null) {
+  const ref = reference ? ` · ${reference}` : "";
+  if (event === "BOOKING_EDITED") return `Your booking was updated${ref}`;
+  if (event === "BOOKING_CANCELLED") return `Your booking was cancelled${ref}`;
+  return `Your booking is confirmed${ref}`;
+}
+
+function guestGreeting(event: BookingNoticeEvent, booking: NoticeSnapshot, siteName: string) {
+  const name = booking.guestFirstName.trim();
+  const hello = name ? `Dear ${name},` : "Hello,";
+  if (event === "BOOKING_EDITED") {
+    return `${hello}\n\nThank you for choosing ${siteName}! Your booking has been updated. Here are the current details:`;
+  }
+  if (event === "BOOKING_CANCELLED") {
+    return `${hello}\n\nThank you for using ${siteName}. Your booking has been cancelled. We hope to welcome you again soon. Details:`;
+  }
+  return `${hello}\n\nThank you for choosing ${siteName}! We are happy to confirm your booking. Here are your booking details:`;
+}
+
+function guestSignOff(siteName: string) {
+  return `Have a great trip!\nThe ${siteName} team`;
+}
+
 async function siteName(): Promise<string> {
   try {
     const settings = await getPlatformSettings();
@@ -162,17 +192,29 @@ async function deliverBookingNotice(input: {
     `Duration: ${Math.max(1, days)} ${Math.max(1, days) === 1 ? "day" : "days"}`,
   ].join("\n");
   const subject = noticeSubject(input.event, reference);
+  const guestEmail = String(input.booking.guestEmail || "").trim();
+  const guestText = [guestGreeting(input.event, input.booking, name), "", text, "", guestSignOff(name)].join("\n");
 
-  const recipients = [...input.partnerEmails, input.booking.guestEmail]
+  const partnerRecipients = input.partnerEmails
     .map((email) => String(email || "").trim())
     .filter(
       (email, index, all) =>
         isValidEmail(email) &&
         all.findIndex((item) => normalizeLogin(item) === normalizeLogin(email)) === index,
     );
+  // The customer always gets their own letter, even when the address matches the partner's.
+  const letters = [
+    ...partnerRecipients.map((to) => ({ to, role: "partner" as const, subject, text })),
+    ...(isValidEmail(guestEmail)
+      ? [{ to: guestEmail, role: "guest" as const, subject: guestSubject(input.event, reference), text: guestText }]
+      : []),
+  ];
 
   const sendEmails = async () => {
-    if (!recipients.length) {
+    if (!isValidEmail(guestEmail)) {
+      console.warn(`[notify] ${input.event} ${reference}: booking has no valid customer email`);
+    }
+    if (!letters.length) {
       console.warn(`[notify] ${input.event} ${reference}: no valid email recipients`);
       return;
     }
@@ -183,24 +225,20 @@ async function deliverBookingNotice(input: {
     } catch {
       /* fall back to SMTP_FROM */
     }
-    const html = `<div style="font-family:sans-serif;line-height:1.6;white-space:pre-wrap">${text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")}</div>`;
     const results = await Promise.allSettled(
-      recipients.map((to) =>
+      letters.map((letter) =>
         sendPartnerMail({
-          to,
+          to: letter.to,
           ...(isValidEmail(from) ? { from, replyTo: from } : {}),
-          subject,
-          text,
-          html,
+          subject: letter.subject,
+          text: letter.text,
+          html: mailHtml(letter.text),
           event: input.event,
           userId: input.userId,
           payload: {
             bookingId: input.booking.id,
             reference,
-            role: normalizeLogin(to) === normalizeLogin(input.booking.guestEmail) ? "guest" : "partner",
+            role: letter.role,
             ...(input.cancellationReason ? { cancellationReason: input.cancellationReason } : {}),
             ...(input.refundEur != null ? { refundEur: input.refundEur } : {}),
           },
@@ -208,10 +246,11 @@ async function deliverBookingNotice(input: {
       ),
     );
     results.forEach((result, i) => {
+      const target = `${letters[i].role} ${letters[i].to}`;
       if (result.status === "rejected") {
-        console.error(`[notify] email to ${recipients[i]} failed`, result.reason);
+        console.error(`[notify] email to ${target} failed`, result.reason);
       } else if (!result.value.sent) {
-        console.error(`[notify] email to ${recipients[i]} was NOT sent (see [mail] log above)`);
+        console.error(`[notify] email to ${target} was NOT sent (see [mail] log above)`);
       }
     });
   };
