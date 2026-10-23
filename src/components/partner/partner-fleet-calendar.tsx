@@ -366,7 +366,9 @@ export function PartnerFleetCalendar() {
     return () => window.clearTimeout(id);
   }, [query]);
 
+  const loadSeq = useRef(0);
   const load = useCallback(async (silent = false) => {
+    const seq = ++loadSeq.current;
     if (!silent) setLoading(true);
     setError("");
     try {
@@ -379,17 +381,18 @@ export function PartnerFleetCalendar() {
       if (qDigits) params.set("q", qDigits);
       const res = await fetch(`/api/partners/fleet-calendar?${params}`, { cache: "no-store" });
       const data = await res.json();
+      if (seq !== loadSeq.current) return;
       if (!res.ok) throw new Error(data.error || "Failed");
       setCars(data.cars || []);
       setBookings(
         ((data.bookings || []) as BookingBar[]).filter((b) => b.status !== "CANCELLED"),
       );
     } catch (err) {
+      if (seq !== loadSeq.current) return;
+      // A late failure must not wipe cars and bookings that a faster request already showed.
       setError(err instanceof Error ? err.message : "Failed");
-      setCars([]);
-      setBookings([]);
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, [rangeFromMs, rangeToMs, locale, debouncedQ]);
 

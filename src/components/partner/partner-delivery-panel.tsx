@@ -43,18 +43,29 @@ export function PartnerDeliveryPanel() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/partners/delivery-prefs", { cache: "no-store" })
-      .then(async (res) => {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || "load failed");
-        if (!cancelled) applyResponse(data);
-      })
-      .catch(() => {
-        if (!cancelled) setLoadFailed(true);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    const load = (attempt: number) => {
+      fetch("/api/partners/delivery-prefs", { cache: "no-store" })
+        .then(async (res) => {
+          const data = await res.json();
+          if (!res.ok) throw new Error(data?.error || "load failed");
+          if (cancelled) return;
+          applyResponse(data);
+          setLoadFailed(false);
+          setLoading(false);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          if (attempt < 1) {
+            window.setTimeout(() => {
+              if (!cancelled) load(attempt + 1);
+            }, 400);
+            return;
+          }
+          setLoadFailed(true);
+          setLoading(false);
+        });
+    };
+    load(0);
     return () => {
       cancelled = true;
     };

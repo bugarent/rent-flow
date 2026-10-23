@@ -208,6 +208,7 @@ export function PartnerPersonalInfoForm({
     return map[id];
   };
   const [active, setActive] = useState<string>(PERSONAL_INFO_SECTIONS[0].id);
+  const settingsDirtyRef = useRef(false);
   const [settings, setSettings] = useState(() => ({
     ...initial,
     ...normalizeContractSelection({
@@ -368,6 +369,48 @@ export function PartnerPersonalInfoForm({
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    if (isAdminReview) return;
+    let cancelled = false;
+    const ac = new AbortController();
+    const timer = window.setTimeout(() => ac.abort(), 12_000);
+    const filled = (s: PartnerCompanySettings) =>
+      Boolean(
+        s.logoUrl?.trim() ||
+          s.title?.trim() ||
+          s.address?.trim() ||
+          s.contractUrl?.trim() ||
+          s.primaryPhone?.trim(),
+      );
+    fetch("/api/partners/company-settings", { cache: "no-store", signal: ac.signal })
+      .then(async (res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || settingsDirtyRef.current || !data?.settings) return;
+        const next = data.settings as PartnerCompanySettings;
+        setSettings((prev) => {
+          if (settingsDirtyRef.current || filled(prev) || !filled(next)) return prev;
+          return {
+            ...prev,
+            ...next,
+            ...normalizeContractSelection({
+              contractUrl: next.contractUrl ?? "",
+              partnerContractActive: Boolean(next.partnerContractActive),
+              useSiteContract: next.useSiteContract === undefined ? true : Boolean(next.useSiteContract),
+            }),
+            tariffs: normalizeTariffIntervals(next.tariffs, MAX_TARIFF_INTERVALS),
+          };
+        });
+      })
+      .catch(() => {
+        /* keep the server payload */
+      })
+      .finally(() => window.clearTimeout(timer));
+    return () => {
+      cancelled = true;
+      ac.abort();
+    };
+  }, [isAdminReview]);
+
   const scrollTo = (id: string) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -377,6 +420,7 @@ export function PartnerPersonalInfoForm({
   };
 
   const patch = (partial: Partial<PartnerCompanySettings>) => {
+    settingsDirtyRef.current = true;
     setSettings((prev) => {
       const next = { ...prev, ...partial };
       if ("firstName" in partial || "lastName" in partial) {

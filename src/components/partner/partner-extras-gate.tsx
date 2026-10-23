@@ -50,7 +50,7 @@ export function PartnerExtrasGateProvider({ children }: { children: ReactNode })
     return () => {
       cancelled = true;
     };
-  }, [onExtras, pathname]);
+  }, [onExtras]);
 
   return <GateContext.Provider value={{ gate, extrasHref: EXTRAS_HREF }}>{children}</GateContext.Provider>;
 }

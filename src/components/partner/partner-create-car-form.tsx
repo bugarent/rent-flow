@@ -705,6 +705,7 @@ export function PartnerCreateCarForm({
           setPhotos(photoSlotsFromSaved(photoUrls));
           setPassportFront(String(car.passport?.frontUrl || ""));
           setPassportBack(String(car.passport?.backUrl || ""));
+          if (!cancelled) setBooting(false);
           setInsuranceExpiresAt(
             String(
               (car as { insuranceExpiresAt?: string }).insuranceExpiresAt ||
@@ -873,16 +874,23 @@ export function PartnerCreateCarForm({
           return;
         }
 
+        const carPromise = carId
+          ? fetch(`/api/cars/${encodeURIComponent(carId)}`, {
+              cache: "no-store",
+              signal: AbortSignal.timeout(20_000),
+            }).catch(() => null)
+          : Promise.resolve(null);
+        const catalogSignal = AbortSignal.timeout(12_000);
         const [extrasRes, prefsRes, meRes, categoriesRes] = await Promise.all([
-          fetch("/api/extras"),
-          fetch("/api/partners/extras-prefs"),
-          fetch("/api/partners/me"),
-          fetch("/api/partners/car-categories"),
+          fetch("/api/extras", { signal: catalogSignal }).catch(() => null),
+          fetch("/api/partners/extras-prefs", { signal: catalogSignal }).catch(() => null),
+          fetch("/api/partners/me", { signal: catalogSignal }).catch(() => null),
+          fetch("/api/partners/car-categories", { signal: catalogSignal }).catch(() => null),
         ]);
-        const extras = await extrasRes.json();
-        const prefsData = prefsRes.ok ? await prefsRes.json() : null;
-        const me = await meRes.json();
-        const categoriesData = categoriesRes.ok ? await categoriesRes.json() : [];
+        const extras = extrasRes?.ok ? await extrasRes.json().catch(() => []) : [];
+        const prefsData = prefsRes?.ok ? await prefsRes.json().catch(() => null) : null;
+        const me = meRes?.ok ? await meRes.json().catch(() => ({})) : {};
+        const categoriesData = categoriesRes?.ok ? await categoriesRes.json().catch(() => []) : [];
         if (cancelled) return;
 
         if (Array.isArray(categoriesData)) {
@@ -899,7 +907,7 @@ export function PartnerCreateCarForm({
 
         let nextCurrency: PartnerDisplayCurrency = displayCurrencyRef.current;
         let nextRates: FxRates = displayRatesRef.current;
-        if (meRes.ok && me.fxRates && typeof me.fxRates === "object" && !moneyCtx) {
+        if (meRes?.ok && me.fxRates && typeof me.fxRates === "object" && !moneyCtx) {
           nextRates = {
             eurUsd: Number(me.fxRates.eurUsd) || DEFAULT_FX_RATES.eurUsd,
             eurGbp: Number(me.fxRates.eurGbp) || DEFAULT_FX_RATES.eurGbp,
@@ -910,7 +918,7 @@ export function PartnerCreateCarForm({
         setPricingCurrency(nextCurrency);
         setFxRates(nextRates);
 
-        if (!carId && extrasRes.ok && Array.isArray(extras) && extras.length) {
+        if (!carId && extrasRes?.ok && Array.isArray(extras) && extras.length) {
           const prefItems = Array.isArray(prefsData?.items) ? prefsData.items : [];
           const prefs = indexExtraPrefs(prefItems);
           const filtered = extrasVisibleOnCarForm(extras, {
@@ -961,7 +969,7 @@ export function PartnerCreateCarForm({
             );
           }
         }
-        if (meRes.ok) {
+        if (meRes?.ok) {
           const pricing =
             me.seasonalPricing && typeof me.seasonalPricing === "object"
               ? (me.seasonalPricing as PartnerSeasonalPricing)
@@ -979,9 +987,15 @@ export function PartnerCreateCarForm({
         }
 
         if (carId) {
-          const carRes = await fetch(`/api/cars/${carId}`, { cache: "no-store" });
-          const car = await carRes.json();
-          if (!carRes.ok) throw new Error(typeof car.error === "string" ? car.error : errUpdateFailedRef.current);
+          let carRes = await carPromise;
+          if (!carRes?.ok) {
+            carRes = await fetch(`/api/cars/${encodeURIComponent(carId)}`, {
+              cache: "no-store",
+              signal: AbortSignal.timeout(20_000),
+            }).catch(() => null);
+          }
+          const car = carRes ? await carRes.json().catch(() => ({})) : {};
+          if (!carRes?.ok) throw new Error(typeof car.error === "string" ? car.error : errUpdateFailedRef.current);
           if (cancelled) return;
 
           const details = parseCarDetails(car.description);
@@ -1083,6 +1097,7 @@ export function PartnerCreateCarForm({
           setPhotos(photoSlotsFromSaved(photoUrls));
           setPassportFront(String(car.passport?.frontUrl || ""));
           setPassportBack(String(car.passport?.backUrl || ""));
+          if (!cancelled) setBooting(false);
           setInsuranceExpiresAt(
             String(
               (car as { insuranceExpiresAt?: string }).insuranceExpiresAt ||
@@ -1119,7 +1134,7 @@ export function PartnerCreateCarForm({
           }
 
           const carExtras = Array.isArray(car.extras) ? car.extras : [];
-          if (extrasRes.ok && Array.isArray(extras) && extras.length) {
+          if (extrasRes?.ok && Array.isArray(extras) && extras.length) {
             const prefItems = Array.isArray(prefsData?.items) ? prefsData.items : [];
             const prefs = indexExtraPrefs(prefItems);
             const offers = readExtraOffers(details);
@@ -1191,7 +1206,7 @@ export function PartnerCreateCarForm({
           }
 
           let deliveryList =
-            meRes.ok && Array.isArray(me.deliveryCatalog) && me.deliveryCatalog.length
+            meRes?.ok && Array.isArray(me.deliveryCatalog) && me.deliveryCatalog.length
               ? (me.deliveryCatalog as DeliveryLocationView[])
               : initialDeliveryRef.current;
           const carPartnerId = String(car.partner?.id || "");

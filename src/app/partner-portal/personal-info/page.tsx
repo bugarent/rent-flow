@@ -30,21 +30,19 @@ export default async function PartnerPersonalInfoPage() {
   let lastAdminNote: string | null = null;
   let catalogCountries: Array<{ iso2: string; name: string; hoverRegion: "Europe" | "Asia" }> = [];
   let fxRates = defaultFxRates();
-  try {
-    fxRates = await getFxRates();
-  } catch {
-    /* defaults */
-  }
 
-  try {
-    catalogCountries = await listPartnerOperatingCountries();
-  } catch {
-    catalogCountries = [];
-  }
+  const [fxResult, countriesResult, partner] = await Promise.all([
+    getFxRates().catch(() => defaultFxRates()),
+    listPartnerOperatingCountries().catch(
+      () => [] as Array<{ iso2: string; name: string; hoverRegion: "Europe" | "Asia" }>,
+    ),
+    prisma.partner.findUnique({ where: { userId: session.user.id } }).catch(() => null),
+  ]);
+  fxRates = fxResult;
+  catalogCountries = countriesResult;
 
   let loaded = false;
   try {
-    const partner = await prisma.partner.findUnique({ where: { userId: session.user.id } });
     if (partner) {
       loaded = true;
       partnerStatus = partner.status;
@@ -58,10 +56,12 @@ export default async function PartnerPersonalInfoPage() {
           partnerCode = null;
         }
       }
-      settings = await resolveCompanySettings(partner);
-      const moderation = await resolveProfileModeration(
-        partner as { id: string; profileModeration?: unknown },
-      );
+      const [resolvedSettings, moderation, seasonal] = await Promise.all([
+        resolveCompanySettings(partner),
+        resolveProfileModeration(partner as { id: string; profileModeration?: unknown }),
+        resolvePartnerSeasonalPricing(partner).catch(() => null),
+      ]);
+      settings = resolvedSettings;
       countriesEditable = canEditDeliveryCountries({
         status: partner.status,
         approvedAt: partner.approvedAt,
@@ -70,16 +70,11 @@ export default async function PartnerPersonalInfoPage() {
       countriesEditUnlockUntil = moderation.countriesEditUnlockUntil;
       pendingRemoderation = partner.status === "PENDING_REMODERATION";
       lastAdminNote = moderation.lastAdminNote;
-      try {
-        const seasonal = await resolvePartnerSeasonalPricing(partner);
-        if (seasonal.enabled || seasonal.seasons.length) {
-          settings = {
-            ...settings,
-            seasonalPricing: seasonal,
-          };
-        }
-      } catch {
-        /* ignore */
+      if (seasonal && (seasonal.enabled || seasonal.seasons.length)) {
+        settings = {
+          ...settings,
+          seasonalPricing: seasonal,
+        };
       }
     }
   } catch {

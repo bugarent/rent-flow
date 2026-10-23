@@ -155,6 +155,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       insuranceDoc?.insuranceUrl || null,
       insuranceDoc?.insuranceExpiresAt || null,
     );
+    // Partner edit does not need checkout enrichment (delivery catalog, payments,
+    // languages). That work is what made the window sit on "loading" and, when it
+    // failed, hid the photos and documents until a later reload.
+    if ((isAdmin || isOwner) && !rangeFrom) {
+      return NextResponse.json(await withPublishedSnapshotForAdmin(shaped));
+    }
     const payload = await enrichPublicCar(shaped, fileCar.partnerId, isAdmin || isOwner);
     if (!isAdmin && !isOwner) {
       const { passport: _passport, insuranceUrl: _insurance, ...publicPayload } = payload;
@@ -183,6 +189,25 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       return null;
     }
   })();
+  if ((isAdmin || isOwner) && !rangeFrom) {
+    const passport =
+      car && "passport" in car && car.passport
+        ? {
+            ...car.passport,
+            insuranceUrl: insuranceUrl || null,
+            insuranceExpiresAt: insuranceExpiresAt || null,
+          }
+        : undefined;
+    return NextResponse.json(
+      await withPublishedSnapshotForAdmin({
+        ...car,
+        ...(passport ? { passport } : {}),
+        insuranceUrl: insuranceUrl || null,
+        insuranceExpiresAt: insuranceExpiresAt || null,
+        rejectionNotice: rejection,
+      }),
+    );
+  }
   if (car && "passport" in car && car.passport) {
     return NextResponse.json(
       await withPublishedSnapshotForAdmin(
