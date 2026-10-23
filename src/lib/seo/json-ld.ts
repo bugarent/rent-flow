@@ -1,5 +1,9 @@
-import { SEO_SITE_NAME, SITE_NAME, SITE_DOMAIN, SUPPORT_EMAIL } from "@/lib/brand";
+import { SEO_SITE_NAME, SITE_DOMAIN, SUPPORT_EMAIL } from "@/lib/brand";
 import { SITE_URL, absoluteUrl } from "@/lib/seo/config";
+import { LOCALES } from "@/lib/i18n/config";
+
+/** Spellings people type for the brand; the domain is left out so Google keeps the brand name. */
+const BRAND_ALTERNATES = ["Rent Airport Cars", "RentAirportCars"];
 
 export type LocalBusinessContact = {
   phone?: string;
@@ -18,7 +22,7 @@ export function buildLocalBusinessJsonLd(contact?: LocalBusinessContact) {
     "@type": ["AutoRental", "LocalBusiness", "CarRental"],
     "@id": `${SITE_URL}/#organization`,
     name: SEO_SITE_NAME,
-    alternateName: ["Rent Airport Cars", "RentAirportCars", SITE_NAME],
+    alternateName: BRAND_ALTERNATES,
     url: SITE_URL,
     logo: absoluteUrl("/logo.png"),
     image: absoluteUrl("/images/hero-tarmac.jpg"),
@@ -68,9 +72,9 @@ export function buildWebSiteJsonLd() {
     "@type": "WebSite",
     "@id": `${SITE_URL}/#website`,
     name: SEO_SITE_NAME,
-    alternateName: ["Rent Airport Cars", "RentAirportCars", SITE_NAME],
-    url: SITE_URL,
-    inLanguage: ["en", "ka", "ru"],
+    alternateName: BRAND_ALTERNATES,
+    url: `${SITE_URL}/`,
+    inLanguage: [...LOCALES],
     publisher: { "@id": `${SITE_URL}/#organization` },
     potentialAction: {
       "@type": "SearchAction",
@@ -97,6 +101,21 @@ export function buildServiceJsonLd() {
     description:
       "Self-drive car rental with airport delivery at Kutaisi (KUT), Tbilisi (TBS) and Batumi (BUS).",
     url: SITE_URL,
+  };
+}
+
+/** Homepage "popular airports and places" cards as an ItemList of their airport pages. */
+export function buildPlacesItemListJsonLd(name: string, items: Array<{ name: string; path: string }>) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name,
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      url: absoluteUrl(item.path),
+    })),
   };
 }
 

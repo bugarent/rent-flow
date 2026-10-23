@@ -96,7 +96,7 @@ export default async function AirportInfoPage({
   const url = absoluteUrl(pagePath(code));
   const jsonLd = [
     buildBreadcrumbJsonLd([
-      { name: copy.home, path: "/" },
+      { name: SEO_SITE_NAME, path: "/" },
       { name: title, path: pagePath(code) },
     ]),
     {

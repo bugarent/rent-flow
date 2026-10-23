@@ -1,9 +1,12 @@
 import type { Locale } from "@/lib/i18n/config";
+import { SEO_SITE_NAME } from "@/lib/brand";
 
 /** Google shows ~50–60 title characters and ~120–160 description characters. */
 export const SEO_TITLE_RANGE = { min: 30, max: 60 } as const;
 export const SEO_DESCRIPTION_RANGE = { min: 120, max: 160 } as const;
-const BRAND = "RentAirportCars";
+const BRAND = SEO_SITE_NAME;
+/** "RENT AIRPORT CARS", "RentAirportCars", "rentairportcars.com" … */
+const BRAND_PATTERN = "rent\\s*airport\\s*cars(?:\\.com)?";
 
 const DESCRIPTION_TEMPLATE: Record<Locale, string> = {
   en: "Rent a car at {airport} ({code}). Meet & greet at arrivals, verified local partners, transparent prices and free cancellation. Book online in minutes.",
@@ -31,19 +34,22 @@ function clip(text: string, max: number): string {
 }
 
 /** Card heading without decorative emoji or a trailing "– Brand" part. */
-function plainHeading(title: string): string {
+export function plainHeading(title: string): string {
   return title
-    .replace(/[\p{Extended_Pictographic}\uFE0F]/gu, "")
-    .replace(new RegExp(`\\s*[–—|-]\\s*${BRAND}\\s*$`, "i"), "")
+    .replace(/[\p{Extended_Pictographic}\uFE0F\u200B-\u200D\u2060\uFEFF]/gu, "")
+    .replace(new RegExp(`\\s*[–—|-]\\s*${BRAND_PATTERN}\\s*$`, "i"), "")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-/** "<heading> | RentAirportCars", dropping the brand when the heading alone fills the limit. */
+/** Google cuts long titles at the end, so the trailing brand may run a little past the range. */
+const BRANDED_TITLE_MAX = 70;
+
+/** "<heading> | RENT AIRPORT CARS", dropping the brand when the heading alone is too long. */
 export function autoSeoTitle(heading: string): string {
   const plain = plainHeading(heading);
   const branded = `${plain} | ${BRAND}`;
-  return branded.length <= SEO_TITLE_RANGE.max ? branded : clip(plain, SEO_TITLE_RANGE.max);
+  return branded.length <= BRANDED_TITLE_MAX ? branded : clip(plain, SEO_TITLE_RANGE.max);
 }
 
 /** First sentences of the page text; the language template when the text is too short. */
@@ -56,7 +62,7 @@ export function autoSeoDescription(input: {
   const lead = String(input.infoText || "")
     .split(/\n+/)
     .map((line) => line.replace(/[\p{Extended_Pictographic}\uFE0F\u200B-\u200D\u2060\uFEFF]/gu, "").trim())
-    .filter((line) => line.length > 40 && !new RegExp(`${BRAND}\\s*$`, "i").test(line))
+    .filter((line) => line.length > 40 && !new RegExp(`${BRAND_PATTERN}\\s*$`, "i").test(line))
     .map((line) => (/[.!?…:;。！？]$/.test(line) ? line : `${line}.`))
     .join(" ");
   if (lead.length >= SEO_DESCRIPTION_RANGE.min) return clip(lead, SEO_DESCRIPTION_RANGE.max);

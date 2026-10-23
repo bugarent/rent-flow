@@ -22,8 +22,32 @@ import { VEHICLE_CATEGORIES } from "@/lib/catalog/categories";
 import { summarizeMappedModels } from "@/lib/cars/category-mapping";
 import { airportCountryIso2 } from "@/lib/catalog/search-places";
 import { withAutoTitleTranslations } from "@/lib/catalog/airport-card-auto-titles";
+import type { Metadata } from "next";
+import { readPreferences } from "@/lib/server/preferences";
+import { buildPageMetadata } from "@/lib/seo/metadata";
+import { getPageSeo } from "@/lib/seo/pages";
+import { buildHomeSeo, popularPlacesListName } from "@/lib/seo/home-seo";
+import { buildPlacesItemListJsonLd } from "@/lib/seo/json-ld";
+import { JsonLd } from "@/components/seo/json-ld";
+import { localizedAirportTitle } from "@/lib/catalog/homepage-airport-i18n";
+import { plainHeading } from "@/lib/catalog/airport-seo";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const [{ locale }, airports] = await Promise.all([
+    readPreferences(),
+    softTimeout(cachedHomepageAirports(), [], 3000),
+  ]);
+  const seo = buildHomeSeo(locale, airports.map((a) => a.iata));
+  return buildPageMetadata({
+    title: seo.title,
+    description: seo.description,
+    path: "/",
+    locale,
+    keywords: [...(getPageSeo("home", locale).keywords ?? []), "RENT AIRPORT CARS", "rent airport cars"],
+  });
+}
 
 export default async function Home() {
   const categoryFallback = VEHICLE_CATEGORIES.map((c) => ({
@@ -50,6 +74,7 @@ export default async function Home() {
     googleReviews,
     bookingChannels,
     bookingCounts,
+    { locale },
   ] = await Promise.all([
     softTimeout(cachedSearchDeliveryAirports(), [], 6000),
     softTimeout(cachedHomepageAirports(), airportFallback, 6000),
@@ -59,6 +84,7 @@ export default async function Home() {
     softTimeout(cachedHomepageGoogleReviews(), null, 6000),
     softTimeout(cachedCustomBookingChannels(), DEFAULT_CUSTOM_BOOKING_CHANNELS, 6000),
     softTimeout(bookingCountsByPickupIata(), new Map<string, number>(), 3000),
+    readPreferences(),
   ]);
 
   // Popular airport cards: most booked first, then the larger fleet, then the admin's order.
@@ -76,8 +102,26 @@ export default async function Home() {
     })
     .map(({ airport }) => airport);
 
+  const placesJsonLd = buildPlacesItemListJsonLd(
+    popularPlacesListName(locale),
+    popularAirports.map((a) => ({
+      name: plainHeading(
+        localizedAirportTitle(
+          withAutoTitleTranslations({
+            iata: a.iata,
+            title: a.title,
+            translations: "translations" in a ? (a.translations as AirportCardTranslations) : undefined,
+          }),
+          locale,
+        ),
+      ),
+      path: `/airport/${encodeURIComponent(a.iata.toUpperCase())}`,
+    })),
+  );
+
   return (
     <div className="flex w-full min-w-0 flex-col overflow-x-clip">
+      {popularAirports.length ? <JsonLd data={placesJsonLd} /> : null}
       <link
         rel="preload"
         as="image"
