@@ -167,7 +167,7 @@ function isToday(d: Date) {
 
 function dayCellClass(d: Date) {
   return cn(
-    "box-border h-full w-7 flex-none border-e border-b border-slate-200 md:w-auto md:min-w-0 md:flex-1",
+    "box-border h-full w-7 flex-none border-e border-b border-slate-200 [touch-action:pan-x_pan-y] md:w-auto md:min-w-0 md:flex-1",
     isWeekBoundaryDay(d) ? "bg-slate-100" : "bg-white",
   );
 }
@@ -188,10 +188,13 @@ export function PartnerFleetCalendar() {
   const t = dictionary.calendar;
   const [query, setQuery] = useState("");
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
+  const [monthMenuOpen, setMonthMenuOpen] = useState(false);
   const [carsColumnNarrow, setCarsColumnNarrow] = useState(false);
+  const [clientReady, setClientReady] = useState(false);
 
   useLayoutEffect(() => {
     if (window.matchMedia("(max-width: 767px)").matches) setCarsColumnNarrow(true);
+    setClientReady(true);
   }, []);
   const [debouncedQ, setDebouncedQ] = useState("");
   const [cars, setCars] = useState<CarRow[]>([]);
@@ -268,7 +271,10 @@ export function PartnerFleetCalendar() {
   }, []);
 
   const onMonthSwipePointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
-    if (e.pointerType === "mouse" && e.button !== 0) return;
+    // Touch and pen must keep the browser's own pan so a finger can drag the
+    // days sideways and the car list up and down. Hijacking those gestures
+    // (preventDefault / touch-action: none) cancels both axes on a phone.
+    if (e.pointerType !== "mouse" || e.button !== 0) return;
     const s = monthSwipeRef.current;
     s.pointerId = e.pointerId;
     s.startX = e.clientX;
@@ -736,8 +742,13 @@ export function PartnerFleetCalendar() {
         if (!mobile) {
           gridRef.current.scrollLeft = 0;
         } else {
+          const scroller = gridRef.current;
+          const col = scroller.querySelector<HTMLElement>("[data-day-col]");
+          const dayWidth = col?.offsetWidth || 28;
           const todayIndex = days.findIndex((d) => isToday(d));
-          gridRef.current.scrollLeft = todayIndex > 0 ? todayIndex * 44 : 0;
+          const maxLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+          const target = todayIndex > 0 ? Math.max(0, (todayIndex - 1) * dayWidth) : 0;
+          scroller.scrollLeft = Math.min(target, maxLeft);
         }
       }
     };
@@ -771,35 +782,34 @@ export function PartnerFleetCalendar() {
           <p className="m-4 shrink-0 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>
         ) : null}
 
-        <div ref={gridRef} className="min-h-0 flex-1 touch-pan-y overflow-y-auto overflow-x-auto overscroll-x-contain">
+        <div
+          ref={gridRef}
+          className="min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-contain pb-[max(3.5rem,env(safe-area-inset-bottom))] [touch-action:pan-x_pan-y] md:pb-0"
+        >
           {/* Sticky header. On a phone each day keeps its own width and the month scrolls sideways. */}
           <div
             className={cn(
-              "sticky top-0 z-20 flex h-10 w-max border-b-2 border-slate-300 bg-white md:h-14 md:w-full",
+              "sticky top-0 z-20 flex h-16 w-max border-b-2 border-slate-300 bg-white md:h-14 md:w-full",
             )}
           >
             <div className={cn("sticky start-0 z-30 flex h-full shrink-0 flex-col border-e-2 border-slate-300 bg-white", carColumnWidth)}>
               <div
                 className={cn(
-                  "flex h-5 items-center gap-0.5 border-b border-[#cfd8e3] bg-[#d9e2e8] px-1 md:h-8",
+                  "relative z-50 flex h-10 items-center gap-0.5 border-b border-[#cfd8e3] bg-[#d9e2e8] px-0.5 md:h-8 md:px-1",
                 )}
               >
-                <select
-                  aria-label="Month"
-                  value={month.getMonth()}
-                  onChange={(e) =>
-                    setMonth(new Date(month.getFullYear(), Number(e.target.value), 1))
-                  }
-                  className={cn(
-                    "h-5 min-w-0 flex-1 truncate rounded border-0 bg-transparent text-[10px] font-bold text-[#1e1b4b] outline-none md:hidden",
-                  )}
+                <button
+                  type="button"
+                  className="flex h-10 min-h-10 w-full min-w-0 flex-1 items-center justify-center gap-0.5 rounded px-0.5 text-[11px] font-bold text-[#1e1b4b] md:hidden"
+                  onClick={() => setMonthMenuOpen(true)}
+                  aria-haspopup="listbox"
+                  aria-expanded={monthMenuOpen}
                 >
-                  {monthsShort.map((name, i) => (
-                    <option key={name} value={i}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
+                  <span className="min-w-0 truncate">
+                    {clientReady ? monthsShort[month.getMonth()] : month.getMonth() + 1}
+                  </span>
+                  <span className="shrink-0">{String(month.getFullYear()).slice(-2)}</span>
+                </button>
                 <select
                   aria-label="Month"
                   value={month.getMonth()}
@@ -821,7 +831,7 @@ export function PartnerFleetCalendar() {
                     setMonth(new Date(Number(e.target.value), month.getMonth(), 1))
                   }
                   className={cn(
-                    "h-5 w-9 shrink-0 rounded border-0 bg-transparent px-0 text-[10px] font-bold text-[#1e1b4b] outline-none md:h-auto md:text-[11px] md:font-extrabold",
+                    "hidden h-auto shrink-0 rounded border-0 bg-transparent px-0 text-[11px] font-extrabold text-[#1e1b4b] outline-none md:block",
                     carsColumnNarrow ? "md:w-12 md:text-[10px]" : "md:w-[4.25rem]",
                   )}
                 >
@@ -867,7 +877,7 @@ export function PartnerFleetCalendar() {
                 "flex h-full w-max shrink-0 select-none flex-col md:w-auto md:min-w-0 md:flex-1",
                 monthSwipeArmed && "cursor-grabbing",
               )}
-              style={{ touchAction: monthSwipeArmed ? "none" : undefined }}
+              style={{ touchAction: monthSwipeArmed ? "none" : "pan-x pan-y" }}
               onPointerDown={onMonthSwipePointerDown}
               onPointerMove={onMonthSwipePointerMove}
               onPointerUp={onMonthSwipePointerEnd}
@@ -877,8 +887,9 @@ export function PartnerFleetCalendar() {
                 {days.map((d) => (
                   <div
                     key={`d-${d.toISOString()}`}
+                    data-day-col=""
                     className={cn(
-                      "box-border flex h-full w-7 flex-none flex-col items-center justify-center overflow-hidden border-e border-b border-slate-200 md:w-auto md:min-w-0 md:flex-1",
+                      "box-border flex h-full w-7 flex-none flex-col items-center justify-center overflow-hidden border-e border-b border-slate-200 [touch-action:pan-x_pan-y] md:w-auto md:min-w-0 md:flex-1",
                       isToday(d)
                         ? "bg-sky-100 ring-2 ring-inset ring-sky-500"
                         : isWeekBoundaryDay(d)
@@ -980,7 +991,7 @@ export function PartnerFleetCalendar() {
                   )}
                   style={{
                     ["--days" as string]: days.length,
-                    touchAction: monthSwipeArmed ? "none" : undefined,
+                    touchAction: monthSwipeArmed ? "none" : "pan-x pan-y",
                   }}
                   onPointerDown={onMonthSwipePointerDown}
                   onPointerMove={onMonthSwipePointerMove}
@@ -1006,7 +1017,7 @@ export function PartnerFleetCalendar() {
                         className={cn(
                           attention
                             ? cn(
-                                "box-border h-full w-7 flex-none border-e border-b border-amber-200/80 md:w-auto md:min-w-0 md:flex-1",
+                                "box-border h-full w-7 flex-none border-e border-b border-amber-200/80 [touch-action:pan-x_pan-y] md:w-auto md:min-w-0 md:flex-1",
                                 isWeekBoundaryDay(d) ? "bg-amber-200/50" : "bg-amber-100/40",
                               )
                             : dayCellClass(d),
@@ -1099,7 +1110,7 @@ export function PartnerFleetCalendar() {
                         style={{
                           left: `${leftPct}%`,
                           width: `${widthPct}%`,
-                          touchAction: monthSwipeArmed ? "none" : undefined,
+                          touchAction: monthSwipeArmed ? "none" : "pan-x pan-y",
                         }}
                       >
                         <div className="flex h-full min-w-0 items-center justify-between gap-0.5 overflow-hidden px-0.5">
@@ -1136,6 +1147,73 @@ export function PartnerFleetCalendar() {
           ) : null}
         </div>
       </div>
+
+      {monthMenuOpen ? (
+        <div
+          className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+          onClick={() => setMonthMenuOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Month"
+            className="flex max-h-[min(85dvh,560px)] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-3 py-2">
+              <p className="text-sm font-extrabold text-[#0b1f4b]">
+                {months[month.getMonth()]} {month.getFullYear()}
+              </p>
+              <button
+                type="button"
+                onClick={() => setMonthMenuOpen(false)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100"
+                aria-label={blockCopy.cancel}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex shrink-0 gap-1.5 overflow-x-auto overscroll-x-contain px-3 py-2 [touch-action:pan-x]">
+              {yearOptions.map((y) => (
+                <button
+                  key={y}
+                  type="button"
+                  onClick={() => setMonth(new Date(y, month.getMonth(), 1))}
+                  className={cn(
+                    "inline-flex h-10 shrink-0 items-center rounded-full px-3 text-sm font-bold",
+                    y === month.getFullYear()
+                      ? "bg-[#0b1f4b] text-white"
+                      : "bg-slate-100 text-slate-800",
+                  )}
+                >
+                  {y}
+                </button>
+              ))}
+            </div>
+            <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[max(0.75rem,env(safe-area-inset-bottom))] [touch-action:pan-y]">
+              {months.map((name, i) => (
+                <li key={name}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMonth(new Date(month.getFullYear(), i, 1));
+                      setMonthMenuOpen(false);
+                    }}
+                    className={cn(
+                      "flex min-h-11 w-full items-center px-4 text-start text-base",
+                      i === month.getMonth()
+                        ? "bg-sky-50 font-extrabold text-[#0b1f4b]"
+                        : "font-semibold text-slate-800",
+                    )}
+                  >
+                    {name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : null}
 
       {selected && (selected.kind === "block" || selected.status === "BLOCKED") ? (
         <PartnerBookingDetailModal
