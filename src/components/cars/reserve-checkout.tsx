@@ -1141,7 +1141,7 @@ export function ReserveCheckout({
             <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-center shadow-sm">
               <p className="text-sm font-extrabold text-[#0b1f4b]">{t.step3}</p>
               <p className="mt-1 text-xs text-slate-500">
-                {tripLocationLabel(pickup, pickupAddress, { airportSuffix: t.airportSuffix })}
+                {tripLocationLabel(pickup, pickupAddress, { locale })}
               </p>
             </div>
             <CheckoutPaypalSandbox
@@ -1931,15 +1931,15 @@ export function ReserveCheckout({
                 <div className="space-y-1.5 text-sm">
                   <div className="space-y-0.5">
                     <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{t.pickup}</p>
-                    <p className="font-semibold text-[#0b1f4b]">
-                      {tripLocationLabel(pickup, pickupAddress, { airportSuffix: t.airportSuffix })}
+                    <p className="break-words font-semibold text-[#0b1f4b]">
+                      {tripLocationLabel(pickup, pickupAddress, { locale })}
                     </p>
                     <p className="text-slate-600">{formatTripDate(startDate, locale)}</p>
                   </div>
                   <div className="space-y-0.5 border-t border-slate-100 pt-1.5">
                     <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{t.dropoff}</p>
-                    <p className="font-semibold text-[#0b1f4b]">
-                      {tripLocationLabel(dropoff, dropoffAddress, { airportSuffix: t.airportSuffix })}
+                    <p className="break-words font-semibold text-[#0b1f4b]">
+                      {tripLocationLabel(dropoff, dropoffAddress, { locale })}
                     </p>
                     <p className="text-slate-600">{formatTripDate(endDate, locale)}</p>
                   </div>
@@ -1951,8 +1951,8 @@ export function ReserveCheckout({
                 copy={t}
                 carTitle={carTitle}
                 dailyRate={dailyRate}
-                pickupLabel={tripLocationLabel(pickup, pickupAddress, { airportSuffix: t.airportSuffix })}
-                dropoffLabel={tripLocationLabel(dropoff, dropoffAddress, { airportSuffix: t.airportSuffix })}
+                pickupLabel={tripLocationLabel(pickup, pickupAddress, { locale })}
+                dropoffLabel={tripLocationLabel(dropoff, dropoffAddress, { locale })}
                 insuranceExtras={insuranceExtras}
                 paidExtras={paidExtras}
                 extraQty={extraQty}
@@ -2384,7 +2384,7 @@ function LineItem({
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <p className="font-semibold text-slate-800">{label}</p>
+        <p className="break-words font-semibold text-slate-800">{label}</p>
         {hint ? <p className="text-xs text-slate-500">{hint}</p> : null}
       </div>
       <span className="flex shrink-0 flex-col items-end leading-tight">

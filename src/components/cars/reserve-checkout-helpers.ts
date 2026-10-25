@@ -1,4 +1,5 @@
-import { cityStreetLabel, findSearchPlace } from "@/lib/catalog/search-places";
+import { composeLocationAddress, findSearchPlace } from "@/lib/catalog/search-places";
+import { placeLabel } from "@/lib/i18n/place-label";
 import {
   isExtraChargeFree,
   isFreeCancellation48Extra,
@@ -135,23 +136,26 @@ export function formatTripDate(value: string, locale?: string) {
   return `${monthLabel} ${day}, ${year}, ${time}`;
 }
 
-export function locationLabel(code: string, options?: { airportSuffix?: string }) {
+export function locationLabel(code: string, options?: { locale?: string; airportSuffix?: string }) {
   const place = findSearchPlace(code);
   if (!place) return code;
-  if (place.kind === "airport" && place.iata) {
-    const suffix = options?.airportSuffix ?? "Airport";
-    return `${place.cityName} ${suffix} [${place.iata}]`;
-  }
-  return place.cityName || place.label;
+  return placeLabel(options?.locale || "en", place.label);
 }
 
-/** Pickup/return line: city plus the street and number when the customer chose a city address. */
+/** Pickup/return line. Airports use the airport name; a city address keeps the street. */
 export function tripLocationLabel(
   code: string,
   street: string | null | undefined,
-  options?: { airportSuffix?: string },
+  options?: { locale?: string; airportSuffix?: string },
 ) {
-  return cityStreetLabel(code, street) || locationLabel(code, options);
+  const locale = options?.locale || "en";
+  const place = findSearchPlace(code);
+  const streetText = String(street || "").trim();
+  if (place?.kind === "city") {
+    const city = placeLabel(locale, `${place.cityName} (city)`).replace(/\s+\([^)]+\)\s*$/, "");
+    return streetText ? composeLocationAddress(city, streetText) : city;
+  }
+  return locationLabel(code, { locale });
 }
 
 export function isAdditionalDriverExtra(extra: { id: string; name: string; checkoutSlot?: string }) {

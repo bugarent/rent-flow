@@ -11,6 +11,7 @@ import {
   type SearchAirportOption,
 } from "@/components/search/airport-search";
 import { isCityLocationCode } from "@/lib/catalog/search-places";
+import { placeLabel } from "@/lib/i18n/place-label";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { cn } from "@/lib/utils";
 import { clampPickupSelection, earliestPickupIsoDate, isPickupSlotAllowed } from "@/lib/bookings/lead-time";
@@ -239,7 +240,7 @@ export function CarsSearchTripEditor({
     for (const o of scoped) {
       map.set(o.iata, {
         value: o.iata,
-        label: o.label,
+        label: placeLabel(locale, o.label),
         kind: o.kind ?? (isCityLocationCode(o.iata) ? "city" : "airport"),
         countryIso2: o.countryIso2,
         country: o.country,
@@ -259,7 +260,7 @@ export function CarsSearchTripEditor({
       }
       map.set(value, {
         value,
-        label: fromAll?.label || value,
+        label: fromAll?.label ? placeLabel(locale, fromAll.label) : value,
         kind: fromAll?.kind ?? (isCityLocationCode(value) ? "city" : "airport"),
         countryIso2: fromAll?.countryIso2,
         country: fromAll?.country,
@@ -286,6 +287,7 @@ export function CarsSearchTripEditor({
     };
   }, [
     options,
+    locale,
     activeCountryIso2,
     pickup,
     dropoff,
