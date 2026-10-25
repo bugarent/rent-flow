@@ -1,5 +1,6 @@
 import { CATALOG_AIRPORTS } from "@/lib/catalog/airports";
 import type { Locale } from "@/lib/i18n/config";
+import { cityWord, extraAirportName, extraCityName } from "@/lib/i18n/place-names";
 
 /** Airport names for locales that are not stored on the catalog record. */
 const EXTRA: Record<string, Partial<Record<Locale, string>>> = {
@@ -218,11 +219,29 @@ function catalogBases(airport: (typeof CATALOG_AIRPORTS)[number]) {
   return bases;
 }
 
-/** Show a catalog airport or country label in the selected language. */
+function cityDisplayName(locale: string, english: string): string {
+  const catalog = CATALOG_AIRPORTS.find(
+    (item) => item.cityName.en === english || Object.values(item.cityName).includes(english),
+  );
+  const stored = catalog?.cityName[locale as Locale];
+  if (stored) return stored;
+  return extraCityName(locale, english) || english;
+}
+
+/** Show a pickup place in the language selected in the main menu. */
 export function placeLabel(locale: string, label: string): string {
   const raw = String(label || "").trim();
   if (!raw) return raw;
+
+  const city = raw.match(/^(.*)\s+\(city\)$/i);
+  if (city) {
+    return `${cityDisplayName(locale, city[1].trim())} (${cityWord(locale)})`;
+  }
+
   const { base, code } = splitCode(raw);
+  const extraAirport = code ? extraAirportName(locale, code, base) : null;
+  if (extraAirport) return withCode(extraAirport, code);
+
   const airport =
     CATALOG_AIRPORTS.find((item) => item.iata === code) ||
     CATALOG_AIRPORTS.find((item) => item.name.en === base);

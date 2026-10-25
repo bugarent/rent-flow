@@ -1,0 +1,271 @@
+import type { Locale } from "@/lib/i18n/config";
+
+/** English pickup names that are not on the main airport catalog, in every site language. */
+type Names = { en: string } & Partial<Record<Locale, string>>;
+
+function names(en: string, ka: string, ru: string, rest?: Partial<Record<Locale, string>>): Names {
+  return { en, ka, ru, ...rest };
+}
+
+export const EXTRA_AIRPORTS: Record<string, Names> = {
+  LWN: names("Shirak Airport", "შირაკის აეროპორტი", "Аэропорт Ширак", {
+    de: "Flughafen Schirak",
+    es: "Aeropuerto de Shirak",
+    fr: "Aéroport de Shirak",
+    it: "Aeroporto di Shirak",
+    nl: "Luchthaven Shirak",
+    pl: "Port lotniczy Szirak",
+    tr: "Şirak Havalimanı",
+    ar: "مطار شيراك",
+    zh: "希拉克机场",
+    ko: "시라크 공항",
+    th: "สนามบินชีรัก",
+  }),
+  SKD: names("Samarkand International", "სამარყანდის აეროპორტი", "Аэропорт Самарканд", {
+    de: "Flughafen Samarkand",
+    es: "Aeropuerto de Samarcanda",
+    fr: "Aéroport de Samarcande",
+    it: "Aeroporto di Samarcanda",
+    nl: "Luchthaven Samarkand",
+    pl: "Port lotniczy Samarkanda",
+    tr: "Semerkand Havalimanı",
+    ar: "مطار سمرقند",
+    zh: "撒马尔罕机场",
+    ko: "사마르칸트 공항",
+    th: "สนามบินซามาร์คันด์",
+  }),
+  TGD: names("Podgorica Airport", "პოდგორიცის აეროპორტი", "Аэропорт Подгорица", {
+    de: "Flughafen Podgorica",
+    es: "Aeropuerto de Podgorica",
+    fr: "Aéroport de Podgorica",
+    it: "Aeroporto di Podgorica",
+    nl: "Luchthaven Podgorica",
+    pl: "Port lotniczy Podgorica",
+    tr: "Podgorica Havalimanı",
+    ar: "مطار بودغوريتسا",
+    zh: "波德戈里察机场",
+    ko: "포드고리차 공항",
+    th: "สนามบินพอดกอรีตซา",
+  }),
+  TIV: names("Tivat Airport", "ტივატის აეროპორტი", "Аэропорт Тиват", {
+    de: "Flughafen Tivat",
+    es: "Aeropuerto de Tivat",
+    fr: "Aéroport de Tivat",
+    it: "Aeroporto di Tivat",
+    nl: "Luchthaven Tivat",
+    pl: "Port lotniczy Tivat",
+    tr: "Tivat Havalimanı",
+    ar: "مطار تيفات",
+    zh: "蒂瓦特机场",
+    ko: "티밧 공항",
+    th: "สนามบินติวัต",
+  }),
+  ESB: names("Ankara Esenboğa", "ანკარის ესენბოგა", "Анкара Эсенбога", {
+    de: "Ankara Esenboğa",
+    es: "Ankara Esenboğa",
+    fr: "Ankara Esenboğa",
+    it: "Ankara Esenboğa",
+    nl: "Ankara Esenboğa",
+    pl: "Ankara Esenboğa",
+    tr: "Ankara Esenboğa Havalimanı",
+    ar: "أنقرة إيسنبوغا",
+    zh: "安卡拉埃森博阿机场",
+    ko: "앙카라 에센보아",
+    th: "อังการา เอเซนโบกา",
+  }),
+  BJV: names("Milas–Bodrum Airport", "მილას-ბოდრუმის აეროპორტი", "Аэропорт Милас-Бодрум", {
+    de: "Flughafen Milas-Bodrum",
+    es: "Aeropuerto de Milas-Bodrum",
+    fr: "Aéroport de Milas-Bodrum",
+    it: "Aeroporto di Milas-Bodrum",
+    nl: "Luchthaven Milas-Bodrum",
+    pl: "Port lotniczy Milas-Bodrum",
+    tr: "Milas-Bodrum Havalimanı",
+    ar: "مطار ميلاس بودروم",
+    zh: "米拉斯-博德鲁姆机场",
+    ko: "밀라스 보드룸 공항",
+    th: "สนามบินมิลาส-โบดรัม",
+  }),
+  DLM: names("Dalaman Airport", "დალამანის აეროპორტი", "Аэропорт Даламан", {
+    de: "Flughafen Dalaman",
+    es: "Aeropuerto de Dalaman",
+    fr: "Aéroport de Dalaman",
+    it: "Aeroporto di Dalaman",
+    nl: "Luchthaven Dalaman",
+    pl: "Port lotniczy Dalaman",
+    tr: "Dalaman Havalimanı",
+    ar: "مطار دالامان",
+    zh: "达拉曼机场",
+    ko: "달라만 공항",
+    th: "สนามบินดาลามัน",
+  }),
+  GZT: names("Gaziantep Airport", "გაზიანთეფის აეროპორტი", "Аэропорт Газиантеп", {
+    de: "Flughafen Gaziantep",
+    es: "Aeropuerto de Gaziantep",
+    fr: "Aéroport de Gaziantep",
+    it: "Aeroporto di Gaziantep",
+    nl: "Luchthaven Gaziantep",
+    pl: "Port lotniczy Gaziantep",
+    tr: "Gaziantep Havalimanı",
+    ar: "مطار غازي عنتاب",
+    zh: "加济安泰普机场",
+    ko: "가지안테프 공항",
+    th: "สนามบินกาเซียนเทป",
+  }),
+  SAW: names("Istanbul Sabiha Gökçen", "საბიჰა გიოკჩენის აეროპორტი", "Аэропорт Сабиха Гёкчен", {
+    de: "Flughafen Sabiha Gökçen",
+    es: "Aeropuerto Sabiha Gökçen",
+    fr: "Aéroport Sabiha Gökçen",
+    it: "Aeroporto Sabiha Gökçen",
+    nl: "Luchthaven Sabiha Gökçen",
+    pl: "Port lotniczy Sabiha Gökçen",
+    tr: "Sabiha Gökçen Havalimanı",
+    ar: "مطار صبيحة كوكجن",
+    zh: "萨比哈·格克琴机场",
+    ko: "사비하 괴크첸 공항",
+    th: "สนามบินซาบิฮา เกิคเชน",
+  }),
+  ASR: names("Kayseri Erkilet", "კაისერის აეროპორტი", "Аэропорт Кайсери", {
+    de: "Flughafen Kayseri",
+    es: "Aeropuerto de Kayseri",
+    fr: "Aéroport de Kayseri",
+    it: "Aeroporto di Kayseri",
+    nl: "Luchthaven Kayseri",
+    pl: "Port lotniczy Kayseri",
+    tr: "Kayseri Havalimanı",
+    ar: "مطار قيصري",
+    zh: "开塞利机场",
+    ko: "카이세리 공항",
+    th: "สนามบินไคเซรี",
+  }),
+  TZX: names("Trabzon Airport", "ტრაბზონის აეროპორტი", "Аэропорт Трабзон", {
+    de: "Flughafen Trabzon",
+    es: "Aeropuerto de Trebisonda",
+    fr: "Aéroport de Trabzon",
+    it: "Aeroporto di Trebisonda",
+    nl: "Luchthaven Trabzon",
+    pl: "Port lotniczy Trabzon",
+    tr: "Trabzon Havalimanı",
+    ar: "مطار طرابزون",
+    zh: "特拉布宗机场",
+    ko: "트라브존 공항",
+    th: "สนามบินแทรบซอน",
+  }),
+  ADB: names("Izmir Adnan Menderes", "იზმირის ადნან მენდერესის აეროპორტი", "Измир Аднан Мендерес", {
+    de: "Flughafen Izmir",
+    es: "Aeropuerto de Esmirna",
+    fr: "Aéroport d'Izmir",
+    it: "Aeroporto di Smirne",
+    nl: "Luchthaven Izmir",
+    pl: "Port lotniczy Izmir",
+    tr: "İzmir Adnan Menderes Havalimanı",
+    ar: "مطار إزمير",
+    zh: "伊兹密尔机场",
+    ko: "이즈미르 공항",
+    th: "สนามบินอิซมีร์",
+  }),
+  BEG: names("Belgrade Nikola Tesla", "ბელგრადის ნიკოლა ტესლას აეროპორტი", "Аэропорт Белград", {
+    de: "Flughafen Belgrad",
+    es: "Aeropuerto de Belgrado",
+    fr: "Aéroport de Belgrade",
+    it: "Aeroporto di Belgrado",
+    nl: "Luchthaven Belgrado",
+    pl: "Port lotniczy Belgrad",
+    tr: "Belgrad Havalimanı",
+    ar: "مطار بلغراد",
+    zh: "贝尔格莱德机场",
+    ko: "베오그라드 공항",
+    th: "สนามบินเบลเกรด",
+  }),
+  INI: names("Niš Constantine the Great", "ნიშის აეროპორტი", "Аэропорт Ниш", {
+    de: "Flughafen Niš",
+    es: "Aeropuerto de Niš",
+    fr: "Aéroport de Niš",
+    it: "Aeroporto di Niš",
+    nl: "Luchthaven Niš",
+    pl: "Port lotniczy Nisz",
+    tr: "Niş Havalimanı",
+    ar: "مطار نيش",
+    zh: "尼什机场",
+    ko: "니시 공항",
+    th: "สนามบินนิช",
+  }),
+};
+
+export const CITY_NAMES: Record<string, Names> = {
+  Telavi: names("Telavi", "თელავი", "Телави"),
+  Zugdidi: names("Zugdidi", "ზუგდიდი", "Зугдиди"),
+  Marneuli: names("Marneuli", "მარნეული", "Марнеули"),
+  Mtskheta: names("Mtskheta", "მცხეთა", "Мцхета"),
+  Ozurgeti: names("Ozurgeti", "ოზურგეთი", "Озургети"),
+  Poti: names("Poti", "ფოთი", "Поти"),
+  Rustavi: names("Rustavi", "რუსთავი", "Рустави"),
+  Senaki: names("Senaki", "სენაკი", "Сенаки"),
+  Khashuri: names("Khashuri", "ხაშური", "Хашури"),
+  Kobuleti: names("Kobuleti", "ქობულეთი", "Кобулети"),
+  Gori: names("Gori", "გორი", "Гори"),
+  Borjomi: names("Borjomi", "ბორჯომი", "Боржоми"),
+  Akhaltsikhe: names("Akhaltsikhe", "ახალციხე", "Ахалцихе"),
+  Gyumri: names("Gyumri", "გიუმრი", "Гюмри", { de: "Gjumri", tr: "Gümrü" }),
+  Armavir: names("Armavir", "არმავირი", "Армавир"),
+  Hrazdan: names("Hrazdan", "ჰრაზდანი", "Раздан"),
+  Kapan: names("Kapan", "კაპანი", "Капан"),
+  Vagharshapat: names("Vagharshapat", "ვაღარშაპატი", "Вагаршапат"),
+  Vanadzor: names("Vanadzor", "ვანაძორი", "Ванадзор"),
+  Budva: names("Budva", "ბუდვა", "Будва"),
+  Kotor: names("Kotor", "კოტორი", "Котор"),
+  "Nikšić": names("Nikšić", "ნიკშიჩი", "Никшич"),
+  Podgorica: names("Podgorica", "პოდგორიცა", "Подгорица"),
+  Tivat: names("Tivat", "ტივატი", "Тиват"),
+  Adana: names("Adana", "ადანა", "Адана", { tr: "Adana" }),
+  Alanya: names("Alanya", "ალანია", "Аланья", { tr: "Alanya" }),
+  Ankara: names("Ankara", "ანკარა", "Анкара", { tr: "Ankara" }),
+  Bodrum: names("Bodrum", "ბოდრუმი", "Бодрум", { tr: "Bodrum" }),
+  Bursa: names("Bursa", "ბურსა", "Бурса", { tr: "Bursa" }),
+  Dalaman: names("Dalaman", "დალამანი", "Даламан", { tr: "Dalaman" }),
+  Gaziantep: names("Gaziantep", "გაზიანთეფი", "Газиантеп", { tr: "Gaziantep" }),
+  Izmir: names("Izmir", "იზმირი", "Измир", { tr: "İzmir", de: "Izmir" }),
+  Kayseri: names("Kayseri", "კაისერი", "Кайсери", { tr: "Kayseri" }),
+  Konya: names("Konya", "კონია", "Конья", { tr: "Konya" }),
+  Trabzon: names("Trabzon", "ტრაპიზონი", "Трабзон", { tr: "Trabzon" }),
+  Mersin: names("Mersin", "მერსინი", "Мерсин", { tr: "Mersin" }),
+};
+
+export const CITY_WORD: Record<Locale, string> = {
+  en: "city",
+  ka: "ქალაქი",
+  de: "Stadt",
+  es: "ciudad",
+  fr: "ville",
+  it: "città",
+  nl: "stad",
+  pl: "miasto",
+  tr: "şehir",
+  ru: "город",
+  ar: "مدينة",
+  zh: "城市",
+  ko: "도시",
+  th: "เมือง",
+};
+
+function fold(value: string) {
+  return value.replace(/[–—-]/g, "-").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+export function extraAirportName(locale: string, code: string, base: string): string | null {
+  const row = EXTRA_AIRPORTS[code.trim().toUpperCase()];
+  if (!row) return null;
+  const known = Object.values(row).filter((value): value is string => Boolean(value));
+  if (base && !known.some((value) => fold(value) === fold(base))) return null;
+  return row[locale as Locale] || row.en;
+}
+
+export function extraCityName(locale: string, english: string): string | null {
+  const row = CITY_NAMES[english];
+  if (!row) return null;
+  return row[locale as Locale] || row.en;
+}
+
+export function cityWord(locale: string): string {
+  return CITY_WORD[locale as Locale] || CITY_WORD.en;
+}
