@@ -1,32 +1,32 @@
 import { NextResponse } from "next/server";
-import { randomBytes } from "node:crypto";
-import { requirePartnerApi } from "@/lib/auth/sessions";
-import { uploadImageToCloudinary } from "@/lib/server/cloudinary-upload";
-import { persistUploadedFile } from "@/lib/server/persist-upload";
+import { getAdminSession, requirePartnerApi } from "@/lib/auth/sessions";
+import { storePartnerUpload } from "@/lib/server/store-partner-upload";
 
 export const maxDuration = 60;
 
-const MAX_BYTES = 20 * 1024 * 1024;
-
-function fileExtension(file: File): string | null {
-  const type = (file.type || "").toLowerCase();
-  if (type === "image/png") return "png";
-  if (type === "image/gif") return "gif";
-  if (type === "image/webp") return "webp";
-  if (type === "application/pdf" || type === "application/x-pdf") return "pdf";
-  if (type === "image/jpeg") return "jpg";
-  const name = file.name.toLowerCase();
-  if (name.endsWith(".png")) return "png";
-  if (name.endsWith(".gif")) return "gif";
-  if (name.endsWith(".webp")) return "webp";
-  if (name.endsWith(".pdf")) return "pdf";
-  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "jpg";
-  return null;
+function uploadErrorResponse(error: unknown) {
+  const message = error instanceof Error ? error.message : "Upload failed";
+  const status =
+    message === "file required" || message.includes("too large") || message.includes("only") ? 400 : 500;
+  return NextResponse.json(
+    {
+      error:
+        message === "file required" ||
+        message.includes("too large") ||
+        message.includes("only") ||
+        message === "Could not save the image" ||
+        message === "Cloudinary is not configured"
+          ? message
+          : "Upload failed",
+    },
+    { status },
+  );
 }
 
 export async function POST(req: Request) {
-  const session = await requirePartnerApi();
-  if (!session) {
+  const partner = await requirePartnerApi();
+  const admin = partner ? null : await getAdminSession();
+  if (!partner && admin?.user.role !== "ADMIN") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -36,44 +36,11 @@ export async function POST(req: Request) {
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "file required" }, { status: 400 });
     }
-    const ext = fileExtension(file);
-    if (!ext) {
-      return NextResponse.json({ error: "PNG, JPG, GIF, WEBP or PDF only" }, { status: 400 });
-    }
-    if (file.size > MAX_BYTES) {
-      return NextResponse.json({ error: "File too large (max 20 MB)" }, { status: 400 });
-    }
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const contentType = ext === "pdf" ? "application/pdf" : ext === "jpg" ? "image/jpeg" : `image/${ext}`;
-    const originalName = `${Date.now()}-${randomBytes(6).toString("hex")}.${ext}`;
-
-    // Car / gallery images → Cloudinary (DB stores only the secure URL).
-    // PDFs (passport, docs) stay on HostedFile for private serving.
-    if (ext !== "pdf") {
-      const uploaded = await uploadImageToCloudinary({
-        bytes: buffer,
-        folder: "partner-cars",
-        publicId: originalName.replace(/\.[^.]+$/, ""),
-      });
-      return NextResponse.json({ url: uploaded.secureUrl, styled: false });
-    }
-
-    await persistUploadedFile(["partner-cars", originalName], buffer, contentType);
-    return NextResponse.json({ url: `/uploads/partner-cars/${originalName}`, styled: false });
+    const kind = String(form.get("kind") || "");
+    const stored = await storePartnerUpload(file, kind);
+    return NextResponse.json({ url: stored.url, styled: false });
   } catch (error) {
     console.error("[partners/uploads]", error);
-    const message = error instanceof Error ? error.message : "Upload failed";
-    if (message === "cover_identity" || message === "cover_style") {
-      return NextResponse.json({ error: message }, { status: message === "cover_identity" ? 400 : 502 });
-    }
-    return NextResponse.json(
-      {
-        error:
-          message === "Could not save the image" || message === "Cloudinary is not configured"
-            ? message
-            : "Upload failed",
-      },
-      { status: 500 },
-    );
+    return uploadErrorResponse(error);
   }
 }

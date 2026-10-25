@@ -43,6 +43,7 @@ import { localizedExtraCopy } from "@/lib/extras/localized-copy";
 import { usePartnerMoneyOptional } from "@/components/providers/partner-money-context";
 import { cn, formatMoney } from "@/lib/utils";
 import { compressImageForUpload } from "@/lib/files/compress-image";
+import { uiText } from "@/lib/i18n/ui-text";
 import { CAR_COLORS, carColorLabel } from "@/lib/catalog/car-colors";
 import { CAR_MAKES_MODELS } from "@/lib/catalog/car-models";
 import {
@@ -378,14 +379,85 @@ function PercentInput({
   );
 }
 
-async function uploadFile(file: File, options?: { original?: boolean }): Promise<{ url: string; styled: boolean }> {
-  const payload = options?.original ? file : await compressImageForUpload(file);
+const PASSPORT_ACCEPT =
+  "image/*,.heic,.heif,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff,.avif,.jfif,application/pdf,.pdf";
+
+function isPdfUrl(url: string) {
+  return /\.pdf($|\?)/i.test(url);
+}
+
+function DocThumb({ url, onOpen }: { url: string; onOpen: () => void }) {
+  if (isPdfUrl(url)) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="mx-auto flex h-28 w-full items-center justify-center rounded bg-white text-sm font-extrabold text-slate-700"
+      >
+        PDF
+      </a>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={url} alt="" className="mx-auto h-28 cursor-zoom-in rounded object-contain" onClick={onOpen} />
+  );
+}
+
+function formatUploadError(err: unknown, locale: string, fallback: string): string {
+  const raw = err instanceof Error ? err.message : "";
+  if (
+    !raw ||
+    raw === "Upload failed" ||
+    /failed to fetch|load failed|networkerror|network request failed|timeout/i.test(raw)
+  ) {
+    return fallback;
+  }
+  if (/too large/i.test(raw)) {
+    return uiText(locale, "The file is too large.", "ფაილი ზედმეტად დიდია.", "Файл слишком большой.");
+  }
+  if (/png, jpg|heic or pdf|only/i.test(raw)) {
+    return uiText(
+      locale,
+      "This file could not be read. Take a photo or choose a JPG, PNG or PDF.",
+      "ფაილი ვერ წაიკითხა. გადაუღეთ ფოტო ან აირჩიეთ JPG, PNG ან PDF.",
+      "Файл не читается. Сделайте фото или выберите JPG, PNG или PDF.",
+    );
+  }
+  return raw;
+}
+
+async function postUpload(file: File, document: boolean): Promise<{ url: string; styled: boolean }> {
   const fd = new FormData();
-  fd.append("file", payload);
+  fd.append("file", file);
+  if (document) fd.append("kind", "document");
   const res = await fetch("/api/partners/uploads", { method: "POST", body: fd });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Upload failed");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Upload failed");
+  if (!data.url) throw new Error("Upload failed");
   return { url: String(data.url), styled: Boolean(data.styled) };
+}
+
+async function uploadFile(file: File, options?: { original?: boolean; document?: boolean }): Promise<{ url: string; styled: boolean }> {
+  const document = Boolean(options?.document);
+  // Keep a modest original when it already fits. Anything larger is shrunk first,
+  // otherwise the host drops the request and the browser only shows "Failed to fetch".
+  const payload = document
+    ? await compressImageForUpload(file, { maxEdge: 2200, targetBytes: 1_100_000 })
+    : options?.original && file.size <= 3.5 * 1024 * 1024
+      ? file
+      : await compressImageForUpload(file);
+  try {
+    return await postUpload(payload, document);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (/unauthorized|forbidden|admin access/i.test(message)) throw err;
+    const smaller = await compressImageForUpload(file, { maxEdge: 1400, targetBytes: 480_000 });
+    const network = /failed to fetch|load failed|networkerror|network request failed|timeout/i.test(message);
+    if (!network && smaller.size >= payload.size && smaller.type === payload.type) throw err;
+    return postUpload(smaller.size < payload.size ? smaller : payload, document);
+  }
 }
 
 /** Form slots for saved photos; old auto-generated studio covers are dropped so the first real photo is the cover. */
@@ -575,14 +647,18 @@ export function PartnerCreateCarForm({
           setPricingCurrency(nextCurrency);
           setFxRates(nextRates);
 
-          const [categoriesRes, carRes] = await Promise.all([
-            fetch("/api/partners/car-categories").catch(() => null),
+          const loadCar = () =>
             fetch(`/api/cars/${encodeURIComponent(carId)}`, {
               cache: "no-store",
-              signal: AbortSignal.timeout(20_000),
-            }),
+              signal: AbortSignal.timeout(25_000),
+            }).catch(() => null);
+          const [categoriesRes, firstCarRes] = await Promise.all([
+            fetch("/api/partners/car-categories").catch(() => null),
+            loadCar(),
           ]);
+          const carRes = firstCarRes?.ok ? firstCarRes : await loadCar();
           if (cancelled) return;
+          if (!carRes) throw new Error("Failed to fetch");
 
           const categoriesData = categoriesRes?.ok ? await categoriesRes.json().catch(() => []) : [];
           if (Array.isArray(categoriesData)) {
@@ -1455,7 +1531,7 @@ export function PartnerCreateCarForm({
       }
       return { urls };
     } catch (err) {
-      showError(err instanceof Error ? err.message : common.uploadFailed, "photo");
+      showError(formatUploadError(err, locale, common.uploadFailed), "photo");
       return { urls: [] };
     } finally {
       setUploading(false);
@@ -1468,11 +1544,11 @@ export function PartnerCreateCarForm({
     setUploading(true);
     setError("");
     try {
-      const url = (await uploadFile(file)).url;
+      const url = (await uploadFile(file, { document: true })).url;
       if (side === "front") setPassportFront(url);
       else setPassportBack(url);
     } catch (err) {
-      showError(err instanceof Error ? err.message : common.uploadFailed, "certificate");
+      showError(formatUploadError(err, locale, common.uploadFailed), "certificate");
     } finally {
       setUploading(false);
       if (side === "front" && passportFrontRef.current) passportFrontRef.current.value = "";
@@ -1836,20 +1912,41 @@ export function PartnerCreateCarForm({
       setRejectModalOpen(false);
       setAdminMessage(
         status === "APPROVED"
-          ? locale === "ka"
-            ? "განცხადება დამტკიცებულია"
-            : "Listing approved"
-          : locale === "ka"
-            ? "განცხადება უარყოფილია — პარტნიორს გაეგზავნა შეტყობინება"
-            : "Listing rejected",
+          ? uiText(locale, "Listing approved", "განცხადება დამტკიცებულია", "Объявление одобрено")
+          : uiText(
+              locale,
+              "Listing rejected",
+              "განცხადება უარყოფილია — პარტნიორს გაეგზავნა შეტყობინება",
+              "Объявление отклонено — партнёру отправлено сообщение",
+            ),
       );
       router.push(adminReview.backHref);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
+      const raw = err instanceof Error ? err.message : "";
+      setError(
+        !raw || raw === "Failed" || /failed to fetch|load failed|networkerror|network request failed/i.test(raw)
+          ? uiText(
+              locale,
+              "Could not save the decision. Try again.",
+              "გადაწყვეტილება ვერ შეინახა. სცადეთ თავიდან.",
+              "Не удалось сохранить решение. Попробуйте снова.",
+            )
+          : raw,
+      );
     } finally {
       setAdminBusy(false);
     }
   };
+
+  const shownError =
+    error && /failed to fetch|load failed|networkerror|network request failed/i.test(error)
+      ? uiText(
+          locale,
+          "Could not reach the server. Check the connection and try again.",
+          "სერვერთან კავშირი ვერ მოხერხდა. შეამოწმეთ ინტერნეტი და სცადეთ თავიდან.",
+          "Не удалось связаться с сервером. Проверьте интернет и попробуйте снова.",
+        )
+      : error;
 
   const mainInfoChanged =
     isChanged("make") ||
@@ -1893,7 +1990,7 @@ export function PartnerCreateCarForm({
               {adminReview.backLabel}
             </Link>
             <p className="text-sm font-extrabold">
-              {locale === "ka" ? "განცხადების მოდერაცია" : "Listing moderation"}
+              {uiText(locale, "Listing moderation", "განცხადების მოდერაცია", "Модерация объявления")}
             </p>
             {isNewListing ? (
               <span className="rounded-full bg-sky-600 px-2.5 py-0.5 text-[11px] font-extrabold text-white">
@@ -1962,7 +2059,7 @@ export function PartnerCreateCarForm({
               : "border-white/50 bg-white/95",
           )}
         >
-        {error ? <div className="rounded-lg bg-red-50 p-3 text-sm font-medium text-red-700">{error}</div> : null}
+        {shownError ? <div className="rounded-lg bg-red-50 p-3 text-sm font-medium text-red-700">{shownError}</div> : null}
         {saveNotice ? (
           <div className="rounded-lg bg-emerald-50 p-3 text-sm font-medium text-emerald-800">{saveNotice}</div>
         ) : null}
@@ -2871,13 +2968,7 @@ export function PartnerCreateCarForm({
               <p className="mb-0.5 text-[11px] font-semibold">{cc.front}</p>
               {passportFront ? (
                 <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={passportFront}
-                    alt=""
-                    className="mx-auto h-28 cursor-zoom-in rounded object-contain"
-                    onClick={() => setDocPreview(passportFront)}
-                  />
+                  <DocThumb url={passportFront} onOpen={() => setDocPreview(passportFront)} />
                   <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                     <button
                       type="button"
@@ -2916,7 +3007,7 @@ export function PartnerCreateCarForm({
               <input
                 ref={passportFrontRef}
                 type="file"
-                accept="image/png,image/jpeg,image/gif,image/webp"
+                accept={PASSPORT_ACCEPT}
                 className="hidden"
                 onChange={(e) => void onPassportSide("front", e.target.files)}
               />
@@ -2930,13 +3021,7 @@ export function PartnerCreateCarForm({
               <p className="mb-0.5 text-[11px] font-semibold">{cc.back}</p>
               {passportBack ? (
                 <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={passportBack}
-                    alt=""
-                    className="mx-auto h-28 cursor-zoom-in rounded object-contain"
-                    onClick={() => setDocPreview(passportBack)}
-                  />
+                  <DocThumb url={passportBack} onOpen={() => setDocPreview(passportBack)} />
                   <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                     <button
                       type="button"
@@ -2975,7 +3060,7 @@ export function PartnerCreateCarForm({
               <input
                 ref={passportBackRef}
                 type="file"
-                accept="image/png,image/jpeg,image/gif,image/webp"
+                accept={PASSPORT_ACCEPT}
                 className="hidden"
                 onChange={(e) => void onPassportSide("back", e.target.files)}
               />
@@ -2997,8 +3082,8 @@ export function PartnerCreateCarForm({
         }}
       >
         <div className={cn("mx-auto w-full", CONTENT_MAX)}>
-          {error ? (
-            <div className="mb-2 rounded-md bg-red-500/95 px-3 py-2 text-sm font-semibold text-white">{error}</div>
+          {shownError ? (
+            <div className="mb-2 rounded-md bg-red-500/95 px-3 py-2 text-sm font-semibold text-white">{shownError}</div>
           ) : null}
           {saveNotice ? (
             <div className="mb-2 rounded-md bg-emerald-600/95 px-3 py-2 text-sm font-semibold text-white">{saveNotice}</div>
@@ -3015,11 +3100,12 @@ export function PartnerCreateCarForm({
                 onChange={(e) => setAdminNote(e.target.value)}
                 rows={2}
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 sm:text-sm"
-                placeholder={
-                  locale === "ka"
-                    ? "კომენტარი პარტნიორისთვის (უარყოფისას სავალდებულო)…"
-                    : "Comment for partner (required when rejecting)…"
-                }
+                placeholder={uiText(
+                  locale,
+                  "Comment for partner (required when rejecting)…",
+                  "კომენტარი პარტნიორისთვის (უარყოფისას სავალდებულო)…",
+                  "Комментарий для партнёра (обязателен при отклонении)…",
+                )}
               />
               <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
                 <button
@@ -3029,12 +3115,8 @@ export function PartnerCreateCarForm({
                   className="inline-flex min-h-11 items-center justify-center rounded-md bg-green-600 px-3 py-1.5 text-xs font-extrabold text-white disabled:opacity-60 sm:px-4"
                 >
                   {loading
-                    ? locale === "ka"
-                      ? "ინახება…"
-                      : "Saving…"
-                    : locale === "ka"
-                      ? "თანხმობა"
-                      : "Approve"}
+                    ? uiText(locale, "Saving…", "ინახება…", "Сохранение…")
+                    : uiText(locale, "Approve", "თანხმობა", "Одобрить")}
                 </button>
                 <button
                   type="button"
@@ -3042,7 +3124,7 @@ export function PartnerCreateCarForm({
                   onClick={() => setRejectModalOpen(true)}
                   className="inline-flex min-h-10 items-center justify-center rounded-md bg-amber-500 px-3 py-1.5 text-xs font-extrabold text-white disabled:opacity-60 sm:px-4"
                 >
-                  {locale === "ka" ? "უარყოფა" : "Reject"}
+                  {uiText(locale, "Reject", "უარყოფა", "Отклонить")}
                 </button>
                 <Link
                   href={adminReview.backHref}
@@ -3113,12 +3195,15 @@ export function PartnerCreateCarForm({
         >
           <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl">
             <h2 className="text-lg font-extrabold text-[#0b1f4b]">
-              {locale === "ka" ? "უარყოფის მიზეზი" : "Rejection reason"}
+              {uiText(locale, "Rejection reason", "უარყოფის მიზეზი", "Причина отклонения")}
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              {locale === "ka"
-                ? "მიუთითეთ, რის გამო არ მოხდა განახლება. შეტყობინება გაეგზავნება პარტნიორს."
-                : "Explain why the update was denied. The partner will see this message."}
+              {uiText(
+                locale,
+                "Explain why the update was denied. The partner will see this message.",
+                "მიუთითეთ, რის გამო არ მოხდა განახლება. შეტყობინება გაეგზავნება პარტნიორს.",
+                "Укажите, почему обновление отклонено. Партнёр увидит это сообщение.",
+              )}
             </p>
             <textarea
               value={adminNote}
@@ -3134,7 +3219,7 @@ export function PartnerCreateCarForm({
                 onClick={() => void runAdminAction("REJECTED")}
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-extrabold text-white disabled:opacity-60"
               >
-                {locale === "ka" ? "გაგზავნა და უარყოფა" : "Send & reject"}
+                {uiText(locale, "Send & reject", "გაგზავნა და უარყოფა", "Отправить и отклонить")}
               </button>
               <button
                 type="button"
