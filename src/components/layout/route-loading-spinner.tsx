@@ -1,27 +1,20 @@
-export function RouteLoadingSpinner({
-  label = "Loading…",
-  seconds = null,
-}: {
-  label?: string;
-  /** Countdown shown inside the ring; null shows the ring alone. */
-  seconds?: number | null;
-}) {
+/** Full-screen RAC mark with a spinning arc. Used for page changes, back/forward, and opening windows. */
+export function RouteLoadingSpinner({ label = "Loading…" }: { label?: string }) {
   return (
     <div
       role="status"
       aria-live="polite"
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-white/45 backdrop-blur-[1px]"
+      className="fixed inset-0 z-[100000] flex items-center justify-center bg-white"
     >
-      <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-slate-200">
-        <span
-          aria-hidden
-          className="absolute h-12 w-12 animate-spin rounded-full border-4 border-sky-600 border-t-transparent"
+      <div className="relative flex h-40 w-40 items-center justify-center">
+        <span className="rac-arc" aria-hidden />
+        <img
+          src="/brand/rac-logo.png"
+          alt=""
+          width={120}
+          height={120}
+          className="h-[120px] w-[120px] object-contain"
         />
-        {seconds !== null ? (
-          <span aria-hidden className="relative text-lg font-extrabold tabular-nums text-sky-700">
-            {seconds}
-          </span>
-        ) : null}
       </div>
       <span className="sr-only">{label}</span>
     </div>

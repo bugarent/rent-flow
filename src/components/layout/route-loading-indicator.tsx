@@ -3,11 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams, type useRouter } from "next/navigation";
 import { RouteLoadingSpinner } from "@/components/layout/route-loading-spinner";
-import { estimateRouteMs, recordRouteMs } from "@/lib/navigation/route-timing-store";
+import { recordRouteMs } from "@/lib/navigation/route-timing-store";
 
-const MIN_VISIBLE_MS = 450;
+const MIN_VISIBLE_MS = 800;
 const MAX_VISIBLE_MS = 15000;
-const MIN_COUNTDOWN_MS = 1000;
 const PATCHED = Symbol.for("rentairportcars.route-loading");
 
 type PatchableRouter = ReturnType<typeof useRouter> & { [PATCHED]?: boolean };
@@ -28,6 +27,11 @@ function leadsToOtherPage(href: string): boolean {
 
 const START_EVENT = "route-loading:start";
 
+function routeKeyFromHref(href: string): string {
+  const url = new URL(href, window.location.href);
+  return `${url.pathname}?${url.search.replace(/^\?/, "")}`;
+}
+
 /**
  * `useRouter()` copies `push`/`replace` from the shared app router instance when each component
  * first renders, so the wrap must happen at module load, before any page component renders.
@@ -42,6 +46,8 @@ function announceRouterNavigations() {
   };
   const push = router.push.bind(router);
   const replace = router.replace.bind(router);
+  const back = router.back?.bind(router);
+  const forward = router.forward?.bind(router);
   try {
     router.push = (href, options) => {
       onStart(href);
@@ -51,6 +57,18 @@ function announceRouterNavigations() {
       onStart(href);
       return replace(href, options);
     };
+    if (back) {
+      router.back = () => {
+        window.dispatchEvent(new CustomEvent(START_EVENT));
+        return back();
+      };
+    }
+    if (forward) {
+      router.forward = () => {
+        window.dispatchEvent(new CustomEvent(START_EVENT));
+        return forward();
+      };
+    }
     router[PATCHED] = true;
   } catch {
     /* read-only router: link clicks still show the spinner */
@@ -59,37 +77,27 @@ function announceRouterNavigations() {
 
 if (typeof window !== "undefined") announceRouterNavigations();
 
-type PendingNavigation = { startedAt: number; estimateMs: number | null };
-
-function secondsLeft(pending: PendingNavigation): number | null {
-  if (pending.estimateMs === null || pending.estimateMs < MIN_COUNTDOWN_MS) return null;
-  const left = pending.estimateMs - (performance.now() - pending.startedAt);
-  return Math.max(0, Math.ceil(left / 1000));
-}
+type PendingNavigation = { startedAt: number };
 
 export function RouteLoadingIndicator() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [visible, setVisible] = useState(false);
-  const [seconds, setSeconds] = useState<number | null>(null);
   const hideTimer = useRef<number | null>(null);
-  const tickTimer = useRef<number | null>(null);
   const pendingRef = useRef<PendingNavigation | null>(null);
+  const routeKeyRef = useRef("");
   const visibleSince = useRef<number | null>(null);
-  const startRef = useRef<(href: string) => void>(() => {});
+  const startRef = useRef<(href?: string) => void>(() => {});
   const stopRef = useRef<(arrived: boolean) => void>(() => {});
 
   useEffect(() => {
     const clearTimers = () => {
       if (hideTimer.current) window.clearTimeout(hideTimer.current);
-      if (tickTimer.current) window.clearInterval(tickTimer.current);
       hideTimer.current = null;
-      tickTimer.current = null;
     };
     const hideNow = () => {
       visibleSince.current = null;
       setVisible(false);
-      setSeconds(null);
     };
     stopRef.current = (arrived) => {
       const pending = pendingRef.current;
@@ -105,21 +113,24 @@ export function RouteLoadingIndicator() {
       else hideTimer.current = window.setTimeout(hideNow, wait);
     };
     startRef.current = (href) => {
-      clearTimers();
-      const pending = { startedAt: performance.now(), estimateMs: estimateRouteMs(href) };
-      pendingRef.current = pending;
-      visibleSince.current = performance.now();
-      setSeconds(secondsLeft(pending));
-      setVisible(true);
-      if (pending.estimateMs !== null && pending.estimateMs >= MIN_COUNTDOWN_MS) {
-        tickTimer.current = window.setInterval(() => setSeconds(secondsLeft(pending)), 200);
+      if (href) {
+        try {
+          routeKeyRef.current = routeKeyFromHref(href);
+        } catch {
+          /* keep the last committed route */
+        }
       }
+      clearTimers();
+      pendingRef.current = { startedAt: performance.now() };
+      visibleSince.current = performance.now();
+      setVisible(true);
       hideTimer.current = window.setTimeout(() => stopRef.current(false), MAX_VISIBLE_MS);
     };
     return clearTimers;
   }, []);
 
   useEffect(() => {
+    routeKeyRef.current = `${pathname}?${searchParams.toString()}`;
     stopRef.current(true);
   }, [pathname, searchParams]);
 
@@ -145,17 +156,26 @@ export function RouteLoadingIndicator() {
       if (!leadsToOtherPage(anchor.href)) return;
       startRef.current(anchor.href);
     };
-    const onPageShow = () => stopRef.current(false);
+    const onPopState = () => {
+      const next = routeKeyFromHref(window.location.href);
+      if (next === routeKeyRef.current) return;
+      startRef.current(window.location.href);
+    };
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      startRef.current();
+      window.setTimeout(() => stopRef.current(true), 0);
+    };
 
     document.addEventListener("click", onClick, true);
     window.addEventListener("pageshow", onPageShow);
-    window.addEventListener("popstate", onPageShow);
+    window.addEventListener("popstate", onPopState, true);
     return () => {
       document.removeEventListener("click", onClick, true);
       window.removeEventListener("pageshow", onPageShow);
-      window.removeEventListener("popstate", onPageShow);
+      window.removeEventListener("popstate", onPopState, true);
     };
   }, []);
 
-  return visible ? <RouteLoadingSpinner seconds={seconds} /> : null;
+  return visible ? <RouteLoadingSpinner /> : null;
 }

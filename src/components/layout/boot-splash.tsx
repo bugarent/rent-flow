@@ -10,8 +10,6 @@ export function BootSplash() {
         #boot-splash{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:#fff;animation:rac-boot-hide .01s linear 1.1s forwards}
         html.rac-ready #boot-splash{display:none}
         @keyframes rac-boot-hide{to{visibility:hidden;opacity:0;pointer-events:none}}
-        @keyframes rac-boot-spin{to{transform:rotate(360deg)}}
-        #boot-splash .rac-arc{position:absolute;inset:0;border-radius:999px;border:3px solid #e7eef6;border-top-color:#1a3b5d;border-right-color:#c47a3a;animation:rac-boot-spin .7s linear infinite}
       `}</style>
       <div id="boot-splash" aria-hidden>
         <div className="relative flex h-40 w-40 items-center justify-center">
