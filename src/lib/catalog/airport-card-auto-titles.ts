@@ -5,6 +5,7 @@ import {
   type AirportCardTranslations,
 } from "@/lib/catalog/homepage-airport-i18n";
 import { findSearchPlace } from "@/lib/catalog/search-places";
+import { placeLabel } from "@/lib/i18n/place-label";
 import { LOCALES } from "@/lib/i18n/config";
 
 /**
@@ -20,12 +21,15 @@ export function withAutoTitleTranslations<T extends { iata: string; title: strin
   if (!code || hasCatalogAirportTitle(code)) return card;
   const place = findSearchPlace(code);
   if (!place) return card;
-  const airport = `${place.name.replace(new RegExp(`\\s*\\(${code}\\)\\s*$`), "")} (${code})`;
   const source = airportCopySourceLocale(card);
   const next: AirportCardTranslations = { ...card.translations };
   for (const lang of LOCALES) {
     if (lang === source || next[lang]?.title?.trim()) continue;
-    next[lang] = { ...next[lang], title: rentalTitleTemplate(lang).replace("{airport}", airport) };
+    const named =
+      place.kind === "city"
+        ? placeLabel(lang, `${place.cityName} (city)`).replace(/\s+\([^)]+\)\s*$/, "").trim()
+        : placeLabel(lang, place.label);
+    next[lang] = { ...next[lang], title: rentalTitleTemplate(lang).replace("{airport}", named || place.cityName) };
   }
   return { ...card, translations: next };
 }

@@ -20,7 +20,7 @@ import type { AirportCardTranslations } from "@/lib/catalog/homepage-airport-i18
 import { getPopularAirports as getStaticPopularAirports } from "@/lib/catalog/popular-airports";
 import { VEHICLE_CATEGORIES } from "@/lib/catalog/categories";
 import { summarizeMappedModels } from "@/lib/cars/category-mapping";
-import { airportCountryIso2 } from "@/lib/catalog/search-places";
+import { airportCountryIso2, findSearchPlace, normalizeLocationCode } from "@/lib/catalog/search-places";
 import { withAutoTitleTranslations } from "@/lib/catalog/airport-card-auto-titles";
 import type { Metadata } from "next";
 import { readPreferences } from "@/lib/server/preferences";
@@ -115,7 +115,7 @@ export default async function Home() {
           locale,
         ),
       ),
-      path: `/airport/${encodeURIComponent(a.iata.toUpperCase())}`,
+      path: `/airport/${encodeURIComponent(normalizeLocationCode(a.iata))}`,
     })),
   );
 
@@ -148,7 +148,7 @@ export default async function Home() {
         airports={rankedAirports.map((a, index) => ({
           iata: a.iata,
           name: a.title,
-          city: a.iata,
+          city: findSearchPlace(a.iata)?.cityName || a.iata,
           image: a.imageUrl,
           rank: index + 1,
           translations: withAutoTitleTranslations({

@@ -1,34 +1,55 @@
 "use client";
 
 import { useMemo } from "react";
-import { airportCountryIso2, airportsForCountry } from "@/lib/catalog/search-places";
+import {
+  airportCountryIso2,
+  airportsForCountry,
+  findSearchPlace,
+  searchPlacesForCountry,
+  type SearchPlace,
+} from "@/lib/catalog/search-places";
+import { placeLabel } from "@/lib/i18n/place-label";
 import { WORLD_COUNTRIES, worldCountryName } from "@/lib/catalog/world-countries";
 
 type CardLike = { id: string; iata: string };
 
 const COPY: Record<
   string,
-  { country: string; countryHelp: string; airport: string; pickAirport: string; empty: string }
+  {
+    country: string;
+    countryHelp: string;
+    airport: string;
+    pickAirport: string;
+    airports: string;
+    cities: string;
+    empty: string;
+  }
 > = {
   ka: {
     country: "ქვეყანა",
     countryHelp: "მთავარ გვერდზე ეს ბარათები ჩანს, როცა ძებნაში ეს ქვეყანაა არჩეული.",
-    airport: "აეროპორტი",
-    pickAirport: "აირჩიეთ აეროპორტი",
+    airport: "აეროპორტი ან ქალაქი",
+    pickAirport: "აირჩიეთ აეროპორტი ან ქალაქი",
+    airports: "აეროპორტები",
+    cities: "ქალაქები",
     empty: "ამ ქვეყნისთვის ბარათი ჯერ არ არის — მთავარ გვერდზე სექცია ცარიელი ჩანს. დაამატეთ ქვემოთ.",
   },
   ru: {
     country: "Страна",
     countryHelp: "На главной эти карточки видны, когда в поиске выбрана эта страна.",
-    airport: "Аэропорт",
-    pickAirport: "Выберите аэропорт",
+    airport: "Аэропорт или город",
+    pickAirport: "Выберите аэропорт или город",
+    airports: "Аэропорты",
+    cities: "Города",
     empty: "Для этой страны карточек пока нет — на главной раздел будет пустым. Добавьте ниже.",
   },
   en: {
     country: "Country",
     countryHelp: "These cards show on the homepage when this country is selected in search.",
-    airport: "Airport",
-    pickAirport: "Select airport",
+    airport: "Airport or city",
+    pickAirport: "Select an airport or a city",
+    airports: "Airports",
+    cities: "Cities",
     empty: "No cards for this country yet — the homepage section shows empty. Add one below.",
   },
 };
@@ -93,7 +114,26 @@ export function AirportCountrySelect({
   );
 }
 
-/** Airport of the selected country for a card (replaces free IATA typing). */
+function placeOptionLabel(locale: string, place: SearchPlace): string {
+  return placeLabel(locale, place.label);
+}
+
+/** Title suggested for a new card: the place's own name, never another airport's. */
+export function suggestedCardTitle(locale: string, place: SearchPlace): string {
+  const label = placeOptionLabel(locale, place);
+  if (place.kind === "city") return label.replace(/\s+\([^)]+\)\s*$/, "").trim();
+  return label;
+}
+
+/** Short caption under an admin card. Cities show the city name, airports the code. */
+export function cardPlaceCaption(code: string, locale: string): string {
+  const place = findSearchPlace(code);
+  if (!place) return code;
+  if (place.kind === "city") return suggestedCardTitle(locale, place) || code;
+  return place.iata || code;
+}
+
+/** Airport or city of the selected country. A city saves on its own, without an airport. */
 export function CountryAirportSelect({
   country,
   value,
@@ -103,12 +143,16 @@ export function CountryAirportSelect({
   country: string;
   value: string;
   locale: string;
-  onChange: (iata: string, label: string) => void;
+  onChange: (code: string, label: string) => void;
 }) {
   const t = airportsCountryCopy(locale);
-  const airports = useMemo(() => airportsForCountry(country), [country]);
+  const places = useMemo(() => searchPlacesForCountry(country), [country]);
+  const airports = places.filter((place) => place.kind === "airport");
+  const cities = places.filter((place) => place.kind === "city");
+  const byLabel = (a: SearchPlace, b: SearchPlace) =>
+    placeOptionLabel(locale, a).localeCompare(placeOptionLabel(locale, b), locale);
   const current = value.trim().toUpperCase();
-  const known = airports.some((a) => (a.iata || a.code) === current);
+  const known = places.some((place) => place.code.toUpperCase() === current);
   return (
     <label className="block text-xs font-bold text-[#0b1f4b]">
       {t.airport}
@@ -117,16 +161,29 @@ export function CountryAirportSelect({
         className="mt-1 w-full rounded-lg border bg-white p-2 text-base font-normal sm:text-xs"
         value={known ? current : ""}
         onChange={(event) => {
-          const place = airports.find((a) => (a.iata || a.code) === event.target.value);
-          onChange(event.target.value, place?.label ?? "");
+          const place = places.find((item) => item.code.toUpperCase() === event.target.value);
+          onChange(event.target.value, place ? suggestedCardTitle(locale, place) : "");
         }}
       >
         <option value="">{t.pickAirport}</option>
-        {airports.map((a) => (
-          <option key={a.code} value={a.iata || a.code}>
-            {a.label}
-          </option>
-        ))}
+        {airports.length ? (
+          <optgroup label={t.airports}>
+            {[...airports].sort(byLabel).map((place) => (
+              <option key={place.code} value={place.code.toUpperCase()}>
+                {placeOptionLabel(locale, place)}
+              </option>
+            ))}
+          </optgroup>
+        ) : null}
+        {cities.length ? (
+          <optgroup label={t.cities}>
+            {[...cities].sort(byLabel).map((place) => (
+              <option key={place.code} value={place.code.toUpperCase()}>
+                {placeOptionLabel(locale, place)}
+              </option>
+            ))}
+          </optgroup>
+        ) : null}
       </select>
     </label>
   );

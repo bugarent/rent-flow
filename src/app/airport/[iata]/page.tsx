@@ -9,7 +9,7 @@ import {
 } from "@/lib/catalog/homepage-airport-i18n";
 import { withAutoTitleTranslations } from "@/lib/catalog/airport-card-auto-titles";
 import { airportPageCopy } from "@/lib/catalog/airport-page-copy";
-import { airportCountryIso2, findSearchPlace } from "@/lib/catalog/search-places";
+import { airportCountryIso2, findSearchPlace, normalizeLocationCode } from "@/lib/catalog/search-places";
 import {
   ensureAirportPrefaceTranslations,
   listHomepageAirports,
@@ -26,9 +26,9 @@ import { SEO_SITE_NAME } from "@/lib/brand";
 export const dynamic = "force-dynamic";
 
 async function loadAirports(iata: string) {
-  const code = decodeURIComponent(iata).trim().toUpperCase();
+  const code = normalizeLocationCode(decodeURIComponent(iata));
   const rows = code ? await listHomepageAirports() : [];
-  return { rows, found: rows.find((row) => row.iata.toUpperCase() === code) ?? null };
+  return { rows, found: rows.find((row) => normalizeLocationCode(row.iata) === code) ?? null };
 }
 
 function airportNameOf(airport: StoredHomepageAirport): string {
@@ -38,7 +38,7 @@ function airportNameOf(airport: StoredHomepageAirport): string {
 }
 
 function pagePath(code: string) {
-  return `/airport/${encodeURIComponent(code.toUpperCase())}`;
+  return `/airport/${encodeURIComponent(normalizeLocationCode(code))}`;
 }
 
 export async function generateMetadata({
@@ -51,7 +51,7 @@ export async function generateMetadata({
   if (!found) return { title: iata.toUpperCase(), robots: { index: false, follow: true } };
   const card = withAutoTitleTranslations(found);
   const airportName = airportNameOf(found);
-  const code = found.iata.toUpperCase();
+  const code = normalizeLocationCode(found.iata);
   const seo = localizedAirportSeo(card, locale, { airportName });
   return buildPageMetadata({
     title: seo.title,
@@ -81,7 +81,7 @@ export default async function AirportInfoPage({
 
   const airport = await ensureAirportPrefaceTranslations(found, locale, { onlyPreferred: true });
   const card = withAutoTitleTranslations(airport);
-  const code = airport.iata.toUpperCase();
+  const code = normalizeLocationCode(airport.iata);
   const airportName = airportNameOf(airport);
   const title = localizedAirportTitle(card, locale);
   const text = localizedAirportInfo(airport, locale);
@@ -108,7 +108,9 @@ export default async function AirportInfoPage({
       url,
       ...(airport.imageUrl ? { image: absoluteUrl(airport.imageUrl) } : {}),
       provider: { "@type": "Organization", name: SEO_SITE_NAME, url: SITE_URL },
-      areaServed: { "@type": "Airport", name: airportName, iataCode: code },
+      areaServed: /^CITY-/i.test(code)
+        ? { "@type": "City", name: airportName }
+        : { "@type": "Airport", name: airportName, iataCode: code },
     },
   ];
 

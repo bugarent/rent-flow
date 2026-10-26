@@ -15,7 +15,7 @@ async function requireAdmin() {
 
 const schema = z.object({
   title: z.string().trim().min(1).max(120),
-  iata: z.string().trim().min(2).max(8),
+  iata: z.string().trim().min(2).max(40),
   imageUrl: z.string().trim().min(1),
   infoText: z.string().trim().max(8000).optional(),
   seoTitle: z.string().trim().max(70).optional(),

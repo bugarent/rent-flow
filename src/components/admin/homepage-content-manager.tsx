@@ -13,6 +13,7 @@ import { AirportCardForm, blankAirportForm } from "@/components/admin/airport-ca
 import {
   AirportCountrySelect,
   airportsCountryCopy,
+  cardPlaceCaption,
   cardsForCountry,
   mergeCountryOrder,
 } from "@/components/admin/homepage-airports-country";
@@ -668,7 +669,7 @@ export function HomepageContentManager({
               <img src={a.imageUrl} alt={a.title} className="h-20 w-full object-cover" />
               <div className="p-2.5">
                 <h3 className="text-sm font-bold text-[#0b1f4b]">{localizedAirportTitle(a, locale)}</h3>
-                <p className="mb-2 text-[11px] text-slate-500">{a.iata}</p>
+                <p className="mb-2 break-words text-[11px] text-slate-500">{cardPlaceCaption(a.iata, locale)}</p>
                 <div className="flex gap-2">
                   <button
                     type="button"

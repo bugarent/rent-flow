@@ -57,7 +57,7 @@ function AirportCard({
           tabIndex={loopCopy ? -1 : undefined}
           className="mt-auto inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#1d6fe8] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#1558c0]"
         >
-          {airportCarsLabel(locale, airport.iata)}
+          {airportCarsLabel(locale, airport.iata, airport.city)}
         </Link>
       </div>
     </article>

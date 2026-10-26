@@ -68,8 +68,12 @@ export function autoSeoDescription(input: {
   if (lead.length >= SEO_DESCRIPTION_RANGE.min) return clip(lead, SEO_DESCRIPTION_RANGE.max);
   const template = DESCRIPTION_TEMPLATE[input.locale] ?? DESCRIPTION_TEMPLATE.en;
   const airport = plainHeading(input.airportName).replace(new RegExp(`\\s*\\(${input.code}\\)\\s*$`, "i"), "");
+  const code = /^CITY-[A-Z]{2}-/i.test(input.code) ? "" : input.code;
   return clip(
-    template.replaceAll("{airport}", airport || input.code).replaceAll("{code}", input.code),
+    template
+      .replaceAll("{airport}", airport || code || input.code)
+      .replaceAll("{code}", code)
+      .replace(/\s*[（(]\s*[)）]/g, ""),
     SEO_DESCRIPTION_RANGE.max,
   );
 }

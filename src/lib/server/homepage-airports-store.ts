@@ -4,6 +4,7 @@ import "server-only";
 import { mkdir, readFile, writeFile } from "@/lib/server/durable-fs";
 import { join } from "node:path";
 import { getPopularAirports as getStaticPopularAirports } from "@/lib/catalog/popular-airports";
+import { normalizeLocationCode } from "@/lib/catalog/search-places";
 import { prisma } from "@/lib/prisma";
 import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
 import {
@@ -68,7 +69,7 @@ async function readFileStore(): Promise<StoredHomepageAirport[]> {
       const item = row as Partial<StoredHomepageAirport>;
       return {
         id: String(item.id || item.iata || `airport-${index}`),
-        iata: String(item.iata || "").toUpperCase(),
+        iata: normalizeLocationCode(String(item.iata || "")),
         title: String(item.title || "Airport"),
         imageUrl: String(item.imageUrl || ""),
         infoText: String(item.infoText || ""),
@@ -130,7 +131,7 @@ function getDbDelegate(): AirportDelegate | null {
 function toStored(row: Record<string, unknown>): StoredHomepageAirport {
   return {
     id: String(row.id),
-    iata: String(row.iata).toUpperCase(),
+    iata: normalizeLocationCode(String(row.iata)),
     title: String(row.title),
     imageUrl: String(row.imageUrl),
     infoText: String(row.infoText || ""),
@@ -338,7 +339,7 @@ async function createInFileStore(input: {
   const row: StoredHomepageAirport = {
     id: `file_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
     title: input.title,
-    iata: input.iata.toUpperCase(),
+    iata: normalizeLocationCode(input.iata),
     imageUrl: input.imageUrl,
     infoText: input.infoText,
     seoTitle: input.seoTitle,
@@ -388,7 +389,7 @@ export async function createHomepageAirport(input: {
 }): Promise<StoredHomepageAirport> {
   const payload = {
     title: input.title.trim(),
-    iata: input.iata.trim().toUpperCase(),
+    iata: normalizeLocationCode(input.iata),
     imageUrl: input.imageUrl.trim(),
     infoText: input.infoText?.trim() ?? "",
     seoTitle: input.seoTitle?.trim() ?? "",
@@ -458,7 +459,7 @@ export async function updateHomepageAirport(
     const updated: StoredHomepageAirport = {
       ...current,
       title: input.title?.trim() ?? current.title,
-      iata: input.iata ? input.iata.trim().toUpperCase() : current.iata,
+      iata: input.iata ? normalizeLocationCode(input.iata) : current.iata,
       imageUrl: input.imageUrl?.trim() ?? current.imageUrl,
       infoText: input.infoText?.trim() ?? current.infoText,
       seoTitle: input.seoTitle?.trim() ?? current.seoTitle,
@@ -480,7 +481,7 @@ export async function updateHomepageAirport(
         where: { id },
         data: {
           title: input.title?.trim(),
-          iata: input.iata ? input.iata.trim().toUpperCase() : undefined,
+          iata: input.iata ? normalizeLocationCode(input.iata) : undefined,
           imageUrl: input.imageUrl?.trim(),
         },
       });

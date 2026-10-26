@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
 import { ImageCropUpload } from "@/components/admin/image-crop-upload";
 import { AirportCardTranslationsFields } from "@/components/admin/airport-card-translations-fields";
 import { AirportSeoFields } from "@/components/admin/airport-seo-fields";
 import { CountryAirportSelect } from "@/components/admin/homepage-airports-country";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
-import { airportsForCountry } from "@/lib/catalog/search-places";
+import { findSearchPlace } from "@/lib/catalog/search-places";
+import { placeLabel } from "@/lib/i18n/place-label";
 import { uiText } from "@/lib/i18n/ui-text";
 import type { AirportCardTranslations } from "@/lib/catalog/homepage-airport-i18n";
 
@@ -73,10 +74,14 @@ export function AirportCardForm({
   const { dictionary, locale } = useAdminLocale();
   const e = dictionary.editor;
   const ui = dictionary.common;
+  const suggestedTitle = useRef("");
   const airportName = useMemo(() => {
-    const code = value.iata.trim().toUpperCase();
-    return airportsForCountry(country).find((a) => (a.iata || a.code) === code)?.label ?? "";
-  }, [country, value.iata]);
+    const place = findSearchPlace(value.iata);
+    if (!place) return "";
+    const label = placeLabel(locale, place.label);
+    if (place.kind === "city") return label.replace(/\s+\([^)]+\)\s*$/, "").trim();
+    return label;
+  }, [locale, value.iata]);
   const words = value.infoText.trim() ? value.infoText.trim().split(/\s+/).length : 0;
 
   const t = {
@@ -124,9 +129,12 @@ export function AirportCardForm({
           country={country}
           locale={locale}
           value={value.iata}
-          onChange={(iata, label) =>
-            onChange(editingId || value.title.trim() ? { iata } : { iata, title: label })
-          }
+          onChange={(code, label) => {
+            const typed = value.title.trim();
+            const replace = !editingId && (!typed || typed === suggestedTitle.current);
+            if (replace) suggestedTitle.current = label;
+            onChange(replace ? { iata: code, title: label } : { iata: code });
+          }}
         />
       </Step>
 
