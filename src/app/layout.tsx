@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { BootSplash } from "@/components/layout/boot-splash";
 import { RouteLoadingIndicator } from "@/components/layout/route-loading-indicator";
 import { PressFeedback } from "@/components/layout/press-feedback";
 import { Geist, Geist_Mono, Inter, Noto_Sans_Georgian, Noto_Sans_Arabic } from "next/font/google";
@@ -71,12 +72,12 @@ export async function generateMetadata(): Promise<Metadata> {
     ...base,
     applicationName: SEO_SITE_NAME,
     icons: {
-      icon: [{ url: "/logo.png", type: "image/png" }],
-      apple: [{ url: "/logo.png", type: "image/png" }],
-      shortcut: "/logo.png",
+      icon: [{ url: "/brand/rac-logo.png", type: "image/png" }],
+      apple: [{ url: "/brand/rac-logo.png", type: "image/png" }],
+      shortcut: "/brand/rac-logo.png",
     },
     other: {
-      "og:logo": `${SITE_URL}/logo.png`,
+      "og:logo": `${SITE_URL}/brand/rac-logo.png`,
     },
   };
 }
@@ -87,8 +88,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const { defaultFxRates } = await import("@/lib/server/preferences");
   const { emptyFooterContact } = await import("@/lib/catalog/footer-contact");
   const [fxRates, footerContact] = await Promise.all([
-    softTimeout(cachedFxRates(), defaultFxRates(), 1500),
-    softTimeout(cachedFooterContact(), emptyFooterContact(), 6000),
+    softTimeout(cachedFxRates(), defaultFxRates(), 400),
+    softTimeout(cachedFooterContact(), emptyFooterContact(), 400),
   ]);
   const dir = isRtl(locale) ? "rtl" : "ltr";
 
@@ -99,9 +100,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${notoGeorgian.variable} ${notoArabic.variable} h-full antialiased`}
     >
       <head>
+        <link rel="preload" as="image" href="/brand/rac-logo.png" />
         <GoogleAnalytics />
       </head>
       <body className="flex min-h-full flex-col bg-slate-50 text-slate-900">
+        <BootSplash />
         <style>{`#nl-badge-frame,iframe[title="Powered by Netlify"],script[src*=".netlify/scripts/hud"]{display:none!important}`}</style>
         <JsonLd
           data={[
@@ -121,6 +124,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           <RouteLoadingIndicator />
         </Suspense>
         <PressFeedback />
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'setTimeout(function(){document.documentElement.classList.add("rac-ready")},400)',
+          }}
+        />
       </body>
     </html>
   );

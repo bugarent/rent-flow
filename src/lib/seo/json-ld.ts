@@ -24,7 +24,7 @@ export function buildLocalBusinessJsonLd(contact?: LocalBusinessContact) {
     name: SEO_SITE_NAME,
     alternateName: BRAND_ALTERNATES,
     url: SITE_URL,
-    logo: absoluteUrl("/logo.png"),
+    logo: absoluteUrl("/brand/rac-logo.png"),
     image: absoluteUrl("/images/hero-tarmac.jpg"),
     description:
       "Airport car rental in Georgia — Kutaisi International Airport (KUT), Tbilisi (TBS) and Batumi (BUS). Verified partners, transparent pricing and airport delivery.",
@@ -146,7 +146,7 @@ export function buildProductVehicleJsonLd(input: {
     ? input.image.startsWith("http")
       ? input.image
       : absoluteUrl(input.image)
-    : absoluteUrl("/logo.png");
+    : absoluteUrl("/brand/rac-logo.png");
 
   return {
     "@context": "https://schema.org",

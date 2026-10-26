@@ -37,7 +37,7 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata(): Promise<Metadata> {
   const [{ locale }, airports] = await Promise.all([
     readPreferences(),
-    softTimeout(cachedHomepageAirports(), [], 3000),
+    softTimeout(cachedHomepageAirports(), [], 800),
   ]);
   const seo = buildHomeSeo(locale, airports.map((a) => a.iata));
   return buildPageMetadata({
@@ -76,14 +76,14 @@ export default async function Home() {
     bookingCounts,
     { locale },
   ] = await Promise.all([
-    softTimeout(cachedSearchDeliveryAirports(), [], 6000),
-    softTimeout(cachedHomepageAirports(), airportFallback, 6000),
-    softTimeout(cachedHomepageCategories(), categoryFallback, 6000),
-    softTimeout(cachedPopularAirportsLayout(), "grid" as const, 6000),
-    softTimeout(cachedHomepageInfoContent(), defaultHomepageInfoContent(), 6000),
-    softTimeout(cachedHomepageGoogleReviews(), null, 6000),
-    softTimeout(cachedCustomBookingChannels(), DEFAULT_CUSTOM_BOOKING_CHANNELS, 6000),
-    softTimeout(bookingCountsByPickupIata(), new Map<string, number>(), 3000),
+    softTimeout(cachedSearchDeliveryAirports(), [], 1200),
+    softTimeout(cachedHomepageAirports(), airportFallback, 1200),
+    softTimeout(cachedHomepageCategories(), categoryFallback, 1200),
+    softTimeout(cachedPopularAirportsLayout(), "grid" as const, 1200),
+    softTimeout(cachedHomepageInfoContent(), defaultHomepageInfoContent(), 1200),
+    softTimeout(cachedHomepageGoogleReviews(), null, 1200),
+    softTimeout(cachedCustomBookingChannels(), DEFAULT_CUSTOM_BOOKING_CHANNELS, 1200),
+    softTimeout(bookingCountsByPickupIata(), new Map<string, number>(), 800),
     readPreferences(),
   ]);
 
