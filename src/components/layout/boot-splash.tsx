@@ -16,7 +16,7 @@ export function BootSplash() {
           <span className="rac-arc" />
           {/* The car-and-plane mark is not used. This is the RAC mark, only while the document opens. */}
           <img
-            src="/brand/rac-logo.png"
+            src="/brand/rac-logo.webp"
             alt=""
             width={120}
             height={120}

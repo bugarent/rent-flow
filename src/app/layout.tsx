@@ -101,7 +101,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${notoGeorgian.variable} ${notoArabic.variable} h-full antialiased`}
     >
       <head>
-        <link rel="preload" as="image" href="/brand/rac-logo.png" />
+        <link rel="preload" as="image" href="/brand/rac-logo.webp" />
         <GoogleAnalytics />
       </head>
       <body className="flex min-h-full flex-col bg-slate-50 text-slate-900">
@@ -128,7 +128,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <script
           dangerouslySetInnerHTML={{
             __html:
-              'setTimeout(function(){document.documentElement.classList.add("rac-ready")},400)',
+              'setTimeout(function(){document.documentElement.classList.add("rac-ready")},150)',
           }}
         />
       </body>

@@ -5,7 +5,7 @@ function RacMark({ size }: { size: "lg" | "md" }) {
     <div className={`relative flex ${box} shrink-0 items-center justify-center`}>
       <span className="rac-arc" aria-hidden />
       <img
-        src="/brand/rac-logo.png"
+        src="/brand/rac-logo.webp"
         alt=""
         width={img}
         height={img}
