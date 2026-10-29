@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { getAdminSession } from "@/lib/auth/sessions";
 import {
   createHomepageAirport,
+  ensureAirportPrefaceTranslations,
   listHomepageAirports,
 } from "@/lib/server/homepage-airports-store";
 import { ensureHomepageDefaults } from "@/lib/server/homepage";
@@ -67,6 +68,11 @@ export async function POST(req: Request) {
       seoDescription: body.seoDescription,
       translations: body.translations,
     });
+    after(() =>
+      ensureAirportPrefaceTranslations(row).catch((error) =>
+        console.warn("[homepage/airports POST] translations", error),
+      ),
+    );
     return NextResponse.json(row, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

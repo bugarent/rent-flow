@@ -130,7 +130,12 @@ export function AirportCardForm({
           value={value.iata}
           onChange={(code, label) => {
             const typed = value.title.trim();
-            const replace = !editingId && (!typed || typed === suggestedTitle.current);
+            // A title ending in another place's code, e.g. “… (LWN)” after switching to EVN, is
+            // left over from the previous choice and would mix two airports on one card.
+            const titleCode = /\(([A-Z]{3})\)\s*$/.exec(typed)?.[1];
+            const staleCode = Boolean(titleCode && titleCode !== code.toUpperCase());
+            const replace =
+              staleCode || (!editingId && (!typed || typed === suggestedTitle.current));
             if (replace) suggestedTitle.current = label;
             onChange(replace ? { iata: code, title: label } : { iata: code });
           }}

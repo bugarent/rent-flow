@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { MappedCarModel } from "@/lib/catalog/car-models";
 import type { PopularAirportsLayout } from "@/lib/catalog/popular-airports-layout";
 import { summarizeMappedModels } from "@/lib/cars/category-mapping";
@@ -69,6 +69,7 @@ export function HomepageContentManager({
   const [error, setError] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
   const [savingAirport, setSavingAirport] = useState(false);
+  const airportSaveInFlight = useRef(false);
 
   const [catForm, setCatForm] = useState(blankCategoryForm);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -251,6 +252,8 @@ export function HomepageContentManager({
 
   const saveAirport = async (event: React.FormEvent) => {
     event.preventDefault();
+    // `savingAirport` only disables the button after a re-render; a quick second tap gets here first.
+    if (airportSaveInFlight.current) return;
     setError("");
     const payload = editingAirport ?? airForm;
     if (!payload.title.trim() || !payload.iata.trim()) {
@@ -261,6 +264,7 @@ export function HomepageContentManager({
       setError(e.imageRequired);
       return;
     }
+    airportSaveInFlight.current = true;
     setSavingAirport(true);
     try {
       const url = editingAirport
@@ -305,6 +309,7 @@ export function HomepageContentManager({
     } catch (err) {
       setError(err instanceof Error ? err.message : e.couldNotSaveAirport);
     } finally {
+      airportSaveInFlight.current = false;
       setSavingAirport(false);
     }
   };

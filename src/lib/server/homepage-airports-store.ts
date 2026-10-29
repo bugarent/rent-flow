@@ -34,6 +34,8 @@ export type StoredHomepageAirport = {
 
 const DATA_DIR = dataRoot();
 const DATA_FILE = join(DATA_DIR, "homepage-airports.json");
+/** Same place + title + image created this recently is the same save, not a new card. */
+const DUPLICATE_CREATE_WINDOW_MS = 5 * 60_000;
 
 type AirportDelegate = {
   findMany: (args?: object) => Promise<Array<Record<string, unknown>>>;
@@ -378,6 +380,11 @@ export async function listHomepageAirports(): Promise<StoredHomepageAirport[]> {
   }
 }
 
+/**
+ * Saves the card and returns at once. Call {@link ensureAirportPrefaceTranslations} after the
+ * response: waiting for every language here ran past the host timeout, the admin saw an
+ * error for a card that was already saved, and saving again created a second card.
+ */
 export async function createHomepageAirport(input: {
   title: string;
   iata: string;
@@ -397,9 +404,20 @@ export async function createHomepageAirport(input: {
     translations: cleanAirportTranslations(input.translations),
   };
 
+  // A double tap (or a retry after a slow save) sends the same card twice; answer with the first.
+  const recent = (await readFileStore()).find(
+    (row) =>
+      row.iata === payload.iata &&
+      row.title === payload.title &&
+      row.imageUrl === payload.imageUrl &&
+      Date.now() - new Date(row.createdAt).getTime() < DUPLICATE_CREATE_WINDOW_MS,
+  );
+  if (recent) return recent;
+
   const db = getDbDelegate();
   const created = await (async () => {
     if (!db) return createInFileStore(payload);
+    let stored: StoredHomepageAirport;
     try {
       const max = await db.aggregate({ _max: { sortOrder: true } });
       const row = await db.create({
@@ -410,23 +428,32 @@ export async function createHomepageAirport(input: {
           sortOrder: (max._max.sortOrder ?? -1) + 1,
         },
       });
-      const stored = {
+      stored = {
         ...toStored(row),
         infoText: payload.infoText,
         seoTitle: payload.seoTitle,
         seoDescription: payload.seoDescription,
         translations: payload.translations,
       };
-      await publishFromDb(db, stored);
-      return stored;
     } catch (error) {
       console.warn("[homepage-airports] DB create failed, using file store:", error);
       return createInFileStore(payload);
     }
+    // The row exists in the database now. A failed publish must not add a second card with
+    // another id — write this same row into the published list instead.
+    try {
+      await publishFromDb(db, stored);
+    } catch (error) {
+      console.warn("[homepage-airports] publish after create failed, appending row:", error);
+      const rows = await readFileStore();
+      if (!rows.some((r) => r.id === stored.id)) await writeFileStore([...rows, stored]);
+    }
+    return stored;
   })();
-  return ensureAirportPrefaceTranslations(created);
+  return created;
 }
 
+/** Same as create: translations are filled after the response. */
 export async function updateHomepageAirport(
   id: string,
   input: {
@@ -502,10 +529,9 @@ export async function updateHomepageAirport(
   })();
   const infoChanged =
     input.infoText !== undefined && input.infoText.trim() !== previousInfo.trim();
-  const base = infoChanged
+  return infoChanged
     ? (await persistInfoTranslations(updated.id, dropInfoTranslations(updated.translations))) ?? updated
     : updated;
-  return ensureAirportPrefaceTranslations(base);
 }
 
 export async function deleteHomepageAirport(id: string): Promise<void> {

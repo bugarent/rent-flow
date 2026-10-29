@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { getAdminSession } from "@/lib/auth/sessions";
 import {
   deleteHomepageAirport,
+  ensureAirportPrefaceTranslations,
   updateHomepageAirport,
 } from "@/lib/server/homepage-airports-store";
 
@@ -36,6 +37,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
     const body = schema.parse(json);
     const row = await updateHomepageAirport(id, body);
+    after(() =>
+      ensureAirportPrefaceTranslations(row).catch((error) =>
+        console.warn("[homepage/airports PATCH] translations", error),
+      ),
+    );
     return NextResponse.json(row);
   } catch (error) {
     if (error instanceof z.ZodError) {
