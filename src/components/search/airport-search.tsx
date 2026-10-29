@@ -907,10 +907,9 @@ export function AirportSearch({
         ))}
       </ul>
 
-      <h1 className="mb-1 text-center text-sm font-extrabold uppercase tracking-wide text-white sm:text-base md:text-lg">
-        <span className="sr-only">{dictionary.meta.title.split("|")[0].trim()} — </span>
+      <p className="mb-1 text-center text-sm font-extrabold uppercase tracking-wide text-white sm:text-base md:text-lg">
         {dictionary.home.searchTitle}
-      </h1>
+      </p>
 
       {/* While places are still loading the row keeps its space, so the form does not jump. */}
       {countries.length > 0 || options.length === 0 ? (
