@@ -22,6 +22,7 @@ import { setHomeCountry } from "@/lib/catalog/home-country-store";
 import { worldCountryName } from "@/lib/catalog/world-countries";
 import { placeLabel, regionName } from "@/lib/i18n/place-label";
 import { CountryFlag } from "@/components/ui/country-flag";
+import { useSearchOptions } from "@/components/search/use-search-options";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { CustomBookingStartModal, loadCustomBookingStartModal } from "@/components/layout/lazy-modals";
 import { preloadProps } from "@/lib/client/preload";
@@ -698,7 +699,7 @@ export function LocationPicker({
 }
 
 export function AirportSearch({
-  options,
+  options: serverOptions,
   onPickupChange,
   customBookingChannels,
   popularIatas = [],
@@ -710,6 +711,7 @@ export function AirportSearch({
   popularIatas?: string[];
 }) {
   const router = useRouter();
+  const options = useSearchOptions(serverOptions);
   const popularKey = popularIatas.map((code) => code.trim().toUpperCase()).join(",");
   const popularRank = useMemo(() => {
     const map = new Map<string, number>();
