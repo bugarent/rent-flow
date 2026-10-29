@@ -3,6 +3,7 @@ import "server-only";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { PUBLIC_CONTENT_TAG } from "@/lib/server/public-data-cache";
 import { clearSearchCatalog } from "@/lib/server/search-catalog";
+import { purgePublicEdgeCache } from "@/lib/server/edge-cache";
 
 /** Drop cached public data so the next request reads fresh content. */
 export function revalidatePublicData() {
@@ -17,6 +18,7 @@ export function revalidatePublicData() {
 /** Drop cached public pages after an admin content save. */
 export function revalidatePublishedContent() {
   revalidatePublicData();
+  purgePublicEdgeCache();
   try {
     revalidatePath("/", "layout");
     revalidatePath("/cars");

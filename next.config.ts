@@ -13,6 +13,21 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Homepage HTML: Netlify edge keeps it a minute per language/currency cookie so the
+        // first byte does not wait for the server. Saves purge the tag (lib/server/edge-cache).
+        // Browsers still get no-store; RSC navigation requests are not cached.
+        source: "/",
+        missing: [{ type: "header", key: "rsc" }],
+        headers: [
+          {
+            key: "Netlify-CDN-Cache-Control",
+            value: "public, s-maxage=60, stale-while-revalidate=300, durable",
+          },
+          { key: "Netlify-Vary", value: "cookie=rac_locale|rac_currency" },
+          { key: "Netlify-Cache-Tag", value: "public-pages" },
+        ],
+      },
+      {
         source: "/:path*",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
