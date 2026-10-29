@@ -837,7 +837,8 @@ export function PartnerFleetCalendar() {
     };
   }, []);
 
-  const carColumnWidth = carsColumnNarrow ? "w-[4.5rem] md:w-[84px]" : "w-36 md:w-[168px]";
+  // Desktop car list is 3 cm (~113px) wider than the old 168px so names and plates fit.
+  const carColumnWidth = carsColumnNarrow ? "w-[4.5rem] md:w-[84px]" : "w-36 md:w-[281px]";
   const carColumnToggleLabel = carsColumnNarrow
     ? locale === "ka"
       ? "სვეტის გაშლა"
