@@ -960,7 +960,7 @@ export function PartnerCreateCarForm({
         const [extrasRes, prefsRes, meRes, categoriesRes] = await Promise.all([
           fetch("/api/extras", { signal: catalogSignal }).catch(() => null),
           fetch("/api/partners/extras-prefs", { signal: catalogSignal }).catch(() => null),
-          fetch("/api/partners/me", { signal: catalogSignal }).catch(() => null),
+          fetch("/api/partners/me", { cache: "no-store", signal: catalogSignal }).catch(() => null),
           fetch("/api/partners/car-categories", { signal: catalogSignal }).catch(() => null),
         ]);
         const extras = extrasRes?.ok ? await extrasRes.json().catch(() => []) : [];

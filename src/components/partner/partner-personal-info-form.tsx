@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Eye, EyeOff, Plus, Trash2, Upload } from "lucide-react";
+import { Check, Eye, EyeOff, Trash2, Upload } from "lucide-react";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { cn } from "@/lib/utils";
 import {
@@ -17,10 +17,9 @@ import {
   normalizeContractSelection,
   type PartnerCompanySettings,
   type PartnerPricingCurrency,
-  type TariffInterval,
   normalizeTariffIntervals,
-  tariffPlusFromDays,
 } from "@/lib/partners/company-settings";
+import { PartnerTariffIntervalsEditor } from "@/components/partner/partner-tariff-intervals-editor";
 import { rebasePartnerAmount } from "@/lib/partners/pricing-currency";
 import {
   PartnerOffHoursPriceInput,
@@ -631,32 +630,6 @@ export function PartnerPersonalInfoForm({
         ...prev.workingDays,
         [day]: { ...prev.workingDays[day], ...partial },
       },
-    }));
-  };
-
-  const normalizeTariffs = (rows: TariffInterval[]): TariffInterval[] =>
-    normalizeTariffIntervals(rows, MAX_TARIFF_INTERVALS);
-
-  const updateTariff = (index: number, patchRow: Partial<TariffInterval>) => {
-    setSettings((prev) => {
-      const draft = prev.tariffs.map((row, i) => (i === index ? { ...row, ...patchRow } : { ...row }));
-      return { ...prev, tariffs: normalizeTariffs(draft) };
-    });
-  };
-
-  const addTariffInterval = () => {
-    setSettings((prev) => {
-      if (prev.tariffs.length >= MAX_TARIFF_INTERVALS) return prev;
-      const last = prev.tariffs[prev.tariffs.length - 1];
-      const fromDays = last ? last.toDays + 1 : 1;
-      return { ...prev, tariffs: normalizeTariffs([...prev.tariffs, { fromDays, toDays: fromDays }]) };
-    });
-  };
-
-  const removeTariffInterval = (index: number) => {
-    setSettings((prev) => ({
-      ...prev,
-      tariffs: normalizeTariffs(prev.tariffs.filter((_, i) => i !== index)),
     }));
   };
 
@@ -1751,55 +1724,20 @@ export function PartnerPersonalInfoForm({
           {isChanged("tariffs") || isChanged("seasonalPricing") ? (
             <p className="mb-3 text-xs font-semibold text-red-700">ტარიფები / სეზონური ფასები შეიცვალა</p>
           ) : null}
-          <div className="space-y-3">
-            {settings.tariffs.map((t, index) => {
-              const minTo = t.fromDays;
-              return (
-                <div key={index} className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-slate-500">{pi.fromDays}</span>
-                  <input
-                    className={cn(inputClass, "w-24 bg-slate-50 text-slate-700")}
-                    type="number"
-                    readOnly
-                    tabIndex={-1}
-                    value={t.fromDays}
-                    title={index === 0 ? "1" : undefined}
-                  />
-                  <span className="text-sm text-slate-500">{pi.toDays}</span>
-                  <input
-                    className={cn(inputClass, "w-24")}
-                    type="number"
-                    min={minTo}
-                    value={t.toDays}
-                    onChange={(e) => updateTariff(index, { toDays: Number(e.target.value) })}
-                  />
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-red-700"
-                    onClick={() => removeTariffInterval(index)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              );
-            })}
-            <div className="rounded-md border border-dashed border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-500">
-              {dictionary.createCar.daysPlus.replace(
-                "{n}",
-                String(tariffPlusFromDays(settings.tariffs)),
-              )}
-            </div>
-            {settings.tariffs.length < MAX_TARIFF_INTERVALS ? (
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-md px-3 py-2 text-sm font-bold text-white"
-                style={{ backgroundColor: ACCENT }}
-                onClick={addTariffInterval}
-              >
-                <Plus className="h-4 w-4" /> {pi.addInterval}
-              </button>
-            ) : null}
-          </div>
+          <PartnerTariffIntervalsEditor
+            tariffs={settings.tariffs}
+            maxIntervals={MAX_TARIFF_INTERVALS}
+            onChange={(tariffs) => patch({ tariffs })}
+            inputClass={inputClass}
+            accent={ACCENT}
+            labels={{
+              fromDays: pi.fromDays,
+              toDays: pi.toDays,
+              addInterval: pi.addInterval,
+              removeInterval: common.remove,
+              daysPlus: dictionary.createCar.daysPlus,
+            }}
+          />
           </div>
         </Section>
 

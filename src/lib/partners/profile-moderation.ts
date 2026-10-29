@@ -128,7 +128,7 @@ function sameJson(a: unknown, b: unknown) {
 
 /**
  * Fields partners may edit anytime without admin remodeation
- * (work days / pricing currency / prep / holidays / off-hours + payment & deposit).
+ * (work days / pricing currency / prep / holidays / off-hours + payment & deposit + tariff day ranges).
  */
 export const PROFILE_REMODERATION_EXEMPT_FIELDS = new Set<string>([
   "workingDays",
@@ -141,6 +141,7 @@ export const PROFILE_REMODERATION_EXEMPT_FIELDS = new Set<string>([
   "depositMethods",
   "requireCreditCard",
   "cashDepositRefundDays",
+  "tariffs",
 ]);
 
 export function filterRemoderationChanges(changes: ProfileFieldChange[]): ProfileFieldChange[] {
@@ -164,6 +165,7 @@ export function applyExemptSettingsToPublished(
     depositMethods: next.depositMethods,
     requireCreditCard: next.requireCreditCard,
     cashDepositRefundDays: next.cashDepositRefundDays,
+    tariffs: next.tariffs,
   };
 }
 
