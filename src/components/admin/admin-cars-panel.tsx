@@ -114,6 +114,20 @@ export function AdminCarsPanel({
     },
     colPlate: uiText(locale, "Plate", "სახ. ნომერი", "Госномер"),
     colPartnerNumber: uiText(locale, "Partner number", "პარტნიორის ნომერი", "Номер партнёра"),
+    pendingTab: uiText(locale, "Awaiting moderation", "მოდერაციის მოლოდინში", "Ждут модерации"),
+    pendingHint: uiText(
+      locale,
+      "Listings that are not approved or not shown in search. The reason is under each car.",
+      "განცხადებები, რომლებიც არ არის დამტკიცებული ან არ ჩანს ძებნაში. მიზეზი წერია თითოეულ მანქანაზე.",
+      "Объявления, которые не одобрены или не видны в поиске. Причина указана у каждой машины.",
+    ),
+    backToLive: uiText(locale, "Live cars", "ძებნაში არსებული მანქანები", "Машины в поиске"),
+    pendingEmpty: uiText(
+      locale,
+      "No listings are waiting for moderation.",
+      "მოდერაციის მოლოდინში განცხადება არ არის.",
+      "Объявлений на модерации нет.",
+    ),
   };
   const [rows, setRows] = useState(cars);
   const [carsSource, setCarsSource] = useState(cars);
@@ -127,6 +141,8 @@ export function AdminCarsPanel({
   const [partnerQuery, setPartnerQuery] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState("");
+  /** Main list = approved and visible in search; the other tab holds everything else. */
+  const [view, setView] = useState<"live" | "pending">("live");
 
   const plateNorm = normalizeQuery(plateQuery);
   const partnerNorm = normalizeQuery(partnerQuery);
@@ -137,12 +153,16 @@ export function AdminCarsPanel({
     setPartnerQuery(partnerDraft);
   };
 
+  const liveRows = useMemo(() => rows.filter((car) => car.searchBlockers.length === 0), [rows]);
+  const pendingRows = useMemo(() => rows.filter((car) => car.searchBlockers.length > 0), [rows]);
+  const viewRows = view === "live" ? liveRows : pendingRows;
+
   const filtered = useMemo(
     () =>
-      rows.filter(
+      viewRows.filter(
         (car) => matchesPlate(car, plateNorm) && matchesPartnerNumber(car, partnerNorm),
       ),
-    [rows, plateNorm, partnerNorm],
+    [viewRows, plateNorm, partnerNorm],
   );
 
   const removeCar = async (car: AdminCarRow) => {
@@ -214,11 +234,35 @@ export function AdminCarsPanel({
         >
           {labels.searchButton}
         </button>
+        <button
+          type="button"
+          onClick={() => setView((current) => (current === "pending" ? "live" : "pending"))}
+          aria-pressed={view === "pending"}
+          className={`relative inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-bold shadow-sm transition ${
+            view === "pending"
+              ? "border-amber-500 bg-amber-400 text-amber-950"
+              : "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
+          }`}
+        >
+          {view === "pending" ? labels.backToLive : labels.pendingTab}
+          {view === "live" && pendingRows.length > 0 ? (
+            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-extrabold text-white">
+              {pendingRows.length > 99 ? "99+" : pendingRows.length}
+            </span>
+          ) : null}
+        </button>
         <p className="shrink-0 self-center text-sm font-semibold text-slate-500 sm:ms-auto">
           {filtered.length}
-          {hasActiveSearch ? ` / ${rows.length}` : ""} {labels.title.toLowerCase()}
+          {hasActiveSearch ? ` / ${viewRows.length}` : ""}{" "}
+          {view === "live" ? labels.title.toLowerCase() : labels.pendingTab.toLowerCase()}
         </p>
       </form>
+
+      {view === "pending" ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          {labels.pendingHint}
+        </p>
+      ) : null}
 
       {deleteError ? (
         <p className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
@@ -341,9 +385,9 @@ export function AdminCarsPanel({
           </article>
         ))}
 
-        {rows.length === 0 ? (
+        {viewRows.length === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
-            {labels.empty}
+            {view === "pending" ? labels.pendingEmpty : labels.empty}
           </p>
         ) : filtered.length === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
