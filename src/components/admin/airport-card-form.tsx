@@ -2,7 +2,6 @@
 
 import { useMemo, useRef, type ReactNode } from "react";
 import { ImageCropUpload } from "@/components/admin/image-crop-upload";
-import { AirportCardTranslationsFields } from "@/components/admin/airport-card-translations-fields";
 import { AirportSeoFields } from "@/components/admin/airport-seo-fields";
 import { CountryAirportSelect } from "@/components/admin/homepage-airports-country";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
@@ -197,15 +196,6 @@ export function AirportCardForm({
           seoTitle={value.seoTitle}
           seoDescription={value.seoDescription}
           onChange={onChange}
-        />
-      </Step>
-
-      <Step n={6} title={uiText(locale, "Other languages (optional)", "სხვა ენები (არასავალდებულო)", "Другие языки (необязательно)")}>
-        <AirportCardTranslationsFields
-          key={editingId || "new"}
-          adminLocale={locale}
-          value={value.translations}
-          onChange={(translations) => onChange({ translations })}
         />
       </Step>
 
