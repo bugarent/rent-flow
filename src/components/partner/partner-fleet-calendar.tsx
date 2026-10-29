@@ -200,6 +200,9 @@ export function PartnerFleetCalendar() {
   const [cars, setCars] = useState<CarRow[]>([]);
   const [bookings, setBookings] = useState<BookingBar[]>([]);
   const [loading, setLoading] = useState(true);
+  /** True once the server has answered with the real fleet; until then an empty list is not “no cars”. */
+  const [fleetLoaded, setFleetLoaded] = useState(false);
+  const [fleetRetrying, setFleetRetrying] = useState(false);
   const [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [viewingInfo, setViewingInfo] = useState<BookingInfoData | null>(null);
@@ -367,8 +370,12 @@ export function PartnerFleetCalendar() {
   }, [query]);
 
   const loadSeq = useRef(0);
+  const retryTimer = useRef<number | null>(null);
+  const retryAttempt = useRef(0);
   const load = useCallback(async (silent = false) => {
     const seq = ++loadSeq.current;
+    if (retryTimer.current) window.clearTimeout(retryTimer.current);
+    retryTimer.current = null;
     if (!silent) setLoading(true);
     setError("");
     try {
@@ -379,29 +386,52 @@ export function PartnerFleetCalendar() {
       });
       const qDigits = digitsOnlyBookingQuery(debouncedQ);
       if (qDigits) params.set("q", qDigits);
-      const res = await fetch(`/api/partners/fleet-calendar?${params}`, { cache: "no-store" });
-      const data = await res.json();
+      const res = await fetch(`/api/partners/fleet-calendar?${params}`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(20_000),
+      });
+      const data = await res.json().catch(() => ({}));
       if (seq !== loadSeq.current) return;
       if (!res.ok) throw new Error(data.error || "Failed");
       setCars(data.cars || []);
       setBookings(
         ((data.bookings || []) as BookingBar[]).filter((b) => b.status !== "CANCELLED"),
       );
+      setFleetLoaded(true);
+      setFleetRetrying(false);
+      retryAttempt.current = 0;
     } catch (err) {
       if (seq !== loadSeq.current) return;
       // A late failure must not wipe cars and bookings that a faster request already showed.
-      setError(err instanceof Error ? err.message : "Failed");
+      if (retryAttempt.current < 4) {
+        const wait = 1500 * 2 ** retryAttempt.current;
+        retryAttempt.current += 1;
+        setFleetRetrying(true);
+        retryTimer.current = window.setTimeout(() => void load(true), wait);
+      } else {
+        setFleetRetrying(false);
+        setError(err instanceof Error && err.name !== "TimeoutError" ? err.message : "Failed");
+      }
     } finally {
       if (seq === loadSeq.current) setLoading(false);
     }
   }, [rangeFromMs, rangeToMs, locale, debouncedQ]);
 
+  const retryNow = () => {
+    retryAttempt.current = 0;
+    void load(false);
+  };
+
   useEffect(() => {
+    retryAttempt.current = 0;
     void load(false);
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible") void load(true);
     }, 60000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+      if (retryTimer.current) window.clearTimeout(retryTimer.current);
+    };
   }, [load]);
 
   const selected = bookings.find((b) => b.id === selectedId) ?? null;
@@ -914,8 +944,10 @@ export function PartnerFleetCalendar() {
             </div>
           </div>
 
-          {loading ? (
-            <p className="p-6 text-center text-sm text-slate-500">{t.loading}</p>
+          {(loading || fleetRetrying) && cars.length === 0 ? (
+            <p className="sticky start-0 p-6 text-center text-sm text-slate-500" role="status">
+              {fleetRetrying ? t.loadRetrying : t.loading}
+            </p>
           ) : null}
 
           {cars.map((car) => {
@@ -1137,7 +1169,19 @@ export function PartnerFleetCalendar() {
             );
           })}
 
-          {!loading && cars.length === 0 ? (
+          {!loading && !fleetRetrying && !fleetLoaded && cars.length === 0 ? (
+            <div className="sticky start-0 w-full bg-white px-4 py-12 text-center text-sm text-slate-600">
+              <button
+                type="button"
+                onClick={retryNow}
+                className="inline-flex min-h-11 items-center rounded-md bg-sky-700 px-4 font-semibold text-white"
+              >
+                {t.retry}
+              </button>
+            </div>
+          ) : null}
+
+          {!loading && fleetLoaded && cars.length === 0 ? (
             <div className="sticky start-0 w-full bg-white px-4 py-12 text-center text-sm text-slate-600">
               <p>{t.noCars}</p>
               <Link

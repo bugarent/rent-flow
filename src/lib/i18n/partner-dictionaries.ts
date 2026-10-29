@@ -145,6 +145,8 @@ export type PartnerDictionary = {
     addCar: string;
     noCars: string;
     loading: string;
+    loadRetrying: string;
+    retry: string;
     zoomIn: string;
     zoomOut: string;
     close: string;
@@ -294,6 +296,8 @@ const en: PartnerDictionary = {
     addCar: "Add car",
     noCars: "No cars in your fleet yet.",
     loading: "Loading…",
+    loadRetrying: "Could not load your cars. Trying again…",
+    retry: "Try again",
     zoomIn: "Zoom in",
     zoomOut: "Zoom out",
     close: "Close",
@@ -441,6 +445,8 @@ const ka: PartnerDictionary = {
     addCar: "მანქანის დამატება",
     noCars: "ავტოპარკში მანქანები ჯერ არ არის.",
     loading: "იტვირთება…",
+    loadRetrying: "მანქანები ვერ ჩაიტვირთა. ვცდილობთ ხელახლა…",
+    retry: "ხელახლა ცდა",
     zoomIn: "გადიდება",
     zoomOut: "დაპატარავება",
     close: "დახურვა",
@@ -588,6 +594,8 @@ const ru: PartnerDictionary = {
     addCar: "Добавить авто",
     noCars: "В автопарке пока нет машин.",
     loading: "Загрузка…",
+    loadRetrying: "Не удалось загрузить машины. Пробуем ещё раз…",
+    retry: "Повторить",
     zoomIn: "Увеличить",
     zoomOut: "Уменьшить",
     close: "Закрыть",

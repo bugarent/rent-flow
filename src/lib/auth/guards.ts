@@ -3,6 +3,7 @@ import { getAdminSession, getCustomerSession, getPartnerSession } from "@/lib/au
 import { prisma } from "@/lib/prisma";
 import { ADMIN_LOGIN, PARTNER_LOGIN } from "@/lib/routes";
 import { LOCAL_PARTNER_ID } from "@/lib/auth/local-partner-store";
+import { softTimeout } from "@/lib/server/soft-timeout";
 
 export async function requireAdmin() {
   const session = await getAdminSession();
@@ -27,8 +28,13 @@ export async function requirePartner() {
   if (role !== "VENDOR") {
     notFound();
   }
+  const timedOut = Symbol("timeout");
   try {
-    const partner = await prisma.partner.findUnique({ where: { userId: session.user.id } });
+    // A slow database is treated like the DB error below, so it cannot hold every cabinet page open.
+    const partner = await softTimeout<
+      Awaited<ReturnType<typeof prisma.partner.findUnique>> | typeof timedOut
+    >(prisma.partner.findUnique({ where: { userId: session.user.id } }), timedOut, 2500);
+    if (partner === timedOut) return session;
     const { partnerCanAccessPortal } = await import("@/lib/auth/partner-access");
     if (!partner || !partnerCanAccessPortal(partner.status)) {
       redirect(`${PARTNER_LOGIN}?registered=1`);

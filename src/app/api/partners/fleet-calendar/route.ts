@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPartnerSession } from "@/lib/auth/sessions";
 import { prisma } from "@/lib/prisma";
-import { isDbOfflineError } from "@/lib/server/db-errors";
+import { isDbAuthError, isDbOfflineError } from "@/lib/server/db-errors";
 import { normalizeLogin } from "@/lib/crypto";
 import { LOCAL_PARTNER_ID, loadLocalPartner } from "@/lib/auth/local-partner-store";
 import { listFileCarsForPartner } from "@/lib/server/partner-cars-store";
@@ -56,25 +56,38 @@ function formatHour(iso: string | Date) {
   });
 }
 
+/** Neon drops the first query after a cold start; one quick retry usually succeeds. */
+async function withDbRetry<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (!isDbOfflineError(error) || isDbAuthError(error)) throw error;
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    return run();
+  }
+}
+
+const INSURANCE_CHECK_EVERY_MS = 10 * 60 * 1000;
+const lastInsuranceCheck = new Map<string, number>();
+
 async function resolvePartnerId(session: {
   user: { id: string; email?: string | null };
-}): Promise<string | null> {
+}): Promise<{ partnerId: string | null; dbOffline: boolean }> {
   const email = normalizeLogin(session.user.email || "");
+  let dbOffline = false;
   try {
-    let partner = await prisma.partner.findUnique({
-      where: { userId: session.user.id },
-      select: { id: true },
-    });
-    if (partner) return partner.id;
-    if (email) {
-      partner = await prisma.partner.findFirst({
-        where: { email },
+    const partner = await withDbRetry(async () => {
+      const byUser = await prisma.partner.findUnique({
+        where: { userId: session.user.id },
         select: { id: true },
       });
-      if (partner) return partner.id;
-    }
+      if (byUser || !email) return byUser;
+      return prisma.partner.findFirst({ where: { email }, select: { id: true } });
+    });
+    if (partner) return { partnerId: partner.id, dbOffline };
   } catch (error) {
     if (!isDbOfflineError(error)) throw error;
+    dbOffline = true;
   }
 
   const local = loadLocalPartner();
@@ -84,9 +97,9 @@ async function resolvePartnerId(session: {
       session.user.id === local.id ||
       (email && normalizeLogin(local.email) === email))
   ) {
-    return local.id;
+    return { partnerId: local.id, dbOffline };
   }
-  return `file-partner-${session.user.id}`;
+  return { partnerId: `file-partner-${session.user.id}`, dbOffline };
 }
 
 export async function GET(req: Request) {
@@ -108,38 +121,47 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Invalid date range" }, { status: 400 });
     }
 
-    const partnerId = await resolvePartnerId(session);
+    const resolved = await resolvePartnerId(session);
+    const partnerId = resolved.partnerId;
+    let offline = resolved.dbOffline;
 
     // Flip expired-insurance APPROVED cars to remodeation before painting the calendar.
-    try {
-      const { applyExpiredInsuranceRemoderation } = await import(
-        "@/lib/server/car-insurance-expiry"
-      );
-      const previewIds: string[] = [];
+    // Expiry is date-based, so once per partner every few minutes is enough.
+    const insuranceKey = partnerId || session.user.id;
+    const lastCheck = lastInsuranceCheck.get(insuranceKey) || 0;
+    if (!offline && Date.now() - lastCheck > INSURANCE_CHECK_EVERY_MS) {
+      lastInsuranceCheck.set(insuranceKey, Date.now());
       try {
-        if (partnerId && !partnerId.startsWith("file-partner-")) {
-          const ids = await prisma.car.findMany({
-            where: { partnerId },
-            select: { id: true },
-          });
-          previewIds.push(...ids.map((c) => c.id));
+        const { applyExpiredInsuranceRemoderation } = await import(
+          "@/lib/server/car-insurance-expiry"
+        );
+        const previewIds: string[] = [];
+        try {
+          if (partnerId && !partnerId.startsWith("file-partner-")) {
+            const ids = await prisma.car.findMany({
+              where: { partnerId },
+              select: { id: true },
+            });
+            previewIds.push(...ids.map((c) => c.id));
+          }
+        } catch {
+          /* offline — file cars still checked below */
         }
-      } catch {
-        /* offline — file cars still checked below */
+        const filePreview = await listFileCarsForPartner({
+          userId: session.user.id,
+          email: session.user.email,
+          partnerId: partnerId || undefined,
+        });
+        for (const c of filePreview) {
+          if (!previewIds.includes(c.id)) previewIds.push(c.id);
+        }
+        if (previewIds.length) {
+          await applyExpiredInsuranceRemoderation({ carIds: previewIds });
+        }
+      } catch (error) {
+        lastInsuranceCheck.delete(insuranceKey);
+        console.warn("[fleet-calendar] insurance expiry", error);
       }
-      const filePreview = await listFileCarsForPartner({
-        userId: session.user.id,
-        email: session.user.email,
-        partnerId: partnerId || undefined,
-      });
-      for (const c of filePreview) {
-        if (!previewIds.includes(c.id)) previewIds.push(c.id);
-      }
-      if (previewIds.length) {
-        await applyExpiredInsuranceRemoderation({ carIds: previewIds });
-      }
-    } catch (error) {
-      console.warn("[fleet-calendar] insurance expiry", error);
     }
 
     type CarOut = {
@@ -155,24 +177,25 @@ export async function GET(req: Request) {
       rejectionNote: string | null;
     };
     const byId = new Map<string, CarOut>();
-    let offline = false;
 
     try {
       if (partnerId && !partnerId.startsWith("file-partner-")) {
-        const cars = await prisma.car.findMany({
-          where: { partnerId },
-          select: {
-            id: true,
-            title: true,
-            make: true,
-            model: true,
-            year: true,
-            status: true,
-            registrationNumber: true,
-            hiddenReason: true,
-          },
-          orderBy: [{ make: "asc" }, { model: "asc" }, { year: "desc" }],
-        });
+        const cars = await withDbRetry(() =>
+          prisma.car.findMany({
+            where: { partnerId },
+            select: {
+              id: true,
+              title: true,
+              make: true,
+              model: true,
+              year: true,
+              status: true,
+              registrationNumber: true,
+              hiddenReason: true,
+            },
+            orderBy: [{ make: "asc" }, { model: "asc" }, { year: "desc" }],
+          }),
+        );
         for (const c of cars) {
           byId.set(c.id, {
             id: c.id,
@@ -228,6 +251,14 @@ export async function GET(req: Request) {
     const cars = [...byId.values()].sort((a, b) =>
       `${a.make} ${a.model}`.localeCompare(`${b.make} ${b.model}`),
     );
+
+    // An empty fleet while the database did not answer is a failed load, not “no cars”.
+    if (offline && !cars.length) {
+      return NextResponse.json(
+        { error: "Could not load calendar", offline: true, retry: true },
+        { status: 503, headers: { "Cache-Control": "no-store" } },
+      );
+    }
 
     try {
       const { readCarRejectionNotices } = await import("@/lib/server/car-rejection-store");

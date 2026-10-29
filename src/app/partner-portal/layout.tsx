@@ -4,7 +4,9 @@ import { PortalSessionProvider } from "@/components/auth/portal-session-provider
 import { PartnerLocaleProvider } from "@/components/providers/partner-locale-context";
 import { PartnerMoneyProvider } from "@/components/providers/partner-money-context";
 import { readPartnerDisplayCurrency, readPartnerLocale } from "@/lib/server/partner-preferences";
-import { getFxRates } from "@/lib/server/preferences";
+import { defaultFxRates } from "@/lib/server/preferences";
+import { cachedFxRates } from "@/lib/server/public-page-data";
+import { softTimeout } from "@/lib/server/soft-timeout";
 import {
   DEFAULT_PARTNER_PRICING_CURRENCY,
   type PartnerPricingCurrency,
@@ -42,12 +44,16 @@ async function readPartnerPricingCurrency(): Promise<PartnerPricingCurrency> {
 }
 
 export default async function PartnerPortalLayout({ children }: { children: React.ReactNode }) {
+  // A cold database must not hold every cabinet page; the cookie currency needs no query at all.
+  const cookieCurrency = await readPartnerDisplayCurrency("" as PartnerPricingCurrency);
   const [locale, fxRates, companyCurrency] = await Promise.all([
     readPartnerLocale(),
-    getFxRates(),
-    readPartnerPricingCurrency(),
+    softTimeout(cachedFxRates(), defaultFxRates(), 1200),
+    cookieCurrency
+      ? Promise.resolve(cookieCurrency)
+      : softTimeout(readPartnerPricingCurrency(), DEFAULT_PARTNER_PRICING_CURRENCY, 1500),
   ]);
-  const pricingCurrency = await readPartnerDisplayCurrency(companyCurrency);
+  const pricingCurrency = cookieCurrency || companyCurrency;
 
   return (
     <PortalSessionProvider portal="partner">
