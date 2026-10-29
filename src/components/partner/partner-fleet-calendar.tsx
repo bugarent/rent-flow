@@ -99,7 +99,7 @@ function addressOptionsForCity(city: string, places: DeliveryPlaceOpt[], locale:
 }
 
 /** Past days shown before today when the calendar opens on the current month. */
-const TODAY_LEAD_DAYS = 4;
+const TODAY_LEAD_DAYS = 9;
 
 function startOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -344,7 +344,7 @@ export function PartnerFleetCalendar() {
   useEffect(() => () => clearMonthSwipe(), [clearMonthSwipe]);
 
   const dayCount = daysInMonth(month);
-  // The current month opens on today in the 5th column (4 past days, then the rest — into next
+  // The current month opens on today in the 10th column (9 past days, then the rest — into next
   // month when needed). Other months still show from the 1st.
   const now = new Date();
   const showingCurrentMonth =
