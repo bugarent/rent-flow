@@ -201,8 +201,6 @@ function CountryPicker({
     };
   }, [open, locked]);
 
-  if (!countries.length) return null;
-
   const list =
     open && !locked
       ? createPortal(

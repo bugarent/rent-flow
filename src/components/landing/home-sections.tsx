@@ -75,9 +75,12 @@ export function HomeHeroPlaceholder() {
   );
 }
 
+/** The hero placeholder is already on screen, so waiting longer here delays nothing visible. */
+const HERO_PLACES_WAIT_MS = 3000;
+
 export async function HomeHeroSection() {
   const [options, bookingChannels, popularAirports] = await Promise.all([
-    softTimeout(cachedSearchDeliveryAirports(), [], DATA_WAIT_MS),
+    softTimeout(cachedSearchDeliveryAirports(), [], HERO_PLACES_WAIT_MS),
     softTimeout(cachedCustomBookingChannels(), DEFAULT_CUSTOM_BOOKING_CHANNELS, DATA_WAIT_MS),
     softTimeout(cachedHomepageAirports(), airportFallback(), DATA_WAIT_MS),
   ]);
