@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import { PARTNER_BASE } from "@/lib/routes";
+import { RacInlineLoader } from "@/components/layout/route-loading-spinner";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { cn } from "@/lib/utils";
 import { formatRegistrationNumberDisplay } from "@/lib/cars/registration-number";
@@ -945,9 +946,13 @@ export function PartnerFleetCalendar() {
           </div>
 
           {(loading || fleetRetrying) && cars.length === 0 ? (
-            <p className="sticky start-0 p-6 text-center text-sm text-slate-500" role="status">
-              {fleetRetrying ? t.loadRetrying : t.loading}
-            </p>
+            <div className="sticky start-0 w-full max-w-[100vw] bg-white">
+              <RacInlineLoader
+                label={t.loading}
+                message={fleetRetrying ? t.loadRetrying : undefined}
+                className="min-h-[50dvh]"
+              />
+            </div>
           ) : null}
 
           {cars.map((car) => {

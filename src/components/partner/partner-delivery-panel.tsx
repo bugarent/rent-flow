@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
+import { RacInlineLoader } from "@/components/layout/route-loading-spinner";
 import { PARTNER_BASE } from "@/lib/routes";
 import { capFreeAfterDays } from "@/lib/delivery/pricing";
 import { deliveryCopyFor } from "@/components/partner/delivery/delivery-copy";
@@ -182,8 +183,8 @@ export function PartnerDeliveryPanel() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#eef2f7]">
-        <main className="mx-auto max-w-6xl px-4 py-10">
-          <p className="text-sm text-slate-600">{t.loading}</p>
+        <main className="mx-auto flex min-h-[70dvh] max-w-6xl items-center justify-center px-4 py-10">
+          <RacInlineLoader label={t.loading} />
         </main>
       </div>
     );

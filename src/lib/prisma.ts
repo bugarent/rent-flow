@@ -3,10 +3,23 @@ import type { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool, type PoolClient } from "pg";
 import { isDbOfflineError } from "@/lib/server/db-errors";
-import { databaseUrl } from "@/lib/database-url";
+import { databaseHost, databaseUrl } from "@/lib/database-url";
 
 const CLIENT_REV = 10;
-const DB_COOLDOWN_MS = 300_000; // 5 min — avoid hammering a dead Postgres on every navigation
+
+/**
+ * How long every query skips Postgres after a connection failure.
+ * Local Postgres that is not running stays down, so wait long. Hosted Neon wakes in seconds,
+ * and on the hosted site the file stores do not hold partner cars, so a long pause shows
+ * partners an empty fleet.
+ */
+function dbCooldownMs(): number {
+  const configured = Number(process.env.DB_COOLDOWN_MS);
+  if (Number.isFinite(configured) && configured > 0) return configured;
+  const host = databaseHost();
+  const local = !host || host === "localhost" || host === "127.0.0.1";
+  return local ? 300_000 : 20_000;
+}
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -28,7 +41,7 @@ function offlineError() {
  */
 function armDbCircuit() {
   if (isDbCircuitOpen()) return;
-  globalForPrisma.dbOfflineUntil = Date.now() + DB_COOLDOWN_MS;
+  globalForPrisma.dbOfflineUntil = Date.now() + dbCooldownMs();
 }
 
 function markDbOffline(error?: unknown) {

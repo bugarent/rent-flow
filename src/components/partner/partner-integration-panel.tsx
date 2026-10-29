@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
+import { RacInlineLoader } from "@/components/layout/route-loading-spinner";
 import { CopyButton } from "@/components/partner/integration/copy-button";
 import { ApiAccessCard } from "@/components/partner/integration/api-access-card";
 import { IcalImportCard, type IcalImportCar } from "@/components/partner/integration/ical-import-card";
@@ -369,7 +370,7 @@ export function PartnerIntegrationPanel() {
             </div>
 
             <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              {loading ? <p className="text-sm text-slate-500">{t.loading}</p> : null}
+              {loading ? <RacInlineLoader label={t.loading} /> : null}
               {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
               {!loading && !error && method === "channel" ? (

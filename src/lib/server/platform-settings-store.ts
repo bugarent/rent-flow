@@ -184,8 +184,11 @@ export async function getPlatformSettings(): Promise<PlatformSettingsRecord> {
       return merged;
     }
   } catch (error) {
+    const { isDbOfflineError } = await import("@/lib/server/db-errors");
+    if (isDbOfflineError(error)) {
       const { markDbCircuitOpen } = await import("@/lib/prisma");
       markDbCircuitOpen("platform-settings", error);
+    }
   }
   setCache(fileSettings);
   return fileSettings;

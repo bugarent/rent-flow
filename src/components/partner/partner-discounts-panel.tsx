@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
+import { RacInlineLoader } from "@/components/layout/route-loading-spinner";
 import { DateInput } from "@/components/ui/date-input";
 import {
   MobileDataCard,
@@ -384,8 +385,8 @@ export function PartnerDiscountsPanel() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#eef2f7]">
-        <main className="mx-auto max-w-6xl px-4 py-10">
-          <p className="text-sm text-slate-600">{t.loading}</p>
+        <main className="mx-auto flex min-h-[70dvh] max-w-6xl items-center justify-center px-4 py-10">
+          <RacInlineLoader label={t.loading} />
         </main>
       </div>
     );

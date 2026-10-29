@@ -56,13 +56,19 @@ function formatHour(iso: string | Date) {
   });
 }
 
-/** Neon drops the first query after a cold start; one quick retry usually succeeds. */
+/**
+ * Neon drops the first query after a cold start; one quick retry usually succeeds.
+ * The retry goes through even when another request already paused DB reads: the partner’s
+ * own fleet is not in the hosted file stores, so the fallback would show an empty calendar.
+ */
 async function withDbRetry<T>(run: () => Promise<T>): Promise<T> {
   try {
     return await run();
   } catch (error) {
     if (!isDbOfflineError(error) || isDbAuthError(error)) throw error;
     await new Promise((resolve) => setTimeout(resolve, 400));
+    const { isDbCircuitOpen, reopenDbCircuit } = await import("@/lib/prisma");
+    if (isDbCircuitOpen()) reopenDbCircuit();
     return run();
   }
 }

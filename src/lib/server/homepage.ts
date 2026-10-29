@@ -67,9 +67,6 @@ export async function ensureHomepageDefaults() {
       })(),
       undefined,
       1200,
-      () => {
-        void import("@/lib/prisma").then((m) => m.markDbCircuitOpen("homepage-defaults-timeout"));
-      },
     );
   } catch (error) {
     const { markDbCircuitOpen } = await import("@/lib/prisma");

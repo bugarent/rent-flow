@@ -38,6 +38,7 @@ import {
 } from "@/lib/cars/insurance-expiry-reason";
 import type { PublishedCarSnapshot } from "@/lib/server/car-published-store";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
+import { RacInlineLoader } from "@/components/layout/route-loading-spinner";
 import { knownText } from "@/lib/i18n/known-record-text";
 import { localizedExtraCopy } from "@/lib/extras/localized-copy";
 import { usePartnerMoneyOptional } from "@/components/providers/partner-money-context";
@@ -1872,8 +1873,10 @@ export function PartnerCreateCarForm({
 
   if (booting) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-100 p-6 text-sm font-medium text-slate-600">
-        {locale === "ka" ? "იტვირთება…" : locale === "ru" ? "Загрузка…" : "Loading…"}
+      <div className="flex min-h-[70dvh] items-center justify-center bg-white">
+        <RacInlineLoader
+          label={locale === "ka" ? "იტვირთება…" : locale === "ru" ? "Загрузка…" : "Loading…"}
+        />
       </div>
     );
   }
