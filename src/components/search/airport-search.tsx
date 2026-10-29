@@ -914,7 +914,8 @@ export function AirportSearch({
         {dictionary.home.searchTitle}
       </h1>
 
-      {countries.length > 0 ? (
+      {/* While places are still loading the row keeps its space, so the form does not jump. */}
+      {countries.length > 0 || options.length === 0 ? (
         <div className="mb-1.5 flex flex-col gap-1 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,50%)_minmax(0,1fr)] sm:items-center sm:gap-x-2">
           <span className="text-left text-[11px] font-semibold leading-none text-white sm:justify-self-start sm:whitespace-nowrap">
             {dictionary.home.searchCountry}

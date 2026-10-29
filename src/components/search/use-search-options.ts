@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import type { SearchAirportOption } from "@/components/search/airport-search";
 
-const RETRY_DELAYS_MS = [0, 1500, 4000, 8000];
+/** First try waits a little: the streamed homepage hero usually brings the list before that. */
+const RETRY_DELAYS_MS = [1500, 3000, 6000, 10000];
 
 /**
  * Server-rendered pickup places, or — when the page arrived without them because the first
