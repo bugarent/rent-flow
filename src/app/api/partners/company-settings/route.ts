@@ -390,6 +390,20 @@ export async function PATCH(req: Request) {
       }
     }
 
+    if (JSON.stringify(previous.tariffs) !== JSON.stringify(nextSettings.tariffs)) {
+      try {
+        const { syncListingTariffRanges } = await import("@/lib/server/sync-listing-tariff-ranges");
+        await syncListingTariffRanges({
+          partnerId: partner.id,
+          userId: session.user.id,
+          email: session.user.email,
+          intervals: nextSettings.tariffs,
+        });
+      } catch (syncError) {
+        console.warn("[partners/company-settings] tariff range sync", syncError);
+      }
+    }
+
     return NextResponse.json({
       settings: nextSettings,
       moderation: countriesLockMeta({ ...partner, status: nextStatus }, moderation),

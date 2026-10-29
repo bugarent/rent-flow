@@ -473,11 +473,14 @@ const NO_EXTRAS_CATALOG: ExtraServicePricing[] = [];
 export function PartnerCreateCarForm({
   initialDeliveryCatalog = NO_DELIVERY_CATALOG,
   initialExtrasCatalog = NO_EXTRAS_CATALOG,
+  initialTariffs,
   carId,
   adminReview = null,
 }: {
   initialDeliveryCatalog?: DeliveryLocationView[];
   initialExtrasCatalog?: ExtraServicePricing[];
+  /** Partner day ranges from personal info, so the price columns are right on first paint. */
+  initialTariffs?: TariffInterval[];
   /** When set, form loads this listing and saves via PATCH (Update). */
   carId?: string;
   /** Admin remodeation: read-only partner form with red change highlights. */
@@ -533,12 +536,18 @@ export function PartnerCreateCarForm({
   const [useSeasonalPricing, setUseSeasonalPricing] = useState(false);
   const [seasonSaving, setSeasonSaving] = useState(false);
   const [seasonSaved, setSeasonSaved] = useState(false);
-  const [tariffIntervals, setTariffIntervals] = useState<TariffInterval[]>([
-    { fromDays: 1, toDays: 3 },
-    { fromDays: 4, toDays: 5 },
-    { fromDays: 6, toDays: 30 },
-  ]);
-  const [tariffPrices, setTariffPrices] = useState<string[]>(["", "", "", ""]);
+  const [tariffIntervals, setTariffIntervals] = useState<TariffInterval[]>(() =>
+    initialTariffs?.length
+      ? normalizeTariffIntervals(initialTariffs)
+      : [
+          { fromDays: 1, toDays: 3 },
+          { fromDays: 4, toDays: 5 },
+          { fromDays: 6, toDays: 30 },
+        ],
+  );
+  const [tariffPrices, setTariffPrices] = useState<string[]>(() =>
+    Array.from({ length: (initialTariffs?.length || 3) + 1 }, () => ""),
+  );
   const [cardRequired, setCardRequired] = useState(false);
   const [seats, setSeats] = useState("5");
   const [doors, setDoors] = useState("4");

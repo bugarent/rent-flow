@@ -11,6 +11,7 @@ import {
   resolveCompanySettings,
 } from "@/lib/server/partner-company-settings-store";
 import { loadPartnerDeliveryCatalog } from "@/lib/server/partner-delivery-catalog";
+import type { TariffInterval } from "@/lib/partners/company-settings";
 
 type SessionUser = { id: string; email?: string | null };
 
@@ -33,10 +34,11 @@ async function resolvePartner(user: SessionUser) {
   return { partnerId: user.id || LOCAL_PARTNER_ID, row: null };
 }
 
-/** Server-side data so the partner car form renders locations/extras on first paint. */
+/** Server-side data so the partner car form renders locations/extras/tariff ranges on first paint. */
 export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
   initialDeliveryCatalog: DeliveryLocationView[];
   initialExtrasCatalog: ExtraServicePricing[];
+  initialTariffs?: TariffInterval[];
 }> {
   try {
     const { partnerId, row } = await resolvePartner(user);
@@ -59,6 +61,7 @@ export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
     return {
       initialDeliveryCatalog: delivery,
       initialExtrasCatalog: await scopeExtrasToPartner(offered, partnerId, company?.deliveryCountryIso2s),
+      initialTariffs: company?.tariffs?.length ? company.tariffs : undefined,
     };
   } catch {
     try {

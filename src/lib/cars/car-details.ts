@@ -101,6 +101,57 @@ export function descriptionWithCabinetPrices(
   return description;
 }
 
+/** Open-ended last tier saved by the car form (`N+` days). */
+const OPEN_TIER_TO_DAYS = 9999;
+
+/**
+ * Move a car's saved tier prices onto the partner's current day ranges, column by column —
+ * the same mapping the car form shows. A range added at the end reuses the price of the one
+ * before it; the `N+` price stays on the open-ended tier. Other details stay as they are.
+ */
+export function descriptionWithTariffRanges(
+  description: string | null | undefined,
+  intervals: Array<{ fromDays: number; toDays: number }>,
+): string | null | undefined {
+  if (!description || !intervals.length) return description;
+  const details = parseCarDetails(description);
+  const tiers = Array.isArray(details?.pricingTiers) ? details.pricingTiers : [];
+  if (!details || !tiers.length) return description;
+
+  const sorted = [...tiers].sort((a, b) => (Number(a.fromDays) || 0) - (Number(b.fromDays) || 0));
+  const openIndex = sorted.findIndex((t) => (Number(t.toDays) || 0) >= OPEN_TIER_TO_DAYS);
+  const bounded = openIndex >= 0 ? sorted.filter((_, i) => i !== openIndex) : sorted;
+  const open = openIndex >= 0 ? sorted[openIndex] : undefined;
+
+  let carry: string | number = bounded[0]?.priceEur ?? "";
+  const nextTiers: CarDetailsPricingTier = intervals.map((interval, i) => {
+    const priceEur = bounded[i]?.priceEur ?? carry;
+    carry = priceEur;
+    return { fromDays: interval.fromDays, toDays: interval.toDays, priceEur };
+  });
+  nextTiers.push({
+    fromDays: intervals[intervals.length - 1].toDays + 1,
+    toDays: OPEN_TIER_TO_DAYS,
+    priceEur: open?.priceEur ?? carry,
+  });
+
+  const same =
+    nextTiers.length === tiers.length &&
+    nextTiers.every((t, i) => {
+      const old = sorted[i];
+      return (
+        old &&
+        Number(old.fromDays) === t.fromDays &&
+        Number(old.toDays) === t.toDays &&
+        String(old.priceEur) === String(t.priceEur)
+      );
+    });
+  if (same) return description;
+
+  const blob = `<!--car-details:${JSON.stringify({ ...details, pricingTiers: nextTiers })}-->`;
+  return description.replace(/<!--car-details:[\s\S]*?-->/, blob);
+}
+
 export function readExtraOffers(details: CarDetailsBlob | null | undefined): CarExtraOffer[] {
   const raw = details && Array.isArray(details.extraOffers) ? details.extraOffers : [];
   return raw.filter(
