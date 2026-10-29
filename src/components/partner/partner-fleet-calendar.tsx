@@ -21,10 +21,7 @@ import { formatBookingRef } from "@/lib/ids";
 import { clampPickupSelection, earliestPickupIsoDate, isPickupSlotAllowed } from "@/lib/bookings/lead-time";
 import { uiLocaleTag } from "@/lib/i18n/ui-text";
 import { DateInput } from "@/components/ui/date-input";
-import {
-  insuranceExpiryReasonLabel,
-  isInsuranceExpiryReason,
-} from "@/lib/cars/insurance-expiry-reason";
+import { isInsuranceExpiryReason } from "@/lib/cars/insurance-expiry-reason";
 
 function digitsOnlyBookingQuery(raw: string): string {
   return String(raw || "")
@@ -1112,12 +1109,6 @@ export function PartnerFleetCalendar() {
                     ))}
                   </div>
 
-                  {isInsuranceExpiryReason(car.hiddenReason) ? (
-                    <div className="pointer-events-none absolute inset-x-0.5 top-1/2 z-[1] flex h-5 -translate-y-1/2 items-center overflow-hidden rounded bg-amber-400 px-1 text-[9px] font-extrabold text-amber-950 shadow-sm ring-1 ring-amber-700/25 md:inset-x-1 md:h-7 md:px-2 md:text-[11px]">
-                      <span className="truncate">{insuranceExpiryReasonLabel(locale)}</span>
-                    </div>
-                  ) : null}
-
                   {rowBookings.map((b) => {
                     const start = new Date(b.pickupAt).getTime();
                     const end = new Date(b.dropoffAt).getTime();
@@ -1695,9 +1686,11 @@ export function PartnerFleetCalendar() {
                     : "border-amber-200 bg-amber-50 text-amber-950",
                 )}
               >
-                {isInsuranceExpiryReason(noticeCar.hiddenReason)
-                  ? insuranceExpiryReasonLabel(locale)
-                  : (noticeCar.rejectionNote || noticeCar.hiddenReason || "").trim() ||
+                {(
+                  noticeCar.rejectionNote ||
+                  (isInsuranceExpiryReason(noticeCar.hiddenReason) ? "" : noticeCar.hiddenReason) ||
+                  ""
+                ).trim() ||
                     (locale === "ka"
                       ? "განცხადება ჯერ არ არის დამტკიცებული. მწვანე გახდება მხოლოდ ადმინის დამტკიცების შემდეგ."
                       : locale === "ru"

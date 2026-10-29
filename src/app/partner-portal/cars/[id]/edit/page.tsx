@@ -9,7 +9,7 @@ export default async function EditCarPage({
 }) {
   const { id } = await params;
   const session = await requirePartner();
-  const { initialDeliveryCatalog, initialExtrasCatalog, initialTariffs } =
+  const { initialDeliveryCatalog, initialExtrasCatalog, initialTariffs, initialCategories } =
     await loadPartnerCarFormInitial(session.user);
 
   return (
@@ -18,6 +18,7 @@ export default async function EditCarPage({
       initialDeliveryCatalog={initialDeliveryCatalog}
       initialExtrasCatalog={initialExtrasCatalog}
       initialTariffs={initialTariffs}
+      initialCategories={initialCategories}
     />
   );
 }

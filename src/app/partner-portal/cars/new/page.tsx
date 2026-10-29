@@ -4,7 +4,7 @@ import { loadPartnerCarFormInitial } from "@/lib/server/partner-car-form-initial
 
 export default async function NewCarPage() {
   const session = await requirePartner();
-  const { initialDeliveryCatalog, initialExtrasCatalog, initialTariffs } =
+  const { initialDeliveryCatalog, initialExtrasCatalog, initialTariffs, initialCategories } =
     await loadPartnerCarFormInitial(session.user);
 
   return (
@@ -12,6 +12,7 @@ export default async function NewCarPage() {
       initialDeliveryCatalog={initialDeliveryCatalog}
       initialExtrasCatalog={initialExtrasCatalog}
       initialTariffs={initialTariffs}
+      initialCategories={initialCategories}
     />
   );
 }

@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { listDueIntegrations } from "@/lib/integrations/repository";
 import { pullAvailability, pullFleet } from "@/lib/integrations/sync-engine";
 import { purgeExpiredBookings } from "@/lib/server/purge-expired-bookings";
-import { applyExpiredInsuranceRemoderation } from "@/lib/server/car-insurance-expiry";
-
 function authorizeCron(req: Request) {
   const secret = process.env.CRON_SECRET || process.env.INTEGRATIONS_CRON_SECRET;
   if (!secret) return process.env.NODE_ENV !== "production";
@@ -20,11 +18,6 @@ export async function POST(req: Request) {
   const retention = await purgeExpiredBookings().catch((error) => {
     console.warn("[cron] booking retention", error);
     return { removed: 0 };
-  });
-
-  const insuranceExpiry = await applyExpiredInsuranceRemoderation().catch((error) => {
-    console.warn("[cron] insurance expiry", error);
-    return { checked: 0, remodeated: 0 };
   });
 
   // Best-effort daily FX refresh when this worker also runs (primary schedule: /api/cron/fx-rates).
@@ -55,7 +48,6 @@ export async function POST(req: Request) {
     ok: true,
     processed: results.length,
     expiredBookingsRemoved: retention.removed,
-    insuranceExpiry,
     fx,
     channelFeeds,
     results,

@@ -168,13 +168,6 @@ export function diffCarAgainstPublished(input: {
       }
     }
   }
-  if (input.live.insuranceUrl != null) {
-    const prevIns = norm((snap as { insuranceUrl?: string }).insuranceUrl);
-    if (prevIns !== norm(input.live.insuranceUrl) && (prevIns || input.live.insuranceUrl)) {
-      changed.set("insurance", { previous: prevIns || "—" });
-    }
-  }
-
   return changed;
 }
 

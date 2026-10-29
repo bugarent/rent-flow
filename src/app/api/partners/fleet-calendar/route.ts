@@ -73,9 +73,6 @@ async function withDbRetry<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
-const INSURANCE_CHECK_EVERY_MS = 10 * 60 * 1000;
-const lastInsuranceCheck = new Map<string, number>();
-
 async function resolvePartnerId(session: {
   user: { id: string; email?: string | null };
 }): Promise<{ partnerId: string | null; dbOffline: boolean }> {
@@ -130,45 +127,6 @@ export async function GET(req: Request) {
     const resolved = await resolvePartnerId(session);
     const partnerId = resolved.partnerId;
     let offline = resolved.dbOffline;
-
-    // Flip expired-insurance APPROVED cars to remodeation before painting the calendar.
-    // Expiry is date-based, so once per partner every few minutes is enough.
-    const insuranceKey = partnerId || session.user.id;
-    const lastCheck = lastInsuranceCheck.get(insuranceKey) || 0;
-    if (!offline && Date.now() - lastCheck > INSURANCE_CHECK_EVERY_MS) {
-      lastInsuranceCheck.set(insuranceKey, Date.now());
-      try {
-        const { applyExpiredInsuranceRemoderation } = await import(
-          "@/lib/server/car-insurance-expiry"
-        );
-        const previewIds: string[] = [];
-        try {
-          if (partnerId && !partnerId.startsWith("file-partner-")) {
-            const ids = await prisma.car.findMany({
-              where: { partnerId },
-              select: { id: true },
-            });
-            previewIds.push(...ids.map((c) => c.id));
-          }
-        } catch {
-          /* offline — file cars still checked below */
-        }
-        const filePreview = await listFileCarsForPartner({
-          userId: session.user.id,
-          email: session.user.email,
-          partnerId: partnerId || undefined,
-        });
-        for (const c of filePreview) {
-          if (!previewIds.includes(c.id)) previewIds.push(c.id);
-        }
-        if (previewIds.length) {
-          await applyExpiredInsuranceRemoderation({ carIds: previewIds });
-        }
-      } catch (error) {
-        lastInsuranceCheck.delete(insuranceKey);
-        console.warn("[fleet-calendar] insurance expiry", error);
-      }
-    }
 
     type CarOut = {
       id: string;
@@ -233,7 +191,7 @@ export async function GET(req: Request) {
         if (!existing.hiddenReason && c.hiddenReason) {
           existing.hiddenReason = c.hiddenReason;
         }
-        // Prefer fresher file status when insurance expiry remodeated the file copy.
+        // Prefer the file status when the file copy was sent back to moderation.
         if (c.status === "PENDING_REMODERATION" && existing.status === "APPROVED") {
           existing.status = c.status;
           existing.hiddenReason = c.hiddenReason ?? existing.hiddenReason;
@@ -278,23 +236,6 @@ export async function GET(req: Request) {
       for (const car of cars) {
         if (car.status === "REJECTED" && car.hiddenReason) car.rejectionNote = car.hiddenReason;
       }
-    }
-
-    try {
-      const { isInsuranceExpired, readCarInsuranceDocs } = await import(
-        "@/lib/server/car-insurance-store"
-      );
-      const { INSURANCE_EXPIRY_REASON } = await import("@/lib/cars/insurance-expiry-reason");
-      const docs = await readCarInsuranceDocs(cars.map((car) => car.id));
-      for (const car of cars) {
-        if (car.status !== "PENDING" && car.status !== "PENDING_REMODERATION") continue;
-        const expires = docs.get(car.id)?.insuranceExpiresAt;
-        if (expires && isInsuranceExpired(expires)) {
-          car.hiddenReason = INSURANCE_EXPIRY_REASON;
-        }
-      }
-    } catch (error) {
-      console.warn("[fleet-calendar] insurance reason", error);
     }
 
     const carIds = cars.map((c) => c.id);

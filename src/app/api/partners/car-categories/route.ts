@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAdminSession, getPartnerSession } from "@/lib/auth/sessions";
 import { LOCAL_PARTNER_ID } from "@/lib/auth/local-partner-store";
-import { listHomepageCategories } from "@/lib/server/homepage-categories-store";
 import { ensureHomepageDefaults } from "@/lib/server/homepage";
+import { listPartnerCarCategoryOptions } from "@/lib/server/partner-car-categories";
 
 /** Active homepage categories for partner car create/edit dropdown (admin may also load for remodeation). */
 export async function GET() {
@@ -23,16 +23,9 @@ export async function GET() {
       /* DB may be offline — file store still works */
     }
 
-    const rows = await listHomepageCategories();
-    const active = rows
-      .filter((c) => c.isActive !== false)
-      .map((c) => ({
-        id: c.id,
-        slug: c.slug,
-        name: c.name,
-      }));
-
-    return NextResponse.json(active);
+    return NextResponse.json(await listPartnerCarCategoryOptions(), {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
     console.error("[partners/car-categories GET]", error);
     return NextResponse.json(

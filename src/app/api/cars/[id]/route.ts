@@ -12,13 +12,7 @@ import { resolvePartnerDeliveryPrices } from "@/lib/delivery/pricing";
 import { scopePickupPlacesInDescription } from "@/lib/cars/scope-pickup-places";
 import { listPartnerScopedDeliveryLocations, persistableCarDeliveryRows } from "@/lib/server/delivery-locations";
 import { withPartnerDeliveryPrices } from "@/lib/server/partner-delivery-listing-sync";
-import { persistCarInsuranceDocument } from "@/lib/server/car-passport-docs";
-import {
-  normalizeInsuranceExpiresAt,
-  normalizeInsuranceUrl,
-  readCarInsuranceDoc,
-  readCarInsuranceUrl,
-} from "@/lib/server/car-insurance-store";
+import { readCarInsuranceDoc, readCarInsuranceUrl } from "@/lib/server/car-insurance-store";
 import { ensureExtrasExistInDb, extrasRowsForCarFk, listExtraServices } from "@/lib/server/extras-store";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import {
@@ -424,20 +418,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             )
         : fileCar.deliveryPrices,
     });
-    if (Object.prototype.hasOwnProperty.call(fileBody, "insuranceUrl")) {
-      const nextInsurance = normalizeInsuranceUrl(fileBody.insuranceUrl);
-      if (!nextInsurance && fileCar.status !== "DRAFT" && !fileAdmin) {
-        return NextResponse.json({ error: "Insurance document is required" }, { status: 400 });
-      }
-      await persistCarInsuranceDocument(id, fileBody.insuranceUrl);
-    }
-    if (Object.prototype.hasOwnProperty.call(fileBody, "insuranceExpiresAt")) {
-      const nextExpiry = normalizeInsuranceExpiresAt(fileBody.insuranceExpiresAt);
-      if (!nextExpiry && fileCar.status !== "DRAFT" && !fileAdmin) {
-        return NextResponse.json({ error: "Insurance expiry date is required" }, { status: 400 });
-      }
-      await persistCarInsuranceDocument(id, undefined, fileBody.insuranceExpiresAt);
-    }
     const insuranceDoc = await readCarInsuranceDoc(id);
     const insuranceUrl = insuranceDoc?.insuranceUrl || null;
     const insuranceExpiresAt = insuranceDoc?.insuranceExpiresAt || null;
@@ -746,20 +726,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           },
         });
       });
-      if (Object.prototype.hasOwnProperty.call(body, "insuranceUrl")) {
-        const nextInsurance = normalizeInsuranceUrl(body.insuranceUrl);
-        if (!nextInsurance && car.status !== "DRAFT") {
-          return NextResponse.json({ error: "Insurance document is required" }, { status: 400 });
-        }
-        await persistCarInsuranceDocument(id, body.insuranceUrl);
-      }
-      if (Object.prototype.hasOwnProperty.call(body, "insuranceExpiresAt")) {
-        const nextExpiry = normalizeInsuranceExpiresAt(body.insuranceExpiresAt);
-        if (!nextExpiry && car.status !== "DRAFT") {
-          return NextResponse.json({ error: "Insurance expiry date is required" }, { status: 400 });
-        }
-        await persistCarInsuranceDocument(id, undefined, body.insuranceExpiresAt);
-      }
       if (!adminCorrection) {
       try {
         const insuranceDoc = await readCarInsuranceDoc(id);

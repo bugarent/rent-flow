@@ -158,7 +158,10 @@ export type PartnerCreateCarCopy = {
     price: string;
     pricing: string;
     mileage: string;
+    /** Group title for insurance-type extras offered to customers. */
     insurance: string;
+    /** Deposit / excess / card-required section of the car form. */
+    deposit: string;
     extras: string;
     specs: string;
     music: string;
@@ -444,6 +447,7 @@ export const partnerUiEn: PartnerUiPack = {
       pricing: "Pricing",
       mileage: "Mileage",
       insurance: "Insurance",
+      deposit: "Deposit & excess",
       extras: "Additional services",
       specs: "Car specifications",
       music: "Music",
@@ -746,6 +750,7 @@ export const partnerUiKa: PartnerUiPack = {
       pricing: "ფასები",
       mileage: "გარბენი",
       insurance: "დაზღვევა",
+      deposit: "დეპოზიტი და ფრანშიზა",
       extras: "დამატებითი მომსახურეობა",
       specs: "მახასიათებლები",
       music: "მუსიკა",
@@ -1049,6 +1054,7 @@ export const partnerUiRu: PartnerUiPack = {
       pricing: "Цены",
       mileage: "Пробег",
       insurance: "Страховка",
+      deposit: "Депозит и франшиза",
       extras: "Дополнительные услуги",
       specs: "Характеристики",
       music: "Музыка",

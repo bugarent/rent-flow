@@ -3,7 +3,7 @@ import "server-only";
 import { carMatchesMappedModels } from "@/lib/cars/category-mapping";
 import { normalizeLocationCode } from "@/lib/catalog/search-places";
 import type { DeliveryPriceRowLike } from "@/lib/delivery/trip-fees";
-import { loadSearchCatalog, clearSearchCatalog, type CatalogCar } from "@/lib/server/search-catalog";
+import { loadSearchCatalog, type CatalogCar } from "@/lib/server/search-catalog";
 import { scopeSearchCars } from "@/lib/server/search-results-scope";
 
 export type PublicCarsQuery = {
@@ -58,21 +58,6 @@ export function createServerTimer(): Timer {
   };
 }
 
-/** Insurance-expiry re-moderation used to run on every search; once per 5 minutes is plenty. */
-const INSURANCE_CHECK_MS = 5 * 60_000;
-let insuranceCheckedAt = 0;
-
-function scheduleInsuranceExpiryCheck() {
-  if (Date.now() - insuranceCheckedAt < INSURANCE_CHECK_MS) return;
-  insuranceCheckedAt = Date.now();
-  void import("@/lib/server/car-insurance-expiry")
-    .then((m) => m.applyExpiredInsuranceRemoderation())
-    .then((result) => {
-      if (result.remodeated > 0) clearSearchCatalog();
-    })
-    .catch((error) => console.warn("[cars search] insurance expiry", error));
-}
-
 function validDate(raw?: string) {
   if (!raw) return null;
   const date = new Date(raw);
@@ -102,7 +87,6 @@ function deliveryOut(rows: DeliveryPriceRowLike[] | undefined): PublicCarItem["d
  * occupancy snapshot, so a warm instance answers without a database round trip.
  */
 export async function searchPublicCars(query: PublicCarsQuery, timer?: Timer): Promise<PublicCarItem[]> {
-  scheduleInsuranceExpiryCheck();
   const catalog = await loadSearchCatalog();
   timer?.mark("catalog");
 

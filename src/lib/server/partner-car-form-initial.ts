@@ -12,6 +12,10 @@ import {
 } from "@/lib/server/partner-company-settings-store";
 import { loadPartnerDeliveryCatalog } from "@/lib/server/partner-delivery-catalog";
 import type { TariffInterval } from "@/lib/partners/company-settings";
+import {
+  listPartnerCarCategoryOptions,
+  type PartnerCarCategoryOption,
+} from "@/lib/server/partner-car-categories";
 
 type SessionUser = { id: string; email?: string | null };
 
@@ -39,17 +43,20 @@ export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
   initialDeliveryCatalog: DeliveryLocationView[];
   initialExtrasCatalog: ExtraServicePricing[];
   initialTariffs?: TariffInterval[];
+  initialCategories: PartnerCarCategoryOption[];
 }> {
+  const categoriesPromise = listPartnerCarCategoryOptions();
   try {
     const { partnerId, row } = await resolvePartner(user);
     const company = await (row
       ? resolveCompanySettings(row)
       : readCompanySettingsFile(partnerId)
     ).catch(() => null);
-    const [delivery, extras, prefs] = await Promise.all([
+    const [delivery, extras, prefs, initialCategories] = await Promise.all([
       loadPartnerDeliveryCatalog(partnerId, company?.deliveryLocationIds || []),
       listExtraServices({ activeOnly: true }),
       readPartnerExtraPrefs(partnerId),
+      categoriesPromise,
     ]);
     const enabledIds = new Set(
       prefs.filter((p) => p.enabled || p.forbidden).map((p) => p.extraServiceId),
@@ -62,16 +69,19 @@ export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
       initialDeliveryCatalog: delivery,
       initialExtrasCatalog: await scopeExtrasToPartner(offered, partnerId, company?.deliveryCountryIso2s),
       initialTariffs: company?.tariffs?.length ? company.tariffs : undefined,
+      initialCategories,
     };
   } catch {
+    const initialCategories = await categoriesPromise;
     try {
       const extras = await listExtraServices({ activeOnly: true });
       return {
         initialDeliveryCatalog: [],
         initialExtrasCatalog: extras.filter((s) => isMandatoryExtra(s)),
+        initialCategories,
       };
     } catch {
-      return { initialDeliveryCatalog: [], initialExtrasCatalog: [] };
+      return { initialDeliveryCatalog: [], initialExtrasCatalog: [], initialCategories };
     }
   }
 }

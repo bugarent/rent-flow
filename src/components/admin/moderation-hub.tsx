@@ -7,11 +7,6 @@ import { ADMIN_BASE } from "@/lib/routes";
 import { useBpLabels } from "@/components/admin/business-partners/labels";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { uiText } from "@/lib/i18n/ui-text";
-import {
-  insuranceExpiryReasonLabel,
-  isInsuranceDateExpired,
-  isInsuranceExpiryReason,
-} from "@/lib/cars/insurance-expiry-reason";
 import { ListingModerationActions } from "@/components/admin/listing-moderation-actions";
 import { ModerationProfilesPanel } from "@/components/admin/moderation-profiles-panel";
 import { PartnersManager } from "@/components/admin/partners-manager";
@@ -36,8 +31,6 @@ export type ModerationCarView = {
   photos: Array<{ id: string; url: string }>;
   passportFrontUrl: string | null;
   passportBackUrl: string | null;
-  insuranceUrl: string | null;
-  insuranceExpiresAt: string | null;
   country: string;
   bodyType: string;
 };
@@ -412,12 +405,6 @@ export function ModerationHub({
                         <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-extrabold text-amber-950">
                           {L.correction}
                         </span>
-                        {isInsuranceExpiryReason(car.hiddenReason) ||
-                        isInsuranceDateExpired(car.insuranceExpiresAt) ? (
-                          <span className="text-[11px] font-extrabold text-red-700">
-                            {insuranceExpiryReasonLabel(locale)}
-                          </span>
-                        ) : null}
                       </>
                     ) : null}
                   </div>
@@ -427,11 +414,6 @@ export function ModerationHub({
                   <p className="truncate text-sm font-semibold text-slate-700">
                     {car.year} · {car.country} · {car.bodyType}
                   </p>
-                  {car.insuranceExpiresAt ? (
-                    <p className="mt-0.5 text-xs font-semibold text-amber-900">
-                      {L.insuranceUntil} {car.insuranceExpiresAt}
-                    </p>
-                  ) : null}
                   <p className="truncate text-xs text-slate-500">{car.partnerName}</p>
                   {car.partnerId ? (
                     <Link

@@ -3,7 +3,7 @@
  *
  * Only admin-approved listings are public. Any partner edit sends the listing back
  * to moderation (PENDING_REMODERATION, shown yellow) and hides it from search until
- * the admin approves it again. New, rejected and expired-insurance listings stay hidden.
+ * the admin approves it again. New and rejected listings stay hidden.
  */
 
 export const PARTNER_EDIT_REMODERATION_REASON = "Partner edited listing — awaiting re-moderation";
@@ -55,7 +55,7 @@ export const publicPartnerWhere = {
   status: { notIn: [...PARTNER_BLOCKING_STATUSES] },
 };
 
-export type SearchBlocker = "status" | "partner" | "noDelivery" | "insurance";
+export type SearchBlocker = "status" | "partner" | "noDelivery";
 
 /** Why a listing cannot appear in customer search (empty = it can). */
 export function listingSearchBlockers(input: {
@@ -63,19 +63,17 @@ export function listingSearchBlockers(input: {
   hiddenReason?: string | null;
   partnerStatus?: string | null;
   activeAirports: string[];
-  insuranceExpired: boolean;
 }): SearchBlocker[] {
   const blockers: SearchBlocker[] = [];
   if (!isPubliclyVisibleListing(input)) blockers.push("status");
   if (!partnerAllowsPublicListings(input.partnerStatus)) blockers.push("partner");
   if (!input.activeAirports.length) blockers.push("noDelivery");
-  if (input.insuranceExpired) blockers.push("insurance");
   return blockers;
 }
 
 /**
  * hiddenReason after a partner saves a listing. Keeps an earlier reason
- * (rejection note, expired insurance) so those listings never become public by editing.
+ * (e.g. a rejection note) so those listings never become public by editing.
  */
 export function hiddenReasonAfterPartnerEdit(input: {
   prevStatus: string;

@@ -15,8 +15,6 @@ import { AdminLoading } from "@/components/admin/admin-page-heading";
 import { formatPartnerCode } from "@/lib/ids";
 import { parseProfileModeration } from "@/lib/partners/profile-moderation";
 import { resolveProfileModeration } from "@/lib/server/partner-profile-moderation-store";
-import { readCarInsuranceDocs } from "@/lib/server/car-insurance-store";
-import { applyExpiredInsuranceRemoderation } from "@/lib/server/car-insurance-expiry";
 import { listFilePendingCars } from "@/lib/server/partner-cars-store";
 import { listDeliveryLocations } from "@/lib/server/delivery-locations";
 import { bodyTypeFromCarDescription, countriesFromCarDescription } from "@/lib/cars/listing-meta";
@@ -37,10 +35,6 @@ async function loadCars(): Promise<{
   queryError: string;
 }> {
   try {
-    await applyExpiredInsuranceRemoderation().catch((error) => {
-      console.warn("[admin/moderation] insurance expiry", error);
-    });
-
     const [rows, fileCars] = await Promise.all([
       prisma.car.findMany({
         where: {
@@ -86,7 +80,6 @@ async function loadCars(): Promise<{
           })
         : Promise.resolve([]),
     ]);
-    const insuranceByCar = await readCarInsuranceDocs(carIds);
     const locations = await listDeliveryLocations({ activeOnly: false });
     const isoByLocationId = new Map(locations.map((loc) => [loc.id, loc.countryIso2]));
 
@@ -101,7 +94,6 @@ async function loadCars(): Promise<{
 
     const prismaCars: ModerationCarView[] = rows.map((car) => {
       const passport = passportByCar.get(car.id);
-      const insurance = insuranceByCar.get(car.id);
       return {
         id: car.id,
         status: car.status,
@@ -115,21 +107,16 @@ async function loadCars(): Promise<{
         photos: photosByCar.get(car.id) ?? [],
         passportFrontUrl: passport?.frontUrl ?? null,
         passportBackUrl: passport?.backUrl ?? null,
-        insuranceUrl: insurance?.insuranceUrl ?? null,
-        insuranceExpiresAt: insurance?.insuranceExpiresAt ?? null,
         country: countriesFromCarDescription(car.description),
         bodyType: bodyTypeFromCarDescription(car.description),
       };
     });
     const seen = new Set(prismaCars.map((c) => c.id));
-    const extraIds = fileCars.filter((c) => !seen.has(c.id)).map((c) => c.id);
-    const fileInsurance = extraIds.length ? await readCarInsuranceDocs(extraIds) : new Map();
     const merged = [
       ...prismaCars,
       ...fileCars
         .filter((car) => !seen.has(car.id))
         .map((car) => {
-          const insurance = fileInsurance.get(car.id);
           return {
             id: car.id,
             status: car.status,
@@ -144,8 +131,6 @@ async function loadCars(): Promise<{
             photos: car.photos.map((url, index) => ({ id: `${car.id}-photo-${index}`, url })),
             passportFrontUrl: car.passportFrontUrl ?? null,
             passportBackUrl: car.passportBackUrl ?? null,
-            insuranceUrl: insurance?.insuranceUrl ?? null,
-            insuranceExpiresAt: insurance?.insuranceExpiresAt ?? null,
             country: countriesFromCarDescription(
               car.description,
               (car.deliveryPrices || []).map((row) => isoByLocationId.get(row.deliveryLocationId) || ""),
@@ -164,8 +149,6 @@ async function loadCars(): Promise<{
     console.error("[admin/moderation listings]", error);
     const dbOffline = isDbOfflineError(error);
     const fileCars = await listFilePendingCars();
-    const fileIds = fileCars.map((c) => c.id);
-    const fileInsurance = fileIds.length ? await readCarInsuranceDocs(fileIds) : new Map();
     let isoByLocationId = new Map<string, string>();
     try {
       const locations = await listDeliveryLocations({ activeOnly: false });
@@ -175,7 +158,6 @@ async function loadCars(): Promise<{
     }
     return {
       cars: fileCars.map((car) => {
-        const insurance = fileInsurance.get(car.id);
         return {
           id: car.id,
           status: car.status,
@@ -189,8 +171,6 @@ async function loadCars(): Promise<{
           photos: car.photos.map((url, index) => ({ id: `${car.id}-photo-${index}`, url })),
           passportFrontUrl: car.passportFrontUrl ?? null,
           passportBackUrl: car.passportBackUrl ?? null,
-          insuranceUrl: insurance?.insuranceUrl ?? null,
-          insuranceExpiresAt: insurance?.insuranceExpiresAt ?? null,
           country: countriesFromCarDescription(
             car.description,
             (car.deliveryPrices || []).map((row) => isoByLocationId.get(row.deliveryLocationId) || ""),

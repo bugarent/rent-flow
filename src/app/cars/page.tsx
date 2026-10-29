@@ -58,28 +58,6 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-const INSURANCE_SWEEP_MS = 5 * 60_000;
-let lastInsuranceSweepAt = 0;
-
-/** At most one background sweep per instance every few minutes (the cron job also runs it). */
-function scheduleInsuranceRemoderation() {
-  const now = Date.now();
-  if (now - lastInsuranceSweepAt < INSURANCE_SWEEP_MS) return;
-  lastInsuranceSweepAt = now;
-  void import("@/lib/server/car-insurance-expiry")
-    .then((m) => m.applyExpiredInsuranceRemoderation())
-    .catch((error) => console.warn("[cars page] insurance expiry", error));
-}
-
-async function loadExpiredInsuranceIds(): Promise<Set<string>> {
-  try {
-    const { listExpiredInsuranceCarIds } = await import("@/lib/server/car-insurance-store");
-    return new Set(await listExpiredInsuranceCarIds());
-  } catch {
-    return new Set();
-  }
-}
-
 async function loadSiteDiscountPercent(): Promise<number> {
   try {
     const { getPlatformSettings } = await import("@/lib/server/platform-settings-store");
@@ -178,9 +156,6 @@ export default async function CarsPage({
     debug?: string;
   }>;
 }) {
-  // Expired-insurance cars are filtered out below; the status write itself does not block the page.
-  scheduleInsuranceRemoderation();
-
   const [
     { startDate, endDate, pickup, dropoff, category, country, pickupAddress, dropoffAddress, debug },
     { locale },
@@ -211,7 +186,6 @@ export default async function CarsPage({
   // Independent reads start together instead of one after another; each is shared
   // across searches for 30s (cleared on listing / delivery / category changes).
   const nonEmpty = (value: { length: number }) => value.length > 0;
-  const expiredIdsPromise = cachedSearchRead("expired-insurance", loadExpiredInsuranceIds);
   const fileCarsPromise = cachedSearchRead("file-cars", () => loadPublicFileSearchCars()).catch(() => []);
   const cabinetPromise = cachedSearchRead("cabinet", loadSearchCabinet, { keep: (c) => c.byPartner.size > 0 });
   const extrasCatalogPromise = cachedSearchRead("extras", () => listExtraServices({ activeOnly: true }), {
@@ -425,7 +399,7 @@ export default async function CarsPage({
   const discountFrom = startDate || new Date().toISOString();
   const discountTo = endDate || startDate || discountFrom;
   const prefIdsKey = [...extraPrefIds].sort().join(",");
-  const [deliveryPrefsMap, extraPrefsMap, periodMap, unavailable, expiredIds] = await Promise.all([
+  const [deliveryPrefsMap, extraPrefsMap, periodMap, unavailable] = await Promise.all([
     cachedSearchRead(`delivery-prefs:${prefIdsKey}`, () => readPartnerDeliveryPrefsMap([...extraPrefIds])).catch(
       () => new Map<string, import("@/lib/server/partner-delivery-prefs-store").PartnerDeliveryPref[]>(),
     ),
@@ -437,7 +411,6 @@ export default async function CarsPage({
       () => new Map<string, number>(),
     ),
     unavailablePromise,
-    expiredIdsPromise,
   ]);
 
   const prefsByPartner = new Map(deliveryPrefsMap);
@@ -447,10 +420,6 @@ export default async function CarsPage({
     prefsByPartner.set(id, deliveryPrefsMap.get(id.replace(/^file-partner-/, "")) || []);
   }
   const extrasPrefsByPartner = new Map<string, PartnerExtraPref[]>(extraPrefsMap);
-  if (expiredIds.size) {
-    cars = keepCars(cars, (car) => !expiredIds.has(car.id) || "insurance expired");
-  }
-
   {
     const places = await cachedSearchRead(
       "delivery-places",

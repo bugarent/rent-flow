@@ -111,7 +111,6 @@ export function AdminCarsPanel({
         "არ აქვს აქტიური აყვანის აეროპორტი",
         "нет активного аэропорта выдачи",
       ),
-      insurance: uiText(locale, "insurance expired", "დაზღვევა ვადაგასულია", "страховка истекла"),
     },
     colPlate: uiText(locale, "Plate", "სახ. ნომერი", "Госномер"),
     colPartnerNumber: uiText(locale, "Partner number", "პარტნიორის ნომერი", "Номер партнёра"),

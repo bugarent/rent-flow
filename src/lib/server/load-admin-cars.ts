@@ -11,8 +11,6 @@ import { formatPartnerCode } from "@/lib/ids";
 import { listingSearchBlockers, type SearchBlocker } from "@/lib/cars/listing-visibility";
 import { findSearchPlace, normalizeLocationCode, parseCityLocationCode } from "@/lib/catalog/search-places";
 import { listDeliveryLocations } from "@/lib/server/delivery-locations";
-import { listExpiredInsuranceCarIds } from "@/lib/server/car-insurance-store";
-
 function uniqueAirports(codes: string[]): string[] {
   return [...new Set(codes.map((c) => c.trim().toUpperCase()).filter(Boolean))].sort();
 }
@@ -147,12 +145,9 @@ export async function loadAdminCarRows(): Promise<{
 }> {
   let dbOffline = false;
   const byId = new Map<string, AdminCarRow>();
-  const [partnerLookup, locations, expiredIds] = await Promise.all([
+  const [partnerLookup, locations] = await Promise.all([
     buildPartnerLookup(),
     listDeliveryLocations({ activeOnly: false }).catch(() => []),
-    listExpiredInsuranceCarIds()
-      .then((ids) => new Set(ids))
-      .catch(() => new Set<string>()),
   ]);
   if (partnerLookup.dbOffline) dbOffline = true;
   const locationById = new Map(locations.map((loc) => [loc.id, loc]));
@@ -193,7 +188,6 @@ export async function loadAdminCarRows(): Promise<{
           status: c.status,
           hiddenReason: c.hiddenReason,
           activeAirports: searchAirports,
-          insuranceExpired: expiredIds.has(c.id),
         }),
       };
       byId.set(c.id, {
@@ -279,7 +273,6 @@ export async function loadAdminCarRows(): Promise<{
           hiddenReason: c.hiddenReason,
           partnerStatus: c.partner?.status ? String(c.partner.status) : null,
           activeAirports: searchAirports,
-          insuranceExpired: expiredIds.has(c.id),
         }),
       };
       byId.set(c.id, {

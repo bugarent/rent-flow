@@ -31,11 +31,6 @@ import {
 import { isSyntheticDeliveryId } from "@/lib/delivery/pricing";
 import { findCarExtraOffer, parseCarDetails, readExtraOffers } from "@/lib/cars/car-details";
 import { diffCarAgainstPublished, fieldChangesMapFromRecord } from "@/lib/cars/car-published-diff";
-import {
-  insuranceExpiryReasonLabel,
-  isInsuranceDateExpired,
-  isInsuranceExpiryReason,
-} from "@/lib/cars/insurance-expiry-reason";
 import type { PublishedCarSnapshot } from "@/lib/server/car-published-store";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { RacInlineLoader } from "@/components/layout/route-loading-spinner";
@@ -156,7 +151,7 @@ const SECTION_IDS = [
   "main-info",
   "pricing",
   "mileage",
-  "insurance",
+  "deposit",
   "extras",
   "specs",
   "music",
@@ -170,7 +165,7 @@ const SECTION_COPY_KEY: Record<CreateCarSectionId, keyof PartnerCreateCarCopy["s
   "main-info": "mainInfo",
   pricing: "pricing",
   mileage: "mileage",
-  insurance: "insurance",
+  deposit: "deposit",
   extras: "extras",
   specs: "specs",
   music: "music",
@@ -474,11 +469,14 @@ export function PartnerCreateCarForm({
   initialDeliveryCatalog = NO_DELIVERY_CATALOG,
   initialExtrasCatalog = NO_EXTRAS_CATALOG,
   initialTariffs,
+  initialCategories,
   carId,
   adminReview = null,
 }: {
   initialDeliveryCatalog?: DeliveryLocationView[];
   initialExtrasCatalog?: ExtraServicePricing[];
+  /** Server list so the category dropdown is never empty on first paint. */
+  initialCategories?: PartnerCarCategoryOption[];
   /** Partner day ranges from personal info, so the price columns are right on first paint. */
   initialTariffs?: TariffInterval[];
   /** When set, form loads this listing and saves via PATCH (Update). */
@@ -522,7 +520,13 @@ export function PartnerCreateCarForm({
   const [color, setColor] = useState("");
   if (color === "Other") setColor("");
   const [categorySlug, setCategorySlug] = useState("");
-  const [categoryOptions, setCategoryOptions] = useState<PartnerCarCategoryOption[]>([]);
+  const [categoryOptions, setCategoryOptionsState] = useState<PartnerCarCategoryOption[]>(
+    () => initialCategories ?? [],
+  );
+  /** A failed or empty category response keeps the list already on screen. */
+  const setCategoryOptions = (next: PartnerCarCategoryOption[]) => {
+    if (next.length) setCategoryOptionsState(next);
+  };
   const [licenseCat, setLicenseCat] = useState("B");
   const [minDriverAge, setMinDriverAge] = useState("18");
   const [minLicenseYears, setMinLicenseYears] = useState("0");
@@ -573,12 +577,6 @@ export function PartnerCreateCarForm({
   );
   const [passportFront, setPassportFront] = useState("");
   const [passportBack, setPassportBack] = useState("");
-  const [insuranceExpiresAt, setInsuranceExpiresAt] = useState("");
-  const insuranceExpiredReview =
-    awaitingAdminModeration &&
-    (isInsuranceExpiryReason(moderationReason) ||
-      isChanged("insuranceExpiresAt") ||
-      isInsuranceDateExpired(insuranceExpiresAt));
   const [uploading, setUploading] = useState(false);
   const [docPreview, setDocPreview] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -792,14 +790,6 @@ export function PartnerCreateCarForm({
           setPassportFront(String(car.passport?.frontUrl || ""));
           setPassportBack(String(car.passport?.backUrl || ""));
           if (!cancelled) setBooting(false);
-          setInsuranceExpiresAt(
-            String(
-              (car as { insuranceExpiresAt?: string }).insuranceExpiresAt ||
-                (car.passport as { insuranceExpiresAt?: string } | null | undefined)
-                  ?.insuranceExpiresAt ||
-                "",
-            ).slice(0, 10),
-          );
 
           const tiers = Array.isArray(details?.pricingTiers) ? details.pricingTiers : [];
           if (tiers.length) {
@@ -1184,14 +1174,6 @@ export function PartnerCreateCarForm({
           setPassportFront(String(car.passport?.frontUrl || ""));
           setPassportBack(String(car.passport?.backUrl || ""));
           if (!cancelled) setBooting(false);
-          setInsuranceExpiresAt(
-            String(
-              (car as { insuranceExpiresAt?: string }).insuranceExpiresAt ||
-                (car.passport as { insuranceExpiresAt?: string } | null | undefined)
-                  ?.insuranceExpiresAt ||
-                "",
-            ).slice(0, 10),
-          );
 
           const tiers = Array.isArray(details?.pricingTiers) ? details.pricingTiers : [];
           if (tiers.length) {
@@ -1791,8 +1773,6 @@ export function PartnerCreateCarForm({
           showError(apiErr, "photo", ["photos"]);
         } else if (/passport|certificate/i.test(apiErr)) {
           showError(apiErr, "certificate", ["passport"]);
-        } else if (/insurance/i.test(apiErr)) {
-          showError(apiErr, "certificate", ["insurance-file"]);
         } else if (/delivery|airport|NO_DELIVERY/i.test(apiErr) || code === "NO_DELIVERY") {
           showError(cc.errDeliveryPlace);
         } else if (/partner profile/i.test(apiErr)) {
@@ -2077,9 +2057,7 @@ export function PartnerCreateCarForm({
         ) : null}
         {awaitingAdminModeration ? (
           <div className="rounded-lg border border-red-600 bg-red-100 px-4 py-3 text-sm font-extrabold text-red-950">
-            {insuranceExpiredReview
-              ? insuranceExpiryReasonLabel(locale)
-              : isNewListing
+            {isNewListing
                 ? fieldChanges.size > 0
                   ? locale === "ka"
                     ? `ახალი განცხადება — პარტნიორმა განაახლა ${fieldChanges.size} ველი. გაწითლებული ადგილები მონიშნავს ცვლილებებს.`
@@ -2536,7 +2514,7 @@ export function PartnerCreateCarForm({
           ) : null}
         </SectionCard>
 
-        <SectionCard id="insurance" title={knownText(locale, cc.sections.insurance)}>
+        <SectionCard id="deposit" title={cc.sections.deposit}>
           <div className="mb-1 grid gap-2 sm:grid-cols-2">
             <Field label={`${cc.deposit}`} invalid={fieldInvalid("deposit")}>
               <MoneyInput
