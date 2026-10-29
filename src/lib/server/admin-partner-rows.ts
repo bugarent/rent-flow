@@ -37,6 +37,8 @@ export type AdminPartnerRow = {
   unreadForAdmin: number;
   updatedAt: string;
   source?: "db" | "file";
+  /** Partner linked and verified the Telegram bot. Unknown (undefined) for file-only rows. */
+  telegramActive?: boolean;
   /** Lower-case names, email, phones and codes for the admin search box. */
   searchText: string;
 };
@@ -153,6 +155,7 @@ export async function loadAdminPartnerRows(): Promise<{
         unreadForAdmin,
         updatedAt: p.updatedAt.toISOString(),
         source: "db" as const,
+        telegramActive: Boolean(p.telegramChatId && p.telegramVerifiedAt),
       };
     });
   } catch (error) {

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { uiText } from "@/lib/i18n/ui-text";
 import { PartnerRowActions } from "@/components/admin/partner-row-actions";
+import { PartnerTelegramBadge } from "@/components/admin/partner-telegram-badge";
 import { BookingCustomersPanel } from "@/components/admin/booking-customers-panel";
 import type { BookingCustomerRow } from "@/lib/admin/booking-customer-row";
 import { ADMIN_BASE } from "@/lib/routes";
@@ -56,6 +57,7 @@ type PartnerRow = {
   updatedAt?: string;
   source?: "db" | "file";
   searchText?: string;
+  telegramActive?: boolean;
 };
 
 const PRIMARY_STATUSES = new Set([
@@ -843,6 +845,15 @@ export function PartnersManager({
                                 </span>
                               ) : null}
                             </span>
+                            {p.telegramActive !== undefined ? (
+                              <div className="mt-1">
+                                <PartnerTelegramBadge
+                                  active={p.telegramActive}
+                                  locale={locale}
+                                  className="max-w-[11rem]"
+                                />
+                              </div>
+                            ) : null}
                           </td>
                           <td className="px-2 py-1 align-middle">
                             <div className="flex flex-col items-stretch gap-1">
@@ -1093,6 +1104,11 @@ export function PartnersManager({
                         </span>
                       ) : null}
                     </span>
+                    {p.telegramActive !== undefined ? (
+                      <div className="mt-1 flex justify-end">
+                        <PartnerTelegramBadge active={p.telegramActive} locale={locale} className="text-xs" />
+                      </div>
+                    ) : null}
                   </MobileDataRow>
                   <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
                     {filter === "REJECTED" || unread > 0 ? (
