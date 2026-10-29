@@ -176,13 +176,43 @@ function dayCellClass(d: Date) {
   );
 }
 
-/** Green only after admin APPROVED; everything else awaiting review stays yellow. */
+/** Green only after admin APPROVED; awaiting review stays yellow; sent back by admin is red. */
 function needsAttentionStatus(status: string) {
   return status !== "APPROVED";
 }
 
+function isRejectedStatus(status: string) {
+  return status === "REJECTED";
+}
+
 function carWindowClass(status: string) {
+  if (isRejectedStatus(status)) return "bg-red-600";
   return needsAttentionStatus(status) ? "bg-amber-400" : "bg-emerald-500";
+}
+
+/** Whole-row colours for listings that are not live yet. */
+const ROW_TONE = {
+  pending: {
+    row: "border-amber-300 bg-amber-100/80",
+    carCell: "border-amber-300 bg-amber-200/90",
+    track: "bg-amber-50/90",
+    day: "border-amber-200/80",
+    dayWeekBoundary: "bg-amber-200/50",
+    dayPlain: "bg-amber-100/40",
+  },
+  rejected: {
+    row: "border-red-400 bg-red-100/90",
+    carCell: "border-red-400 bg-red-200/90",
+    track: "bg-red-50/90",
+    day: "border-red-200/80",
+    dayWeekBoundary: "bg-red-200/60",
+    dayPlain: "bg-red-100/50",
+  },
+} as const;
+
+function rowTone(status: string) {
+  if (!needsAttentionStatus(status)) return null;
+  return isRejectedStatus(status) ? ROW_TONE.rejected : ROW_TONE.pending;
 }
 
 export function PartnerFleetCalendar() {
@@ -968,22 +998,20 @@ export function PartnerFleetCalendar() {
 
           {cars.map((car) => {
             const rowBookings = bookings.filter((b) => b.carId === car.id);
-            const attention = needsAttentionStatus(car.status);
+            const tone = rowTone(car.status);
             return (
               <div
                 key={car.id}
                 className={cn(
                   "flex h-7 w-max border-b-2 md:h-[52px] md:w-full",
-                  attention ? "border-amber-300 bg-amber-100/80" : "border-slate-200",
+                  tone ? tone.row : "border-slate-200",
                 )}
               >
                 <div
                   className={cn(
                     "sticky start-0 z-10 flex h-full shrink-0 items-center gap-1 border-e-2 px-1.5 md:gap-1.5",
                     carColumnWidth,
-                    attention
-                      ? "border-amber-300 bg-amber-200/90"
-                      : "border-slate-300 bg-white",
+                    tone ? tone.carCell : "border-slate-300 bg-white",
                   )}
                 >
                   <button
@@ -1037,7 +1065,7 @@ export function PartnerFleetCalendar() {
                 <div
                   className={cn(
                     "relative h-full w-[calc(var(--days)*1.75rem)] flex-none select-none md:w-auto md:min-w-0 md:flex-1",
-                    attention && "bg-amber-50/90",
+                    tone?.track,
                     monthSwipeArmed && "cursor-grabbing",
                   )}
                   style={{
@@ -1066,10 +1094,11 @@ export function PartnerFleetCalendar() {
                           openBlockModal(car.id, d);
                         }}
                         className={cn(
-                          attention
+                          tone
                             ? cn(
-                                "box-border h-full w-7 flex-none border-e border-b border-amber-200/80 [touch-action:pan-x_pan-y] md:w-auto md:min-w-0 md:flex-1",
-                                isWeekBoundaryDay(d) ? "bg-amber-200/50" : "bg-amber-100/40",
+                                "box-border h-full w-7 flex-none border-e border-b [touch-action:pan-x_pan-y] md:w-auto md:min-w-0 md:flex-1",
+                                tone.day,
+                                isWeekBoundaryDay(d) ? tone.dayWeekBoundary : tone.dayPlain,
                               )
                             : dayCellClass(d),
                           isToday(d) && "bg-sky-100/80 ring-2 ring-inset ring-sky-400",
@@ -1609,9 +1638,21 @@ export function PartnerFleetCalendar() {
       {noticeCar ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
-            <div className="flex items-start justify-between gap-3 border-b border-amber-100 bg-amber-50 px-5 py-3">
+            <div
+              className={cn(
+                "flex items-start justify-between gap-3 border-b px-5 py-3",
+                isRejectedStatus(noticeCar.status)
+                  ? "border-red-100 bg-red-50"
+                  : "border-amber-100 bg-amber-50",
+              )}
+            >
               <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-amber-800">
+                <p
+                  className={cn(
+                    "text-xs font-bold uppercase tracking-wide",
+                    isRejectedStatus(noticeCar.status) ? "text-red-800" : "text-amber-800",
+                  )}
+                >
                   {noticeCar.status === "REJECTED"
                     ? locale === "ka"
                       ? "უარყოფილი განცხადება"
@@ -1645,7 +1686,14 @@ export function PartnerFleetCalendar() {
                     ? "Комментарий администратора"
                     : "Admin comment"}
               </p>
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm font-medium leading-relaxed text-amber-950">
+              <div
+                className={cn(
+                  "rounded-xl border px-3 py-3 text-sm font-medium leading-relaxed",
+                  isRejectedStatus(noticeCar.status)
+                    ? "border-red-200 bg-red-50 text-red-950"
+                    : "border-amber-200 bg-amber-50 text-amber-950",
+                )}
+              >
                 {isInsuranceExpiryReason(noticeCar.hiddenReason)
                   ? insuranceExpiryReasonLabel(locale)
                   : (noticeCar.rejectionNote || noticeCar.hiddenReason || "").trim() ||
@@ -1656,11 +1704,17 @@ export function PartnerFleetCalendar() {
                         : "This listing is not approved yet. It turns green only after admin approval.")}
               </div>
               <p className="text-xs text-slate-500">
-                {locale === "ka"
-                  ? "ფანჯარა დარჩება ყვითელი, სანამ ადმინისტრატორი არ დაამტკიცებს განცხადებას."
-                  : locale === "ru"
-                    ? "Окно останется жёлтым, пока администратор не одобрит объявление."
-                    : "The window stays yellow until an administrator approves the listing."}
+                {isRejectedStatus(noticeCar.status)
+                  ? locale === "ka"
+                    ? "ადმინისტრატორმა განცხადება უკან დაგიბრუნათ. გაასწორეთ შენიშვნა და ხელახლა გაგზავნეთ — ზოლი გაყვითლდება მოდერაციის დროს და გამწვანდება დამტკიცების შემდეგ."
+                    : locale === "ru"
+                      ? "Администратор вернул объявление. Исправьте замечание и отправьте снова — строка станет жёлтой на модерации и зелёной после одобрения."
+                      : "The administrator sent this listing back. Fix the note and resubmit — the row turns yellow during review and green once approved."
+                  : locale === "ka"
+                    ? "ფანჯარა დარჩება ყვითელი, სანამ ადმინისტრატორი არ დაამტკიცებს განცხადებას."
+                    : locale === "ru"
+                      ? "Окно останется жёлтым, пока администратор не одобрит объявление."
+                      : "The window stays yellow until an administrator approves the listing."}
               </p>
             </div>
             <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-5 py-4">
