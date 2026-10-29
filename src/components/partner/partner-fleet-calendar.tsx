@@ -98,6 +98,9 @@ function addressOptionsForCity(city: string, places: DeliveryPlaceOpt[], locale:
   return opts;
 }
 
+/** Past days shown before today when the calendar opens on the current month. */
+const TODAY_LEAD_DAYS = 4;
+
 function startOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
@@ -341,8 +344,15 @@ export function PartnerFleetCalendar() {
   useEffect(() => () => clearMonthSwipe(), [clearMonthSwipe]);
 
   const dayCount = daysInMonth(month);
-  const rangeFrom = month;
-  const rangeTo = addDays(month, dayCount);
+  // The current month opens on today in the 5th column (4 past days, then the rest — into next
+  // month when needed). Other months still show from the 1st.
+  const now = new Date();
+  const showingCurrentMonth =
+    month.getFullYear() === now.getFullYear() && month.getMonth() === now.getMonth();
+  const rangeFrom = showingCurrentMonth
+    ? addDays(new Date(now.getFullYear(), now.getMonth(), now.getDate()), -TODAY_LEAD_DAYS)
+    : month;
+  const rangeTo = addDays(rangeFrom, dayCount);
   const rangeFromMs = rangeFrom.getTime();
   const rangeToMs = rangeTo.getTime();
   const days = useMemo(() => eachDay(new Date(rangeFromMs), dayCount), [rangeFromMs, dayCount]);
@@ -781,7 +791,8 @@ export function PartnerFleetCalendar() {
           const dayWidth = col?.offsetWidth || 28;
           const todayIndex = days.findIndex((d) => isToday(d));
           const maxLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
-          const target = todayIndex > 0 ? Math.max(0, (todayIndex - 1) * dayWidth) : 0;
+          const target =
+            todayIndex > 0 ? Math.max(0, (todayIndex - TODAY_LEAD_DAYS) * dayWidth) : 0;
           scroller.scrollLeft = Math.min(target, maxLeft);
         }
       }
