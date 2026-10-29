@@ -64,6 +64,20 @@ async function toJpeg(bytes: Uint8Array): Promise<Uint8Array | null> {
   }
 }
 
+/** Listing / card / banner photos are stored as WebP so even the full-size view stays light. */
+async function toWebp(bytes: Uint8Array): Promise<Uint8Array | null> {
+  try {
+    const out = await sharp(bytes, { failOn: "none", animated: false, limitInputPixels: 120_000_000 })
+      .rotate()
+      .resize({ width: 2200, height: 2200, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 82, effort: 4 })
+      .toBuffer();
+    return out.length > 80 ? out : null;
+  } catch {
+    return null;
+  }
+}
+
 async function putCloudinary(bytes: Uint8Array, publicId: string): Promise<string> {
   const uploaded = await Promise.race([
     uploadImageToCloudinary({ bytes: Buffer.from(bytes), folder: "partner-cars", publicId }),
@@ -102,20 +116,22 @@ export async function storePartnerUpload(file: File, kind?: string | null): Prom
   }
 
   const standard = sniffed === "jpeg" || sniffed === "png" || sniffed === "gif" || sniffed === "webp";
-  const keepOriginal = !document && standard && bytes.length <= 900 * 1024;
   let payload: Uint8Array = bytes;
   let contentType = sniffed ? contentTypeOf(sniffed) : "image/jpeg";
   let ext = sniffed ? extOf(sniffed) : "jpg";
 
-  if (!keepOriginal) {
-    const jpeg = await toJpeg(bytes);
-    if (jpeg) {
-      payload = jpeg;
-      contentType = "image/jpeg";
-      ext = "jpg";
-    } else if (!standard) {
-      throw new Error("PNG, JPG, WEBP, GIF, HEIC or PDF only");
-    }
+  // Photos → WebP. Passport scans stay JPEG (admins open and print them as documents).
+  const converted = document
+    ? standard && bytes.length <= 900 * 1024
+      ? null
+      : await toJpeg(bytes)
+    : await toWebp(bytes);
+  if (converted) {
+    payload = converted;
+    contentType = document ? "image/jpeg" : "image/webp";
+    ext = document ? "jpg" : "webp";
+  } else if (!standard) {
+    throw new Error("PNG, JPG, WEBP, GIF, HEIC or PDF only");
   }
 
   const name = `${Date.now()}-${randomBytes(6).toString("hex")}.${ext}`;

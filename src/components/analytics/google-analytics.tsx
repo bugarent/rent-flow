@@ -2,7 +2,7 @@ const GA_MEASUREMENT_ID = "G-CCS8K6LHLT";
 
 /**
  * The pageview is queued at once; gtag.js (~180 KB, ~350 ms of main thread on mobile) loads on
- * the first interaction or a few seconds after `load`, so it stays out of first paint and TBT.
+ * the first interaction or 10 s after `load`, so it stays out of first paint and TBT.
  */
 const GTAG_INIT = `window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
@@ -20,7 +20,7 @@ gtag('config', '${GA_MEASUREMENT_ID}');
     document.head.appendChild(s);
   }
   events.forEach(function(e){ window.addEventListener(e, load, { capture: true, passive: true, once: true }); });
-  function later(){ setTimeout(load, 4000); }
+  function later(){ setTimeout(load, 10000); }
   if (document.readyState === 'complete') later(); else window.addEventListener('load', later, { once: true });
 })();`;
 

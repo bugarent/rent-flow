@@ -5,7 +5,7 @@ import { SiteImage } from "@/components/ui/site-image";
 
 const STORY_IMAGE = "/images/about/story.jpg";
 const SUPPORT_IMAGE = "/images/about/support.jpg";
-const HERO_IMAGE = "/images/about/hero.jpg";
+const HERO_IMAGE = "/images/about/hero.webp";
 
 export function AboutPageView({
   title,

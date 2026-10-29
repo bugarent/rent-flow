@@ -7,10 +7,10 @@ export const SEO_SITE_NAME = "RENT AIRPORT CARS";
 export const SUPPORT_EMAIL =
   process.env.NEXT_PUBLIC_SUPPORT_EMAIL?.trim() || "info@rentairportcars.com";
 
-export const HERO_BACKGROUND_URL = "/images/hero-tarmac.jpg?v=6";
-export const MANAGE_BOOKING_BACKDROP_URL = "/images/manage-booking-backdrop.jpg?v=2";
+export const HERO_BACKGROUND_URL = "/images/hero-tarmac.webp?v=6";
+export const MANAGE_BOOKING_BACKDROP_URL = "/images/manage-booking-backdrop.webp?v=2";
 /** Partner “Create auto” page — airport + rental cars, brand-associated. */
-export const CREATE_AUTO_BACKDROP_URL = "/images/create-auto-backdrop.jpg?v=3";
+export const CREATE_AUTO_BACKDROP_URL = "/images/create-auto-backdrop.webp?v=3";
 
 export const DEFAULT_GOOGLE_MAPS_URL =
   "https://maps.google.com/?q=Kutaisi+International+Airport";

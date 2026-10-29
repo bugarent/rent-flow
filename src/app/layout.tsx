@@ -101,7 +101,6 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${notoGeorgian.variable} ${notoArabic.variable} h-full antialiased`}
     >
       <head>
-        <link rel="preload" as="image" href="/brand/rac-logo.webp" />
         <GoogleAnalytics />
       </head>
       <body className="flex min-h-full flex-col bg-slate-50 text-slate-900">

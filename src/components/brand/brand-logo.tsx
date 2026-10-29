@@ -40,11 +40,11 @@ export function BrandLogo({
         className={`${mark} shrink-0`}
         style={{
           backgroundColor: "var(--brand-navy)",
-          WebkitMaskImage: "url(/brand/logo-mark.png?v=4)",
+          WebkitMaskImage: "url(/brand/logo-mark.webp?v=4)",
           WebkitMaskRepeat: "no-repeat",
           WebkitMaskPosition: "center",
           WebkitMaskSize: "contain",
-          maskImage: "url(/brand/logo-mark.png?v=4)",
+          maskImage: "url(/brand/logo-mark.webp?v=4)",
           maskRepeat: "no-repeat",
           maskPosition: "center",
           maskSize: "contain",
