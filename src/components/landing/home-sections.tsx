@@ -40,6 +40,19 @@ function airportFallback() {
   }));
 }
 
+/**
+ * Cards only show the title. The full page text and SEO lines in every language made the
+ * homepage HTML ~0.5 MB larger, so only titles go to the browser (all languages, for switching).
+ */
+function titleOnly(translations: AirportCardTranslations | undefined): AirportCardTranslations {
+  const out: AirportCardTranslations = {};
+  for (const [lang, row] of Object.entries(translations ?? {})) {
+    const title = row?.title?.trim();
+    if (title) out[lang as keyof AirportCardTranslations] = { title };
+  }
+  return out;
+}
+
 function categoryFallback() {
   return VEHICLE_CATEGORIES.map((c) => ({
     id: c.id,
@@ -138,7 +151,15 @@ export async function HomeBelowFold() {
   return (
     <>
       {popularAirports.length ? <JsonLd data={placesJsonLd} /> : null}
-      <CategorySlider categories={categories} />
+      <CategorySlider
+        categories={categories.map((c) => ({
+          id: c.id,
+          slug: c.slug,
+          name: c.name,
+          details: c.details,
+          imageUrl: c.imageUrl,
+        }))}
+      />
       <HowItWorksPanel content={infoContent} />
       <PopularAirports
         layout={airportsLayout}
@@ -148,11 +169,13 @@ export async function HomeBelowFold() {
           city: findSearchPlace(a.iata)?.cityName || a.iata,
           image: a.imageUrl,
           rank: index + 1,
-          translations: withAutoTitleTranslations({
-            iata: a.iata,
-            title: a.title,
-            translations: "translations" in a ? (a.translations as AirportCardTranslations) : undefined,
-          }).translations,
+          translations: titleOnly(
+            withAutoTitleTranslations({
+              iata: a.iata,
+              title: a.title,
+              translations: "translations" in a ? (a.translations as AirportCardTranslations) : undefined,
+            }).translations,
+          ),
           countryIso2: airportCountryIso2(a.iata),
         }))}
       />
