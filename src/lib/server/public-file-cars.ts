@@ -107,18 +107,47 @@ function toSearchCar(car: FileCarListing, byId: Map<string, DeliveryLocationView
   };
 }
 
+/**
+ * A listing saved while the database was down gets `file-partner-<session user id>`. That is the
+ * user id, not the Partner id, so search found no Delivery places or personal info for it and the
+ * approved listing vanished. Map such ids back to the real partner.
+ */
+async function realPartnerIdResolver(): Promise<(car: FileCarListing) => string> {
+  try {
+    const { prisma } = await import("@/lib/prisma");
+    const partners = await prisma.partner.findMany({ select: { id: true, userId: true, email: true } });
+    const ids = new Set(partners.map((p) => p.id));
+    const byUser = new Map(partners.filter((p) => p.userId).map((p) => [p.userId as string, p.id]));
+    const byEmail = new Map(partners.map((p) => [p.email.trim().toLowerCase(), p.id]));
+    return (car) => {
+      const raw = String(car.partnerId || "").trim();
+      const bare = raw.replace(/^file-partner-/, "");
+      if (ids.has(raw) || ids.has(bare)) return ids.has(raw) ? raw : bare;
+      return (
+        byUser.get(bare) ||
+        byUser.get(String(car.partnerUserId || "")) ||
+        byEmail.get(String(car.partnerEmail || "").trim().toLowerCase()) ||
+        raw
+      );
+    };
+  } catch {
+    return (car) => car.partnerId;
+  }
+}
+
 /** Places and fees are applied later from the partner's Delivery page (scopeSearchCars). */
 export async function loadPublicFileSearchCars(): Promise<FileSearchCar[]> {
-  const [stored, locations, snapshots] = await Promise.all([
+  const [stored, locations, snapshots, partnerIdOf] = await Promise.all([
     listFileCars(),
     listDeliveryLocations({ activeOnly: false }),
     readPublishedSnapshotsMap().catch(() => new Map<string, PublishedCarSnapshot>()),
+    realPartnerIdResolver(),
   ]);
   const byId = new Map(locations.map((loc) => [loc.id, loc]));
   return stored
     .filter((car) => isPublicFileCar(car))
     .map((car) => {
-      const shaped = toSearchCar(car, byId);
+      const shaped = { ...toSearchCar(car, byId), partnerId: partnerIdOf(car) };
       if (car.status !== "PENDING_REMODERATION") return shaped;
       return overlayPublishedListing({ ...shaped, status: car.status }, snapshots.get(car.id));
     });
