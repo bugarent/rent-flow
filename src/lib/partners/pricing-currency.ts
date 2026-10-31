@@ -11,13 +11,50 @@ export function formatPartnerAmount(amount: number): string {
   return formatAmountNumber(amount);
 }
 
+/** The amount as the partner typed it (or as stored in EUR) — every other currency is derived from it. */
+type MoneyOrigin = { amount: number; currency: PartnerDisplayCurrency };
+
+/**
+ * Shown text → its origin, so switching EUR → USD → GEL → EUR converts from the original
+ * amount each time instead of from the previous rounded figure (10 € stays 10 €).
+ */
+const moneyOrigins = new Map<string, MoneyOrigin>();
+const MAX_MONEY_ORIGINS = 5000;
+
+function originKey(text: string, currency: PartnerDisplayCurrency) {
+  return `${currency}:${text}`;
+}
+
+function rememberOrigin(text: string, currency: PartnerDisplayCurrency, origin: MoneyOrigin) {
+  if (typeof window === "undefined") return;
+  if (moneyOrigins.size >= MAX_MONEY_ORIGINS) moneyOrigins.clear();
+  moneyOrigins.set(originKey(text, currency), origin);
+}
+
+function originOf(amount: string | number, currency: PartnerDisplayCurrency): MoneyOrigin {
+  const text = formatPartnerAmount(toNumber(amount, 0));
+  return moneyOrigins.get(originKey(text, currency)) ?? { amount: toNumber(amount, 0), currency };
+}
+
+function exactEur(origin: MoneyOrigin, rates: FxRates): number {
+  if (origin.currency === "EUR") return origin.amount;
+  const perEur = convertFromEur(1, origin.currency, rates);
+  return perEur > 0 ? origin.amount / perEur : origin.amount;
+}
+
+function amountIn(origin: MoneyOrigin, currency: PartnerDisplayCurrency, rates: FxRates): number {
+  if (origin.currency === currency) return origin.amount;
+  return convertFromEur(exactEur(origin, rates), currency, rates);
+}
+
 /** Convert partner-currency input → EUR for DB / public listings. */
 export function partnerAmountToEur(
   amount: string | number | null | undefined,
   currency: PartnerDisplayCurrency = DEFAULT_PARTNER_PRICING_CURRENCY,
   rates: FxRates,
 ): number {
-  return convertToEur(toNumber(amount, 0), currency, rates);
+  if (amount == null || String(amount).trim() === "") return convertToEur(0, currency, rates);
+  return convertToEur(exactEur(originOf(amount, currency), rates), "EUR", rates);
 }
 
 /** Convert stored EUR → partner working currency for form fields. */
@@ -26,7 +63,10 @@ export function eurToPartnerAmount(
   currency: PartnerDisplayCurrency = DEFAULT_PARTNER_PRICING_CURRENCY,
   rates: FxRates,
 ): string {
-  return formatPartnerAmount(convertFromEur(toNumber(amountEur, 0), currency, rates));
+  const origin: MoneyOrigin = { amount: toNumber(amountEur, 0), currency: "EUR" };
+  const text = formatPartnerAmount(amountIn(origin, currency, rates));
+  rememberOrigin(text, currency, origin);
+  return text;
 }
 
 export function partnerCurrencySymbol(
@@ -43,6 +83,8 @@ export function rebasePartnerAmount(
   rates: FxRates,
 ): string {
   if (from === to) return formatPartnerAmount(toNumber(amount, 0));
-  const eur = convertToEur(toNumber(amount, 0), from, rates);
-  return formatPartnerAmount(convertFromEur(eur, to, rates));
+  const origin = originOf(amount, from);
+  const text = formatPartnerAmount(amountIn(origin, to, rates));
+  rememberOrigin(text, to, origin);
+  return text;
 }
