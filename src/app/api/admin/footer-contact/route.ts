@@ -12,11 +12,14 @@ async function requireAdmin() {
   return session;
 }
 
+/** Omitted fields keep their saved value. */
 const schema = z.object({
-  phone: z.string().trim().max(80).optional().default(""),
-  email: z.string().trim().max(160).optional().default(""),
-  inboxEmail: z.string().trim().max(160).optional().default(""),
-  address: z.string().trim().max(200).optional().default(""),
+  phone: z.string().trim().max(80).optional(),
+  email: z.string().trim().max(160).optional(),
+  inboxEmail: z.string().trim().max(160).optional(),
+  address: z.string().trim().max(200).optional(),
+  paymentBadges: z.array(z.string().max(40)).max(20).optional(),
+  socialLinks: z.record(z.string(), z.string().max(300)).optional(),
 });
 
 export async function GET() {
