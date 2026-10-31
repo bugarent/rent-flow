@@ -5,7 +5,6 @@ import { GoogleReviewsCarousel } from "@/components/landing/google-reviews-carou
 import { HowItWorksPanel, WhyChooseUsPanel } from "@/components/landing/why-and-how";
 import { JsonLd } from "@/components/seo/json-ld";
 import {
-  cachedCountryCovers,
   cachedCustomBookingChannels,
   cachedHomepageAirports,
   cachedHomepageCategories,
@@ -16,7 +15,6 @@ import {
 } from "@/lib/server/public-page-data";
 import { defaultHomepageInfoContent } from "@/lib/server/homepage-info-blocks-store";
 import { DEFAULT_CUSTOM_BOOKING_CHANNELS } from "@/lib/catalog/custom-booking-channels";
-import { BUILT_IN_COUNTRY_COVERS } from "@/lib/catalog/country-covers";
 import { softTimeout } from "@/lib/server/soft-timeout";
 import { bookingCountsByPickupIata } from "@/lib/server/airport-popularity";
 import type { AirportCardTranslations } from "@/lib/catalog/homepage-airport-i18n";
@@ -73,7 +71,6 @@ export function HomeHeroPlaceholder() {
       airports={[]}
       channels={DEFAULT_CUSTOM_BOOKING_CHANNELS}
       popularIatas={[]}
-      countryCovers={BUILT_IN_COUNTRY_COVERS}
     />
   );
 }
@@ -82,18 +79,16 @@ export function HomeHeroPlaceholder() {
 const HERO_PLACES_WAIT_MS = 3000;
 
 export async function HomeHeroSection() {
-  const [options, bookingChannels, popularAirports, countryCovers] = await Promise.all([
+  const [options, bookingChannels, popularAirports] = await Promise.all([
     softTimeout(cachedSearchDeliveryAirports(), [], HERO_PLACES_WAIT_MS),
     softTimeout(cachedCustomBookingChannels(), DEFAULT_CUSTOM_BOOKING_CHANNELS, DATA_WAIT_MS),
     softTimeout(cachedHomepageAirports(), airportFallback(), DATA_WAIT_MS),
-    softTimeout(cachedCountryCovers(), BUILT_IN_COUNTRY_COVERS, DATA_WAIT_MS),
   ]);
   return (
     <HomeHeroWithIndividualBooking
       airports={options}
       channels={bookingChannels}
       popularIatas={popularAirports.map((a) => a.iata)}
-      countryCovers={countryCovers}
     />
   );
 }

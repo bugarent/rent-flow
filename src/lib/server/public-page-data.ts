@@ -11,7 +11,6 @@ import { getHomepageInfoContent } from "@/lib/server/homepage-info-blocks-store"
 import { getPublicHomepageGoogleReviews } from "@/lib/server/homepage-google-reviews-store";
 import { getPublicCustomBookingChannels } from "@/lib/server/custom-booking-channels-store";
 import { getPublicFooterContact } from "@/lib/server/footer-contact-store";
-import { getPublicCountryCovers } from "@/lib/server/country-covers-store";
 import { getFxRates } from "@/lib/server/preferences";
 
 const nonEmpty = (rows: unknown[]) => rows.length > 0;
@@ -42,6 +41,5 @@ export const cachedCustomBookingChannels = cachedPublicRead(
   "custom-booking-channels",
   getPublicCustomBookingChannels,
 );
-export const cachedCountryCovers = cachedPublicRead("country-covers", getPublicCountryCovers);
 export const cachedFooterContact = cachedPublicRead("footer-contact", getPublicFooterContact);
 export const cachedFxRates = cachedPublicRead("fx-rates", getFxRates, { revalidate: 3600 });
