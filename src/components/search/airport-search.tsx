@@ -880,12 +880,13 @@ export function AirportSearch({
 
   const fieldClass =
     "w-full min-w-0 bg-transparent text-sm font-medium text-slate-800 outline-none [appearance:auto]";
-  const labelClass = "mb-0.5 block text-left text-[11px] font-semibold leading-none text-white";
+  const labelClass =
+    "mb-0.5 block text-left text-[11px] font-semibold leading-none text-white [text-shadow:0_1px_2px_rgba(2,6,23,0.7)]";
 
   return (
     <form
       onSubmit={submit}
-      className="box-border w-full min-w-0 max-w-full overflow-x-clip rounded-2xl border border-white/12 bg-[#0b1f4b] px-3 py-1.5 text-white shadow-xl sm:px-3.5 sm:py-2"
+      className="box-border w-full min-w-0 max-w-full overflow-x-clip rounded-2xl border border-white/20 bg-[#0b1f4b]/45 px-3 py-1.5 text-white shadow-xl backdrop-blur-[3px] sm:px-3.5 sm:py-2"
     >
       <ul className="mb-1.5 grid grid-cols-2 gap-1 sm:mb-2 sm:grid-cols-3 sm:gap-1.5">
         {(
@@ -907,14 +908,14 @@ export function AirportSearch({
         ))}
       </ul>
 
-      <p className="mb-1 text-center text-sm font-extrabold uppercase tracking-wide text-white sm:text-base md:text-lg">
+      <p className="mb-1 text-center text-sm font-extrabold uppercase tracking-wide text-white [text-shadow:0_1px_3px_rgba(2,6,23,0.7)] sm:text-base md:text-lg">
         {dictionary.home.searchTitle}
       </p>
 
       {/* While places are still loading the row keeps its space, so the form does not jump. */}
       {countries.length > 0 || options.length === 0 ? (
         <div className="mb-1.5 flex flex-col gap-1 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,50%)_minmax(0,1fr)] sm:items-center sm:gap-x-2">
-          <span className="text-left text-[11px] font-semibold leading-none text-white sm:justify-self-start sm:whitespace-nowrap">
+          <span className="text-left text-[11px] font-semibold leading-none text-white [text-shadow:0_1px_2px_rgba(2,6,23,0.7)] sm:justify-self-start sm:whitespace-nowrap">
             {dictionary.home.searchCountry}
           </span>
           <div className="min-w-0 w-full">
