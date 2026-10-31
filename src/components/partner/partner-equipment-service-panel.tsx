@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Lock, Pencil, Plus, X } from "lucide-react";
+import { ArrowLeft, Lock, Pencil, Plus, Trash2, X } from "lucide-react";
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
 import {
   capPartnerMaxPeriod,
@@ -42,6 +42,11 @@ type RowState = {
   adminMaxDaily: number | null;
   carIds: string[];
 };
+
+/** Services a partner created themselves (slug `p-…`); only these can be deleted by the partner. */
+function isPartnerOwnService(service: { slug?: string | null }) {
+  return String(service.slug || "").startsWith("p-");
+}
 
 function clampDailyInput(value: string, min: number | null, max: number | null) {
   const n = Number(value);
@@ -108,6 +113,8 @@ function uiCopy(locale: string) {
       name: "დასახელება",
       description: "აღწერა",
       delete: "წაშლა",
+      deleteConfirm: "ნამდვილად გსურთ ამ სერვისის წაშლა? ის აღარ გამოჩნდება თქვენს მანქანებზე.",
+      deleteFailed: "სერვისის წაშლა ვერ მოხერხდა.",
       breadcrumb: "დამატებითი მომსახურეობა",
       empty: "მომსახურება ჯერ არ არის.",
       carsCount: "{n} მანქანა",
@@ -163,6 +170,8 @@ function uiCopy(locale: string) {
       name: "Название",
       description: "Описание",
       delete: "Удалить",
+      deleteConfirm: "Удалить эту услугу? Она больше не будет показываться на ваших машинах.",
+      deleteFailed: "Не удалось удалить услугу.",
       breadcrumb: "Доп. услуги",
       empty: "Услуг пока нет.",
       carsCount: "{n} авто",
@@ -216,6 +225,8 @@ function uiCopy(locale: string) {
     name: "Name",
     description: "Description",
     delete: "Delete",
+    deleteConfirm: "Delete this service? It will no longer show on your cars.",
+    deleteFailed: "Could not delete the service.",
     breadcrumb: "Additional equipment and services",
     empty: "No services yet.",
     carsCount: "{n} cars",
@@ -720,6 +731,27 @@ export function PartnerEquipmentServicePanel({
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const removeOwnService = async (row: RowState) => {
+    if (!window.confirm(t.deleteConfirm)) return;
+    setDeletingId(row.service.id);
+    setError("");
+    try {
+      const res = await fetch(`/api/partners/extras?id=${encodeURIComponent(row.service.id)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : t.deleteFailed);
+      setRows((prev) => prev.filter((r) => r.service.id !== row.service.id));
+      if (editingId === row.service.id) setEditingId(null);
+      if (openServiceId === row.service.id) setOpenServiceId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.deleteFailed);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -1289,6 +1321,18 @@ export function PartnerEquipmentServicePanel({
                                   <Pencil className="h-3.5 w-3.5" />
                                 </button>
                               )}
+                              {isPartnerOwnService(row.service) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => void removeOwnService(row)}
+                                  disabled={deletingId === row.service.id}
+                                  title={t.delete}
+                                  aria-label={t.delete}
+                                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-rose-200 bg-white text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              ) : null}
                             </div>
                           </td>
                         </tr>
@@ -1423,6 +1467,17 @@ export function PartnerEquipmentServicePanel({
                           disabledTitle={t.mandatoryLockedTitle}
                           onPick={(mode) => applyOfferMode(row, mode)}
                         />
+                        {isPartnerOwnService(row.service) ? (
+                          <button
+                            type="button"
+                            onClick={() => void removeOwnService(row)}
+                            disabled={deletingId === row.service.id}
+                            className="mt-1 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-md border border-rose-200 bg-white text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            {t.delete}
+                          </button>
+                        ) : null}
                         {open && canEditPrices ? (
                           <div className="mt-1 space-y-1.5 border-t border-slate-100 pt-1.5">
                             <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">

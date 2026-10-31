@@ -1,7 +1,14 @@
 import { dataRoot } from "@/lib/persistent-paths";
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "@/lib/server/durable-fs";
+import {
+  mkdir,
+  readFile,
+  readFileForUpdate,
+  StoreUnavailableError,
+  withStoreLock,
+  writeFile,
+} from "@/lib/server/durable-fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import {
@@ -150,4 +157,30 @@ export async function createPartnerCustomExtra(
   store[pid] = [...existing, row];
   await writeStore(store);
   return row;
+}
+
+/**
+ * Partner removes their own service. The row is kept inactive (past bookings still name it);
+ * it no longer appears in the cabinet, on listings or at checkout.
+ */
+export async function deactivatePartnerCustomExtra(partnerId: string, extraId: string): Promise<boolean> {
+  const pid = String(partnerId || "").trim();
+  const id = String(extraId || "").trim();
+  if (!pid || !id) return false;
+  return withStoreLock(STORE, async () => {
+    const raw = await readFileForUpdate(STORE);
+    let store: StoreFile = {};
+    if (raw != null) {
+      const parsed = JSON.parse(raw) as unknown;
+      if (!parsed || typeof parsed !== "object") throw new StoreUnavailableError();
+      store = parsed as StoreFile;
+    }
+    const rows = Array.isArray(store[pid]) ? store[pid] : [];
+    const index = rows.findIndex((r) => r.id === id);
+    if (index < 0) return false;
+    const next = [...rows];
+    next[index] = { ...rows[index], isActive: false, updatedAt: new Date().toISOString() };
+    await writeStore({ ...store, [pid]: next });
+    return true;
+  });
 }

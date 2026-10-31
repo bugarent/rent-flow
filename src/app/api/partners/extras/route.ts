@@ -7,6 +7,7 @@ import { LOCAL_PARTNER_ID, loadLocalPartner } from "@/lib/auth/local-partner-sto
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import {
   createPartnerCustomExtra,
+  deactivatePartnerCustomExtra,
   listPartnerCustomExtrasAsPricing,
   partnerCustomToPricing,
 } from "@/lib/server/partner-custom-extras-store";
@@ -96,6 +97,33 @@ export async function POST(req: Request) {
     console.error("[partners/extras POST]", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Could not create extra" },
+      { status: 500 },
+    );
+  }
+}
+
+/** Partner deletes one of their own services (admin catalog services can only be switched off). */
+export async function DELETE(req: Request) {
+  try {
+    const session = await requirePartnerApi();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const partnerId = await resolvePartnerId(session.user.id, session.user.email);
+    const id = new URL(req.url).searchParams.get("id")?.trim() || "";
+    if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+    const removed = await deactivatePartnerCustomExtra(partnerId, id);
+    if (!removed) return NextResponse.json({ error: "Service not found" }, { status: 404 });
+    const prefs = await readPartnerExtraPrefs(partnerId);
+    if (prefs.some((p) => p.extraServiceId === id)) {
+      await writePartnerExtraPrefs(
+        partnerId,
+        prefs.filter((p) => p.extraServiceId !== id),
+      );
+    }
+    return NextResponse.json({ ok: true, id });
+  } catch (error) {
+    console.error("[partners/extras DELETE]", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Could not delete extra" },
       { status: 500 },
     );
   }
