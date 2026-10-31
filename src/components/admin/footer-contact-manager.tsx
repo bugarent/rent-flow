@@ -1,37 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import {
-  DEFAULT_FOOTER_PAYMENT_BADGES,
-  FOOTER_PAYMENT_BADGES,
-  FOOTER_PAYMENT_BADGE_LABELS,
-  FOOTER_SOCIAL_LABELS,
-  FOOTER_SOCIAL_NETWORKS,
-  type FooterContactConfig,
-  type FooterPaymentBadge,
-  type FooterSocialLinks,
-} from "@/lib/catalog/footer-contact";
+import type { FooterContactConfig } from "@/lib/catalog/footer-contact";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
-import { uiText } from "@/lib/i18n/ui-text";
 
 type Props = {
   initial: FooterContactConfig;
 };
 
 export function FooterContactManager({ initial }: Props) {
-  const { dictionary, locale } = useAdminLocale();
+  const { dictionary } = useAdminLocale();
   const s = dictionary.sections;
   const c = dictionary.common;
   const [phone, setPhone] = useState(initial.phone);
   const [email, setEmail] = useState(initial.email);
   const [inboxEmail, setInboxEmail] = useState(initial.inboxEmail || initial.email);
   const [address, setAddress] = useState(initial.address);
-  const [badges, setBadges] = useState<FooterPaymentBadge[]>(
-    initial.paymentBadges ?? DEFAULT_FOOTER_PAYMENT_BADGES,
-  );
-  const [social, setSocial] = useState<FooterSocialLinks>(initial.socialLinks ?? {});
-  const toggleBadge = (id: FooterPaymentBadge) =>
-    setBadges((prev) => (prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id]));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -44,7 +28,7 @@ export function FooterContactManager({ initial }: Props) {
       const res = await fetch("/api/admin/footer-contact", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, email, inboxEmail, address, paymentBadges: badges, socialLinks: social }),
+        body: JSON.stringify({ phone, email, inboxEmail, address }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || c.failed);
@@ -52,8 +36,6 @@ export function FooterContactManager({ initial }: Props) {
       setEmail(String(data.email || ""));
       setInboxEmail(String(data.inboxEmail || ""));
       setAddress(String(data.address || ""));
-      if (Array.isArray(data.paymentBadges)) setBadges(data.paymentBadges);
-      if (data.socialLinks && typeof data.socialLinks === "object") setSocial(data.socialLinks);
       setMessage(s.footerContactSaved);
     } catch (err) {
       setError(err instanceof Error ? err.message : c.failed);
@@ -115,61 +97,6 @@ export function FooterContactManager({ initial }: Props) {
           onChange={(e) => setAddress(e.target.value)}
         />
       </label>
-
-      <fieldset className="space-y-1.5">
-        <legend className="text-[11px] font-semibold text-slate-700">
-          {uiText(locale, "Payment logos in the footer", "გადახდის ლოგოები ფუთერში", "Логотипы оплаты в футере")}
-        </legend>
-        <div className="flex flex-wrap gap-1.5">
-          {FOOTER_PAYMENT_BADGES.map((id) => {
-            const on = badges.includes(id);
-            return (
-              <label
-                key={id}
-                className={`inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold ${
-                  on ? "border-[#0b1f4b] bg-[#0b1f4b] text-white" : "border-slate-300 bg-white text-slate-700"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  className="sr-only"
-                  checked={on}
-                  disabled={busy}
-                  onChange={() => toggleBadge(id)}
-                />
-                {FOOTER_PAYMENT_BADGE_LABELS[id]}
-              </label>
-            );
-          })}
-        </div>
-      </fieldset>
-
-      <fieldset className="space-y-1.5">
-        <legend className="text-[11px] font-semibold text-slate-700">
-          {uiText(
-            locale,
-            "Social links (empty = hidden)",
-            "სოციალური ქსელების ბმულები (ცარიელი = არ ჩანს)",
-            "Соцсети (пусто = скрыто)",
-          )}
-        </legend>
-        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-          {FOOTER_SOCIAL_NETWORKS.map((network) => (
-            <label key={network} className="block text-[11px] font-semibold text-slate-600">
-              {FOOTER_SOCIAL_LABELS[network]}
-              <input
-                type="url"
-                inputMode="url"
-                className="mt-0.5 w-full rounded-lg border p-2 text-base font-normal sm:text-xs"
-                placeholder="https://…"
-                value={social[network] ?? ""}
-                disabled={busy}
-                onChange={(e) => setSocial((prev) => ({ ...prev, [network]: e.target.value }))}
-              />
-            </label>
-          ))}
-        </div>
-      </fieldset>
 
       <button
         type="button"
