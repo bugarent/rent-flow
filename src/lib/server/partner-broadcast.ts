@@ -77,6 +77,7 @@ async function sendOne(
   contact: ResolvedContact,
   text: string,
   channels: Set<PartnerBroadcastChannel>,
+  mailFrom: string,
 ): Promise<PartnerBroadcastResult> {
   const result: PartnerBroadcastResult = { id: contact.id, name: contact.name };
   if (channels.has("telegram") && contact.chatIds.length) {
@@ -95,7 +96,9 @@ async function sendOne(
       text,
       html: `<div style="font-family:sans-serif;line-height:1.5;white-space:pre-wrap">${escapeHtml(text)}</div>`,
       event: "PARTNER_NOTICE",
-      payload: { partnerId: contact.id },
+      payload: { partnerId: contact.id, ...(mailFrom ? { from: mailFrom } : {}) },
+      // Admin-chosen sender; replies come back to the same mailbox.
+      ...(mailFrom ? { from: mailFrom, replyTo: mailFrom } : {}),
     });
     result.email = mail.sent;
   }
@@ -116,11 +119,16 @@ export async function sendPartnerBroadcast(
   channels: PartnerBroadcastChannel[],
 ): Promise<PartnerBroadcastResult[]> {
   const wanted = new Set(channels);
+  const mailFrom = wanted.has("email")
+    ? await import("@/lib/server/partner-mail-from")
+        .then((m) => m.readPartnerMailFrom())
+        .catch(() => "")
+    : "";
   const results: PartnerBroadcastResult[] = [];
   const queue = [...contacts];
   const workers = Array.from({ length: Math.min(5, queue.length) }, async () => {
     for (let next = queue.shift(); next; next = queue.shift()) {
-      results.push(await sendOne(next, text, wanted));
+      results.push(await sendOne(next, text, wanted, mailFrom));
     }
   });
   await Promise.all(workers);

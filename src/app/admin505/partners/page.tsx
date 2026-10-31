@@ -11,14 +11,17 @@ import { loadBookingCustomers } from "@/lib/server/load-booking-customers";
 import { PartnerCountryStats } from "@/components/admin/partner-country-stats";
 import { partnerCountryStats } from "@/lib/admin/partner-country-stats";
 import { uiText } from "@/lib/i18n/ui-text";
+import { PartnerMailFromPanel } from "@/components/admin/partner-broadcast/partner-mail-from-panel";
+import { readPartnerMailFrom } from "@/lib/server/partner-mail-from";
 
 export default async function AdminPartnersPage() {
   await requireAdmin();
   const locale = await readAdminLocale();
   const t = getAdminDictionary(locale);
-  const [partnerRows, bookingCustomers] = await Promise.all([
+  const [partnerRows, bookingCustomers, partnerMailFrom] = await Promise.all([
     loadAdminPartnerRows(),
     loadBookingCustomers(),
+    readPartnerMailFrom().catch(() => ""),
   ]);
   const partners = filterDirectoryPartners(partnerRows.partners);
 
@@ -34,6 +37,7 @@ export default async function AdminPartnersPage() {
           stats={partnerCountryStats(partners)}
           hint={uiText(locale, "Partners / uploaded listings", "პარტნიორები / ატვირთული განცხადებები", "Партнёры / загруженные объявления")}
         />
+        <PartnerMailFromPanel initialFromEmail={partnerMailFrom} />
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           {(partnerRows.dbOffline || partnerRows.queryError) && (
             <div
