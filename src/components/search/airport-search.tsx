@@ -701,12 +701,15 @@ export function AirportSearch({
   onPickupChange,
   customBookingChannels,
   popularIatas = [],
+  surface = "solid",
 }: {
   options: SearchAirportOption[];
   onPickupChange?: (pickupIata: string) => void;
   customBookingChannels?: CustomBookingChannelsConfig;
   /** Homepage popular airports order — these list first in the selected country. */
   popularIatas?: string[];
+  /** `glass`: sits inside the hero's frosted card, so it draws no background of its own. */
+  surface?: "solid" | "glass";
 }) {
   const router = useRouter();
   const options = useSearchOptions(serverOptions);
@@ -885,7 +888,11 @@ export function AirportSearch({
   return (
     <form
       onSubmit={submit}
-      className="box-border w-full min-w-0 max-w-full overflow-x-clip rounded-2xl border border-white/12 bg-[#0b1f4b] px-3 py-1.5 text-white shadow-xl sm:px-3.5 sm:py-2"
+      className={
+        surface === "glass"
+          ? "box-border w-full min-w-0 max-w-full overflow-x-clip rounded-2xl px-1.5 py-1 text-white sm:px-2 sm:py-1.5"
+          : "box-border w-full min-w-0 max-w-full overflow-x-clip rounded-2xl border border-white/12 bg-[#0b1f4b] px-3 py-1.5 text-white shadow-xl sm:px-3.5 sm:py-2"
+      }
     >
       <ul className="mb-1.5 grid grid-cols-2 gap-1 sm:mb-2 sm:grid-cols-3 sm:gap-1.5">
         {(

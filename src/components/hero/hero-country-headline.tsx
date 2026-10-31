@@ -30,15 +30,15 @@ export function HeroCountryHeadline({ places }: { places: SearchAirportOption[] 
   return (
     <div
       key={country}
-      className="mx-auto mb-2.5 w-full rounded-2xl border border-white/15 bg-[#0b1f4b]/55 px-4 py-2.5 text-center shadow-lg backdrop-blur-md motion-safe:animate-[rac-fade-in_.35s_ease-out] sm:mb-3 sm:px-6 sm:py-3"
+      className="mx-1 mb-1.5 border-b border-white/15 px-2 pb-2.5 pt-2 text-center motion-safe:animate-[rac-fade-in_.35s_ease-out] sm:mx-2 sm:mb-2 sm:px-4 sm:pt-2.5"
     >
-      <h1 className="text-pretty text-white">
+      <h1 className="text-pretty text-white [text-shadow:0_1px_2px_rgba(2,6,23,0.55)]">
         <span className="block text-base font-extrabold leading-tight tracking-tight sm:text-xl">
           {title}
         </span>
         {subtitle ? <span className="sr-only"> — </span> : null}
         {subtitle ? (
-          <span className="mt-1 block text-xs font-medium leading-snug text-white/85 sm:text-sm">
+          <span className="mt-1 block text-xs font-medium leading-snug text-white/90 sm:text-sm">
             {subtitle}
           </span>
         ) : null}
