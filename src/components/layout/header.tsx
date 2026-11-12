@@ -21,12 +21,6 @@ const helpButtonClass = headerChipClass;
 
 const loginButtonClass = `${headerChipClass} sm:px-6`;
 
-function scrollToPageStart() {
-  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-  document.documentElement.scrollTop = 0;
-  document.body.scrollTop = 0;
-}
-
 export function Header({ overlay = false }: { overlay?: boolean }) {
   const pathname = usePathname() || "/";
   const router = useRouter();
@@ -133,19 +127,15 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
             className={`${headerChipClass} h-12 min-h-12 min-w-0 max-w-full flex-1 basis-full justify-start gap-2 px-2.5 sm:h-14 sm:min-h-14 sm:flex-none sm:basis-auto sm:gap-3.5 sm:px-6 lg:h-[60px] lg:min-h-[60px] lg:px-7`}
             onClick={(e) => {
               setOpen(false);
-              // Always land on the public home page from any route (including `/` itself).
+              // Full reload of the public homepage, so the cover search returns to its first view.
               e.preventDefault();
-              scrollToPageStart();
-              if (pathname === "/") {
-                if (window.location.hash || window.location.search) {
-                  router.replace("/");
-                }
-                scrollToPageStart();
-                router.refresh();
+              const onCleanHome =
+                window.location.pathname === "/" && !window.location.search && !window.location.hash;
+              if (onCleanHome) {
+                window.location.reload();
                 return;
               }
-              router.push("/");
-              requestAnimationFrame(scrollToPageStart);
+              window.location.assign("/");
             }}
             aria-label="Rentairportcars.com — home"
           >
