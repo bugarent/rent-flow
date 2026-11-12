@@ -14,7 +14,7 @@ import {
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { prefetchFullRoute } from "@/lib/client/prefetch-route";
-import { CalendarDays, ChevronDown, ChevronLeft, Clock3, MapPin, PlaneTakeoff, BadgeCheck, ShieldCheck, Zap } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronLeft, Clock3, MapPin, Plane, PlaneTakeoff, BadgeCheck, ShieldCheck, Zap } from "lucide-react";
 import type { CatalogAirport } from "@/lib/catalog/airports";
 import { isCityLocationCode } from "@/lib/catalog/search-places";
 import { defaultSearchDateRange } from "@/lib/catalog/default-search-dates";
@@ -420,6 +420,7 @@ export function LocationPicker({
 
   const renderOption = (option: LocationChoice, flagIso2?: string) => {
     const iso2 = (flagIso2 || option.countryIso2 || "").trim().toUpperCase();
+    const isAirport = option.kind === "airport" || (option.kind !== "city" && option.kind !== "special" && !isCityChoice(option));
     return (
       <li key={option.value}>
         <button
@@ -433,7 +434,12 @@ export function LocationPicker({
           }`}
         >
           {iso2 ? <CountryFlag iso2={iso2} className="h-3 w-4 shrink-0" /> : null}
-          <span className="min-w-0 flex-1 whitespace-normal break-words">{option.label}</span>
+          <span className="min-w-0 whitespace-normal break-words">
+            {option.label}
+            {isAirport ? (
+              <Plane className="ml-1 inline-block h-3.5 w-3.5 translate-y-[-1px] text-sky-700" aria-hidden />
+            ) : null}
+          </span>
         </button>
       </li>
     );
