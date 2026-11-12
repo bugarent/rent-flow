@@ -34,6 +34,8 @@ import {
   liveChatBotForAdminUi,
 } from "@/lib/server/live-chat-telegram-bot-store";
 import { HomepageSearchCountries } from "@/components/admin/homepage-search-countries";
+import { HomepageCountryCoversManager } from "@/components/admin/homepage-country-covers-manager";
+import { getUploadedCountryCovers } from "@/lib/server/country-covers-store";
 import { AdminPageHeading, AdminSearchCountriesHeading } from "@/components/admin/admin-page-heading";
 
 export default async function AdminOperationsHomePage() {
@@ -62,6 +64,7 @@ export default async function AdminOperationsHomePage() {
     legalPages,
     searchLocations,
     deliveryCounts,
+    countryCovers,
   ] = await Promise.all([
     getHomepageCategories(),
     getHomepageAirports(),
@@ -79,6 +82,7 @@ export default async function AdminOperationsHomePage() {
       console.warn("[admin homepage] delivery counts", error);
       return {} as Record<string, number>;
     }),
+    getUploadedCountryCovers(),
   ]);
 
   return (
@@ -125,6 +129,9 @@ export default async function AdminOperationsHomePage() {
               compact
             />
           </section>
+        </div>
+        <div className="min-w-0">
+          <HomepageCountryCoversManager initialUploaded={countryCovers} locations={searchLocations} />
         </div>
         <div className="min-w-0">
           <HomepageInfoBlocksManager initial={infoContent} />

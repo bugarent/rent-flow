@@ -12,6 +12,7 @@ import { getPublicHomepageGoogleReviews } from "@/lib/server/homepage-google-rev
 import { getPublicCustomBookingChannels } from "@/lib/server/custom-booking-channels-store";
 import { hasFooterContact } from "@/lib/catalog/footer-contact";
 import { getPublicFooterContact } from "@/lib/server/footer-contact-store";
+import { getPublicCountryCovers } from "@/lib/server/country-covers-store";
 import { getFxRates } from "@/lib/server/preferences";
 
 const nonEmpty = (rows: unknown[]) => rows.length > 0;
@@ -43,6 +44,7 @@ export const cachedCustomBookingChannels = cachedPublicRead(
   "custom-booking-channels",
   getPublicCustomBookingChannels,
 );
+export const cachedCountryCovers = cachedPublicRead("country-covers", getPublicCountryCovers);
 export const cachedFooterContact = cachedPublicRead("footer-contact", getPublicFooterContact, {
   // A timed-out or failed read is an empty contact. Caching that hides the
   // phone, email, and address until the cache expires.

@@ -5,17 +5,21 @@ import { AirportSearch, type SearchAirportOption } from "@/components/search/air
 import { HeroCountryHeadline } from "@/components/hero/hero-country-headline";
 import type { CustomBookingChannelsConfig } from "@/lib/catalog/custom-booking-channels";
 import { HOME_RESET_EVENT } from "@/lib/catalog/home-country-store";
+import { HeroCountryCover } from "@/components/hero/hero-country-cover";
+import { BUILT_IN_COUNTRY_COVERS, type CountryCoverMap } from "@/lib/catalog/country-covers";
 
 export function AirportHero({
   airports,
   onPickupChange,
   customBookingChannels,
   popularIatas,
+  countryCovers = BUILT_IN_COUNTRY_COVERS,
 }: {
   airports: SearchAirportOption[];
   onPickupChange?: (pickupIata: string) => void;
   customBookingChannels?: CustomBookingChannelsConfig;
   popularIatas?: string[];
+  countryCovers?: CountryCoverMap;
 }) {
   const [formKey, setFormKey] = useState(0);
   useEffect(() => {
@@ -42,6 +46,7 @@ export function AirportHero({
         />
       </picture>
       <div className="absolute inset-0 bg-slate-950/15" aria-hidden />
+      <HeroCountryCover covers={countryCovers} />
 
       <div className="relative z-10 mx-auto flex w-full max-w-5xl items-center justify-center px-3 pb-[calc(1.5rem+1.5cm)] pt-[calc(8.25rem+0.5cm)] sm:px-4 sm:pb-[calc(2rem+1.5cm)] sm:pt-[calc(6rem+0.5cm)] lg:px-6 lg:pt-[calc(6.5rem+0.5cm)]">
         <div className="w-full min-w-0 max-w-[calc(680px+4cm)]">
