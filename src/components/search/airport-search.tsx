@@ -274,6 +274,7 @@ export function LocationPicker({
   ariaLabel,
   countries,
   onCountrySelect,
+  activeIso2 = "",
 }: {
   options: LocationChoice[];
   value: string;
@@ -290,6 +291,8 @@ export function LocationPicker({
   /** Empty click lists countries; choosing one reveals that country's places. Typing filters places. */
   countries?: SearchCountry[];
   onCountrySelect?: (iso2: string) => void;
+  /** Country already chosen. Reopening the field lists its places in this same panel. */
+  activeIso2?: string;
 }) {
   const { dictionary } = usePreferences();
   const resolvedEmpty = emptyMessage ?? dictionary.home.noLocationsFound;
@@ -304,6 +307,8 @@ export function LocationPicker({
   const restoreRef = useRef(restoreOnClear);
   const onChangeRef = useRef(onChange);
   const listId = useId();
+  // Country click focuses the field again; that focus must not wipe the place list.
+  const holdCountryRef = useRef(false);
   useLayoutEffect(() => {
     valueRef.current = value;
     restoreRef.current = restoreOnClear;
@@ -373,9 +378,11 @@ export function LocationPicker({
     placePanel();
     const onReposition = () => placePanel();
     const onPointerDown = (event: MouseEvent) => {
+      if (holdCountryRef.current) return;
       const target = event.target as Node;
       if (rootRef.current?.contains(target)) return;
       if (panelRef.current?.contains(target)) return;
+      if (target instanceof Element && target.closest("[data-location-panel]")) return;
       setOpen(false);
       setQuery("");
       setBrowseIso2("");
@@ -446,10 +453,18 @@ export function LocationPicker({
   );
 
   const selectCountry = (iso2: string) => {
+    holdCountryRef.current = true;
     setBrowseIso2(iso2);
     setQuery("");
+    setOpen(true);
     onCountrySelect?.(iso2);
-    requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
+    requestAnimationFrame(() => {
+      inputRef.current?.focus({ preventScroll: true });
+      placePanel();
+      requestAnimationFrame(() => {
+        holdCountryRef.current = false;
+      });
+    });
   };
 
   const list =
@@ -457,6 +472,7 @@ export function LocationPicker({
       ? createPortal(
           <div
             ref={panelRef}
+            data-location-panel=""
             className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white text-left shadow-2xl"
             style={panelStyle}
           >
@@ -476,6 +492,7 @@ export function LocationPicker({
                         aria-selected={false}
                         onMouseDown={(e) => {
                           e.preventDefault();
+                          e.stopPropagation();
                           selectCountry(country.iso2);
                         }}
                         onClick={() => selectCountry(country.iso2)}
@@ -495,9 +512,14 @@ export function LocationPicker({
                     type="button"
                     onMouseDown={(e) => {
                       e.preventDefault();
+                      e.stopPropagation();
+                      holdCountryRef.current = true;
                       setBrowseIso2("");
                       setQuery("");
-                      requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
+                      requestAnimationFrame(() => {
+                        inputRef.current?.focus({ preventScroll: true });
+                        holdCountryRef.current = false;
+                      });
                     }}
                     className="flex min-h-10 w-full shrink-0 items-center gap-2 border-b border-slate-100 px-2.5 py-1.5 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50"
                   >
@@ -558,10 +580,14 @@ export function LocationPicker({
         spellCheck={false}
         required={required && !value}
         onFocus={() => {
-          const opening = !open;
           setOpen(true);
+          if (holdCountryRef.current) {
+            requestAnimationFrame(() => placePanel());
+            return;
+          }
+          const opening = !open;
           setQuery("");
-          if (opening && countryStep) setBrowseIso2("");
+          if (opening && countryStep) setBrowseIso2(activeIso2 || "");
           requestAnimationFrame(() => placePanel());
         }}
         onChange={(e) => {
@@ -853,6 +879,7 @@ export function AirportSearch({
               citiesGroup={useLocationGroups ? dictionary.home.citiesGroup : undefined}
               countries={locked ? undefined : countries}
               onCountrySelect={chooseCountry}
+              activeIso2={locked ? "" : countryIso2}
             />
           </FieldShell>
         </label>
