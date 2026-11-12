@@ -36,6 +36,10 @@ export const BUILT_IN_COUNTRY_COVERS: CountryCoverMap = {
   AZ: builtIn("az", 0.63),
   ME: builtIn("me", 0.7),
   RS: builtIn("rs", 0.5),
+  AL: builtIn("al", 0.7),
+  XK: builtIn("xk", 0.6),
+  MK: builtIn("mk", 0.78),
+  HR: builtIn("hr", 0.42),
 };
 
 export function normalizeCoverIso(iso: string | null | undefined): string {

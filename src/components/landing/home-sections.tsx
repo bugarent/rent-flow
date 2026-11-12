@@ -77,12 +77,14 @@ export function HomeHeroPlaceholder() {
 const HERO_PLACES_WAIT_MS = 3000;
 
 export async function HomeHeroSection() {
-  const [options, bookingChannels, popularAirports, countryCovers] = await Promise.all([
+  const [options, bookingChannels, popularAirports, cachedCovers] = await Promise.all([
     readOr(cachedSearchDeliveryAirports, [], HERO_PLACES_WAIT_MS),
     readOr(cachedCustomBookingChannels, DEFAULT_CUSTOM_BOOKING_CHANNELS, DATA_WAIT_MS),
     savedOrStatic(cachedHomepageAirports, staticHomepageAirports, DATA_WAIT_MS),
     readOr(cachedCountryCovers, BUILT_IN_COUNTRY_COVERS, DATA_WAIT_MS),
   ]);
+  // A map cached before a built-in cover was added would hide that country's photo.
+  const countryCovers = { ...BUILT_IN_COUNTRY_COVERS, ...cachedCovers };
   return (
     <HomeHeroWithIndividualBooking
       airports={options}
