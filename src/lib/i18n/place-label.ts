@@ -219,7 +219,7 @@ function catalogBases(airport: (typeof CATALOG_AIRPORTS)[number]) {
   return bases;
 }
 
-function cityDisplayName(locale: string, english: string): string {
+export function cityDisplayName(locale: string, english: string): string {
   const catalog = CATALOG_AIRPORTS.find(
     (item) => item.cityName.en === english || Object.values(item.cityName).includes(english),
   );

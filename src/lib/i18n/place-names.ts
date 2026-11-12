@@ -229,6 +229,24 @@ export const CITY_NAMES: Record<string, Names> = {
   Konya: names("Konya", "კონია", "Конья", { tr: "Konya" }),
   Trabzon: names("Trabzon", "ტრაპიზონი", "Трабзон", { tr: "Trabzon" }),
   Mersin: names("Mersin", "მერსინი", "Мерсин", { tr: "Mersin" }),
+  // Airport cities named on the homepage cover; ka/ru also come from the airport catalog where it has them.
+  Tbilisi: names("Tbilisi", "თბილისი", "Тбилиси", { de: "Tiflis", fr: "Tbilissi", ar: "تبليسي", zh: "第比利斯", ko: "트빌리시", th: "ทบิลิซี" }),
+  Batumi: names("Batumi", "ბათუმი", "Батуми", { fr: "Batoumi", ar: "باتومي", zh: "巴统", ko: "바투미", th: "บาทูมี" }),
+  Kutaisi: names("Kutaisi", "ქუთაისი", "Кутаиси", { de: "Kutaissi", fr: "Koutaïssi", ar: "كوتايسي", zh: "库塔伊西", ko: "쿠타이시", th: "คูตาอีซี" }),
+  Yerevan: names("Yerevan", "ერევანი", "Ереван", { de: "Jerewan", es: "Ereván", fr: "Erevan", it: "Erevan", nl: "Jerevan", pl: "Erywań", tr: "Erivan", ar: "يريفان", zh: "埃里温", ko: "예레반", th: "เยเรวาน" }),
+  Baku: names("Baku", "ბაქო", "Баку", { fr: "Bakou", tr: "Bakü", ar: "باكو", zh: "巴库", ko: "바쿠", th: "บากู" }),
+  Ganja: names("Ganja", "განჯა", "Гянджа", { de: "Gəncə", tr: "Gence", ar: "كنجة", zh: "占贾", ko: "간자", th: "กันจา" }),
+  Nakhchivan: names("Nakhchivan", "ნახჩევანი", "Нахичевань", { de: "Nachitschewan", tr: "Nahçıvan", ar: "نخجوان", zh: "纳希切万", ko: "나흐치반", th: "นาคีชีวัน" }),
+  Lankaran: names("Lankaran", "ლენქორანი", "Ленкорань", { tr: "Lenkeran", ar: "لنكران", zh: "连科兰", ko: "랑카란", th: "ลังคารัน" }),
+  Gabala: names("Gabala", "გაბალა", "Габала", { tr: "Kabala", ar: "قبلة", zh: "盖贝莱", ko: "가발라", th: "กาบาลา" }),
+  Belgrade: names("Belgrade", "ბელგრადი", "Белград", { de: "Belgrad", es: "Belgrado", it: "Belgrado", nl: "Belgrado", pl: "Belgrad", tr: "Belgrad", ar: "بلغراد", zh: "贝尔格莱德", ko: "베오그라드", th: "เบลเกรด" }),
+  Nis: names("Niš", "ნიში", "Ниш", { ar: "نيش", zh: "尼什", ko: "니시", th: "นิช" }),
+  Tirana: names("Tirana", "ტირანა", "Тирана", { fr: "Tirana", tr: "Tiran", ar: "تيرانا", zh: "地拉那", ko: "티라나", th: "ติรานา" }),
+  Pristina: names("Pristina", "პრიშტინა", "Приштина", { de: "Pristina", tr: "Priştine", ar: "بريشتينا", zh: "普里什蒂纳", ko: "프리슈티나", th: "พริสตีนา" }),
+  Skopje: names("Skopje", "სკოპიე", "Скопье", { fr: "Skopje", tr: "Üsküp", ar: "سكوبيه", zh: "斯科普里", ko: "스코페", th: "สโกเปีย" }),
+  Zagreb: names("Zagreb", "ზაგრები", "Загреб", { ar: "زغرب", zh: "萨格勒布", ko: "자그레브", th: "ซาเกร็บ" }),
+  Split: names("Split", "სპლიტი", "Сплит", { ar: "سبليت", zh: "斯普利特", ko: "스플리트", th: "สปลิต" }),
+  Dubrovnik: names("Dubrovnik", "დუბროვნიკი", "Дубровник", { ar: "دوبروفنيك", zh: "杜布罗夫尼克", ko: "두브로브니크", th: "ดูบรอฟนิก" }),
 };
 
 export const CITY_WORD: Record<Locale, string> = {

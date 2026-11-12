@@ -1,133 +1,185 @@
 import type { Locale } from "@/lib/i18n/config";
-import { regionName } from "@/lib/i18n/place-label";
+import { cityDisplayName, regionName } from "@/lib/i18n/place-label";
+import { COUNTRY_PLACES } from "@/lib/catalog/country-places-data";
+import { COUNTRY_NAMES_KA } from "@/lib/catalog/country-names-ka";
 
 /** Country shown on the homepage cover before a visitor picks one (main market, what Google sees). */
 export const DEFAULT_HERO_COUNTRY = "GE";
 
-/** Up to three of the country's biggest tourist places, in English (used by most languages). */
-const TOP_PLACES: Record<string, [string, string, string]> = {
-  GE: ["Tbilisi", "Batumi", "Kutaisi"],
-  AM: ["Yerevan", "Gyumri", "Dilijan"],
-  AZ: ["Baku", "Gabala", "Sheki"],
-  ME: ["Budva", "Kotor", "Podgorica"],
-  RS: ["Belgrade", "Novi Sad", "Niš"],
-  TR: ["Istanbul", "Antalya", "Cappadocia"],
+const MAX_AIRPORTS = 3;
+
+/** Order the airports are named in, where it differs from the country seed list. */
+const AIRPORT_ORDER: Record<string, string[]> = {
+  GE: ["TBS", "BUS", "KUT"],
 };
 
-/** Georgian and Russian need the locative forms, so their sentences are written out per country. */
-const WRITTEN: Partial<Record<Locale, Record<string, string>>> = {
-  ka: {
-    GE: "მანქანების გაქირავება საქართველოში — საუკეთესო ადგილობრივი ფასები სანდო პარტნიორებისგან თბილისში, ბათუმსა და ქუთაისში",
-    AM: "მანქანების გაქირავება სომხეთში — საუკეთესო ადგილობრივი ფასები სანდო პარტნიორებისგან ერევანში, გიუმრისა და დილიჟანში",
-    AZ: "მანქანების გაქირავება აზერბაიჯანში — საუკეთესო ადგილობრივი ფასები სანდო პარტნიორებისგან ბაქოში, გაბალასა და შექში",
-    ME: "მანქანების გაქირავება მონტენეგროში — საუკეთესო ადგილობრივი ფასები სანდო პარტნიორებისგან ბუდვაში, კოტორსა და პოდგორიცაში",
-    RS: "მანქანების გაქირავება სერბეთში — საუკეთესო ადგილობრივი ფასები სანდო პარტნიორებისგან ბელგრადში, ნოვი სადსა და ნიშში",
-    TR: "მანქანების გაქირავება თურქეთში — საუკეთესო ადგილობრივი ფასები სანდო პარტნიორებისგან სტამბოლში, ანტალიასა და კაპადოკიაში",
-  },
-  ru: {
-    GE: "Аренда авто в Грузии — лучшие местные цены от проверенных партнёров в Тбилиси, Батуми и Кутаиси",
-    AM: "Аренда авто в Армении — лучшие местные цены от проверенных партнёров в Ереване, Гюмри и Дилижане",
-    AZ: "Аренда авто в Азербайджане — лучшие местные цены от проверенных партнёров в Баку, Габале и Шеки",
-    ME: "Аренда авто в Черногории — лучшие местные цены от проверенных партнёров в Будве, Которе и Подгорице",
-    RS: "Аренда авто в Сербии — лучшие местные цены от проверенных партнёров в Белграде, Нови-Саде и Нише",
-    TR: "Аренда авто в Турции — лучшие местные цены от проверенных партнёров в Стамбуле, Анталье и Каппадокии",
-  },
+/** Russian needs the prepositional case of the country ("в Грузии"). */
+const RU_COUNTRY_IN: Record<string, string> = {
+  GE: "в Грузии",
+  AM: "в Армении",
+  AZ: "в Азербайджане",
+  ME: "в Черногории",
+  RS: "в Сербии",
+  TR: "в Турции",
+  AL: "в Албании",
+  XK: "в Косово",
+  MK: "в Северной Македонии",
+  HR: "в Хорватии",
+  IT: "в Италии",
+  GR: "в Греции",
+  BG: "в Болгарии",
+  RO: "в Румынии",
+  ES: "в Испании",
+  FR: "во Франции",
+  DE: "в Германии",
+  PL: "в Польше",
+  AE: "в ОАЭ",
+  CY: "на Кипре",
+  BA: "в Боснии и Герцеговине",
+  SI: "в Словении",
+  HU: "в Венгрии",
+  PT: "в Португалии",
+  UA: "в Украине",
+  IL: "в Израиле",
 };
 
-/** `{country}` and `{a}`, `{b}`, `{c}` (places) are filled in. */
-const TEMPLATES: Record<Locale, { three: string; two: string; one: string }> = {
-  en: {
-    three: "Car rental in {country} — best local prices from trusted partners in {a}, {b} and {c}",
-    two: "Car rental in {country} — best local prices from trusted partners in {a} and {b}",
-    one: "Car rental in {country} — best local prices from trusted partners in {a}",
-  },
-  ka: {
-    three: "მანქანების გაქირავება — {country}: საუკეთესო ადგილობრივი ფასები სანდო პარტნიორებისგან: {a}, {b} და {c}",
-    two: "მანქანების გაქირავება — {country}: საუკეთესო ადგილობრივი ფასები სანდო პარტნიორებისგან: {a} და {b}",
-    one: "მანქანების გაქირავება — {country}: საუკეთესო ადგილობრივი ფასები სანდო პარტნიორებისგან: {a}",
-  },
-  ru: {
-    three: "Аренда авто — {country}: лучшие местные цены от проверенных партнёров: {a}, {b} и {c}",
-    two: "Аренда авто — {country}: лучшие местные цены от проверенных партнёров: {a} и {b}",
-    one: "Аренда авто — {country}: лучшие местные цены от проверенных партнёров: {a}",
-  },
-  de: {
-    three: "Mietwagen {country} — beste lokale Preise von geprüften Partnern in {a}, {b} und {c}",
-    two: "Mietwagen {country} — beste lokale Preise von geprüften Partnern in {a} und {b}",
-    one: "Mietwagen {country} — beste lokale Preise von geprüften Partnern in {a}",
-  },
-  es: {
-    three: "Alquiler de coches en {country}: los mejores precios locales de socios de confianza en {a}, {b} y {c}",
-    two: "Alquiler de coches en {country}: los mejores precios locales de socios de confianza en {a} y {b}",
-    one: "Alquiler de coches en {country}: los mejores precios locales de socios de confianza en {a}",
-  },
-  fr: {
-    three: "Location de voiture — {country} : meilleurs prix locaux de partenaires fiables à {a}, {b} et {c}",
-    two: "Location de voiture — {country} : meilleurs prix locaux de partenaires fiables à {a} et {b}",
-    one: "Location de voiture — {country} : meilleurs prix locaux de partenaires fiables à {a}",
-  },
-  it: {
-    three: "Noleggio auto — {country}: i migliori prezzi locali da partner affidabili a {a}, {b} e {c}",
-    two: "Noleggio auto — {country}: i migliori prezzi locali da partner affidabili a {a} e {b}",
-    one: "Noleggio auto — {country}: i migliori prezzi locali da partner affidabili a {a}",
-  },
-  nl: {
-    three: "Autoverhuur in {country} — de beste lokale prijzen van betrouwbare partners in {a}, {b} en {c}",
-    two: "Autoverhuur in {country} — de beste lokale prijzen van betrouwbare partners in {a} en {b}",
-    one: "Autoverhuur in {country} — de beste lokale prijzen van betrouwbare partners in {a}",
-  },
-  pl: {
-    three: "Wynajem samochodów — {country}: najlepsze lokalne ceny od zaufanych partnerów: {a}, {b} i {c}",
-    two: "Wynajem samochodów — {country}: najlepsze lokalne ceny od zaufanych partnerów: {a} i {b}",
-    one: "Wynajem samochodów — {country}: najlepsze lokalne ceny od zaufanych partnerów: {a}",
-  },
-  tr: {
-    three: "{country} araç kiralama — {a}, {b} ve {c} için güvenilir ortaklardan en iyi yerel fiyatlar",
-    two: "{country} araç kiralama — {a} ve {b} için güvenilir ortaklardan en iyi yerel fiyatlar",
-    one: "{country} araç kiralama — {a} için güvenilir ortaklardan en iyi yerel fiyatlar",
-  },
-  ar: {
-    three: "تأجير السيارات في {country} — أفضل الأسعار المحلية من شركاء موثوقين في {a} و{b} و{c}",
-    two: "تأجير السيارات في {country} — أفضل الأسعار المحلية من شركاء موثوقين في {a} و{b}",
-    one: "تأجير السيارات في {country} — أفضل الأسعار المحلية من شركاء موثوقين في {a}",
-  },
-  zh: {
-    three: "{country}租车 — {a}、{b}和{c}可信合作伙伴提供的最优本地价格",
-    two: "{country}租车 — {a}和{b}可信合作伙伴提供的最优本地价格",
-    one: "{country}租车 — {a}可信合作伙伴提供的最优本地价格",
-  },
-  ko: {
-    three: "{country} 렌터카 — {a}, {b}, {c}의 믿을 수 있는 파트너가 제공하는 최고의 현지 가격",
-    two: "{country} 렌터카 — {a}, {b}의 믿을 수 있는 파트너가 제공하는 최고의 현지 가격",
-    one: "{country} 렌터카 — {a}의 믿을 수 있는 파트너가 제공하는 최고의 현지 가격",
-  },
-  th: {
-    three: "เช่ารถใน{country} — ราคาท้องถิ่นที่ดีที่สุดจากพาร์ทเนอร์ที่เชื่อถือได้ใน {a}, {b} และ {c}",
-    two: "เช่ารถใน{country} — ราคาท้องถิ่นที่ดีที่สุดจากพาร์ทเนอร์ที่เชื่อถือได้ใน {a} และ {b}",
-    one: "เช่ารถใน{country} — ราคาท้องถิ่นที่ดีที่สุดจากพาร์ทเนอร์ที่เชื่อถือได้ใน {a}",
-  },
+/** Georgian genitive that the simple rule gets wrong (vowel drop). */
+const KA_GENITIVE: Record<string, string> = {
+  ერევანი: "ერევნის",
 };
+
+/** "საქართველო" → "საქართველოში", "სომხეთი" → "სომხეთში". */
+function kaInCountry(name: string): string {
+  return name.endsWith("ი") ? `${name.slice(0, -1)}ში` : `${name}ში`;
+}
+
+/** "თბილისი" → "თბილისის", "ტირანა" → "ტირანის", "ბაქო" → "ბაქოს". */
+function kaGenitive(name: string): string {
+  if (KA_GENITIVE[name]) return KA_GENITIVE[name];
+  if (/[ია]$/.test(name)) return `${name.slice(0, -1)}ის`;
+  if (/[ეოუ]$/.test(name)) return `${name}ს`;
+  return `${name}ის`;
+}
+
+/** "Ереван" → "Еревана", "Гянджа" → "Гянджи", "Тбилиси" stays. */
+function ruGenitive(name: string): string {
+  if (/[иоуеэюы]$/i.test(name) || /\s/.test(name)) return name;
+  if (/[гкхжчшщ]а$/i.test(name)) return `${name.slice(0, -1)}и`;
+  if (/а$/i.test(name)) return `${name.slice(0, -1)}ы`;
+  if (/я$/i.test(name)) return `${name.slice(0, -1)}и`;
+  if (/ь$/i.test(name)) return `${name.slice(0, -1)}и`;
+  if (/й$/i.test(name)) return `${name.slice(0, -1)}я`;
+  return `${name}а`;
+}
+
+const GEORGIAN = /^[\u10A0-\u10FF\s-]+$/;
+const CYRILLIC = /^[\u0400-\u04FF\s-]+$/;
+
+function joinList(items: string[], and: string, comma = ", ", gap = " "): string {
+  if (items.length <= 1) return items[0] ?? "";
+  return `${items.slice(0, -1).join(comma)}${gap}${and}${gap}${items[items.length - 1]}`;
+}
+
+/** English city names of the country's main airports, active ones first, at most three. */
+export function countryAirportCities(iso2: string, activeIatas: string[] = []): string[] {
+  const code = iso2.toUpperCase();
+  const seeds = COUNTRY_PLACES[code]?.airports ?? [];
+  const order = AIRPORT_ORDER[code] ?? seeds.map((s) => s[0]);
+  const rank = (iata: string) => {
+    const i = order.indexOf(iata);
+    return i === -1 ? order.length : i;
+  };
+  const active = new Set(activeIatas.map((c) => c.toUpperCase()));
+  const pool = active.size ? seeds.filter((s) => active.has(s[0])) : seeds;
+  const cities: string[] = [];
+  for (const [, city] of [...pool].sort((a, b) => rank(a[0]) - rank(b[0]))) {
+    if (city && !cities.includes(city)) cities.push(city);
+    if (cities.length >= MAX_AIRPORTS) break;
+  }
+  return cities;
+}
+
+function countryTitle(locale: Locale, code: string): string {
+  const name = regionName(locale, code, code);
+  switch (locale) {
+    case "ka":
+      return `მანქანების გაქირავება ${kaInCountry(COUNTRY_NAMES_KA[code] || name)}`;
+    case "ru":
+      return RU_COUNTRY_IN[code] ? `Аренда авто ${RU_COUNTRY_IN[code]}` : `Аренда авто: ${name}`;
+    case "de":
+      return `Mietwagen in ${name}`;
+    case "es":
+      return `Alquiler de coches en ${name}`;
+    case "fr":
+      return `Location de voiture : ${name}`;
+    case "it":
+      return `Noleggio auto in ${name}`;
+    case "nl":
+      return `Autoverhuur in ${name}`;
+    case "pl":
+      return `Wynajem samochodów: ${name}`;
+    case "tr":
+      return `${name} araç kiralama`;
+    case "ar":
+      return `تأجير السيارات في ${name}`;
+    case "zh":
+      return `${name}租车`;
+    case "ko":
+      return `${name} 렌터카`;
+    case "th":
+      return `เช่ารถใน${name}`;
+    default:
+      return `Car rental in ${name}`;
+  }
+}
+
+function airportLine(locale: Locale, englishCities: string[]): string {
+  const cities = englishCities.map((city) => cityDisplayName(locale, city));
+  const one = cities.length === 1;
+  switch (locale) {
+    case "ka":
+      return cities.every((c) => GEORGIAN.test(c))
+        ? `მანქანის გაქირავება ${joinList(cities.map(kaGenitive), "და")} აეროპორტში.`
+        : `მანქანის გაქირავება აეროპორტებში: ${joinList(cities, "და")}.`;
+    case "ru":
+      return cities.every((c) => CYRILLIC.test(c))
+        ? `Аренда авто в ${one ? "аэропорту" : "аэропортах"} ${joinList(cities.map(ruGenitive), "и")}.`
+        : `Аренда авто в аэропортах: ${joinList(cities, "и")}.`;
+    case "de":
+      return `Mietwagen ${one ? "am Flughafen" : "an den Flughäfen"} ${joinList(cities, "und")}.`;
+    case "es":
+      return `Alquiler de coches en ${one ? "el aeropuerto" : "los aeropuertos"} de ${joinList(cities, "y")}.`;
+    case "fr":
+      return `Location de voiture ${one ? "à l’aéroport" : "aux aéroports"} de ${joinList(cities, "et")}.`;
+    case "it":
+      return `Noleggio auto ${one ? "all’aeroporto" : "negli aeroporti"} di ${joinList(cities, "e")}.`;
+    case "nl":
+      return `Autoverhuur op ${one ? "de luchthaven" : "de luchthavens"} van ${joinList(cities, "en")}.`;
+    case "pl":
+      return `Wynajem samochodów ${one ? "na lotnisku" : "na lotniskach"}: ${joinList(cities, "i")}.`;
+    case "tr":
+      return `${joinList(cities, "ve")} ${one ? "havalimanında" : "havalimanlarında"} araç kiralama.`;
+    case "ar":
+      return `تأجير السيارات في ${one ? "مطار" : "مطارات"} ${cities.join(" و")}.`;
+    case "zh":
+      return `${joinList(cities, "和", "、", "")}机场租车。`;
+    case "ko":
+      return `${cities.join(", ")} 공항 렌터카.`;
+    case "th":
+      return `เช่ารถที่สนามบิน ${joinList(cities, "และ")}`;
+    default:
+      return `Car rental at ${joinList(cities, "and")} ${one ? "airport" : "airports"}.`;
+  }
+}
 
 /**
- * Homepage cover headline for the country picked in search (Georgia until one is picked).
- * `fallbackPlaces` are the country's own pickup places, used for countries without a written list.
+ * Homepage cover headline for the country picked in search (Georgia until one is picked):
+ * "Car rental in {country} — Car rental at {main airports}." in the visitor's language.
+ * `activeIatas` are the airports currently offered in search; they decide which airports are named.
  */
-export function countryHeroHeadline(
-  locale: Locale,
-  iso2: string,
-  fallbackPlaces: string[] = [],
-): string {
+export function countryHeroHeadline(locale: Locale, iso2: string, activeIatas: string[] = []): string {
   const code = (iso2 || DEFAULT_HERO_COUNTRY).toUpperCase();
-  const written = WRITTEN[locale]?.[code];
-  if (written) return written;
-  const places = (TOP_PLACES[code] ?? fallbackPlaces).filter(Boolean).slice(0, 3);
-  const country = regionName(locale, code, code);
-  const set = TEMPLATES[locale] ?? TEMPLATES.en;
-  const template = places.length >= 3 ? set.three : places.length === 2 ? set.two : set.one;
-  if (!places.length) return template.split(" — ")[0].replace("{country}", country);
-  return template
-    .replace("{country}", country)
-    .replace("{a}", places[0] ?? "")
-    .replace("{b}", places[1] ?? "")
-    .replace("{c}", places[2] ?? "");
+  const title = countryTitle(locale, code);
+  const cities = countryAirportCities(code, activeIatas);
+  return cities.length ? `${title} — ${airportLine(locale, cities)}` : title;
 }

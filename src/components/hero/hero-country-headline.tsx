@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import { usePreferences } from "@/components/providers/preferences-context";
 import type { SearchAirportOption } from "@/components/search/airport-search";
 import { useHomeCountry } from "@/lib/catalog/home-country-store";
-import { placeLabel } from "@/lib/i18n/place-label";
 import { countryHeroHeadline } from "@/lib/seo/country-hero-headline";
 
 /**
@@ -14,15 +13,14 @@ import { countryHeroHeadline } from "@/lib/seo/country-hero-headline";
 export function HeroCountryHeadline({ places }: { places: SearchAirportOption[] }) {
   const { locale } = usePreferences();
   const country = useHomeCountry();
-  const fallbackPlaces = useMemo(() => {
+  const activeAirports = useMemo(() => {
     const code = country.toUpperCase();
     return places
-      .filter((p) => p.countryIso2?.toUpperCase() === code && p.kind === "city")
-      .sort((a, b) => (b.carCount ?? 0) - (a.carCount ?? 0))
-      .map((p) => placeLabel(locale, p.label).replace(/\s+\([^)]+\)\s*$/, "").trim());
-  }, [country, locale, places]);
+      .filter((p) => p.countryIso2?.toUpperCase() === code && p.kind === "airport")
+      .map((p) => p.iata);
+  }, [country, places]);
 
-  const text = countryHeroHeadline(locale, country, fallbackPlaces);
+  const text = countryHeroHeadline(locale, country, activeAirports);
   if (!country) return <h1 className="sr-only">{text}</h1>;
 
   const [title, ...rest] = text.split(" — ");
