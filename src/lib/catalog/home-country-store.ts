@@ -13,6 +13,15 @@ export function setHomeCountry(iso2: string) {
   for (const listener of listeners) listener();
 }
 
+/** Logo click on the homepage: reset the cover search without waiting for a reload. */
+export const HOME_RESET_EVENT = "rac-home-reset";
+
+export function requestHomeReset() {
+  setHomeCountry("");
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(HOME_RESET_EVENT));
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   return () => {

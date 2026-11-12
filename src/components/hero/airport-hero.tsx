@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { AirportSearch, type SearchAirportOption } from "@/components/search/airport-search";
 import { HeroCountryHeadline } from "@/components/hero/hero-country-headline";
 import type { CustomBookingChannelsConfig } from "@/lib/catalog/custom-booking-channels";
+import { HOME_RESET_EVENT } from "@/lib/catalog/home-country-store";
 
 export function AirportHero({
   airports,
@@ -15,6 +17,13 @@ export function AirportHero({
   customBookingChannels?: CustomBookingChannelsConfig;
   popularIatas?: string[];
 }) {
+  const [formKey, setFormKey] = useState(0);
+  useEffect(() => {
+    const reset = () => setFormKey((key) => key + 1);
+    window.addEventListener(HOME_RESET_EVENT, reset);
+    return () => window.removeEventListener(HOME_RESET_EVENT, reset);
+  }, []);
+
   return (
     <section className="relative isolate w-full overflow-x-clip bg-[#0b1f4b]">
       <picture>
@@ -38,6 +47,7 @@ export function AirportHero({
         <div className="w-full min-w-0 max-w-[calc(680px+4cm)]">
           <HeroCountryHeadline places={airports} />
           <AirportSearch
+            key={formKey}
             options={airports}
             onPickupChange={onPickupChange}
             customBookingChannels={customBookingChannels}

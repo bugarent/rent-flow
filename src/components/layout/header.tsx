@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -10,6 +10,7 @@ import { BrandLogo } from "@/components/brand/brand-logo";
 import { CurrencySelect, LanguageSelect, headerChipClass } from "@/components/layout/header-selects";
 import { getBusinessPartnershipCopy } from "@/lib/i18n/business-partnership-copy";
 import { BUSINESS_PARTNER_LOGIN } from "@/lib/routes";
+import { requestHomeReset } from "@/lib/catalog/home-country-store";
 import { subscribeOpenManageBooking } from "@/components/layout/open-manage-booking";
 import { loadManageBookingModal, ManageBookingModal } from "@/components/layout/lazy-modals";
 import { preloadProps, usePreloadWhenIdle } from "@/lib/client/preload";
@@ -29,15 +30,13 @@ function pinPageTop() {
   document.body.scrollTop = 0;
 }
 
-/** Logo click reloads `/`. Stop the browser putting the visitor back where they had scrolled. */
-function markHomeTop() {
+function rememberHomeTop() {
   try {
     sessionStorage.setItem(HOME_TOP_KEY, "1");
   } catch {
     /* private mode */
   }
   if ("scrollRestoration" in history) history.scrollRestoration = "manual";
-  pinPageTop();
 }
 
 export function Header({ overlay = false }: { overlay?: boolean }) {
@@ -63,37 +62,25 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
   const bpCopy = isPartnershipPage ? getBusinessPartnershipCopy(locale) : null;
   usePreloadWhenIdle(loadManageBookingModal);
 
-  useEffect(() => {
-    let timers: number[] = [];
-    const consume = () => {
-      let pending = false;
-      try {
-        pending = sessionStorage.getItem(HOME_TOP_KEY) === "1";
-      } catch {
-        return;
-      }
-      if (!pending) return;
-      if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+  useLayoutEffect(() => {
+    let pending = false;
+    try {
+      pending = sessionStorage.getItem(HOME_TOP_KEY) === "1";
+    } catch {
+      return;
+    }
+    if (!pending) return;
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    pinPageTop();
+    const frame = requestAnimationFrame(() => {
       pinPageTop();
-      timers.forEach((id) => window.clearTimeout(id));
-      timers = [0, 50, 250].map((ms) => window.setTimeout(pinPageTop, ms));
-      timers.push(
-        window.setTimeout(() => {
-          pinPageTop();
-          try {
-            sessionStorage.removeItem(HOME_TOP_KEY);
-          } catch {
-            /* private mode */
-          }
-        }, 450),
-      );
-    };
-    consume();
-    window.addEventListener("pageshow", consume);
-    return () => {
-      window.removeEventListener("pageshow", consume);
-      timers.forEach((id) => window.clearTimeout(id));
-    };
+      try {
+        sessionStorage.removeItem(HOME_TOP_KEY);
+      } catch {
+        /* private mode */
+      }
+    });
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {
@@ -180,13 +167,17 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
             onClick={(e) => {
               setOpen(false);
               e.preventDefault();
-              markHomeTop();
-              const onCleanHome =
-                window.location.pathname === "/" && !window.location.search && !window.location.hash;
-              if (onCleanHome) {
-                window.location.reload();
+              if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+              const onHome = window.location.pathname === "/";
+              if (onHome) {
+                if (window.location.search || window.location.hash) {
+                  window.history.replaceState(null, "", "/");
+                }
+                pinPageTop();
+                requestHomeReset();
                 return;
               }
+              rememberHomeTop();
               window.location.assign("/");
             }}
             aria-label="Rentairportcars.com — home"
