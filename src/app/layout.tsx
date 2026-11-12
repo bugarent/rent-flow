@@ -89,7 +89,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const { emptyFooterContact } = await import("@/lib/catalog/footer-contact");
   const [fxRates, footerContact] = await Promise.all([
     softTimeout(cachedFxRates(), defaultFxRates(), 400),
-    softTimeout(cachedFooterContact(), emptyFooterContact(), 400),
+    // Postgres often needs longer than the shell budget. A short wait used to
+    // send an empty contact and hide the phone, email, and address.
+    softTimeout(cachedFooterContact(), emptyFooterContact(), 1500),
   ]);
   const dir = isRtl(locale) ? "rtl" : "ltr";
 

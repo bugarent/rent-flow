@@ -8,6 +8,7 @@ import { FloatingOnlineChat } from "@/components/layout/floating-online-chat";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import type { FooterContactConfig } from "@/lib/catalog/footer-contact";
 import { isAdminPath, isBusinessPartnerPath, isPartnerPath } from "@/lib/routes";
+import { useResolvedFooterContact } from "@/components/layout/use-resolved-footer-contact";
 
 export function PublicShell({
   children,
@@ -17,6 +18,7 @@ export function PublicShell({
   footerContact?: FooterContactConfig | null;
 }) {
   const pathname = usePathname() || "/";
+  const contact = useResolvedFooterContact(footerContact);
   if (
     isAdminPath(pathname) ||
     isPartnerPath(pathname) ||
@@ -39,8 +41,8 @@ export function PublicShell({
         <Header overlay={isHome} />
       </Suspense>
       <main className="relative min-w-0 flex-1 overflow-x-clip pb-20 md:pb-0">{children}</main>
-      <Footer contact={footerContact} />
-      <FloatingOnlineChat email={footerContact?.email} phone={footerContact?.phone} />
+      <Footer contact={contact} />
+      <FloatingOnlineChat email={contact?.email} phone={contact?.phone} />
       <MobileBottomNav />
     </>
   );

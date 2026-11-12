@@ -10,6 +10,7 @@ import {
 import { getHomepageInfoContent } from "@/lib/server/homepage-info-blocks-store";
 import { getPublicHomepageGoogleReviews } from "@/lib/server/homepage-google-reviews-store";
 import { getPublicCustomBookingChannels } from "@/lib/server/custom-booking-channels-store";
+import { hasFooterContact } from "@/lib/catalog/footer-contact";
 import { getPublicFooterContact } from "@/lib/server/footer-contact-store";
 import { getFxRates } from "@/lib/server/preferences";
 
@@ -42,5 +43,9 @@ export const cachedCustomBookingChannels = cachedPublicRead(
   "custom-booking-channels",
   getPublicCustomBookingChannels,
 );
-export const cachedFooterContact = cachedPublicRead("footer-contact", getPublicFooterContact);
+export const cachedFooterContact = cachedPublicRead("footer-contact", getPublicFooterContact, {
+  // A timed-out or failed read is an empty contact. Caching that hides the
+  // phone, email, and address until the cache expires.
+  keep: hasFooterContact,
+});
 export const cachedFxRates = cachedPublicRead("fx-rates", getFxRates, { revalidate: 3600 });
