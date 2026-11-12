@@ -98,6 +98,21 @@ async function companyPayments(partnerId: string) {
   }
 }
 
+async function borderRoutes(partnerId: string) {
+  if (!partnerId) return [];
+  try {
+    const { loadCrossBorderRouteIndex } = await import("@/lib/server/cross-border-route-index");
+    const index = await loadCrossBorderRouteIndex();
+    return index.routesFor(partnerId).map((route) => ({
+      pickupCodes: route.pickupCodes,
+      returnCodes: route.returnCodes,
+      priceEur: route.priceEur,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 async function clientLanguages(partnerId: string): Promise<string[]> {
   try {
     const { loadPartnerClientLanguages } = await import("@/lib/server/partner-client-languages");
@@ -128,7 +143,7 @@ export async function enrichPublicCarPayload<T extends object>(
     input.partnerIdHint,
   );
   const carId = String(fields.id || input.carId).trim();
-  const [discountPercent, deliveryPrices, hydrated, payments, partnerClientLanguages] =
+  const [discountPercent, deliveryPrices, hydrated, payments, partnerClientLanguages, crossBorderRoutes] =
     await Promise.all([
       periodDiscount(input.carId, fields.discountPercent, input),
       deliveryRows(partnerId, fields.deliveryPrices),
@@ -137,6 +152,7 @@ export async function enrichPublicCarPayload<T extends object>(
         : hydratedExtras(partnerId, carId, fields.extras),
       companyPayments(partnerId),
       clientLanguages(partnerId),
+      borderRoutes(partnerId),
     ]);
   const extras = Array.isArray(hydrated)
     ? filterExtrasByCarOffers(hydrated, String(fields.description || ""))
@@ -148,6 +164,7 @@ export async function enrichPublicCarPayload<T extends object>(
     ...(extras !== undefined ? { extras } : {}),
     ...payments,
     partnerClientLanguages,
+    crossBorderRoutes,
   };
 }
 

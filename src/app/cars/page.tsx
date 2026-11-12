@@ -4,7 +4,7 @@ import { readPreferences } from "@/lib/server/preferences";
 import { toNumber } from "@/lib/utils";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { normalizeLocationCode } from "@/lib/catalog/search-places";
-import { loadSearchCabinet } from "@/lib/server/search-cabinet-scope";
+import { loadSearchCabinet, partnerIdsForPlace } from "@/lib/server/search-cabinet-scope";
 import { partnerIdsForTrip, scopeSearchCars } from "@/lib/server/search-results-scope";
 import { loadPublicFileSearchCars } from "@/lib/server/public-file-cars";
 import { cachedSearchRead } from "@/lib/server/search-catalog";
@@ -42,6 +42,7 @@ import { isCrossBorderExtra } from "@/lib/extras/cross-border";
 import { extraAvailableIn, locationCountryIso2 } from "@/lib/extras/country-scope";
 import { getSearchDeliveryAirports } from "@/lib/server/delivery-locations";
 import { getCrossBorderReturnPlaces } from "@/lib/server/cross-border-returns";
+import { loadCrossBorderRouteIndex } from "@/lib/server/cross-border-route-index";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 import { getPageSeo } from "@/lib/seo/pages";
 
@@ -208,8 +209,27 @@ export default async function CarsPage({
   ).catch(() => null);
 
   const pickupIata = pickup?.trim();
-  const cabinet = await cabinetPromise;
-  const tripPartnerIds = pickupIata ? new Set(partnerIdsForTrip(cabinet, pickupIata, dropoff)) : null;
+  const [cabinet, routeIndex] = await Promise.all([
+    cabinetPromise,
+    loadCrossBorderRouteIndex().catch(() => null),
+  ]);
+  let tripList = pickupIata ? partnerIdsForTrip(cabinet, pickupIata, dropoff) : null;
+  if (
+    tripList &&
+    routeIndex &&
+    pickupIata &&
+    dropoff &&
+    normalizeLocationCode(dropoff) !== normalizeLocationCode(pickupIata)
+  ) {
+    const pickupPartners = new Set(partnerIdsForPlace(cabinet, pickupIata));
+    tripList = [
+      ...new Set([
+        ...tripList,
+        ...routeIndex.partnerIds(pickupIata, dropoff).filter((id) => pickupPartners.has(id)),
+      ]),
+    ];
+  }
+  const tripPartnerIds = tripList ? new Set(tripList) : null;
 
   let categoryName: string | null = null;
   const categoryLabels = new Map<string, string>();
@@ -459,10 +479,14 @@ export default async function CarsPage({
           return `lead time: needs ${required} min before pickup, only ${minutesUntilPickup} min left`;
         }
         if (dropoffCode && normalizeLocationCode(dropoffCode) !== normalizeLocationCode(pickupIata)) {
-          const returning = matchDeliveryRowsForPlace(car.deliveryPrices, dropoffCode);
-          if (!returning.length) return `no delivery price for return at ${dropoffCode}`;
-          if (!returning.some((row) => meetsBookingLeadTime(toNumber(row.travelTimeMinutes, 0), minutesUntilPickup))) {
-            return `lead time: return at ${dropoffCode} is not ready`;
+          const partnerId = String(car.partnerId || "");
+          const borderReturn = routeIndex?.allows(partnerId, pickupIata, dropoffCode) === true;
+          if (!borderReturn) {
+            const returning = matchDeliveryRowsForPlace(car.deliveryPrices, dropoffCode);
+            if (!returning.length) return `no delivery price for return at ${dropoffCode}`;
+            if (!returning.some((row) => meetsBookingLeadTime(toNumber(row.travelTimeMinutes, 0), minutesUntilPickup))) {
+              return `lead time: return at ${dropoffCode} is not ready`;
+            }
           }
         }
         return true;
@@ -534,15 +558,16 @@ export default async function CarsPage({
     );
     const baseDiscount = toNumber(car.discountPercent, 0);
     const periodDiscount = periodByCar.get(car.id) ?? 0;
+    const partnerId = car.partner?.id || car.partnerId || "";
     const fees = computeTripDeliveryFees({
       rows: car.deliveryPrices,
       pickup: pickupIata,
       dropoff: dropoff || pickupIata,
       rentalDays,
+      crossBorderFeeEur: routeIndex?.fee(partnerId, pickupIata || "", dropoff || pickupIata || "") ?? null,
     });
     const pickupRows = pickupIata ? matchDeliveryRowsForPlace(car.deliveryPrices, pickupIata) : [];
     const pickupFree = pickupIata ? pickupRows.length > 0 && fees.pickupFeeEur <= 0 : undefined;
-    const partnerId = car.partner?.id || car.partnerId || "";
     const offeredFromPrefs: string[] = [];
     const prefCandidates = [
       partnerId,

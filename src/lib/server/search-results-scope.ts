@@ -71,6 +71,17 @@ export async function scopeSearchCars<T extends SearchCar>(
     return [];
   };
 
+  let crossBorderReturn: ((partnerId: string, pickup: string, dropoff: string) => boolean) | undefined;
+  if (opts.pickup && opts.dropoff && normalizeLocationCode(opts.dropoff) !== normalizeLocationCode(opts.pickup)) {
+    try {
+      const { loadCrossBorderRouteIndex } = await import("@/lib/server/cross-border-route-index");
+      const index = await loadCrossBorderRouteIndex();
+      crossBorderReturn = (partnerId, pickup, dropoff) => index.allows(partnerId, pickup, dropoff);
+    } catch {
+      crossBorderReturn = undefined;
+    }
+  }
+
   const places = opts.places ?? (await loadDeliveryPlaces());
   const priced = cars.map((car) => ({
     ...car,
@@ -88,5 +99,6 @@ export async function scopeSearchCars<T extends SearchCar>(
     countryIso2: opts.countryIso2,
     prefsByPartner,
     listingPlacesByCar,
+    crossBorderReturn,
   });
 }

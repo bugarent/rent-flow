@@ -236,3 +236,20 @@ export async function isPartnerCrossBorderEnabled(partnerId: string): Promise<bo
   const pref = prefs.find((p) => p.extraServiceId === CROSS_BORDER_EXTRA_ID);
   return Boolean(pref?.enabled) && !pref?.forbidden;
 }
+
+/** Partners who switched on “border crossing allowed” (bare id and file-partner alias). */
+export async function listCrossBorderEnabledPartnerIds(): Promise<Set<string>> {
+  const { CROSS_BORDER_EXTRA_ID } = await import("@/lib/extras/cross-border");
+  const store = await readStore();
+  const ids = new Set<string>();
+  for (const [partnerId, prefs] of Object.entries(store)) {
+    if (!Array.isArray(prefs)) continue;
+    const pref = prefs.find((row) => row?.extraServiceId === CROSS_BORDER_EXTRA_ID);
+    if (!pref?.enabled || pref.forbidden) continue;
+    const bare = partnerId.trim().replace(/^file-partner-/, "");
+    if (!bare) continue;
+    ids.add(bare);
+    ids.add(`file-partner-${bare}`);
+  }
+  return ids;
+}

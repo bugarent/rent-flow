@@ -22,6 +22,7 @@ import { syncPartnerDeliveryPricesToListings } from "@/lib/server/partner-delive
   writePartnerDeliveryPrefs,
   type PartnerDeliveryPref,
 } from "@/lib/server/partner-delivery-prefs-store";
+import { readPartnerCrossBorderRoutes } from "@/lib/server/partner-cross-border-routes-store";
 import {
   isPartnerCrossBorderEnabled,
   setPartnerCrossBorderEnabled,
@@ -89,11 +90,12 @@ export async function GET() {
 
     const partnerId = await resolvePartnerId(session.user.id, session.user.email);
     await resetLegacyAutoDeliveryLimits();
-    const [scoped, prefs, pricingCurrency, crossBorderEnabled] = await Promise.all([
+    const [scoped, prefs, pricingCurrency, crossBorderEnabled, crossBorderRoutes] = await Promise.all([
       listPartnerCountryDeliveryLocations(partnerId),
       readPartnerDeliveryPrefs(partnerId),
       partnerPricingCurrency(partnerId),
       isPartnerCrossBorderEnabled(partnerId),
+      readPartnerCrossBorderRoutes(partnerId),
     ]);
     return NextResponse.json(
       {
@@ -103,6 +105,7 @@ export async function GET() {
         items: panelItems(scoped.locations, prefs, scoped.selectedIds),
         options: await deliveryAddOptionsByCountry(scoped.countries),
         crossBorderEnabled,
+        crossBorderRoutes,
       },
       { headers: { "Cache-Control": "no-store" } },
     );

@@ -182,6 +182,20 @@ export async function clampAllPartnerFreeAfterDays(
   });
 }
 
+export async function readAllPartnerDeliveryPrefs(): Promise<Map<string, PartnerDeliveryPref[]>> {
+  const store = await readStore();
+  const map = new Map<string, PartnerDeliveryPref[]>();
+  for (const [id, rows] of Object.entries(store)) {
+    map.set(
+      id,
+      Array.isArray(rows)
+        ? rows.map(cleanPref).filter((row): row is PartnerDeliveryPref => Boolean(row))
+        : [],
+    );
+  }
+  return map;
+}
+
 export async function readPartnerDeliveryPrefsMap(
   partnerIds: string[],
 ): Promise<Map<string, PartnerDeliveryPref[]>> {

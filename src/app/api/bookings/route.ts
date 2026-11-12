@@ -616,11 +616,14 @@ export async function POST(req: Request) {
               { status: 400 },
             );
           }
-          deliveryFeeEur = computeTripDeliveryFees({
+      deliveryFeeEur = computeTripDeliveryFees({
             rows,
             pickup: pickupCode,
             dropoff: dropoffCode,
             rentalDays: days,
+            crossBorderFeeEur: await (
+              await import("@/lib/server/cross-border-route-index")
+            ).crossBorderFeeFor(String(fileCar.partnerId || ""), pickupCode, dropoffCode),
           }).totalFeeEur;
         } catch {
           deliveryFeeEur = 0;
@@ -977,6 +980,9 @@ export async function POST(req: Request) {
         pickup: pickupCode,
         dropoff: dropoffCode,
         rentalDays: days,
+        crossBorderFeeEur: await (
+          await import("@/lib/server/cross-border-route-index")
+        ).crossBorderFeeFor(car.partner.id, pickupCode, dropoffCode),
       }).totalFeeEur;
     } catch {
       deliveryFeeEur = 0;

@@ -11,11 +11,16 @@ import { DeliveryCountrySection } from "@/components/partner/delivery/delivery-c
 import { DeliveryStatusSwitch } from "@/components/partner/delivery/delivery-status-switch";
 import {
   optionsFromResponse,
+  placeLabel,
   prefsPayload,
   rowsFromItems,
   type DeliveryAddOption,
   type DeliveryRowState,
 } from "@/components/partner/delivery/delivery-types";
+import {
+  CrossBorderRoutesEditor,
+} from "@/components/partner/delivery/cross-border-routes-editor";
+import type { CrossBorderRoute } from "@/lib/delivery/cross-border-routes";
 
 export function PartnerDeliveryPanel() {
   const { locale } = usePartnerLocale();
@@ -26,6 +31,7 @@ export function PartnerDeliveryPanel() {
   const [options, setOptions] = useState<Record<string, DeliveryAddOption[]>>({});
   const [openCountries, setOpenCountries] = useState<Set<string> | null>(null);
   const [crossBorderEnabled, setCrossBorderEnabled] = useState(false);
+  const [routes, setRoutes] = useState<CrossBorderRoute[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [addingCountry, setAddingCountry] = useState<string | null>(null);
@@ -40,6 +46,7 @@ export function PartnerDeliveryPanel() {
     if (Array.isArray(data.countries)) setCountries(data.countries.map(String));
     if (data.options) setOptions(optionsFromResponse(data.options));
     if (typeof data.crossBorderEnabled === "boolean") setCrossBorderEnabled(data.crossBorderEnabled);
+    if (Array.isArray(data.crossBorderRoutes)) setRoutes(data.crossBorderRoutes as CrossBorderRoute[]);
   };
 
   useEffect(() => {
@@ -168,6 +175,24 @@ export function PartnerDeliveryPanel() {
     }
   };
 
+  const saveRoutes = async (next: CrossBorderRoute[]) => {
+    setError("");
+    try {
+      const res = await fetch("/api/partners/cross-border-routes", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ routes: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !Array.isArray(data?.routes)) throw new Error("save failed");
+      setRoutes(data.routes as CrossBorderRoute[]);
+      return true;
+    } catch {
+      setError(t.errSave);
+      return false;
+    }
+  };
+
   const toggleCrossBorder = async () => {
     const next = !crossBorderEnabled;
     setCrossBorderEnabled(next);
@@ -217,6 +242,21 @@ export function PartnerDeliveryPanel() {
             onChange={() => void toggleCrossBorder()}
           />
         </div>
+
+        {crossBorderEnabled ? (
+          <CrossBorderRoutesEditor
+            places={enabledRows.map((row) => ({
+              id: row.location.id,
+              countryIso2: (row.location.countryIso2 || "").toUpperCase(),
+              country: row.location.country,
+              label: placeLabel(row.location, locale),
+            }))}
+            countryCount={sectionCountries.length}
+            routes={routes}
+            t={t}
+            onSave={saveRoutes}
+          />
+        ) : null}
 
         {!sectionCountries.length ? (
           <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50 px-4 py-8 text-center">

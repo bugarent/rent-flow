@@ -85,6 +85,7 @@ import {
 } from "@/components/cars/reserve-checkout-helpers";
 import { ExtraServiceIcon } from "@/components/cars/extra-service-icon";
 import { computeTripDeliveryFees } from "@/lib/delivery/trip-fees";
+import { crossBorderRouteFee } from "@/lib/delivery/cross-border-routes";
 import { getCheckoutCopy, type CheckoutCopy } from "@/lib/i18n/checkout-copy";
 
 type PaidExtra = ReservePaidExtra;
@@ -114,6 +115,11 @@ type CarPayload = {
       isActive?: boolean;
       airport?: { iata?: string; city?: { country?: { iso2?: string } } } | null;
     } | null;
+  }>;
+  crossBorderRoutes?: Array<{
+    pickupCodes: string[];
+    returnCodes: string[];
+    priceEur: number;
   }>;
   extras?: Array<{
     extraServiceId?: string;
@@ -530,6 +536,7 @@ export function ReserveCheckout({
       pickup,
       dropoff,
       rentalDays: days,
+      crossBorderFeeEur: crossBorderRouteFee(car.crossBorderRoutes, pickup, dropoff),
     });
   }, [car, pickup, dropoff, days]);
 

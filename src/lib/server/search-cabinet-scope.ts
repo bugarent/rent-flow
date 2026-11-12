@@ -185,6 +185,8 @@ export function scopeCarsToPersonalPlaces<T extends ScopedCar>(
     prefsByPartner?: Map<string, PartnerDeliveryPref[]>;
     /** Listing's own assigned place ids (from deliveryPrices only). */
     listingPlacesByCar: Map<string, string[]>;
+    /** Pickup → other-country return the partner priced on the Delivery page. */
+    crossBorderReturn?: (partnerId: string, pickup: string, dropoff: string) => boolean;
   },
 ): { cars: T[]; rejected: Array<{ id: string; reason: string }> } {
   const pickup = opts.pickup?.trim() || "";
@@ -215,6 +217,7 @@ export function scopeCarsToPersonalPlaces<T extends ScopedCar>(
     ];
     const failure = legs
       .map(({ code, label }) => {
+        if (label.startsWith("return") && opts.crossBorderReturn?.(pid, pickup, code)) return "";
         if (!placeAllowed(cabinet, personal, code)) return `personal info does not include ${label}${code}`;
         if (!placeAllowed(cabinet, offered, code)) return `Delivery page has ${label}${code} OFF`;
         if (!placeAllowed(cabinet, allowed, code)) return `no delivery price saved for ${label}${code}`;

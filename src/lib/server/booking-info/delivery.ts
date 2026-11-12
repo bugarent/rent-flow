@@ -229,6 +229,11 @@ export async function resolveDeliverySummary(input: {
       pickup: pickupIata,
       dropoff: dropoffIata,
       rentalDays: input.rentalDays,
+      crossBorderFeeEur: input.partnerId
+        ? await (
+            await import("@/lib/server/cross-border-route-index")
+          ).crossBorderFeeFor(input.partnerId, pickupIata, dropoffIata)
+        : null,
     });
 
     const pickupLoc = byIata.get(pickupIata) || null;

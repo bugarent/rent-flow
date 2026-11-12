@@ -132,6 +132,11 @@ export function computeTripDeliveryFees(input: {
   pickup: string | undefined;
   dropoff: string | undefined;
   rentalDays: number;
+  /**
+   * When the partner saved a border-crossing pair for this pickup and return,
+   * that amount is the return fee (including 0). Omit it for a normal same-country return.
+   */
+  crossBorderFeeEur?: number | null;
 }): { pickupFeeEur: number; dropoffFeeEur: number; totalFeeEur: number } {
   const days = Math.max(1, input.rentalDays || 1);
   const pickupRows = matchDeliveryRowsForPlace(input.rows, input.pickup);
@@ -141,8 +146,12 @@ export function computeTripDeliveryFees(input: {
   if (!dropoffCode) {
     return { pickupFeeEur, dropoffFeeEur: 0, totalFeeEur: pickupFeeEur };
   }
+  const border =
+    input.crossBorderFeeEur == null || !Number.isFinite(Number(input.crossBorderFeeEur))
+      ? null
+      : Math.max(0, Number(input.crossBorderFeeEur));
   const dropoffRows = matchDeliveryRowsForPlace(input.rows, dropoffCode);
-  const dropoffFeeEur = legFeeFromRows(dropoffRows, days);
+  const dropoffFeeEur = border == null ? legFeeFromRows(dropoffRows, days) : border;
   return {
     pickupFeeEur,
     dropoffFeeEur,
