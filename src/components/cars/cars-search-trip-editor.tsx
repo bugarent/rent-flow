@@ -11,6 +11,7 @@ import {
   type SearchAirportOption,
 } from "@/components/search/airport-search";
 import { isCityLocationCode } from "@/lib/catalog/search-places";
+import { returnPlacesForPickup, type CrossBorderReturnMap } from "@/lib/catalog/cross-border-returns";
 import { placeLabel } from "@/lib/i18n/place-label";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { cn } from "@/lib/utils";
@@ -149,6 +150,7 @@ export function CarsSearchTripEditor({
   category,
   country = "",
   filtersSlot,
+  crossBorderReturns,
 }: {
   options: SearchAirportOption[];
   country?: string;
@@ -160,6 +162,8 @@ export function CarsSearchTripEditor({
   dropoffAddress?: string;
   category?: string;
   filtersSlot?: ReactNode;
+  /** Other-country return places switched on by a partner who also serves the pickup. */
+  crossBorderReturns?: CrossBorderReturnMap;
 }) {
   const router = useRouter();
   const { dictionary, locale } = usePreferences();
@@ -271,14 +275,36 @@ export function CarsSearchTripEditor({
     if (dropoff !== SAME_AS_PICKUP) ensure(dropoff);
     ensure(initialDropoff);
 
-    const all = [...map.values()].sort((a, b) =>
-      compareSearchPlaces({ ...a, isCity: a.kind === "city" }, { ...b, isCity: b.kind === "city" }),
+    const extraCodes = new Set(returnPlacesForPickup(crossBorderReturns, pickup || initialPickup));
+    for (const o of options) {
+      if (!extraCodes.has(o.iata.toUpperCase()) || map.has(o.iata)) continue;
+      map.set(o.iata, {
+        value: o.iata,
+        label: placeLabel(locale, o.label),
+        kind: o.kind ?? (isCityLocationCode(o.iata) ? "city" : "airport"),
+        countryIso2: o.countryIso2,
+        country: o.country,
+        carCount: o.carCount,
+      });
+    }
+
+    const all = [...map.values()].sort((a, b) => {
+      const countryOrder = (a.countryIso2 || "").localeCompare(b.countryIso2 || "");
+      if (preferred && a.countryIso2?.toUpperCase() !== b.countryIso2?.toUpperCase()) {
+        if (a.countryIso2?.toUpperCase() === preferred) return -1;
+        if (b.countryIso2?.toUpperCase() === preferred) return 1;
+        if (countryOrder) return countryOrder;
+      }
+      return compareSearchPlaces({ ...a, isCity: a.kind === "city" }, { ...b, isCity: b.kind === "city" });
+    });
+    const pickupOnly = all.filter(
+      (choice) => !preferred || choice.countryIso2?.toUpperCase() === preferred || choice.value.toUpperCase() === pickup.toUpperCase(),
     );
-    const airports = all.filter((o) => o.kind === "airport");
-    const cities = all.filter((o) => o.kind === "city");
+    const airports = pickupOnly.filter((o) => o.kind === "airport");
+    const cities = pickupOnly.filter((o) => o.kind === "city");
     const grouped = airports.length > 0 && cities.length > 0;
     return {
-      pickupChoices: all,
+      pickupChoices: pickupOnly,
       dropoffChoices: [
         { value: SAME_AS_PICKUP, label: dictionary.home.sameAsPickup, kind: "special" as const },
         ...all,
@@ -294,20 +320,23 @@ export function CarsSearchTripEditor({
     initialPickup,
     initialDropoff,
     dictionary.home.sameAsPickup,
+    crossBorderReturns,
   ]);
 
   useEffect(() => {
     if (dropoff === SAME_AS_PICKUP || !activeCountryIso2) return;
-    const codes = new Set(pickupChoices.map((o) => o.value));
-    if (!codes.has(dropoff)) {
+    const codes = new Set(
+      dropoffChoices.filter((choice) => choice.kind !== "special").map((choice) => choice.value.toUpperCase()),
+    );
+    if (!codes.has(dropoff.toUpperCase())) {
       setDropoff(SAME_AS_PICKUP);
       setDropoffAddress("");
     }
-  }, [dropoff, activeCountryIso2, pickupChoices]);
+  }, [dropoff, activeCountryIso2, dropoffChoices]);
 
   const pickupOption = pickupChoices.find((o) => o.value === pickup);
   const resolvedDropoff = dropoff === SAME_AS_PICKUP ? pickup : dropoff;
-  const dropoffOption = pickupChoices.find((o) => o.value === resolvedDropoff);
+  const dropoffOption = dropoffChoices.find((o) => o.value === resolvedDropoff);
   const pickupIsCity = Boolean(
     pickupOption && (pickupOption.kind === "city" || isCityLocationCode(pickupOption.value)),
   );

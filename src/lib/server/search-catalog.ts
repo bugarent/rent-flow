@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import type { PartnerDeliveryPref } from "@/lib/server/partner-delivery-prefs-store";
 import type { SearchCabinet } from "@/lib/server/search-cabinet-scope";
+import { crossBorderReturnCache } from "@/lib/server/cross-border-return-cache";
 import type { StoredHomepageCategory } from "@/lib/server/homepage-categories-store";
 
 /** Only what search filtering and the public car list need — no description blob, no extras. */
@@ -81,6 +82,7 @@ export function clearSearchCatalog() {
   state.value = null;
   // Old reads stay only as a fallback for a failing database; the generation bump makes them stale.
   state.generation += 1;
+  crossBorderReturnCache.clear();
 }
 
 const FALLBACK_MS = 30 * 60_000;

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CarsSearchTripEditor } from "@/components/cars/cars-search-trip-editor";
+import type { CrossBorderReturnMap } from "@/lib/catalog/cross-border-returns";
 import {
   SEARCH_RESULTS_PAGE_SIZE,
   SearchResultsPagination,
@@ -884,6 +885,7 @@ export function CarsSearchResults({
   extrasCatalog = [],
   crossBorderFilter = null,
   searchOptions = [],
+  crossBorderReturns,
   startDate,
   endDate,
   pickup,
@@ -902,6 +904,7 @@ export function CarsSearchResults({
   extrasCatalog?: SearchFilterExtra[];
   crossBorderFilter?: { id: string; name: string } | null;
   searchOptions?: SearchAirportOption[];
+  crossBorderReturns?: CrossBorderReturnMap;
   startDate: string;
   endDate: string;
   pickup: string;
@@ -1239,6 +1242,7 @@ export function CarsSearchResults({
         {/* Editable trip summary */}
         <CarsSearchTripEditor
           options={searchOptions}
+          crossBorderReturns={crossBorderReturns}
           pickup={pickup}
           dropoff={dropoff || pickup}
           startDate={startDate}

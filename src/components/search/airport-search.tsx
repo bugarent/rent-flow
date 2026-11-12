@@ -28,6 +28,7 @@ import { CustomBookingStartModal, loadCustomBookingStartModal } from "@/componen
 import { preloadProps } from "@/lib/client/preload";
 import type { CustomBookingChannelsConfig } from "@/lib/catalog/custom-booking-channels";
 import { clampPickupSelection, earliestPickupIsoDate, isPickupSlotAllowed } from "@/lib/bookings/lead-time";
+import { returnPlacesForPickup, type CrossBorderReturnMap } from "@/lib/catalog/cross-border-returns";
 import {
   SearchDateRangePicker,
   formatRangeDay,
@@ -707,12 +708,18 @@ export function AirportSearch({
   onPickupChange,
   customBookingChannels,
   popularIatas = [],
+  crossBorderReturns,
 }: {
   options: SearchAirportOption[];
   onPickupChange?: (pickupIata: string) => void;
   customBookingChannels?: CustomBookingChannelsConfig;
   /** Homepage popular airports order — these list first in the selected country. */
   popularIatas?: string[];
+  /**
+   * Other-country places a partner switched on together with this pickup.
+   * Shown only in the return list.
+   */
+  crossBorderReturns?: CrossBorderReturnMap;
 }) {
   const router = useRouter();
   const options = useSearchOptions(serverOptions);
@@ -797,22 +804,32 @@ export function AirportSearch({
     setHomeCountry(countryIso2);
   }, [countryIso2]);
 
-  // Keep pickup/dropoff inside the selected country's active locations.
+  const crossBorderCodes = useMemo(
+    () => new Set(returnPlacesForPickup(crossBorderReturns, pickup)),
+    [crossBorderReturns, pickup],
+  );
+
+  // Pickup stays in the selected country. Return may also be another country
+  // when the same partner switched that place on.
   useEffect(() => {
-    const codes = new Set(locations.map((o) => o.iata));
-    if (pickup && !codes.has(pickup)) {
+    const codes = new Set(locations.map((o) => o.iata.toUpperCase()));
+    if (pickup && !codes.has(pickup.toUpperCase())) {
       setPickup(locations[0]?.iata || "");
       setPickupAddress("");
     }
-    if (dropoff !== SAME_AS_PICKUP && !codes.has(dropoff)) {
+    if (
+      dropoff !== SAME_AS_PICKUP &&
+      !codes.has(dropoff.toUpperCase()) &&
+      !crossBorderCodes.has(dropoff.toUpperCase())
+    ) {
       setDropoff(SAME_AS_PICKUP);
       setDropoffAddress("");
     }
-  }, [locations, pickup, dropoff]);
+  }, [locations, pickup, dropoff, crossBorderCodes]);
 
   const pickupOption = locations.find((o) => o.iata === pickup);
   const dropoffCode = dropoff === SAME_AS_PICKUP ? pickup : dropoff;
-  const dropoffOption = locations.find((o) => o.iata === dropoffCode);
+  const dropoffOption = options.find((o) => o.iata.toUpperCase() === dropoffCode.toUpperCase());
   const pickupIsCity = Boolean(
     pickupOption && (pickupOption.kind === "city" || isCityLocationCode(pickupOption.iata)),
   );
@@ -839,12 +856,48 @@ export function AirportSearch({
     });
     return locations.map(mapOption);
   }, [locations, locale, popularRank]);
+  const crossBorderChoices = useMemo<LocationChoice[]>(() => {
+    if (!crossBorderCodes.size) return [];
+    const have = new Set(locationChoices.map((choice) => choice.value.toUpperCase()));
+    return options
+      .filter((o) => crossBorderCodes.has(o.iata.toUpperCase()) && !have.has(o.iata.toUpperCase()))
+      .sort((a, b) => {
+        const country = a.countryIso2.localeCompare(b.countryIso2);
+        if (country) return country;
+        return compareSearchPlaces(
+          {
+            label: a.label,
+            isCity: a.kind === "city" || isCityLocationCode(a.iata),
+            carCount: a.carCount,
+          },
+          {
+            label: b.label,
+            isCity: b.kind === "city" || isCityLocationCode(b.iata),
+            carCount: b.carCount,
+          },
+        );
+      })
+      .map((o) => ({
+        value: o.iata,
+        label: placeLabel(locale, o.label),
+        kind:
+          o.kind === "city" || isCityLocationCode(o.iata)
+            ? ("city" as const)
+            : o.kind === "airport"
+              ? ("airport" as const)
+              : undefined,
+        countryIso2: o.countryIso2,
+        country: regionName(locale, o.countryIso2, o.country || worldCountryName(o.countryIso2)),
+        carCount: o.carCount,
+      }));
+  }, [options, locationChoices, crossBorderCodes, locale]);
   const dropoffChoices = useMemo<LocationChoice[]>(
     () => [
       { value: SAME_AS_PICKUP, label: dictionary.home.sameAsPickup, kind: "special" },
       ...locationChoices,
+      ...crossBorderChoices,
     ],
-    [dictionary.home.sameAsPickup, locationChoices],
+    [dictionary.home.sameAsPickup, locationChoices, crossBorderChoices],
   );
   const showIndividualBooking = Boolean(
     pickup && customBookingChannels && pickupOption?.individualBookingEnabled === true,

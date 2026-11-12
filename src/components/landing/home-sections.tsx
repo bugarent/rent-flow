@@ -28,6 +28,7 @@ import { localizedAirportTitle } from "@/lib/catalog/homepage-airport-i18n";
 import { airportCountryIso2, findSearchPlace, normalizeLocationCode } from "@/lib/catalog/search-places";
 import { withAutoTitleTranslations } from "@/lib/catalog/airport-card-auto-titles";
 import { readPreferences } from "@/lib/server/preferences";
+import { getCrossBorderReturnPlaces } from "@/lib/server/cross-border-returns";
 import { popularPlacesListName } from "@/lib/seo/home-seo";
 import { buildPlacesItemListJsonLd } from "@/lib/seo/json-ld";
 import { plainHeading } from "@/lib/catalog/airport-seo";
@@ -79,11 +80,12 @@ export function HomeHeroPlaceholder() {
 const HERO_PLACES_WAIT_MS = 3000;
 
 export async function HomeHeroSection() {
-  const [options, bookingChannels, popularAirports, cachedCovers] = await Promise.all([
+  const [options, bookingChannels, popularAirports, cachedCovers, crossBorderReturns] = await Promise.all([
     readOr(cachedSearchDeliveryAirports, [], HERO_PLACES_WAIT_MS),
     readOr(cachedCustomBookingChannels, DEFAULT_CUSTOM_BOOKING_CHANNELS, DATA_WAIT_MS),
     savedOrStatic(cachedHomepageAirports, staticHomepageAirports, DATA_WAIT_MS),
     readOr(cachedCountryCovers, BUILT_IN_COUNTRY_COVERS, DATA_WAIT_MS),
+    softTimeout(getCrossBorderReturnPlaces(), {}, HERO_PLACES_WAIT_MS),
   ]);
   // A map cached before a built-in cover was added would hide that country's photo.
   const countryCovers = { ...BUILT_IN_COUNTRY_COVERS, ...cachedCovers };
@@ -97,6 +99,7 @@ export async function HomeHeroSection() {
       channels={bookingChannels}
       popularIatas={popularAirports.map((a) => a.iata)}
       countryCovers={countryCovers}
+      crossBorderReturns={crossBorderReturns}
     />
   );
 }

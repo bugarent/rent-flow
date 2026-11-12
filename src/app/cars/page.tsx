@@ -41,6 +41,7 @@ import type { ExtraCopyBag } from "@/lib/extras/localized-copy";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
 import { extraAvailableIn, locationCountryIso2 } from "@/lib/extras/country-scope";
 import { getSearchDeliveryAirports } from "@/lib/server/delivery-locations";
+import { getCrossBorderReturnPlaces } from "@/lib/server/cross-border-returns";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 import { getPageSeo } from "@/lib/seo/pages";
 
@@ -192,6 +193,7 @@ export default async function CarsPage({
     keep: nonEmpty,
   }).catch(() => null);
   const searchOptionsPromise = getSearchDeliveryAirports().catch(() => []);
+  const crossBorderReturnsPromise = getCrossBorderReturnPlaces().catch(() => ({}));
   const siteDiscountPromise = cachedSearchRead("site-discount", loadSiteDiscountPercent);
   const companyFilesPromise = cachedSearchRead("company-files", loadCompanySettingsFiles, { keep: nonEmpty });
   const unavailablePromise = loadUnavailableCarIds(startDate, endDate);
@@ -659,9 +661,10 @@ export default async function CarsPage({
     crossBorderFilter = null;
   }
 
-  const [searchOptions, siteDiscountPercent] = await Promise.all([
+  const [searchOptions, siteDiscountPercent, crossBorderReturns] = await Promise.all([
     searchOptionsPromise,
     siteDiscountPromise,
+    crossBorderReturnsPromise,
   ]);
 
   const emptyMessage = pickupIata
@@ -683,6 +686,7 @@ export default async function CarsPage({
       extrasCatalog={filterExtras}
       crossBorderFilter={crossBorderFilter}
       searchOptions={searchOptions}
+      crossBorderReturns={crossBorderReturns}
       startDate={startDate || ""}
       endDate={endDate || ""}
       pickup={pickup || ""}

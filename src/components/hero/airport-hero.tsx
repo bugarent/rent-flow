@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AirportSearch, type SearchAirportOption } from "@/components/search/airport-search";
+import type { CrossBorderReturnMap } from "@/lib/catalog/cross-border-returns";
 import { HeroCountryHeadline } from "@/components/hero/hero-country-headline";
 import type { CustomBookingChannelsConfig } from "@/lib/catalog/custom-booking-channels";
 import { HOME_RESET_EVENT } from "@/lib/catalog/home-country-store";
@@ -14,12 +15,14 @@ export function AirportHero({
   customBookingChannels,
   popularIatas,
   countryCovers = BUILT_IN_COUNTRY_COVERS,
+  crossBorderReturns,
 }: {
   airports: SearchAirportOption[];
   onPickupChange?: (pickupIata: string) => void;
   customBookingChannels?: CustomBookingChannelsConfig;
   popularIatas?: string[];
   countryCovers?: CountryCoverMap;
+  crossBorderReturns?: CrossBorderReturnMap;
 }) {
   const [formKey, setFormKey] = useState(0);
   useEffect(() => {
@@ -57,6 +60,7 @@ export function AirportHero({
             onPickupChange={onPickupChange}
             customBookingChannels={customBookingChannels}
             popularIatas={popularIatas}
+            crossBorderReturns={crossBorderReturns}
           />
         </div>
       </div>

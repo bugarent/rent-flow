@@ -73,6 +73,11 @@ async function liveListingCounts(): Promise<Map<string, number>> {
   return counts;
 }
 
+/** Partner ids (without the file-partner prefix) that have at least one public car. */
+export async function partnerKeysWithLiveCars(): Promise<Set<string>> {
+  return new Set((await liveListingCounts()).keys());
+}
+
 /**
  * Live cars customers can get at each place key. Listings follow the partner's
  * Delivery page, so every live car of an approved partner counts at each place the
