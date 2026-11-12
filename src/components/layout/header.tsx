@@ -21,6 +21,25 @@ const helpButtonClass = headerChipClass;
 
 const loginButtonClass = `${headerChipClass} sm:px-6`;
 
+const HOME_TOP_KEY = "rac-home-top";
+
+function pinPageTop() {
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+}
+
+/** Logo click reloads `/`. Stop the browser putting the visitor back where they had scrolled. */
+function markHomeTop() {
+  try {
+    sessionStorage.setItem(HOME_TOP_KEY, "1");
+  } catch {
+    /* private mode */
+  }
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+  pinPageTop();
+}
+
 export function Header({ overlay = false }: { overlay?: boolean }) {
   const pathname = usePathname() || "/";
   const router = useRouter();
@@ -43,6 +62,39 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
   const hideCustomerNav = isPartnershipPage || isBusinessPortalPage;
   const bpCopy = isPartnershipPage ? getBusinessPartnershipCopy(locale) : null;
   usePreloadWhenIdle(loadManageBookingModal);
+
+  useEffect(() => {
+    let timers: number[] = [];
+    const consume = () => {
+      let pending = false;
+      try {
+        pending = sessionStorage.getItem(HOME_TOP_KEY) === "1";
+      } catch {
+        return;
+      }
+      if (!pending) return;
+      if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+      pinPageTop();
+      timers.forEach((id) => window.clearTimeout(id));
+      timers = [0, 50, 250].map((ms) => window.setTimeout(pinPageTop, ms));
+      timers.push(
+        window.setTimeout(() => {
+          pinPageTop();
+          try {
+            sessionStorage.removeItem(HOME_TOP_KEY);
+          } catch {
+            /* private mode */
+          }
+        }, 450),
+      );
+    };
+    consume();
+    window.addEventListener("pageshow", consume);
+    return () => {
+      window.removeEventListener("pageshow", consume);
+      timers.forEach((id) => window.clearTimeout(id));
+    };
+  }, []);
 
   useEffect(() => {
     return subscribeOpenManageBooking(() => {
@@ -127,8 +179,8 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
             className={`${headerChipClass} h-12 min-h-12 min-w-0 max-w-full flex-1 basis-full justify-start gap-2 px-2.5 sm:h-14 sm:min-h-14 sm:flex-none sm:basis-auto sm:gap-3.5 sm:px-6 lg:h-[60px] lg:min-h-[60px] lg:px-7`}
             onClick={(e) => {
               setOpen(false);
-              // Full reload of the public homepage, so the cover search returns to its first view.
               e.preventDefault();
+              markHomeTop();
               const onCleanHome =
                 window.location.pathname === "/" && !window.location.search && !window.location.hash;
               if (onCleanHome) {
