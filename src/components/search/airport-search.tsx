@@ -14,7 +14,7 @@ import {
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { prefetchFullRoute } from "@/lib/client/prefetch-route";
-import { CalendarDays, ChevronDown, Clock3, Globe, MapPin, PlaneTakeoff, BadgeCheck, ShieldCheck, Zap } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronLeft, Clock3, MapPin, PlaneTakeoff, BadgeCheck, ShieldCheck, Zap } from "lucide-react";
 import type { CatalogAirport } from "@/lib/catalog/airports";
 import { isCityLocationCode } from "@/lib/catalog/search-places";
 import { defaultSearchDateRange } from "@/lib/catalog/default-search-dates";
@@ -115,181 +115,6 @@ function countriesFromOptions(options: SearchAirportOption[], locale: string): S
   return [...map.entries()]
     .map(([iso2, name]) => ({ iso2, name }))
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-}
-
-function CountryPicker({
-  countries,
-  value,
-  onChange,
-  locked,
-}: {
-  countries: SearchCountry[];
-  value: string;
-  onChange: (iso2: string) => void;
-  locked: boolean;
-}) {
-  const { dictionary } = usePreferences();
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
-  const rootRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
-  const selected = countries.find((c) => c.iso2 === value) ?? null;
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return countries;
-    return countries.filter((country) => {
-      const hay = `${country.name} ${country.iso2}`.toLowerCase();
-      return hay.includes(q);
-    });
-  }, [countries, query]);
-
-  const placePanel = () => {
-    const rect = buttonRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const width = Math.max(rect.width, 260);
-    const left = Math.min(Math.max(12, rect.left), window.innerWidth - width - 12);
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
-    const maxHeight = Math.min(340, Math.max(200, Math.max(spaceBelow, spaceAbove) - 16));
-    const openUp = spaceBelow < 200 && spaceAbove > spaceBelow;
-    const top = openUp
-      ? Math.max(12, rect.top - maxHeight - 8)
-      : Math.min(rect.bottom + 8, window.innerHeight - Math.min(maxHeight, spaceBelow) - 12);
-    setPanelStyle({
-      position: "fixed",
-      left,
-      width,
-      maxHeight,
-      zIndex: 250,
-      top,
-    });
-  };
-
-  useEffect(() => {
-    if (!open || locked) return;
-    setQuery("");
-    placePanel();
-    const scrollX = window.scrollX;
-    const scrollY = window.scrollY;
-    requestAnimationFrame(() => {
-      searchRef.current?.focus({ preventScroll: true });
-      window.scrollTo(scrollX, scrollY);
-    });
-    const onReposition = () => placePanel();
-    const onPointerDown = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (rootRef.current?.contains(target)) return;
-      if (panelRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("resize", onReposition);
-    window.addEventListener("scroll", onReposition, true);
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("resize", onReposition);
-      window.removeEventListener("scroll", onReposition, true);
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open, locked]);
-
-  const list =
-    open && !locked
-      ? createPortal(
-          <div
-            ref={panelRef}
-            className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white text-left shadow-2xl"
-            style={panelStyle}
-          >
-            <div className="shrink-0 border-b border-emerald-200/80 bg-emerald-50 p-2">
-              <input
-                ref={searchRef}
-                type="text"
-                inputMode="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onFocus={(e) => e.currentTarget.focus({ preventScroll: true })}
-                placeholder={dictionary.home.searchCountryPlaceholder}
-                autoComplete="off"
-                autoCorrect="off"
-                spellCheck={false}
-                className="w-full rounded-md border border-emerald-300 bg-emerald-100/80 px-3 py-2 text-sm font-medium text-emerald-950 outline-none placeholder:text-emerald-700/70 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-300/60"
-                aria-label={dictionary.home.searchCountryPlaceholder}
-              />
-            </div>
-            <ul role="listbox" className="min-h-0 flex-1 overflow-y-auto py-1">
-              {filtered.length === 0 ? (
-                <li className="px-3 py-3 text-sm text-slate-500">{dictionary.home.noCountriesFound}</li>
-              ) : (
-                filtered.map((country) => (
-                  <li key={country.iso2}>
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={country.iso2 === value}
-                      onClick={() => {
-                        onChange(country.iso2);
-                        setOpen(false);
-                      }}
-                      className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-slate-50 ${
-                        country.iso2 === value ? "bg-sky-50 font-semibold text-sky-950" : "text-slate-800"
-                      }`}
-                    >
-                      <span className="min-w-0 flex-1 truncate">{country.name}</span>
-                      <CountryFlag iso2={country.iso2} title={country.name} />
-                    </button>
-                  </li>
-                ))
-              )}
-            </ul>
-          </div>,
-          document.body,
-        )
-      : null;
-
-  return (
-    <div ref={rootRef} className="relative">
-      <button
-        ref={buttonRef}
-        type="button"
-        disabled={locked}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => {
-          if (!locked) setOpen((prev) => !prev);
-        }}
-        className="flex min-h-8 w-full items-center gap-2 bg-transparent text-sm font-medium text-slate-800 outline-none disabled:cursor-default"
-      >
-        <span className="flex min-w-0 flex-1 items-center justify-center gap-2">
-          <Globe className="h-4 w-4 shrink-0 text-[#1A3B5D]/80" />
-          {selected ? (
-            <>
-              <span className="truncate">{selected.name}</span>
-              <CountryFlag iso2={selected.iso2} title={selected.name} />
-            </>
-          ) : (
-            <span className="truncate text-slate-500">{dictionary.home.searchCountryPlaceholder}</span>
-          )}
-        </span>
-        <ChevronDown
-          className={`h-5 w-5 shrink-0 transition-transform ${
-            open ? "rotate-180 text-[#e67e22]" : "text-[#e67e22]"
-          }`}
-          strokeWidth={2.75}
-          aria-hidden
-        />
-      </button>
-      {list}
-    </div>
-  );
 }
 
 function clampDateToMin(value: string, min: string) {
@@ -447,6 +272,8 @@ export function LocationPicker({
   restoreOnClear,
   inputClassName,
   ariaLabel,
+  countries,
+  onCountrySelect,
 }: {
   options: LocationChoice[];
   value: string;
@@ -460,11 +287,15 @@ export function LocationPicker({
   /** If the field is left empty after search, restore this value (e.g. same-as-pickup). */
   restoreOnClear?: string;
   inputClassName?: string;
+  /** Empty click lists countries; choosing one reveals that country's places. Typing filters places. */
+  countries?: SearchCountry[];
+  onCountrySelect?: (iso2: string) => void;
 }) {
   const { dictionary } = usePreferences();
   const resolvedEmpty = emptyMessage ?? dictionary.home.noLocationsFound;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [browseIso2, setBrowseIso2] = useState("");
   const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -479,10 +310,21 @@ export function LocationPicker({
     onChangeRef.current = onChange;
   });
   const selected = options.find((o) => o.value === value);
+  const countryStep = Boolean(countries && countries.length > 1);
+  const showCountries = countryStep && !browseIso2 && !query.trim();
+  const browseCountry = browseIso2 ? (countries?.find((c) => c.iso2 === browseIso2) ?? null) : null;
+
+  const placePool = useMemo(() => {
+    if (!browseIso2) return options;
+    const iso = browseIso2.toUpperCase();
+    return options.filter(
+      (option) => option.kind === "special" || (option.countryIso2 || "").toUpperCase() === iso,
+    );
+  }, [options, browseIso2]);
 
   const filtered = useMemo(
-    () => options.filter((option) => locationMatchesQuery(option, query)),
-    [options, query],
+    () => placePool.filter((option) => locationMatchesQuery(option, query)),
+    [placePool, query],
   );
 
   const grouped = useMemo(() => groupLocationsByCountry(filtered), [filtered]);
@@ -522,6 +364,7 @@ export function LocationPicker({
   const closePanel = () => {
     setOpen(false);
     setQuery("");
+    setBrowseIso2("");
     if (!valueRef.current && restoreRef.current) onChangeRef.current(restoreRef.current);
   };
 
@@ -535,12 +378,14 @@ export function LocationPicker({
       if (panelRef.current?.contains(target)) return;
       setOpen(false);
       setQuery("");
+      setBrowseIso2("");
       if (!valueRef.current && restoreRef.current) onChangeRef.current(restoreRef.current);
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setOpen(false);
         setQuery("");
+        setBrowseIso2("");
         if (!valueRef.current && restoreRef.current) onChangeRef.current(restoreRef.current);
         inputRef.current?.blur();
       }
@@ -576,7 +421,7 @@ export function LocationPicker({
           aria-selected={option.value === value}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => pick(option.value)}
-          className={`flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-xs leading-snug hover:bg-slate-50 ${
+          className={`flex min-h-11 w-full items-center gap-1.5 px-2.5 py-2 text-left text-sm leading-snug hover:bg-slate-50 sm:min-h-10 sm:py-1.5 sm:text-xs ${
             option.value === value ? "bg-sky-50 font-semibold text-sky-950" : "font-medium text-slate-800"
           }`}
         >
@@ -600,6 +445,13 @@ export function LocationPicker({
     </>
   );
 
+  const selectCountry = (iso2: string) => {
+    setBrowseIso2(iso2);
+    setQuery("");
+    onCountrySelect?.(iso2);
+    requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
+  };
+
   const list =
     open
       ? createPortal(
@@ -608,33 +460,81 @@ export function LocationPicker({
             className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white text-left shadow-2xl"
             style={panelStyle}
           >
-            <ul id={listId} role="listbox" className="min-h-0 flex-1 overflow-y-auto py-0.5">
-              {filtered.length === 0 ? (
-                <li className="px-2.5 py-2 text-xs text-slate-500">{resolvedEmpty}</li>
-              ) : useCountryGroups ? (
-                renderCountryBlocks()
-              ) : useKindGroups ? (
-                <>
-                  {specialFiltered.map((option) => renderOption(option))}
-                  {airportFiltered.length ? (
-                    <li className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                      {airportsGroup}
+            {showCountries ? (
+              <ul id={listId} role="listbox" className="min-h-0 flex-1 overflow-y-auto py-0.5">
+                <li className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                  {dictionary.home.searchCountry}
+                </li>
+                {countries!.length === 0 ? (
+                  <li className="px-2.5 py-2 text-xs text-slate-500">{dictionary.home.noCountriesFound}</li>
+                ) : (
+                  countries!.map((country) => (
+                    <li key={country.iso2}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={false}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          selectCountry(country.iso2);
+                        }}
+                        onClick={() => selectCountry(country.iso2)}
+                        className="flex min-h-11 w-full items-center gap-2 px-2.5 py-2 text-left text-base font-medium text-slate-800 hover:bg-slate-50 sm:min-h-10 sm:text-sm"
+                      >
+                        <span className="min-w-0 flex-1 truncate">{country.name}</span>
+                        <CountryFlag iso2={country.iso2} title={country.name} />
+                      </button>
                     </li>
-                  ) : null}
-                  {airportFiltered.map((option) => renderOption(option))}
-                  {cityFiltered.length ? (
-                    <li className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                      {citiesGroup}
-                    </li>
-                  ) : null}
-                  {cityFiltered.map((option) => renderOption(option))}
-                </>
-              ) : (
-                [...specialFiltered, ...airportFiltered, ...cityFiltered, ...plainFiltered].map(
-                  (option) => renderOption(option),
-                )
-              )}
-            </ul>
+                  ))
+                )}
+              </ul>
+            ) : (
+              <>
+                {browseCountry ? (
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setBrowseIso2("");
+                      setQuery("");
+                      requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
+                    }}
+                    className="flex min-h-10 w-full shrink-0 items-center gap-2 border-b border-slate-100 px-2.5 py-1.5 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                  >
+                    <ChevronLeft className="h-4 w-4 shrink-0 text-[#e67e22]" aria-hidden />
+                    <span className="min-w-0 flex-1 truncate">{browseCountry.name}</span>
+                    <CountryFlag iso2={browseCountry.iso2} title={browseCountry.name} />
+                  </button>
+                ) : null}
+                <ul id={listId} role="listbox" className="min-h-0 flex-1 overflow-y-auto py-0.5">
+                  {filtered.length === 0 ? (
+                    <li className="px-2.5 py-2 text-xs text-slate-500">{resolvedEmpty}</li>
+                  ) : useCountryGroups ? (
+                    renderCountryBlocks()
+                  ) : useKindGroups ? (
+                    <>
+                      {specialFiltered.map((option) => renderOption(option))}
+                      {airportFiltered.length ? (
+                        <li className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                          {airportsGroup}
+                        </li>
+                      ) : null}
+                      {airportFiltered.map((option) => renderOption(option))}
+                      {cityFiltered.length ? (
+                        <li className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                          {citiesGroup}
+                        </li>
+                      ) : null}
+                      {cityFiltered.map((option) => renderOption(option))}
+                    </>
+                  ) : (
+                    [...specialFiltered, ...airportFiltered, ...cityFiltered, ...plainFiltered].map(
+                      (option) => renderOption(option),
+                    )
+                  )}
+                </ul>
+              </>
+            )}
           </div>,
           document.body,
         )
@@ -658,8 +558,10 @@ export function LocationPicker({
         spellCheck={false}
         required={required && !value}
         onFocus={() => {
+          const opening = !open;
           setOpen(true);
           setQuery("");
+          if (opening && countryStep) setBrowseIso2("");
           requestAnimationFrame(() => placePanel());
         }}
         onChange={(e) => {
@@ -673,7 +575,7 @@ export function LocationPicker({
         }}
         className={
           inputClassName ||
-          "min-h-8 w-full min-w-0 bg-transparent text-sm font-semibold text-black caret-[#e67e22] outline-none placeholder:font-semibold placeholder:text-black/85"
+          "min-h-11 w-full min-w-0 bg-transparent text-base font-semibold text-black caret-[#e67e22] outline-none placeholder:font-semibold placeholder:text-black/85 sm:min-h-8 sm:text-sm"
         }
       />
       <ChevronDown
@@ -724,11 +626,7 @@ export function AirportSearch({
   // Empty until the visitor picks a country or a place; a single-country site needs no choice.
   const [countryIso2, setCountryIso2] = useState(() => (locked ? countries[0]?.iso2 || "" : ""));
 
-  const locations = useMemo(() => {
-    const preferred = countryIso2?.toUpperCase() || "";
-    const filtered = preferred
-      ? options.filter((o) => o.countryIso2?.toUpperCase() === preferred)
-      : options;
+  const allLocations = useMemo(() => {
     const rankOf = (o: SearchAirportOption) =>
       popularRank.get(String(o.iata || "").toUpperCase()) ?? Number.POSITIVE_INFINITY;
     const place = (o: SearchAirportOption) => ({
@@ -737,8 +635,14 @@ export function AirportSearch({
       rank: rankOf(o),
       carCount: o.carCount,
     });
-    return [...filtered].sort((a, b) => compareSearchPlaces(place(a), place(b)));
-  }, [options, countryIso2, popularRank]);
+    return [...options].sort((a, b) => compareSearchPlaces(place(a), place(b)));
+  }, [options, popularRank]);
+
+  const locations = useMemo(() => {
+    const preferred = countryIso2?.toUpperCase() || "";
+    if (!preferred) return allLocations;
+    return allLocations.filter((o) => o.countryIso2?.toUpperCase() === preferred);
+  }, [allLocations, countryIso2]);
 
   const [pickup, setPickup] = useState("");
   const [dropoff, setDropoff] = useState(SAME_AS_PICKUP);
@@ -795,7 +699,7 @@ export function AirportSearch({
   useEffect(() => {
     const codes = new Set(locations.map((o) => o.iata));
     if (pickup && !codes.has(pickup)) {
-      setPickup(locations[0]?.iata || "");
+      setPickup("");
       setPickupAddress("");
     }
     if (dropoff !== SAME_AS_PICKUP && !codes.has(dropoff)) {
@@ -804,9 +708,9 @@ export function AirportSearch({
     }
   }, [locations, pickup, dropoff]);
 
-  const pickupOption = locations.find((o) => o.iata === pickup);
+  const pickupOption = options.find((o) => o.iata === pickup);
   const dropoffCode = dropoff === SAME_AS_PICKUP ? pickup : dropoff;
-  const dropoffOption = locations.find((o) => o.iata === dropoffCode);
+  const dropoffOption = options.find((o) => o.iata === dropoffCode);
   const pickupIsCity = Boolean(
     pickupOption && (pickupOption.kind === "city" || isCityLocationCode(pickupOption.iata)),
   );
@@ -816,7 +720,7 @@ export function AirportSearch({
   const airportOptions = locations.filter((o) => o.kind !== "city" && !isCityLocationCode(o.iata));
   const cityOptions = locations.filter((o) => o.kind === "city" || isCityLocationCode(o.iata));
   const useLocationGroups = airportOptions.length > 0 && cityOptions.length > 0;
-  const locationChoices = useMemo<LocationChoice[]>(() => {
+  const { allLocationChoices, locationChoices } = useMemo(() => {
     const mapOption = (o: SearchAirportOption): LocationChoice => ({
       value: o.iata,
       label: placeLabel(locale, o.label),
@@ -831,8 +735,34 @@ export function AirportSearch({
       rank: isCityLocationCode(o.iata) ? undefined : popularRank.get(String(o.iata || "").toUpperCase()),
       carCount: o.carCount,
     });
-    return locations.map(mapOption);
-  }, [locations, locale, popularRank]);
+    const all = allLocations.map(mapOption);
+    const preferred = countryIso2?.toUpperCase() || "";
+    const scoped = preferred
+      ? all.filter((o) => (o.countryIso2 || "").toUpperCase() === preferred)
+      : [];
+    return { allLocationChoices: all, locationChoices: scoped };
+  }, [allLocations, countryIso2, locale, popularRank]);
+
+  const chooseCountry = (iso2: string) => {
+    const next = iso2.trim().toUpperCase();
+    if (!next) return;
+    setCountryIso2(next);
+    const place = options.find((o) => o.iata === pickup);
+    if (pickup && place?.countryIso2?.toUpperCase() !== next) {
+      setPickup("");
+      setPickupAddress("");
+    }
+  };
+
+  const onPickupPicked = (code: string) => {
+    setPickup(code);
+    if (!code) {
+      setPickupAddress("");
+      return;
+    }
+    const iso2 = options.find((o) => o.iata === code)?.countryIso2?.toUpperCase();
+    if (iso2) setCountryIso2(iso2);
+  };
   const dropoffChoices = useMemo<LocationChoice[]>(
     () => [
       { value: SAME_AS_PICKUP, label: dictionary.home.sameAsPickup, kind: "special" },
@@ -908,43 +838,21 @@ export function AirportSearch({
         ))}
       </ul>
 
-      <p className="mb-1 text-center text-sm font-extrabold uppercase tracking-wide text-white [text-shadow:0_1px_3px_rgba(2,6,23,0.7)] sm:text-base md:text-lg">
-        {dictionary.home.searchTitle}
-      </p>
-
-      {/* While places are still loading the row keeps its space, so the form does not jump. */}
-      {countries.length > 0 || options.length === 0 ? (
-        <div className="mb-1.5 flex flex-col gap-1 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,50%)_minmax(0,1fr)] sm:items-center sm:gap-x-2">
-          <span className="text-left text-[11px] font-semibold leading-none text-white [text-shadow:0_1px_2px_rgba(2,6,23,0.7)] sm:justify-self-start sm:whitespace-nowrap">
-            {dictionary.home.searchCountry}
-          </span>
-          <div className="min-w-0 w-full">
-            <div className="min-h-11 rounded-lg border border-white/45 bg-white px-2.5 py-1.5 text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)] sm:min-h-8 sm:py-1">
-              <CountryPicker
-                countries={countries}
-                value={countryIso2}
-                onChange={setCountryIso2}
-                locked={locked}
-              />
-            </div>
-          </div>
-          <div className="hidden sm:block" aria-hidden="true" />
-        </div>
-      ) : null}
-
       <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
         <label className="block">
           <span className={labelClass}>{dictionary.home.pickupLocation}</span>
           <FieldShell icon={<PlaneTakeoff className="h-4 w-4" />}>
             <LocationPicker
-              options={locationChoices}
+              options={allLocationChoices}
               value={pickup}
-              onChange={setPickup}
+              onChange={onPickupPicked}
               placeholder={dictionary.home.selectPickup}
               ariaLabel={dictionary.home.pickupLocation}
               required
               airportsGroup={useLocationGroups ? dictionary.home.airportsGroup : undefined}
               citiesGroup={useLocationGroups ? dictionary.home.citiesGroup : undefined}
+              countries={locked ? undefined : countries}
+              onCountrySelect={chooseCountry}
             />
           </FieldShell>
         </label>
