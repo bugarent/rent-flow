@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { uiText } from "@/lib/i18n/ui-text";
-import { ModerationListingsByPartner } from "@/components/admin/moderation-listings-by-partner";
+import { ModerationListingCard } from "@/components/admin/moderation-listing-card";
 import { ModerationProfilesPanel } from "@/components/admin/moderation-profiles-panel";
 import { PartnersManager } from "@/components/admin/partners-manager";
 import { cn } from "@/lib/utils";
@@ -367,15 +367,17 @@ export function ModerationHub({
           )}
 
           <div className="mt-5 space-y-3">
-            <ModerationListingsByPartner
-              cars={visibleCars}
-              partners={partners}
-              openUserLabel={labels.openUser}
-              openPersonalInfoLabel={labels.openPersonalInfo}
-              onCarDone={(carId) =>
-                setRemovedCarIds((prev) => (prev.includes(carId) ? prev : [...prev, carId]))
-              }
-            />
+            {visibleCars.map((car) => (
+              <ModerationListingCard
+                key={car.id}
+                car={car}
+                openUserLabel={labels.openUser}
+                openPersonalInfoLabel={labels.openPersonalInfo}
+                onDone={() =>
+                  setRemovedCarIds((prev) => (prev.includes(car.id) ? prev : [...prev, car.id]))
+                }
+              />
+            ))}
             {visibleCars.length === 0 ? (
               <p className="text-slate-500">
                 {listingsDbOffline ? labels.dbOfflineHint : labels.noListings}
