@@ -173,20 +173,20 @@ function airportLine(locale: Locale, englishCities: string[]): string {
 }
 
 const WORLD_HEADLINE: Record<Locale, string> = {
-  en: "Car rental at airports worldwide",
-  ka: "მანქანის გაქირავება მსოფლიოს აეროპორტებში",
-  de: "Mietwagen an Flughäfen weltweit",
-  es: "Alquiler de coches en aeropuertos de todo el mundo",
-  fr: "Location de voiture dans les aéroports du monde entier",
-  it: "Noleggio auto negli aeroporti di tutto il mondo",
-  nl: "Autoverhuur op luchthavens wereldwijd",
-  pl: "Wynajem samochodów na lotniskach na całym świecie",
-  tr: "Dünya genelinde havalimanlarında araç kiralama",
-  ru: "Аренда авто в аэропортах по всему миру",
-  ar: "تأجير السيارات في مطارات العالم",
-  zh: "全球机场租车",
-  ko: "전 세계 공항 렌터카",
-  th: "เช่ารถที่สนามบินทั่วโลก",
+  en: "Car rental at the airport",
+  ka: "მანქანის გაქირავება აეროპორტში",
+  de: "Mietwagen am Flughafen",
+  es: "Alquiler de coches en el aeropuerto",
+  fr: "Location de voiture à l’aéroport",
+  it: "Noleggio auto in aeroporto",
+  nl: "Autoverhuur op de luchthaven",
+  pl: "Wynajem samochodów na lotnisku",
+  tr: "Havalimanında araç kiralama",
+  ru: "Аренда авто в аэропорту",
+  ar: "تأجير السيارات في المطار",
+  zh: "机场租车",
+  ko: "공항 렌터카",
+  th: "เช่ารถที่สนามบิน",
 };
 
 /** Cover title before a country is picked. */
