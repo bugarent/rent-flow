@@ -446,6 +446,7 @@ export function AdminPartnerReviewPanel({
         rejectBtn: "უარყოფა",
         close: "დახურვა",
         goBack: "უკან დაბრუნება",
+        openCabinet: "პარტნიორის კაბინეტის გახსნა",
         rejectedBadge: "უარყოფილი",
         primaryTitle: "პირველადი პარტნიორის დეტალები",
         noCars: "ამ პარტნიორს ჯერ არ აქვს ატვირთული მანქანა.",
@@ -497,6 +498,7 @@ export function AdminPartnerReviewPanel({
         rejectBtn: "Отклонить",
         close: "Закрыть",
         goBack: "Назад",
+        openCabinet: "Открыть кабинет партнёра",
         rejectedBadge: "Отклонён",
         primaryTitle: "Детали первичного партнёра",
         noCars: "У партнёра пока нет загруженных автомобилей.",
@@ -552,6 +554,7 @@ export function AdminPartnerReviewPanel({
       rejectBtn: "Reject",
       close: "Close",
       goBack: "Go back",
+      openCabinet: "Open partner cabinet",
       rejectedBadge: "Rejected",
       primaryTitle: "Primary partner details",
       note: "Admin note (optional)",
@@ -563,6 +566,22 @@ export function AdminPartnerReviewPanel({
 
   const resolvedBackHref = backHref ?? `${ADMIN_BASE}/moderation`;
   const resolvedBackLabel = backLabel ?? adminBackLabel(locale, backTarget) ?? labels.back;
+  // New tab, so the review page stays open; POST keeps it out of reach of other sites.
+  const openCabinetButton = (
+    <form
+      method="post"
+      action={`/api/admin/partners/${encodeURIComponent(partnerId)}/open-cabinet`}
+      target="_blank"
+      className="contents"
+    >
+      <button
+        type="submit"
+        className="rounded-lg bg-[#0b1f4b] px-4 py-2 text-sm font-bold text-white hover:bg-[#16336e]"
+      >
+        {labels.openCabinet} ↗
+      </button>
+    </form>
+  );
 
   const handleBack = () => {
     if (onBack) onBack();
@@ -1706,6 +1725,7 @@ export function AdminPartnerReviewPanel({
                     {labels.rejectBtn}
                   </button>
                 ) : null}
+                {openCabinetButton}
                 {onBack ? (
                   <button
                     type="button"
@@ -1793,6 +1813,7 @@ export function AdminPartnerReviewPanel({
                     {labels.rejectBtn}
                   </button>
                 ) : null}
+                {openCabinetButton}
                 {onBack ? (
                   <button
                     type="button"
