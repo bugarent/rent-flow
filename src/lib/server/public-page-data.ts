@@ -3,9 +3,9 @@ import "server-only";
 import { cachedPublicRead } from "@/lib/server/public-data-cache";
 import { getSearchDeliveryAirports } from "@/lib/server/delivery-locations";
 import {
-  getHomepageAirports,
-  getHomepageCategories,
   getPopularAirportsLayoutSetting,
+  loadHomepageAirports,
+  loadHomepageCategories,
 } from "@/lib/server/homepage";
 import { getHomepageInfoContent } from "@/lib/server/homepage-info-blocks-store";
 import { getPublicHomepageGoogleReviews } from "@/lib/server/homepage-google-reviews-store";
@@ -20,12 +20,13 @@ export const cachedSearchDeliveryAirports = cachedPublicRead(
   getSearchDeliveryAirports,
   { keep: nonEmpty },
 );
-export const cachedHomepageAirports = cachedPublicRead("homepage-airports", getHomepageAirports, {
+// ":v2": earlier entries could hold the built-in cards cached as if they were saved data.
+export const cachedHomepageAirports = cachedPublicRead("homepage-airports:v2", loadHomepageAirports, {
   keep: nonEmpty,
 });
 export const cachedHomepageCategories = cachedPublicRead(
-  "homepage-categories",
-  getHomepageCategories,
+  "homepage-categories:v2",
+  loadHomepageCategories,
   { keep: nonEmpty },
 );
 export const cachedPopularAirportsLayout = cachedPublicRead(

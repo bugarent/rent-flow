@@ -79,54 +79,55 @@ export async function ensureHomepageDefaults() {
   }
 }
 
-export async function getHomepageCategories(): Promise<HomepageCategoryCard[]> {
-  try {
-    const rows = await listHomepageCategories();
-    if (rows.length === 0) {
-      return VEHICLE_CATEGORIES.map((c) => ({
-        id: c.id,
-        slug: c.id,
-        name: c.name,
-        details: summarizeMappedModels(c.mappedModels) || c.model,
-        imageUrl: c.image,
-        mappedModels: c.mappedModels ?? [],
-      }));
-    }
-    return rows
-      .filter((c) => c.isActive !== false)
-      .map((c) => ({
-        id: c.id,
-        slug: c.slug,
-        name: c.name,
-        details: c.details,
-        imageUrl: c.imageUrl,
-        mappedModels: c.mappedModels,
-      }));
-  } catch {
-    return VEHICLE_CATEGORIES.map((c) => ({
+/** Built-in cards, only for when nothing was ever loaded from the saved stores. */
+export function staticHomepageCategories(): HomepageCategoryCard[] {
+  return VEHICLE_CATEGORIES.map((c) => ({
+    id: c.id,
+    slug: c.id,
+    name: c.name,
+    details: summarizeMappedModels(c.mappedModels) || c.model,
+    imageUrl: c.image,
+    mappedModels: c.mappedModels ?? [],
+  }));
+}
+
+export function staticHomepageAirports(): HomepageAirportCard[] {
+  return getStaticPopularAirports().map((a) => ({
+    id: a.iata,
+    iata: a.iata,
+    title: a.name,
+    imageUrl: a.image,
+    infoText: "",
+  }));
+}
+
+function activeCategoryCards(rows: Awaited<ReturnType<typeof listHomepageCategories>>): HomepageCategoryCard[] {
+  return rows
+    .filter((c) => c.isActive !== false)
+    .map((c) => ({
       id: c.id,
-      slug: c.id,
+      slug: c.slug,
       name: c.name,
-      details: summarizeMappedModels(c.mappedModels) || c.model,
-      imageUrl: c.image,
-      mappedModels: c.mappedModels ?? [],
+      details: c.details,
+      imageUrl: c.imageUrl,
+      mappedModels: c.mappedModels,
     }));
+}
+
+/** Saved categories only; empty when the store could not be read (so caches never keep built-ins). */
+export async function loadHomepageCategories(): Promise<HomepageCategoryCard[]> {
+  try {
+    return activeCategoryCards(await listHomepageCategories());
+  } catch {
+    return [];
   }
 }
 
-export async function getHomepageAirports(): Promise<HomepageAirportCard[]> {
+/** Saved airport cards only; empty when the store could not be read. */
+export async function loadHomepageAirports(): Promise<HomepageAirportCard[]> {
   try {
     const { listHomepageAirports } = await import("@/lib/server/homepage-airports-store");
     const rows = await listHomepageAirports();
-    if (rows.length === 0) {
-      return getStaticPopularAirports().map((a) => ({
-        id: a.iata,
-        iata: a.iata,
-        title: a.name,
-        imageUrl: a.image,
-        infoText: "",
-      }));
-    }
     return rows.map((a) => ({
       id: a.id,
       iata: a.iata,
@@ -136,14 +137,22 @@ export async function getHomepageAirports(): Promise<HomepageAirportCard[]> {
       translations: a.translations,
     }));
   } catch {
-    return getStaticPopularAirports().map((a) => ({
-      id: a.iata,
-      iata: a.iata,
-      title: a.name,
-      imageUrl: a.image,
-      infoText: "",
-    }));
+    return [];
   }
+}
+
+export async function getHomepageCategories(): Promise<HomepageCategoryCard[]> {
+  try {
+    const rows = await listHomepageCategories();
+    return rows.length ? activeCategoryCards(rows) : staticHomepageCategories();
+  } catch {
+    return staticHomepageCategories();
+  }
+}
+
+export async function getHomepageAirports(): Promise<HomepageAirportCard[]> {
+  const rows = await loadHomepageAirports();
+  return rows.length ? rows : staticHomepageAirports();
 }
 
 export async function getPopularAirportsLayoutSetting(): Promise<PopularAirportsLayout> {

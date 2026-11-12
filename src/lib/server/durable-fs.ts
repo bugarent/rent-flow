@@ -26,6 +26,8 @@ export { access, rename, cp, readdir, stat };
 
 /** Retrying a rejected password on every read/write is what locks the role at the pooler. */
 const AUTH_COOLDOWN_MS = 300_000;
+/** Neon wakes a suspended compute in ~0.5–3s. */
+const DB_READ_WAIT_MS = 4000;
 
 let tableReady: Promise<void> | null = null;
 let jsonPool: Pool | null = null;
@@ -307,16 +309,21 @@ export async function readFile(path: string, encoding?: BufferEncoding): Promise
   }
 
   const pending = readFromDb(path);
+  // The local copy may be older than a save made on another server instance, so give a
+  // waking database a few seconds before falling back to it.
   const fromDb = await Promise.race([
     pending,
-    new Promise<string | null>((resolve) => setTimeout(() => resolve(null), 1200)),
+    new Promise<string | null>((resolve) => setTimeout(() => resolve(null), DB_READ_WAIT_MS)),
   ]);
   if (fromDb != null) {
     void hydrateFile(path, fromDb);
     return textFromDbPayload(fromDb, encoding);
   }
   try {
-    return encoding ? await fsReadFile(path, encoding) : await fsReadFile(path);
+    const local = encoding ? await fsReadFile(path, encoding) : await fsReadFile(path);
+    // Refresh the local copy from the late answer so the next read is current.
+    void pending.then((late) => (late != null ? hydrateFile(path, late) : undefined)).catch(() => undefined);
+    return local;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT" && (error as NodeJS.ErrnoException).code !== "EACCES") {
       throw error;

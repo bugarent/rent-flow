@@ -16,12 +16,11 @@ import {
 import { defaultHomepageInfoContent } from "@/lib/server/homepage-info-blocks-store";
 import { DEFAULT_CUSTOM_BOOKING_CHANNELS } from "@/lib/catalog/custom-booking-channels";
 import { softTimeout } from "@/lib/server/soft-timeout";
+import type { CachedPublicRead } from "@/lib/server/public-data-cache";
+import { staticHomepageAirports, staticHomepageCategories } from "@/lib/server/homepage";
 import { bookingCountsByPickupIata } from "@/lib/server/airport-popularity";
 import type { AirportCardTranslations } from "@/lib/catalog/homepage-airport-i18n";
 import { localizedAirportTitle } from "@/lib/catalog/homepage-airport-i18n";
-import { getPopularAirports as getStaticPopularAirports } from "@/lib/catalog/popular-airports";
-import { VEHICLE_CATEGORIES } from "@/lib/catalog/categories";
-import { summarizeMappedModels } from "@/lib/cars/category-mapping";
 import { airportCountryIso2, findSearchPlace, normalizeLocationCode } from "@/lib/catalog/search-places";
 import { withAutoTitleTranslations } from "@/lib/catalog/airport-card-auto-titles";
 import { readPreferences } from "@/lib/server/preferences";
@@ -30,14 +29,21 @@ import { buildPlacesItemListJsonLd } from "@/lib/seo/json-ld";
 import { plainHeading } from "@/lib/catalog/airport-seo";
 
 const DATA_WAIT_MS = 1200;
+/**
+ * The sections below the hero stream in after it, so waiting for a waking database here
+ * delays nothing on screen; giving up early showed the built-in cards instead of the saved ones.
+ */
+const SECTION_WAIT_MS = 6000;
 
-function airportFallback() {
-  return getStaticPopularAirports().map((a) => ({
-    id: a.iata,
-    iata: a.iata,
-    title: a.name,
-    imageUrl: a.image,
-  }));
+/** Fresh value, else this instance's last good one, else `fallback`. */
+function readOr<T>(read: CachedPublicRead<T>, fallback: T, ms: number): Promise<T> {
+  return softTimeout(read(), read.peek() ?? fallback, ms);
+}
+
+/** Saved cards; the built-in ones only when nothing was ever loaded on this server. */
+async function savedOrStatic<T>(read: CachedPublicRead<T[]>, fallback: () => T[], ms: number): Promise<T[]> {
+  const rows = await readOr(read, [], ms);
+  return rows.length ? rows : (read.peek() ?? fallback());
 }
 
 /**
@@ -51,17 +57,6 @@ function titleOnly(translations: AirportCardTranslations | undefined): AirportCa
     if (title) out[lang as keyof AirportCardTranslations] = { title };
   }
   return out;
-}
-
-function categoryFallback() {
-  return VEHICLE_CATEGORIES.map((c) => ({
-    id: c.id,
-    slug: c.id,
-    name: c.name,
-    details: summarizeMappedModels(c.mappedModels) || c.model,
-    imageUrl: c.image,
-    mappedModels: c.mappedModels ?? [],
-  }));
 }
 
 /** Hero shown in the first bytes, before any data: the photo is the LCP and must not wait. */
@@ -80,9 +75,9 @@ const HERO_PLACES_WAIT_MS = 3000;
 
 export async function HomeHeroSection() {
   const [options, bookingChannels, popularAirports] = await Promise.all([
-    softTimeout(cachedSearchDeliveryAirports(), [], HERO_PLACES_WAIT_MS),
-    softTimeout(cachedCustomBookingChannels(), DEFAULT_CUSTOM_BOOKING_CHANNELS, DATA_WAIT_MS),
-    softTimeout(cachedHomepageAirports(), airportFallback(), DATA_WAIT_MS),
+    readOr(cachedSearchDeliveryAirports, [], HERO_PLACES_WAIT_MS),
+    readOr(cachedCustomBookingChannels, DEFAULT_CUSTOM_BOOKING_CHANNELS, DATA_WAIT_MS),
+    savedOrStatic(cachedHomepageAirports, staticHomepageAirports, DATA_WAIT_MS),
   ]);
   return (
     <HomeHeroWithIndividualBooking
@@ -109,12 +104,12 @@ export async function HomeBelowFold() {
     bookingCounts,
     { locale },
   ] = await Promise.all([
-    softTimeout(cachedSearchDeliveryAirports(), [], DATA_WAIT_MS),
-    softTimeout(cachedHomepageAirports(), airportFallback(), DATA_WAIT_MS),
-    softTimeout(cachedHomepageCategories(), categoryFallback(), DATA_WAIT_MS),
-    softTimeout(cachedPopularAirportsLayout(), "grid" as const, DATA_WAIT_MS),
-    softTimeout(cachedHomepageInfoContent(), defaultHomepageInfoContent(), DATA_WAIT_MS),
-    softTimeout(cachedHomepageGoogleReviews(), null, DATA_WAIT_MS),
+    readOr(cachedSearchDeliveryAirports, [], SECTION_WAIT_MS),
+    savedOrStatic(cachedHomepageAirports, staticHomepageAirports, SECTION_WAIT_MS),
+    savedOrStatic(cachedHomepageCategories, staticHomepageCategories, SECTION_WAIT_MS),
+    readOr(cachedPopularAirportsLayout, "grid" as const, SECTION_WAIT_MS),
+    readOr(cachedHomepageInfoContent, defaultHomepageInfoContent(), SECTION_WAIT_MS),
+    readOr(cachedHomepageGoogleReviews, null, SECTION_WAIT_MS),
     softTimeout(bookingCountsByPickupIata(), new Map<string, number>(), 800),
     readPreferences(),
   ]);

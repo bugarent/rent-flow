@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata(): Promise<Metadata> {
   const [{ locale }, airports] = await Promise.all([
     readPreferences(),
-    softTimeout(cachedHomepageAirports(), [], 800),
+    softTimeout(cachedHomepageAirports(), cachedHomepageAirports.peek() ?? [], 800),
   ]);
   const seo = buildHomeSeo(locale, airports.map((a) => a.iata));
   return buildPageMetadata({
