@@ -59,6 +59,16 @@ export function HeroCountryCover({ covers }: { covers: CountryCoverMap }) {
           </picture>
         );
       })}
+      {showing && covers[active]?.credit ? (
+        <a
+          href={covers[active].credit!.url}
+          target="_blank"
+          rel="noopener noreferrer nofollow"
+          className="absolute bottom-1.5 right-2 z-20 max-w-[70%] truncate rounded bg-slate-950/35 px-1.5 py-0.5 text-[10px] text-white/80 hover:text-white"
+        >
+          Photo: {covers[active].credit!.author} · {covers[active].credit!.license} · Wikimedia Commons
+        </a>
+      ) : null}
       {/* Darkens bright landmark photos so the glass card and white text keep their contrast. */}
       <div
         className={cn(

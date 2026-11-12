@@ -12,6 +12,17 @@ export type CountryCover = {
   height: number;
   /** Set for admin uploads; built-in covers have none. */
   updatedAt?: string;
+  /** `auto`: found on Wikimedia Commons for a country without a cover. */
+  source?: "admin" | "auto";
+  /** Required on display for Commons photos (CC licenses). */
+  credit?: CountryCoverCredit;
+};
+
+export type CountryCoverCredit = {
+  author: string;
+  license: string;
+  /** File page on Wikimedia Commons. */
+  url: string;
 };
 
 export type CountryCoverMap = Record<string, CountryCover>;

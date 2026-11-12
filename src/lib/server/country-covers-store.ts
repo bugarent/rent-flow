@@ -5,18 +5,33 @@ import {
   clampFocal,
   normalizeCoverIso,
   type CountryCover,
+  type CountryCoverCredit,
   type CountryCoverMap,
 } from "@/lib/catalog/country-covers";
 import { readFile, readFileForUpdate, withStoreLock, writeFile } from "@/lib/server/durable-fs";
 import { ensureDataDir, resolveDataFile } from "@/lib/server/data-paths";
 import { createTtlCache } from "@/lib/server/ttl-cache";
 
-type StoreShape = { covers: CountryCoverMap };
+type StoreShape = {
+  covers: CountryCoverMap;
+  /** Last automatic photo search per country (ISO time), so the web is searched once, not per visit. */
+  autoAttempts?: Record<string, string>;
+};
 
 const cache = createTtlCache<CountryCoverMap>(60_000);
 
 async function storePath() {
   return resolveDataFile("admin", "country-covers.json");
+}
+
+function cleanCredit(raw: unknown): CountryCoverCredit | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const row = raw as Record<string, unknown>;
+  const author = typeof row.author === "string" ? row.author.trim().slice(0, 160) : "";
+  const license = typeof row.license === "string" ? row.license.trim().slice(0, 60) : "";
+  const url = typeof row.url === "string" ? row.url.trim() : "";
+  if (!url.startsWith("https://")) return undefined;
+  return { author, license, url };
 }
 
 function cleanCover(raw: unknown): CountryCover | null {
@@ -35,32 +50,48 @@ function cleanCover(raw: unknown): CountryCover | null {
     width: Number(row.width) || 1600,
     height: Number(row.height) || 900,
     updatedAt: str(row.updatedAt) || undefined,
+    source: row.source === "auto" ? "auto" : row.source === "admin" ? "admin" : undefined,
+    credit: cleanCredit(row.credit),
   };
 }
 
-function parseStore(text: string | null): CountryCoverMap {
-  if (!text) return {};
+function parseStore(text: string | null): Required<StoreShape> {
+  const empty = { covers: {}, autoAttempts: {} };
+  if (!text) return empty;
   try {
     const parsed = JSON.parse(text) as Partial<StoreShape>;
-    const out: CountryCoverMap = {};
+    const covers: CountryCoverMap = {};
     for (const [iso, raw] of Object.entries(parsed.covers ?? {})) {
       const code = normalizeCoverIso(iso);
       const cover = cleanCover(raw);
-      if (code && cover) out[code] = cover;
+      if (code && cover) covers[code] = cover;
     }
-    return out;
+    const autoAttempts: Record<string, string> = {};
+    for (const [iso, at] of Object.entries(parsed.autoAttempts ?? {})) {
+      const code = normalizeCoverIso(iso);
+      if (code && typeof at === "string") autoAttempts[code] = at;
+    }
+    return { covers, autoAttempts };
   } catch {
-    return {};
+    return empty;
   }
 }
 
-/** Admin uploads only (no built-ins). */
-export async function getUploadedCountryCovers(): Promise<CountryCoverMap> {
+async function readStore(): Promise<Required<StoreShape>> {
   try {
     return parseStore(await readFile(await storePath(), "utf8"));
   } catch {
-    return {};
+    return { covers: {}, autoAttempts: {} };
   }
+}
+
+/** Admin uploads and automatic covers (no built-ins). */
+export async function getUploadedCountryCovers(): Promise<CountryCoverMap> {
+  return (await readStore()).covers;
+}
+
+export async function getCountryCoverAutoAttempts(): Promise<Record<string, string>> {
+  return (await readStore()).autoAttempts;
 }
 
 /** Built-in landmark covers with admin uploads on top. */
@@ -76,31 +107,44 @@ export async function getPublicCountryCovers(): Promise<CountryCoverMap> {
   }
 }
 
-async function updateStore(change: (covers: CountryCoverMap) => CountryCoverMap): Promise<CountryCoverMap> {
+async function updateStore(change: (store: Required<StoreShape>) => Required<StoreShape>): Promise<CountryCoverMap> {
   const path = await storePath();
   return withStoreLock(path, async () => {
     const current = parseStore(await readFileForUpdate(path));
-    const next = change({ ...current });
+    const next = change({ covers: { ...current.covers }, autoAttempts: { ...current.autoAttempts } });
     await ensureDataDir("admin");
-    await writeFile(path, JSON.stringify({ covers: next } satisfies StoreShape, null, 2), "utf8");
-    const merged = { ...BUILT_IN_COUNTRY_COVERS, ...next };
-    cache.set(merged);
-    return next;
+    await writeFile(path, JSON.stringify(next satisfies StoreShape, null, 2), "utf8");
+    cache.set({ ...BUILT_IN_COUNTRY_COVERS, ...next.covers });
+    return next.covers;
   });
 }
 
 export async function saveCountryCover(iso: string, cover: CountryCover): Promise<CountryCoverMap> {
   const code = normalizeCoverIso(iso);
   if (!code) throw new Error("Invalid country");
-  return updateStore((covers) => ({ ...covers, [code]: cover }));
+  return updateStore((store) => ({ ...store, covers: { ...store.covers, [code]: cover } }));
+}
+
+/**
+ * Records an automatic search so it is not repeated on every visit: `ok:<time>` is never retried
+ * (an admin who removed that photo keeps it removed), `none:<time>` is retried later.
+ */
+export async function markCountryCoverAutoAttempt(iso: string, found: boolean): Promise<void> {
+  const code = normalizeCoverIso(iso);
+  if (!code) return;
+  await updateStore((store) => ({
+    ...store,
+    autoAttempts: { ...store.autoAttempts, [code]: `${found ? "ok" : "none"}:${new Date().toISOString()}` },
+  }));
 }
 
 /** Explicit admin action: drop the upload so the built-in cover (if any) shows again. */
 export async function removeCountryCover(iso: string): Promise<CountryCoverMap> {
   const code = normalizeCoverIso(iso);
   if (!code) throw new Error("Invalid country");
-  return updateStore((covers) => {
+  return updateStore((store) => {
+    const covers = { ...store.covers };
     delete covers[code];
-    return covers;
+    return { ...store, covers };
   });
 }

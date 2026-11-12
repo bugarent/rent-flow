@@ -21,8 +21,15 @@ async function put(name: string, bytes: Buffer, contentType: string): Promise<st
 export async function buildCountryCover(file: File, iso: string, focalX: number): Promise<CountryCover> {
   if (!(file instanceof File) || file.size <= 0) throw new Error("file required");
   if (file.size > MAX_BYTES) throw new Error("File too large (max 20 MB)");
+  return buildCountryCoverFromBytes(Buffer.from(await file.arrayBuffer()), iso, focalX);
+}
 
-  const input = Buffer.from(await file.arrayBuffer());
+export async function buildCountryCoverFromBytes(
+  input: Buffer,
+  iso: string,
+  focalX: number,
+): Promise<CountryCover> {
+  if (input.length > MAX_BYTES) throw new Error("File too large (max 20 MB)");
   const base = sharp(input, { failOn: "none", animated: false, limitInputPixels: 120_000_000 }).rotate();
   const oriented = await base.clone().toBuffer({ resolveWithObject: true }).catch(() => null);
   if (!oriented) throw new Error("PNG, JPG, WEBP, HEIC or AVIF only");

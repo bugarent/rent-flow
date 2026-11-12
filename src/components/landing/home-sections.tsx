@@ -17,6 +17,8 @@ import {
 import { defaultHomepageInfoContent } from "@/lib/server/homepage-info-blocks-store";
 import { DEFAULT_CUSTOM_BOOKING_CHANNELS } from "@/lib/catalog/custom-booking-channels";
 import { BUILT_IN_COUNTRY_COVERS } from "@/lib/catalog/country-covers";
+import { after } from "next/server";
+import { ensureCountryCovers } from "@/lib/server/country-cover-auto";
 import { softTimeout } from "@/lib/server/soft-timeout";
 import type { CachedPublicRead } from "@/lib/server/public-data-cache";
 import { staticHomepageAirports, staticHomepageCategories } from "@/lib/server/homepage";
@@ -85,6 +87,10 @@ export async function HomeHeroSection() {
   ]);
   // A map cached before a built-in cover was added would hide that country's photo.
   const countryCovers = { ...BUILT_IN_COUNTRY_COVERS, ...cachedCovers };
+  const missingCovers = [
+    ...new Set(options.map((o) => String(o.countryIso2 || "").toUpperCase()).filter(Boolean)),
+  ].filter((iso) => !countryCovers[iso]);
+  if (missingCovers.length) after(() => ensureCountryCovers(missingCovers));
   return (
     <HomeHeroWithIndividualBooking
       airports={options}

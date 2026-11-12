@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { ImageUp, RotateCcw } from "lucide-react";
+import { ImageUp, RotateCcw, Search } from "lucide-react";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { uiText } from "@/lib/i18n/ui-text";
@@ -101,6 +101,26 @@ export function HomepageCountryCoversManager({
     }
   };
 
+  const autoFind = async (iso: string) => {
+    setBusy(iso);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/homepage/country-covers?iso2=${encodeURIComponent(iso)}`, { method: "PUT" });
+      const data = (await res.json().catch(() => ({}))) as { uploaded?: CountryCoverMap; found?: boolean };
+      if (!res.ok || !data.uploaded) throw new Error();
+      setUploaded(data.uploaded);
+      setNotice(
+        data.found
+          ? { iso, ok: true, text: tx("Photo found and saved", "ფოტო მოიძებნა და შეინახა", "Фото найдено и сохранено") }
+          : { iso, ok: false, text: tx("No suitable photo found — upload one", "შესაფერისი ფოტო ვერ მოიძებნა — ატვირთეთ", "Подходящее фото не найдено — загрузите") },
+      );
+    } catch {
+      setNotice({ iso, ok: false, text: tx("Could not search", "ძებნა ვერ მოხერხდა", "Не удалось найти") });
+    } finally {
+      setBusy("");
+    }
+  };
+
   return (
     <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
       <div>
@@ -157,7 +177,9 @@ export function HomepageCountryCoversManager({
                     own ? "bg-emerald-600 text-white" : cover ? "bg-white/90 text-slate-700" : "bg-amber-500 text-white"
                   }`}
                 >
-                  {own
+                  {own?.source === "auto"
+                    ? tx("Automatic", "ავტომატური", "Автоматически")
+                    : own
                     ? tx("Uploaded", "ატვირთული", "Загружена")
                     : cover
                       ? tx("Built-in", "ჩაშენებული", "Встроенная")
@@ -197,6 +219,19 @@ export function HomepageCountryCoversManager({
                         ? tx("Replace photo", "ფოტოს შეცვლა", "Заменить фото")
                         : tx("Upload photo", "ფოტოს ატვირთვა", "Загрузить фото")}
                   </button>
+                  {!BUILT_IN_COUNTRY_COVERS[iso] && own?.source !== "admin" ? (
+                    <button
+                      type="button"
+                      disabled={Boolean(busy)}
+                      onClick={() => void autoFind(iso)}
+                      className="inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-[#0b1f4b] hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      <Search className="h-4 w-4" aria-hidden />
+                      {own
+                        ? tx("Find another", "სხვის მოძებნა", "Найти другое")
+                        : tx("Find automatically", "ავტომატური მოძებნა", "Найти автоматически")}
+                    </button>
+                  ) : null}
                   {own ? (
                     <button
                       type="button"
