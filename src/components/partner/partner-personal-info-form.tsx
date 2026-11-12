@@ -895,11 +895,11 @@ export function PartnerPersonalInfoForm({
         setMessage(String(data.message || "Password updated"));
       } else {
         setMessage(
-          data.moderation?.pendingRemoderation
-            ? pi.savedRemoderation
-            : data.remoderation
-              ? pi.savedForAdminReview
-              : pi.saved,
+          data.remoderation
+            ? data.moderation?.partnerStatus === "PENDING_REMODERATION"
+              ? pi.savedRemoderation
+              : pi.savedForAdminReview
+            : pi.saved,
         );
       }
     } catch (err) {

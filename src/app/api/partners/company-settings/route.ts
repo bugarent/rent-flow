@@ -146,6 +146,7 @@ export async function PATCH(req: Request) {
     const countryIso2s = settings.deliveryCountryIso2s.length
       ? settings.deliveryCountryIso2s
       : parseIso2List(partner.operatingCountryIso2s);
+    const countriesChanged = !countriesListsEqual(previous.deliveryCountryIso2s, countryIso2s);
 
     const rawSettings = (body?.settings ?? body) as Record<string, unknown> | null;
     const { resolvePartnerDeliveryLocationIds, keepLocationIdsForCountries } = await import(
@@ -153,9 +154,13 @@ export async function PATCH(req: Request) {
     );
     // Personal info only picks countries; locations come from the Delivery page and stay as saved.
     // A country that comes back gets its still-ON Delivery places back.
+    // Leaving locations untouched when countries did not change avoids a false remodeation
+    // on work-day, payment, tariff, or contract saves.
     let resolvedLocationIds: string[];
     if (Array.isArray(rawSettings?.deliveryLocationIds)) {
       resolvedLocationIds = await resolvePartnerDeliveryLocationIds(settings.deliveryLocationIds || []);
+    } else if (!countriesChanged) {
+      resolvedLocationIds = [...(previous.deliveryLocationIds || [])];
     } else {
       const { readPartnerDeliveryPrefs } = await import("@/lib/server/partner-delivery-prefs-store");
       const enabledPrefIds = (await readPartnerDeliveryPrefs(partner.id).catch(() => []))
@@ -176,7 +181,6 @@ export async function PATCH(req: Request) {
       deliveryCountryIso2s: countryIso2s,
       deliveryLocationIds: resolvedLocationIds,
     };
-    const countriesChanged = !countriesListsEqual(previous.deliveryCountryIso2s, countryIso2s);
     if (!(nextSettings.primaryMessengers?.length > 0) || !(nextSettings.secondaryMessengers?.length > 0)) {
       return NextResponse.json(
         { error: "Select at least one messenger for each phone number" },
@@ -224,7 +228,7 @@ export async function PATCH(req: Request) {
     if (needsRemoderation) {
       moderation = ensurePublishedSnapshot(moderation, previous);
     }
-    // Work days / payment / currency apply live even while other profile fields await remodeation.
+    // Only basic information waits for admin. Other sections of this window apply live.
     if (moderation.publishedSettings) {
       moderation = {
         ...moderation,

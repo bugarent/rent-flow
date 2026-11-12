@@ -127,46 +127,49 @@ function sameJson(a: unknown, b: unknown) {
 }
 
 /**
- * Fields partners may edit anytime without admin remodeation
- * (work days / pricing currency / prep / holidays / off-hours + payment & deposit + tariff day ranges).
+ * Personal-info window, "Basic information" section only.
+ * A save is sent to the administrator when one of these fields changes.
+ * Work days, payment, tariffs, contract, and password do not open remodeation.
  */
-export const PROFILE_REMODERATION_EXEMPT_FIELDS = new Set<string>([
-  "workingDays",
-  "pricingCurrency",
-  "prepMinutes",
-  "publicHolidays",
-  "offHoursService",
-  "offHoursPrice",
-  "rentPaymentMethods",
-  "depositMethods",
-  "requireCreditCard",
-  "cashDepositRefundDays",
-  "tariffs",
-]);
+const PROFILE_MAIN_INFO_FIELDS = [
+  "title",
+  "firstName",
+  "lastName",
+  "legalName",
+  "country",
+  "centralOffice",
+  "address",
+  "clientLanguages",
+  "logoUrl",
+  "primaryPhone",
+  "secondaryPhone",
+  "primaryMessengers",
+  "secondaryMessengers",
+  "email",
+  "website",
+  "deliveryCountryIso2s",
+  "deliveryLocationIds",
+] as const satisfies readonly (keyof PartnerCompanySettings)[];
+
+export const PROFILE_REMODERATION_FIELDS = new Set<string>(PROFILE_MAIN_INFO_FIELDS);
 
 export function filterRemoderationChanges(changes: ProfileFieldChange[]): ProfileFieldChange[] {
-  return changes.filter((c) => !PROFILE_REMODERATION_EXEMPT_FIELDS.has(c.field));
+  return changes.filter((c) => PROFILE_REMODERATION_FIELDS.has(c.field));
 }
 
-/** Keep live public snapshot in sync for remodeation-exempt fields. */
+/**
+ * While basic information waits for admin, every other personal-info field
+ * stays on the live public snapshot.
+ */
 export function applyExemptSettingsToPublished(
   published: PartnerCompanySettings,
   next: PartnerCompanySettings,
 ): PartnerCompanySettings {
-  return {
-    ...published,
-    workingDays: next.workingDays,
-    pricingCurrency: next.pricingCurrency,
-    prepMinutes: next.prepMinutes,
-    publicHolidays: next.publicHolidays,
-    offHoursService: next.offHoursService,
-    offHoursPrice: next.offHoursPrice,
-    rentPaymentMethods: next.rentPaymentMethods,
-    depositMethods: next.depositMethods,
-    requireCreditCard: next.requireCreditCard,
-    cashDepositRefundDays: next.cashDepositRefundDays,
-    tariffs: next.tariffs,
-  };
+  const live: PartnerCompanySettings = { ...next };
+  for (const key of PROFILE_MAIN_INFO_FIELDS) {
+    (live as Record<string, unknown>)[key] = published[key];
+  }
+  return live;
 }
 
 /** Compare company settings for admin remodeation notice. */
