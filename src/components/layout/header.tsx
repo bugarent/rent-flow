@@ -10,7 +10,6 @@ import { BrandLogo } from "@/components/brand/brand-logo";
 import { CurrencySelect, LanguageSelect, headerChipClass } from "@/components/layout/header-selects";
 import { getBusinessPartnershipCopy } from "@/lib/i18n/business-partnership-copy";
 import { BUSINESS_PARTNER_LOGIN } from "@/lib/routes";
-import { requestHomeReset } from "@/lib/catalog/home-country-store";
 import { subscribeOpenManageBooking } from "@/components/layout/open-manage-booking";
 import { loadManageBookingModal, ManageBookingModal } from "@/components/layout/lazy-modals";
 import { preloadProps, usePreloadWhenIdle } from "@/lib/client/preload";
@@ -167,17 +166,13 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
             onClick={(e) => {
               setOpen(false);
               e.preventDefault();
-              if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+              rememberHomeTop();
+              pinPageTop();
               const onHome = window.location.pathname === "/";
-              if (onHome) {
-                if (window.location.search || window.location.hash) {
-                  window.history.replaceState(null, "", "/");
-                }
-                pinPageTop();
-                requestHomeReset();
+              if (onHome && !window.location.search && !window.location.hash) {
+                window.location.reload();
                 return;
               }
-              rememberHomeTop();
               window.location.assign("/");
             }}
             aria-label="Rentairportcars.com — home"

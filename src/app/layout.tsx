@@ -106,6 +106,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <GoogleAnalytics />
       </head>
       <body className="flex min-h-full flex-col bg-slate-50 text-slate-900">
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'try{if(sessionStorage.getItem("rac-home-top")==="1"){if("scrollRestoration"in history)history.scrollRestoration="manual";var p=function(){scrollTo(0,0);document.documentElement.scrollTop=0;if(document.body)document.body.scrollTop=0};p();addEventListener("pageshow",p);addEventListener("load",function(){p();try{sessionStorage.removeItem("rac-home-top")}catch(e){}})}}catch(e){}',
+          }}
+        />
         <BootSplash />
         <style>{`#nl-badge-frame,iframe[title="Powered by Netlify"],script[src*=".netlify/scripts/hud"]{display:none!important}`}</style>
         <JsonLd
