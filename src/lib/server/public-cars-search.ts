@@ -133,8 +133,8 @@ export async function searchPublicCars(query: PublicCarsQuery, timer?: Timer): P
     timer?.mark("availability");
   }
 
-  let periodMap = new Map<string, number>();
-  let mergeDiscount = (base: number, period: number) => Math.max(base, period);
+  let periodMap = new Map<string, number[]>();
+  let mergeDiscount = (base: number, _period: number | number[]) => base;
   try {
     const store = await import("@/lib/server/partner-period-discounts-store");
     const from = query.startDate?.trim() || new Date().toISOString();

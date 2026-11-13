@@ -517,8 +517,8 @@ export async function POST(req: Request) {
       basePercent: toNumber(
         (pricedFileCar as { discountPercent?: number }).discountPercent,
       ),
-      pickupDate: pickupAt.toISOString().slice(0, 10),
-      dropoffDate: dropoffAt.toISOString().slice(0, 10),
+      pickupDate: pickupAt.toISOString(),
+      dropoffDate: dropoffAt.toISOString(),
     });
     const daily = roundMoney(
       resolveDailyRateEur(details, toNumber(pricedFileCar.dailyRateEur), discountPercent, days),
@@ -847,8 +847,8 @@ export async function POST(req: Request) {
     const discountPercent = await resolveListingDiscountPercent({
       carId: id,
       basePercent: toNumber(pricedCar.discountPercent),
-      pickupDate: pickupAt.toISOString().slice(0, 10),
-      dropoffDate: dropoffAt.toISOString().slice(0, 10),
+      pickupDate: pickupAt.toISOString(),
+      dropoffDate: dropoffAt.toISOString(),
     });
     const daily = roundMoney(
       resolveDailyRateEur(details, toNumber(pricedCar.dailyRateEur), discountPercent, days),

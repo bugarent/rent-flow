@@ -74,8 +74,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const isAdmin = adminSession?.user.role === "ADMIN";
   const isVendor = partnerSession?.user.role === "VENDOR";
   const url = new URL(req.url);
-  const rangeFrom = String(url.searchParams.get("startDate") || "").slice(0, 10);
-  const rangeTo = String(url.searchParams.get("endDate") || rangeFrom).slice(0, 10);
+  // Keep the times: period discounts are spread over the same charged days as the price.
+  const rangeFrom = String(url.searchParams.get("startDate") || "").trim().slice(0, 32);
+  const rangeTo = String(url.searchParams.get("endDate") || rangeFrom).trim().slice(0, 32);
 
   if (!partnerSession && !adminSession) {
     const publicCar = await loadPublicCarPayload(id, { rangeFrom, rangeTo });

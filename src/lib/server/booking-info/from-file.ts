@@ -86,7 +86,7 @@ export async function resolvedDiscountPercentForBooking(input: {
     );
     return mergeListingDiscountPercent(base, map.get(input.carId) ?? 0);
   } catch {
-    return Math.min(100, Math.max(0, base));
+    return mergeListingDiscountPercent(base, 0);
   }
 }
 

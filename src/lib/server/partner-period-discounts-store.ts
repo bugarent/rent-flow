@@ -4,6 +4,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "@/lib/server/durable-fs";
 import { join } from "node:path";
+import { rentalDayCount } from "@/lib/cars/reserve-pricing";
 
 const STORE = join(dataRoot(), "partner-period-discounts.json");
 
@@ -59,21 +60,27 @@ function inYearlyWindow(md: string, fromMd: string, toMd: string): boolean {
   return fromMd <= toMd ? md >= fromMd && md <= toMd : md >= fromMd || md <= toMd;
 }
 
-/** Does any day of the rental (`YYYY-MM-DD` … `YYYY-MM-DD`) fall in the yearly MM-DD window? */
-export function yearlyPeriodHitsRange(fromMd: string, toMd: string, rangeFrom: string, rangeTo: string): boolean {
+const DAY_MS = 86_400_000;
+const MAX_PRICED_DAYS = 366;
+
+/**
+ * Calendar day (MM-DD) of each charged rental day: day 1 is the pickup date, then one per 24h,
+ * the same count the price uses. No return date = one day.
+ */
+export function rentalMonthDays(rangeFrom: string, rangeTo?: string): string[] {
+  const first = toDay(rangeFrom) || (Number.isNaN(Date.parse(rangeFrom)) ? "" : toDay(new Date(rangeFrom).toISOString()));
+  if (!first) return [];
+  const days = rangeTo ? Math.min(MAX_PRICED_DAYS, rentalDayCount(rangeFrom, rangeTo)) : 1;
+  const start = dayMs(first);
+  return Array.from({ length: days }, (_, i) => new Date(start + i * DAY_MS).toISOString().slice(5, 10));
+}
+
+/** Is this day (MM-DD) inside the yearly MM-DD window? Both ends count. */
+export function dayInYearlyPeriod(md: string, fromMd: string, toMd: string): boolean {
   const f = toMonthDay(fromMd);
   const t = toMonthDay(toMd);
-  const rf = toDay(rangeFrom);
-  const rt = toDay(rangeTo);
-  if (!f || !t || !rf || !rt) return false;
-  const start = dayMs(rf);
-  const end = Math.max(start, dayMs(rt));
-  const DAY = 86_400_000;
-  if (end - start >= 365 * DAY) return true;
-  for (let ms = start; ms <= end; ms += DAY) {
-    if (inYearlyWindow(new Date(ms).toISOString().slice(5, 10), f, t)) return true;
-  }
-  return false;
+  if (!f || !t || !md) return false;
+  return inYearlyWindow(md, f, t);
 }
 
 async function readStore(): Promise<StoreFile> {
@@ -104,7 +111,8 @@ async function writeStore(data: StoreFile) {
 const SEARCH_READ_TTL_MS = 30_000;
 let searchRead: { at: number; store: StoreFile } | null = null;
 
-const SEARCH_READ_STALE_MS = 10 * 60_000;
+/** A partner's new period must reach search quickly; an older copy answers at most this long. */
+const SEARCH_READ_STALE_MS = 60_000;
 let searchRefresh: Promise<StoreFile> | null = null;
 
 async function readStoreForSearch(): Promise<StoreFile> {
@@ -219,53 +227,73 @@ export async function deletePeriodDiscount(id: string, partnerId: string): Promi
   return true;
 }
 
+/** Per charged rental day: the day's period adjustment in percent. Positive = cheaper, negative = markup. */
+export type PeriodDayAdjustments = number[];
+
 /**
- * For each carId, the period adjustment for the rental: the strongest overlapping discount minus the
- * strongest overlapping markup. Positive = cheaper, negative = markup.
+ * For each car with a discount or markup on any rental day, that adjustment day by day:
+ * the strongest discount covering the day minus the strongest markup covering it, 0 outside every period.
+ * A 10-day rental whose discount starts on day 6 is five 0s then five discounted days.
  */
 export async function periodDiscountPercentByCarId(
   rangeFrom: string,
   rangeTo: string,
   carIds?: string[],
   opts?: { fresh?: boolean },
-): Promise<Map<string, number>> {
-  // Accept ISO datetimes from search (`2026-09-15T10:00`) as well as plain days.
-  const from = toDay(rangeFrom) || toDay(new Date(rangeFrom).toISOString());
-  const to =
-    toDay(rangeTo || rangeFrom) ||
-    toDay(new Date(rangeTo || rangeFrom).toISOString()) ||
-    from;
-  const map = new Map<string, number>();
-  if (!from || !to) return map;
+): Promise<Map<string, PeriodDayAdjustments>> {
+  const map = new Map<string, PeriodDayAdjustments>();
+  const days = rentalMonthDays(rangeFrom, rangeTo);
+  if (!days.length) return map;
 
   const idFilter = carIds?.length ? new Set(carIds) : null;
   const { items } = opts?.fresh ? await readStore() : await readStoreForSearch();
-  const discounts = new Map<string, number>();
-  const markups = new Map<string, number>();
+  const discounts = new Map<string, number[]>();
+  const markups = new Map<string, number[]>();
   for (const item of items) {
-    if (!yearlyPeriodHitsRange(item.from, item.to, from, to)) continue;
+    const covered = days.map((md) => dayInYearlyPeriod(md, item.from, item.to));
+    if (!covered.some(Boolean)) continue;
     const target = item.kind === "markup" ? markups : discounts;
     for (const carId of item.carIds) {
       if (idFilter && !idFilter.has(carId)) continue;
-      if (item.percent > (target.get(carId) ?? 0)) target.set(carId, item.percent);
+      const row = target.get(carId) ?? days.map(() => 0);
+      covered.forEach((hit, i) => {
+        if (hit && item.percent > row[i]) row[i] = item.percent;
+      });
+      target.set(carId, row);
     }
   }
   for (const carId of new Set([...discounts.keys(), ...markups.keys()])) {
-    const net = (discounts.get(carId) ?? 0) - (markups.get(carId) ?? 0);
-    if (net !== 0) map.set(carId, net);
+    const off = discounts.get(carId);
+    const up = markups.get(carId);
+    const net = days.map((_, i) => (off?.[i] ?? 0) - (up?.[i] ?? 0));
+    if (net.some((value) => value !== 0)) map.set(carId, net);
   }
   return map;
 }
 
-/**
- * Listing price adjustment: the larger of the listing's own discount and a period discount,
- * or the listing discount minus a period markup. Positive = cheaper, negative = markup.
- */
-export function mergeListingDiscountPercent(basePercent: number, periodPercent: number): number {
-  const base = Number.isFinite(basePercent) ? Math.max(0, basePercent) : 0;
-  const period = Number.isFinite(periodPercent) ? periodPercent : 0;
+function mergeDay(base: number, period: number): number {
   const merged = period < 0 ? base + period : Math.max(base, period);
   return Math.min(100, Math.max(-100, merged));
+}
+
+/**
+ * Listing price adjustment for the whole rental, as one percent off the normal daily price:
+ * each day takes the larger of the listing's own discount and that day's period discount,
+ * or the listing discount minus that day's markup; the result is the average over the days,
+ * so the rental total equals the sum of the day-by-day prices. Positive = cheaper, negative = markup.
+ */
+export function mergeListingDiscountPercent(
+  basePercent: number,
+  period: number | PeriodDayAdjustments,
+): number {
+  const base = Number.isFinite(basePercent) ? Math.max(0, basePercent) : 0;
+  const days = Array.isArray(period) ? period : [period];
+  if (!days.length) return mergeDay(base, 0);
+  const sum = days.reduce<number>(
+    (total, value) => total + mergeDay(base, Number.isFinite(value) ? value : 0),
+    0,
+  );
+  return Math.round((sum / days.length) * 10_000) / 10_000;
 }
 
 /** Listing discount used when a booking is created, including an active period discount. */
