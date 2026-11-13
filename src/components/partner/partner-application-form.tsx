@@ -141,7 +141,7 @@ function websiteOk(value: string) {
 
 function fieldClass(invalid: boolean) {
   return cn(
-    "mt-1 w-full rounded-md border bg-white px-3 py-2.5 text-base font-normal text-slate-900 outline-none",
+    "mt-1 w-full rounded-md border bg-white px-3 py-2 text-base font-normal text-slate-900 outline-none",
     invalid ? "border-red-500 bg-red-50" : "border-[#c5ced8] focus:border-sky-500",
   );
 }
@@ -283,7 +283,7 @@ export function PartnerApplicationForm({
       onClick={onClose}
     >
       <div
-        className="flex h-[100dvh] max-h-[100dvh] w-full max-w-5xl flex-col overflow-hidden rounded-none bg-[#f4f7fb] text-slate-900 shadow-2xl sm:h-auto sm:max-h-[90dvh] sm:rounded-2xl"
+        className="flex h-[100dvh] max-h-[100dvh] w-full max-w-5xl flex-col xl:max-w-6xl overflow-hidden rounded-none bg-[#f4f7fb] text-slate-900 shadow-2xl sm:h-auto sm:max-h-[94dvh] sm:rounded-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex shrink-0 items-start justify-between border-b bg-white px-4 py-3 sm:px-5">
@@ -307,11 +307,11 @@ export function PartnerApplicationForm({
             noValidate
             className="flex min-h-0 flex-1 flex-col overflow-hidden"
           >
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
             {error ? <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
-            <div className="rounded-xl border border-slate-200 bg-[#eef3f8] p-3 sm:p-4">
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="space-y-4">
+            <div className="rounded-xl border border-slate-200 bg-[#eef3f8] p-3">
+              <div className="grid gap-4 lg:grid-cols-2 lg:gap-5 xl:grid-cols-[1.15fr_1fr_0.9fr]">
+                <div className="space-y-3">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <TextField label={t.firstName} value={firstName} onChange={setFirstName} invalid={mark("firstName")} />
                     <TextField label={t.lastName} value={lastName} onChange={setLastName} invalid={mark("lastName")} />
@@ -356,7 +356,7 @@ export function PartnerApplicationForm({
                               )
                             }
                             className={cn(
-                              "min-h-10 rounded-md border px-2.5 py-1.5 text-xs font-semibold",
+                              "min-h-10 rounded-md border px-2.5 py-1 text-xs font-semibold lg:min-h-8",
                               on
                                 ? "border-emerald-600 bg-emerald-50 text-emerald-900"
                                 : "border-slate-200 bg-white text-slate-600",
@@ -370,7 +370,7 @@ export function PartnerApplicationForm({
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div data-invalid={mark("countries") ? "true" : undefined}>
                     <p className={cn("mb-1.5 text-sm font-semibold", mark("countries") ? "text-red-700" : "text-[#3a4553]")}>
                       {t.countries} <span className="text-[#e11d48]">*</span>
@@ -382,7 +382,7 @@ export function PartnerApplicationForm({
                         mark("countries") && countryIso2s.length === 0 && "border border-red-500 bg-red-50 p-2",
                       )}
                     >
-                      <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
                         <select
                           className="h-11 min-w-0 flex-1 rounded-md border border-[#c5ced8] bg-white px-3 text-base"
                           value={addCountry}
@@ -458,27 +458,17 @@ export function PartnerApplicationForm({
                     invalid={mark("managerPhone")}
                     hint={t.phoneCodeRequired}
                   />
+                </div>
+
+                {/* Third column on wide screens, a full-width row below on medium ones, so the form fits without scrolling. */}
+                <div className="space-y-3 lg:col-span-2 xl:col-span-1">
                   <div data-invalid={mark("website") ? "true" : undefined}>
-                    <p className={cn("mb-1.5 text-sm font-semibold", mark("website") ? "text-red-700" : "text-[#3a4553]")}>
-                      {t.website}
-                      {noWebsite ? null : <span className="text-[#e11d48]"> *</span>}
-                    </p>
-                    <div
-                      className={cn(
-                        "rounded-md border bg-white px-3 py-2",
-                        mark("website") ? "border-red-500 bg-red-50" : "border-[#c5ced8]",
-                      )}
-                    >
-                      <input
-                        type="text"
-                        inputMode="url"
-                        disabled={noWebsite}
-                        aria-invalid={mark("website") || undefined}
-                        className="min-h-11 w-full border-0 bg-transparent text-base font-normal text-slate-900 outline-none disabled:text-slate-400"
-                        value={noWebsite ? "" : website}
-                        onChange={(event) => setWebsite(event.target.value)}
-                      />
-                      <label className="mt-1 flex min-h-10 cursor-pointer items-center gap-2 border-t border-slate-200 pt-1.5 text-sm font-semibold text-slate-700">
+                    <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3">
+                      <p className={cn("text-sm font-semibold", mark("website") ? "text-red-700" : "text-[#3a4553]")}>
+                        {t.website}
+                        {noWebsite ? null : <span className="text-[#e11d48]"> *</span>}
+                      </p>
+                      <label className="flex min-h-9 cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700">
                         <input
                           type="checkbox"
                           className="h-5 w-5 shrink-0 accent-sky-600"
@@ -492,40 +482,55 @@ export function PartnerApplicationForm({
                         <span>{t.noWebsite}</span>
                       </label>
                     </div>
-                  </div>
-                  <div
-                    data-invalid={mark("login") || mark("password") || mark("confirm") ? "true" : undefined}
-                    className={cn(
-                      "space-y-3 rounded-md border bg-white p-3",
-                      mark("login") || mark("password") || mark("confirm") ? "border-red-500" : "border-slate-200",
-                    )}
-                  >
-                    <p className="text-sm font-semibold text-[#3a4553]">{t.credentials}</p>
-                    <TextField
-                      label={t.login}
-                      value={loginEmail}
-                      onChange={setLoginEmail}
-                      invalid={mark("login")}
-                      type="email"
-                      autoComplete="email"
-                    />
-                    <TextField
-                      label={t.password}
-                      value={password}
-                      onChange={setPassword}
-                      invalid={mark("password")}
-                      type="password"
-                      autoComplete="new-password"
-                    />
-                    <TextField
-                      label={t.confirm}
-                      value={confirmPassword}
-                      onChange={setConfirmPassword}
-                      invalid={mark("confirm")}
-                      type="password"
-                      autoComplete="new-password"
+                    <input
+                      type="text"
+                      inputMode="url"
+                      disabled={noWebsite}
+                      aria-invalid={mark("website") || undefined}
+                      aria-label={t.website}
+                      className={cn(
+                        fieldClass(mark("website")),
+                        "mt-0 disabled:bg-slate-100 disabled:text-slate-400",
+                      )}
+                      value={noWebsite ? "" : website}
+                      onChange={(event) => setWebsite(event.target.value)}
                     />
                   </div>
+              <div
+                data-invalid={mark("login") || mark("password") || mark("confirm") ? "true" : undefined}
+                className={cn(
+                  "rounded-md border bg-white p-3",
+                  mark("login") || mark("password") || mark("confirm") ? "border-red-500" : "border-slate-200",
+                )}
+              >
+                <p className="text-sm font-semibold text-[#3a4553]">{t.credentials}</p>
+                <div className="mt-1 grid gap-3 sm:grid-cols-3 xl:grid-cols-1 xl:gap-2">
+                  <TextField
+                    label={t.login}
+                    value={loginEmail}
+                    onChange={setLoginEmail}
+                    invalid={mark("login")}
+                    type="email"
+                    autoComplete="email"
+                  />
+                  <TextField
+                    label={t.password}
+                    value={password}
+                    onChange={setPassword}
+                    invalid={mark("password")}
+                    type="password"
+                    autoComplete="new-password"
+                  />
+                  <TextField
+                    label={t.confirm}
+                    value={confirmPassword}
+                    onChange={setConfirmPassword}
+                    invalid={mark("confirm")}
+                    type="password"
+                    autoComplete="new-password"
+                  />
+                </div>
+              </div>
                 </div>
               </div>
             </div>
@@ -636,9 +641,7 @@ function PhoneRow({
           <PhoneMessengerIcons selected={messengers} onChange={onMessengers} labels={messengerLabels} />
         </div>
       </div>
-      <p className={cn("mt-1 text-sm leading-snug", invalid ? "font-semibold text-red-700" : "text-slate-500")}>
-        {hint}
-      </p>
+      {invalid ? <p className="mt-1 text-sm font-semibold leading-snug text-red-700">{hint}</p> : null}
     </div>
   );
 }
