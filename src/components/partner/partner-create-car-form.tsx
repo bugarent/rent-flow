@@ -534,11 +534,12 @@ export function PartnerCreateCarForm({
   const [deleting, setDeleting] = useState(false);
 
   const [extrasCatalog, setExtrasCatalog] = useState<ExtraServicePricing[]>(initialExtrasCatalog);
-  const initialExtraPrefsRef = useRef(Boolean(initialExtraPrefs) && !isAdminReview);
+  const serverExtraPrefs = Boolean(initialExtraPrefs) && !isAdminReview;
+  const initialExtraPrefsRef = useRef(serverExtraPrefs);
   /** Without the partner's list from the server, wait for it before showing any service. */
-  const [extrasReady, setExtrasReady] = useState(() => initialExtraPrefsRef.current);
+  const [extrasReady, setExtrasReady] = useState(serverExtraPrefs);
   const [extraSelections, setExtraSelections] = useState<PartnerExtraSelection[]>(() =>
-    initialExtraPrefs && initialExtraPrefsRef.current
+    initialExtraPrefs && serverExtraPrefs
       ? selectionsFromCabinet(initialExtrasCatalog, initialExtraPrefs).map((row) => ({
           ...row,
           priceEur:

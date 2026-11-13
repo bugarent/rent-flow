@@ -23,7 +23,6 @@ import {
   optionalPeriodMoney,
 } from "@/lib/extras/pricing";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
-import { isListingInsuranceService } from "@/lib/extras/checkout-slot";
 import {
   partnerCabinetDefaults,
   partnerServiceAlwaysAdded,
