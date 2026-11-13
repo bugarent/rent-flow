@@ -52,6 +52,7 @@ import {
 } from "@/lib/cars/registration-number";
 import {
   DEFAULT_PARTNER_PRICING_CURRENCY,
+  DEFAULT_PARTNER_TARIFFS,
   isPartnerPricingCurrency,
   type TariffInterval,
   normalizeTariffIntervals,
@@ -516,11 +517,7 @@ export function PartnerCreateCarForm({
   const [tariffIntervals, setTariffIntervals] = useState<TariffInterval[]>(() =>
     initialTariffs?.length
       ? normalizeTariffIntervals(initialTariffs)
-      : [
-          { fromDays: 1, toDays: 3 },
-          { fromDays: 4, toDays: 5 },
-          { fromDays: 6, toDays: 30 },
-        ],
+      : DEFAULT_PARTNER_TARIFFS.map((row) => ({ ...row })),
   );
   const [tariffPrices, setTariffPrices] = useState<string[]>(() =>
     Array.from({ length: (initialTariffs?.length || 3) + 1 }, () => ""),

@@ -13,6 +13,7 @@ import {
 } from "@/lib/server/partner-company-settings-store";
 import {
   DEFAULT_PARTNER_PRICING_CURRENCY,
+  DEFAULT_PARTNER_TARIFFS,
   type PartnerPricingCurrency,
 } from "@/lib/partners/company-settings";
 import { getFxRates } from "@/lib/server/preferences";
@@ -112,11 +113,7 @@ export async function GET() {
       seasonalPricing = emptySeasonalPricing();
     }
 
-    let tariffs = [
-      { fromDays: 1, toDays: 3 },
-      { fromDays: 4, toDays: 5 },
-      { fromDays: 6, toDays: 30 },
-    ];
+    let tariffs = DEFAULT_PARTNER_TARIFFS.map((row) => ({ ...row }));
     let pricingCurrency: PartnerPricingCurrency = DEFAULT_PARTNER_PRICING_CURRENCY;
     let deliveryLocationIds: string[] = [];
     let deliveryCatalog: DeliveryLocationView[] = [];

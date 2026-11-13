@@ -42,6 +42,13 @@ export type TariffInterval = {
   toDays: number;
 };
 
+/** Day ranges a new partner sees until they edit or add their own. */
+export const DEFAULT_PARTNER_TARIFFS: TariffInterval[] = [
+  { fromDays: 1, toDays: 3 },
+  { fromDays: 4, toDays: 6 },
+  { fromDays: 7, toDays: 30 },
+];
+
 /** Next row always starts at previous “to” + 1. First row always starts at 1. */
 export function normalizeTariffIntervals(
   rows: TariffInterval[],
@@ -220,11 +227,7 @@ export function defaultCompanySettings(
     requireCreditCard: false,
     depositMethods: ["Cash"],
     cashDepositRefundDays: 0,
-    tariffs: [
-      { fromDays: 1, toDays: 3 },
-      { fromDays: 4, toDays: 5 },
-      { fromDays: 6, toDays: 30 },
-    ],
+    tariffs: DEFAULT_PARTNER_TARIFFS.map((row) => ({ ...row })),
     seasonalPricing: emptySeasonalPricing(),
     yearFullySeasonal: true,
     contractUrl: "",
