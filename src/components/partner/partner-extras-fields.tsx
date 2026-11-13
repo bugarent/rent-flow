@@ -9,6 +9,7 @@ import {
 } from "@/lib/extras/pricing";
 import { findCarExtraOffer, type CarExtraOffer } from "@/lib/cars/car-details";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
+import { isListingInsuranceService } from "@/lib/extras/checkout-slot";
 import { partnerStatusLocked } from "@/lib/extras/partner-service-choice";
 import { formatAmountNumber } from "@/lib/utils";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
@@ -102,6 +103,42 @@ export function indexExtraPrefs(items: CarFormExtraPref[]) {
       return byId.get(service.id) || (service.slug ? bySlug.get(service.slug) : undefined);
     },
   };
+}
+
+/** Default per-listing state for a new car, taken from the partner's cabinet choices. Prices stay in EUR. */
+export function selectionsFromCabinet(
+  catalog: ExtraServicePricing[],
+  prefItems: CarFormExtraPref[],
+): PartnerExtraSelection[] {
+  const prefs = indexExtraPrefs(prefItems);
+  const existingPrices = catalog.map((service) => {
+    const pref = prefs.forService(service);
+    const price = pref?.forbidden
+      ? 0
+      : pref?.priceEur != null
+        ? Number(pref.priceEur)
+        : Number(service.defaultPriceEur ?? service.minPriceEur ?? 0);
+    return { extraServiceId: service.id, priceEur: price, forbidden: Boolean(pref?.forbidden) };
+  });
+  return buildExtraSelections(catalog, existingPrices).map((row) => {
+    const service = catalog.find((item) => item.id === row.extraServiceId);
+    const pref = service ? prefs.forService(service) : undefined;
+    const mandatory = service ? isMandatoryExtra(service) : false;
+    const insurance = service ? isListingInsuranceService(service) : false;
+    let enabled = row.enabled;
+    let forbidden = Boolean(row.forbidden);
+    if (!mandatory && pref?.forbidden) {
+      enabled = true;
+      forbidden = true;
+    } else if (!mandatory && pref && pref.enabled === false) {
+      enabled = false;
+      forbidden = false;
+    } else if (!mandatory && !pref && insurance) {
+      enabled = true;
+      forbidden = false;
+    }
+    return { ...row, enabled, forbidden, priceEur: forbidden ? "0" : row.priceEur };
+  });
 }
 
 export function catalogIdsForCarExtras(

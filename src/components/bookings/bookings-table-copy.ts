@@ -4,6 +4,7 @@ export type BookingsTableCopy = {
   filters: string;
   all: string;
   paid: string;
+  current: string;
   completed: string;
   cancelled: string;
   empty: string;
@@ -27,6 +28,7 @@ const COPY: Record<string, BookingsTableCopy> = {
     filters: "Filters",
     all: "All",
     paid: "Active",
+    current: "In progress",
     completed: "Completed",
     cancelled: "Cancelled",
     empty: "Partner cancelled",
@@ -48,6 +50,7 @@ const COPY: Record<string, BookingsTableCopy> = {
     filters: "ფილტრები",
     all: "ყველა",
     paid: "აქტიური",
+    current: "მიმდინარე",
     completed: "დასრულებული",
     cancelled: "გაუქმებული",
     empty: "პარტნიორის გაუქმებული",
@@ -69,6 +72,7 @@ const COPY: Record<string, BookingsTableCopy> = {
     filters: "Фильтры",
     all: "Все",
     paid: "Активные",
+    current: "Текущая",
     completed: "Завершено",
     cancelled: "Отменено",
     empty: "Отменено партнёром",
@@ -90,6 +94,7 @@ const COPY: Record<string, BookingsTableCopy> = {
     filters: "Filtres",
     all: "Tous",
     paid: "Actives",
+    current: "En cours",
     completed: "Terminée",
     cancelled: "Annulé",
     empty: "Annulé par le partenaire",
@@ -111,6 +116,7 @@ const COPY: Record<string, BookingsTableCopy> = {
     filters: "Filter",
     all: "Alle",
     paid: "Aktiv",
+    current: "Laufend",
     completed: "Abgeschlossen",
     cancelled: "Storniert",
     empty: "Vom Partner storniert",
@@ -132,6 +138,7 @@ const COPY: Record<string, BookingsTableCopy> = {
     filters: "Filtry",
     all: "Wszystkie",
     paid: "Aktywne",
+    current: "W trakcie",
     completed: "Zakończone",
     cancelled: "Anulowane",
     empty: "Anulowane przez partnera",
@@ -153,6 +160,7 @@ const COPY: Record<string, BookingsTableCopy> = {
     filters: "تصفية",
     all: "الكل",
     paid: "نشط",
+    current: "جارية",
     completed: "مكتمل",
     cancelled: "ملغى",
     empty: "ملغى من الشريك",

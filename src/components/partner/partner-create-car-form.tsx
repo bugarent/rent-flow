@@ -21,6 +21,8 @@ import {
   catalogIdsForOffers,
   extrasVisibleOnCarForm,
   indexExtraPrefs,
+  selectionsFromCabinet,
+  type CarFormExtraPref,
   type PartnerExtraSelection,
 } from "@/components/partner/partner-extras-fields";
 import {
@@ -420,6 +422,7 @@ const NO_EXTRAS_CATALOG: ExtraServicePricing[] = [];
 export function PartnerCreateCarForm({
   initialDeliveryCatalog = NO_DELIVERY_CATALOG,
   initialExtrasCatalog = NO_EXTRAS_CATALOG,
+  initialExtraPrefs,
   initialTariffs,
   initialCategories,
   carId,
@@ -427,6 +430,8 @@ export function PartnerCreateCarForm({
 }: {
   initialDeliveryCatalog?: DeliveryLocationView[];
   initialExtrasCatalog?: ExtraServicePricing[];
+  /** Cabinet state of each service in `initialExtrasCatalog`, so the services section is right on first paint. */
+  initialExtraPrefs?: CarFormExtraPref[];
   /** Server list so the category dropdown is never empty on first paint. */
   initialCategories?: PartnerCarCategoryOption[];
   /** Partner day ranges from personal info, so the price columns are right on first paint. */
@@ -529,10 +534,19 @@ export function PartnerCreateCarForm({
   const [deleting, setDeleting] = useState(false);
 
   const [extrasCatalog, setExtrasCatalog] = useState<ExtraServicePricing[]>(initialExtrasCatalog);
-  /** The server catalog lists every service; wait for the partner's own list before showing any. */
-  const [extrasReady, setExtrasReady] = useState(false);
+  const initialExtraPrefsRef = useRef(Boolean(initialExtraPrefs) && !isAdminReview);
+  /** Without the partner's list from the server, wait for it before showing any service. */
+  const [extrasReady, setExtrasReady] = useState(() => initialExtraPrefsRef.current);
   const [extraSelections, setExtraSelections] = useState<PartnerExtraSelection[]>(() =>
-    buildExtraSelections(initialExtrasCatalog),
+    initialExtraPrefs && initialExtraPrefsRef.current
+      ? selectionsFromCabinet(initialExtrasCatalog, initialExtraPrefs).map((row) => ({
+          ...row,
+          priceEur:
+            !row.priceEur || row.priceEur === "0"
+              ? row.priceEur
+              : eurToPartnerAmount(row.priceEur, DEFAULT_PARTNER_PRICING_CURRENCY, DEFAULT_FX_RATES),
+        }))
+      : buildExtraSelections(initialExtrasCatalog),
   );
   const [pickupPlaces, setPickupPlaces] = useState<PickupPlaceRow[]>([]);
   const [pricingCurrency, setPricingCurrency] = useState<PartnerDisplayCurrency>(
@@ -951,7 +965,7 @@ export function PartnerCreateCarForm({
         setPricingCurrency(nextCurrency);
         setFxRates(nextRates);
 
-        if (!carId && extrasRes?.ok && Array.isArray(extras) && extras.length) {
+        if (!carId && !initialExtraPrefsRef.current && extrasRes?.ok && Array.isArray(extras) && extras.length) {
           const prefItems = Array.isArray(prefsData?.items) ? prefsData.items : [];
           const prefs = indexExtraPrefs(prefItems);
           const filtered = extrasVisibleOnCarForm(extras, {
@@ -959,47 +973,16 @@ export function PartnerCreateCarForm({
             fallback: extrasFallbackRef.current,
           });
           if (!cancelled && (prefs.trusted || filtered.length > 0)) {
-            const existingPrices = filtered.map((service: ExtraServicePricing) => {
-              const pref = prefs.forService(service);
-              const price =
-                pref?.forbidden
-                  ? 0
-                  : pref?.priceEur != null
-                    ? Number(pref.priceEur)
-                    : Number(service.defaultPriceEur ?? service.minPriceEur ?? 0);
-              return {
-                extraServiceId: service.id,
-                priceEur: price,
-                forbidden: Boolean(pref?.forbidden),
-              };
-            });
             setExtrasCatalog(filtered);
             setExtrasReady(true);
             setExtraSelections(
-              buildExtraSelections(filtered, existingPrices).map((row) => {
-                const service = filtered.find((item) => item.id === row.extraServiceId);
-                const pref = service ? prefs.forService(service) : undefined;
-                const mandatory = service ? isMandatoryExtra(service) : false;
-                const insurance = service ? isListingInsuranceService(service) : false;
-                let enabled = row.enabled;
-                let forbidden = Boolean(row.forbidden);
-                if (!mandatory && pref?.forbidden) {
-                  enabled = true;
-                  forbidden = true;
-                } else if (!mandatory && pref && pref.enabled === false) {
-                  enabled = false;
-                  forbidden = false;
-                } else if (!mandatory && !pref && insurance) {
-                  enabled = true;
-                  forbidden = false;
-                }
-                const priceEur = forbidden
-                  ? "0"
-                  : !row.priceEur || row.priceEur === "0"
+              selectionsFromCabinet(filtered, prefItems).map((row) => ({
+                ...row,
+                priceEur:
+                  !row.priceEur || row.priceEur === "0"
                     ? row.priceEur
-                    : eurToPartnerAmount(row.priceEur, nextCurrency, nextRates);
-                return { ...row, enabled, forbidden, priceEur };
-              }),
+                    : eurToPartnerAmount(row.priceEur, nextCurrency, nextRates),
+              })),
             );
           }
         }

@@ -6,6 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { listExtraServices } from "@/lib/server/extras-store";
 import { scopeExtrasToPartner } from "@/lib/server/extras/partner-country-scope";
 import { readPartnerExtraPrefs } from "@/lib/server/partner-extras-prefs-store";
+import { listPartnerCarsForExtras } from "@/lib/server/partner-extras-fleet";
+import { partnerCabinetDefaults, partnerServiceAdded } from "@/lib/extras/partner-service-choice";
+import type { CarFormExtraPref } from "@/components/partner/partner-extras-fields";
 import {
   readCompanySettingsFile,
   resolveCompanySettings,
@@ -42,6 +45,8 @@ async function resolvePartner(user: SessionUser) {
 export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
   initialDeliveryCatalog: DeliveryLocationView[];
   initialExtrasCatalog: ExtraServicePricing[];
+  /** Cabinet state of each service in `initialExtrasCatalog`; present only when the partner's list loaded. */
+  initialExtraPrefs?: CarFormExtraPref[];
   initialTariffs?: TariffInterval[];
   initialCategories: PartnerCarCategoryOption[];
 }> {
@@ -52,22 +57,36 @@ export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
       ? resolveCompanySettings(row)
       : readCompanySettingsFile(partnerId)
     ).catch(() => null);
-    const [delivery, extras, prefs, initialCategories] = await Promise.all([
+    const [delivery, extras, prefs, initialCategories, fleet] = await Promise.all([
       loadPartnerDeliveryCatalog(partnerId, company?.deliveryLocationIds || []),
       listExtraServices({ activeOnly: true }),
       readPartnerExtraPrefs(partnerId),
       categoriesPromise,
+      listPartnerCarsForExtras({ user }, partnerId).catch(() => null),
     ]);
-    const enabledIds = new Set(
-      prefs.filter((p) => p.enabled || p.forbidden).map((p) => p.extraServiceId),
+    const prefById = new Map(prefs.map((p) => [p.extraServiceId, p]));
+    const offered = extras.filter((service) => {
+      if (isMandatoryExtra(service)) return true;
+      const pref = prefById.get(service.id);
+      if (isCrossBorderExtra(service)) return Boolean(pref?.enabled || pref?.forbidden);
+      if (!fleet) return true;
+      return partnerServiceAdded(service, pref, fleet.usedOnCar(service));
+    });
+    const initialExtrasCatalog = await scopeExtrasToPartner(
+      offered,
+      partnerId,
+      company?.deliveryCountryIso2s,
     );
-    const offered = extras.filter(
-      (service) =>
-        isMandatoryExtra(service) || !isCrossBorderExtra(service) || enabledIds.has(service.id),
-    );
+    const initialExtraPrefs: CarFormExtraPref[] | undefined = fleet
+      ? initialExtrasCatalog.map((service) => ({
+          service: { id: service.id, slug: service.slug },
+          ...partnerCabinetDefaults(service, prefById.get(service.id), fleet.usedOnCar(service)),
+        }))
+      : undefined;
     return {
       initialDeliveryCatalog: delivery,
-      initialExtrasCatalog: await scopeExtrasToPartner(offered, partnerId, company?.deliveryCountryIso2s),
+      initialExtrasCatalog,
+      initialExtraPrefs,
       initialTariffs: company?.tariffs?.length ? company.tariffs : undefined,
       initialCategories,
     };

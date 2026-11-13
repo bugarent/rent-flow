@@ -1,5 +1,10 @@
-import { isMandatoryExtra } from "@/lib/extras/pricing";
-import { resolveCheckoutSlot } from "@/lib/extras/checkout-slot";
+import {
+  clampPartnerDailyPrice,
+  isMandatoryExtra,
+  isMandatoryFreeExtra,
+  isPeriodForcedFreeExtra,
+} from "@/lib/extras/pricing";
+import { isListingInsuranceService, resolveCheckoutSlot } from "@/lib/extras/checkout-slot";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
 
 type ChoiceService = Parameters<typeof isMandatoryExtra>[0] & {
@@ -44,4 +49,48 @@ export function partnerServiceAdded(
   if (partnerServiceAlwaysAdded(service)) return true;
   if (typeof pref?.added === "boolean") return pref.added;
   return Boolean(pref?.enabled || pref?.forbidden || usedOnCar);
+}
+
+/** One service as the partner's cabinet shows it: on the list, default state and daily price (EUR). */
+export function partnerCabinetDefaults(
+  service: ChoiceService & {
+    minPriceEur: number | null;
+    maxPriceEur: number | null;
+    maxPeriodEur?: number | null;
+    defaultPriceEur?: number | null;
+  },
+  pref: { added?: boolean; enabled?: boolean; forbidden?: boolean; priceEur?: number } | null | undefined,
+  usedOnCar = false,
+): { added: boolean; enabled: boolean; forbidden: boolean; priceEur: number } {
+  const locked = partnerStatusLocked(service);
+  const added = partnerServiceAdded(service, pref, usedOnCar);
+  const forbidden = locked || !added ? false : Boolean(pref?.forbidden);
+  const insuranceDefault =
+    !pref &&
+    isListingInsuranceService({
+      checkoutSlot: service.checkoutSlot,
+      slug: service.slug ?? undefined,
+      isTpl: Boolean(service.isTpl),
+      name: service.name,
+    });
+  const priceEur =
+    isMandatoryFreeExtra(service) || forbidden || isPeriodForcedFreeExtra(service)
+      ? 0
+      : clampPartnerDailyPrice(
+          service.minPriceEur,
+          service.maxPriceEur,
+          isMandatoryExtra(service)
+            ? pref?.priceEur ?? 0
+            : pref?.priceEur ?? service.defaultPriceEur ?? service.minPriceEur ?? 0,
+        );
+  const enabled = locked
+    ? true
+    : !added
+      ? false
+      : forbidden
+        ? true
+        : pref
+          ? Boolean(pref.enabled)
+          : insuranceDefault;
+  return { added, enabled, forbidden, priceEur };
 }

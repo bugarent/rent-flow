@@ -130,11 +130,19 @@ function addressIncludesCity(address: string, city: string, iata: string) {
   });
 }
 
-export function statusLabel(status: string, t: Copy, ended = false) {
-  if (ended && (status === "CONFIRMED" || status === "COMPLETED" || status === "PENDING")) return t.completed;
-  if (status === "CONFIRMED" || status === "COMPLETED" || status === "PENDING") return t.paid;
+export function statusLabel(
+  status: string,
+  t: Copy,
+  ended = false,
+  phase?: "upcoming" | "current" | "ended" | null,
+) {
   if (status === "CANCELLED") return t.cancelled;
   if (status === "UNFULFILLED") return t.partnerCancelled;
+  if (phase === "ended" || (ended && (status === "CONFIRMED" || status === "COMPLETED" || status === "PENDING"))) {
+    return t.completed;
+  }
+  if (phase === "current") return t.current;
+  if (status === "CONFIRMED" || status === "COMPLETED" || status === "PENDING") return t.paid;
   return t.pending;
 }
 

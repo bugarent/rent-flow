@@ -159,6 +159,7 @@ export function PartnerBookingsDashboard({
         showFiltersButton={false}
         showAllPill={false}
         initialFilter="paid"
+        periodStatus
         showPickupDue
         onView={(row) => {
           const b = byId.get(row.id);

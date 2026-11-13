@@ -19,6 +19,16 @@ export function rentalHasEnded(dropoffAt: string, now = Date.now()) {
   return Number.isFinite(end) && end <= now;
 }
 
+/** Display phase for an active booking. Cancelled and unfulfilled stay on their own status. */
+export type RentalPhase = "upcoming" | "current" | "ended";
+
+export function rentalPhase(pickupAt: string, dropoffAt: string, now = Date.now()): RentalPhase {
+  if (rentalHasEnded(dropoffAt, now)) return "ended";
+  const start = new Date(pickupAt).getTime();
+  if (Number.isFinite(start) && start <= now) return "current";
+  return "upcoming";
+}
+
 export function bookingMatchesStatusFilter(
   b: BookingLike,
   filter: BookingsTableStatusFilter,

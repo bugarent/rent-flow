@@ -23,7 +23,7 @@ import {
   commissionableTripEur,
   guestCancelSettlement,
 } from "@/lib/bookings/guest-cancellation";
-import { isActiveBookingStatus, rentalHasEnded } from "@/lib/bookings/table-filters";
+import { isActiveBookingStatus, rentalHasEnded, rentalPhase } from "@/lib/bookings/table-filters";
 import { formatRegistrationNumberDisplay } from "@/lib/cars/registration-number";
 import { copyFor } from "./copy";
 import {
@@ -108,10 +108,15 @@ export function BookingInfoModal({
       ? formatRegistrationNumberDisplay(booking.car.registrationNumber)
       : String(booking.car.registrationNumber || "").trim().toUpperCase()
     : "";
+  const partnerPhase =
+    readOnly && isActiveBookingStatus(booking.status)
+      ? rentalPhase(booking.pickupAt, booking.dropoffAt)
+      : null;
   const ended =
-    canEditGuestFields &&
-    isActiveBookingStatus(booking.status) &&
-    (booking.status === "COMPLETED" || rentalHasEnded(booking.dropoffAt));
+    partnerPhase === "ended" ||
+    (canEditGuestFields &&
+      isActiveBookingStatus(booking.status) &&
+      (booking.status === "COMPLETED" || rentalHasEnded(booking.dropoffAt)));
 
   const [depositPercent, setDepositPercent] = useState(
     () =>
@@ -949,10 +954,12 @@ export function BookingInfoModal({
                   ? "bg-rose-50 text-rose-700 ring-1 ring-rose-200"
                   : booking.status === "UNFULFILLED" || ended
                     ? "bg-slate-100 text-slate-600 ring-1 ring-slate-200"
-                    : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+                    : partnerPhase === "current"
+                      ? "bg-sky-50 text-sky-800 ring-1 ring-sky-200"
+                      : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
               )}
             >
-              {statusLabel(booking.status, t, ended)}
+              {statusLabel(booking.status, t, ended, partnerPhase)}
             </span>
             {partnerPlate ? (
               <span

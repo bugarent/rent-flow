@@ -13,7 +13,7 @@ import {
   writePartnerExtraPrefs,
   type PartnerExtraPref,
 } from "@/lib/server/partner-extras-prefs-store";
-import { listFileCarsForPartner } from "@/lib/server/partner-cars-store";
+import { listPartnerCarsForExtras } from "@/lib/server/partner-extras-fleet";
 import {
   capPartnerMaxPeriod,
   clampPartnerDailyPrice,
@@ -25,11 +25,10 @@ import {
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
 import { isListingInsuranceService } from "@/lib/extras/checkout-slot";
 import {
-  partnerServiceAdded,
+  partnerCabinetDefaults,
   partnerServiceAlwaysAdded,
   partnerStatusLocked,
 } from "@/lib/extras/partner-service-choice";
-import { parseCarDetails, readExtraOffers } from "@/lib/cars/car-details";
 import { syncListingExtraPrices } from "@/lib/server/sync-listing-extra-prices";
 
 async function resolvePartnerId(userId: string, email?: string | null): Promise<string> {
@@ -64,98 +63,6 @@ async function partnerCatalog(partnerId: string, opts: { scoped?: boolean } = {}
   }
   const sorted = Array.from(byId.values()).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
   return opts.scoped === false ? sorted : scopeExtrasToPartner(sorted, partnerId);
-}
-
-async function listPartnerCarsForExtras(
-  session: { user: { id: string; email?: string | null } },
-  partnerId: string,
-) {
-  const cars: Array<{
-    id: string;
-    title: string;
-    make: string;
-    model: string;
-    year: number;
-    categorySlug: string | null;
-    registrationNumber: string | null;
-  }> = [];
-  const seen = new Set<string>();
-  /** Services already offered on a car (rows or saved offers), by id and by slug. */
-  const usedIds = new Set<string>();
-  const usedSlugs = new Set<string>();
-  const noteOffers = (details: ReturnType<typeof parseCarDetails>) => {
-    for (const offer of readExtraOffers(details)) {
-      if (offer.enabled === false && !offer.forbidden) continue;
-      usedIds.add(offer.extraServiceId);
-      if (offer.slug) usedSlugs.add(offer.slug);
-    }
-  };
-
-  try {
-    const partner = await prisma.partner.findUnique({ where: { userId: session.user.id } });
-    if (partner?.id) {
-      const dbCars = await prisma.car.findMany({
-        where: { partnerId: partner.id },
-        select: {
-          id: true,
-          title: true,
-          make: true,
-          model: true,
-          year: true,
-          categorySlug: true,
-          description: true,
-          extras: { select: { extraServiceId: true } },
-        },
-        orderBy: { updatedAt: "desc" },
-      });
-      for (const c of dbCars) {
-        seen.add(c.id);
-        const details = parseCarDetails(c.description);
-        for (const row of c.extras) usedIds.add(row.extraServiceId);
-        noteOffers(details);
-        cars.push({
-          id: c.id,
-          title: c.title,
-          make: c.make,
-          model: c.model,
-          year: c.year,
-          categorySlug:
-            c.categorySlug || String(details?.categorySlug || details?.bodyType || "") || null,
-          registrationNumber: String(details?.plate || "").trim() || null,
-        });
-      }
-    }
-  } catch (error) {
-    if (!isDbOfflineError(error)) throw error;
-  }
-
-  const fileCars = await listFileCarsForPartner({
-    userId: session.user.id,
-    email: session.user.email,
-    partnerId,
-  });
-  for (const c of fileCars) {
-    if (seen.has(c.id)) continue;
-    const details = parseCarDetails(c.description);
-    for (const row of c.extras || []) if (row?.extraServiceId) usedIds.add(row.extraServiceId);
-    noteOffers(details);
-    cars.push({
-      id: c.id,
-      title: c.title,
-      make: c.make,
-      model: c.model,
-      year: c.year,
-      categorySlug:
-        c.categorySlug || String(details?.categorySlug || details?.bodyType || "") || null,
-      registrationNumber: c.registrationNumber || String(details?.plate || "").trim() || null,
-    });
-  }
-
-  return {
-    cars,
-    usedOnCar: (service: { id: string; slug?: string }) =>
-      usedIds.has(service.id) || Boolean(service.slug && usedSlugs.has(service.slug)),
-  };
 }
 
 function cleanCarIds(raw: unknown, allowed: Set<string>): string[] | undefined {
@@ -219,36 +126,19 @@ export async function GET() {
       })
       .map((service) => {
       const mandatory = isMandatoryExtra(service);
-      const locked = partnerStatusLocked(service);
       const mandatoryFree = isMandatoryFreeExtra(service);
       const pref = prefById.get(service.id);
-      const added = partnerServiceAdded(service, pref, fleet.usedOnCar(service));
+      const { added, enabled, forbidden, priceEur: defaultPrice } = partnerCabinetDefaults(
+        service,
+        pref,
+        fleet.usedOnCar(service),
+      );
       const max = service.maxPriceEur;
-      const forbidden = locked || !added ? false : Boolean(pref?.forbidden);
-      const insuranceDefault = !pref && isListingInsuranceService(service);
-      const defaultPrice =
-        mandatoryFree || forbidden || isPeriodForcedFreeExtra(service)
-          ? 0
-          : clampPartnerDailyPrice(
-              service.minPriceEur,
-              max,
-              mandatory
-                ? pref?.priceEur ?? 0
-                : pref?.priceEur ?? service.defaultPriceEur ?? service.minPriceEur ?? 0,
-            );
       const carIds = Array.isArray(pref?.carIds) ? pref.carIds.map(String) : allCarIds;
       return {
         service,
         added,
-        enabled: locked
-          ? true
-          : !added
-            ? false
-            : forbidden
-              ? true
-              : pref
-                ? Boolean(pref.enabled)
-                : insuranceDefault,
+        enabled,
         forbidden,
         priceEur: defaultPrice,
         maxPriceEur: max,

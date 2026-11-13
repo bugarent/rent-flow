@@ -130,6 +130,7 @@ export type Copy = {
   cancelUnder2WithProtection: string;
   cancelSubmit: string;
   paid: string;
+  current: string;
   completed: string;
   pending: string;
   cancelled: string;

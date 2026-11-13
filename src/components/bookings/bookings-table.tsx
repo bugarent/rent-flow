@@ -9,7 +9,9 @@ import {
   countBookingsByStatusFilter,
   isActiveBookingStatus,
   rentalHasEnded,
+  rentalPhase,
   type BookingsTableStatusFilter,
+  type RentalPhase,
 } from "@/lib/bookings/table-filters";
 import { cn, formatMoneyAmount } from "@/lib/utils";
 import { isCurrency, type Currency } from "@/lib/i18n/config";
@@ -44,8 +46,15 @@ function formatDateDdMmYyyy(iso: string) {
   return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
 }
 
-function statusLabel(status: string, copy: BookingsTableCopy, ended = false) {
-  if (ended && isActiveBookingStatus(status)) return copy.completed;
+function statusLabel(
+  status: string,
+  copy: BookingsTableCopy,
+  ended = false,
+  phase: RentalPhase | null = null,
+) {
+  if (phase === "ended" || (ended && isActiveBookingStatus(status))) return copy.completed;
+  if (phase === "current") return copy.current;
+  if (phase === "upcoming") return copy.paid;
   const tone = bookingsTableStatusTone(status);
   if (tone === "paid") return copy.paid;
   if (tone === "cancelled") return copy.cancelled;
@@ -57,18 +66,29 @@ function StatusBadge({
   status,
   copy,
   ended = false,
+  phase = null,
 }: {
   status: string;
   copy: BookingsTableCopy;
   ended?: boolean;
+  phase?: RentalPhase | null;
 }) {
-  const tone = ended && isActiveBookingStatus(status) ? "neutral" : bookingsTableStatusTone(status);
-  const label = statusLabel(status, copy, ended);
+  const tone = phase
+    ? phase === "ended"
+      ? "neutral"
+      : phase === "current"
+        ? "current"
+        : "paid"
+    : ended && isActiveBookingStatus(status)
+      ? "neutral"
+      : bookingsTableStatusTone(status);
+  const label = statusLabel(status, copy, ended, phase);
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold",
         tone === "paid" && "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+        tone === "current" && "bg-sky-50 text-sky-800 ring-1 ring-sky-200",
         tone === "cancelled" && "bg-rose-50 text-rose-700 ring-1 ring-rose-200",
         tone === "empty" && "bg-slate-100 text-slate-600 ring-1 ring-slate-200",
         tone === "neutral" && "bg-slate-50 text-slate-600 ring-1 ring-slate-200",
@@ -118,6 +138,7 @@ export function BookingsTable({
   showToolbar = true,
   initialFilter = "all",
   labelEndedBookings = false,
+  periodStatus = false,
   showPickupDue = false,
   attentionRowIds = [],
   attentionFilter,
@@ -138,6 +159,8 @@ export function BookingsTable({
   initialFilter?: BookingsTableStatusFilter;
   /** Past return time is shown as completed instead of active. */
   labelEndedBookings?: boolean;
+  /** Active bookings follow the rental dates: upcoming, in progress, completed. */
+  periodStatus?: boolean;
   /** Partner list: total price and the amount due when the car is picked up. */
   showPickupDue?: boolean;
   /** Rows that still need attention — highlighted until opened. */
@@ -427,6 +450,11 @@ export function BookingsTable({
                         status={row.status}
                         copy={copy}
                         ended={labelEndedBookings && rentalHasEnded(row.dropoffAt)}
+                        phase={
+                          periodStatus && isActiveBookingStatus(row.status)
+                            ? rentalPhase(row.pickupAt, row.dropoffAt)
+                            : null
+                        }
                       />
                     </td>
                     <td className="px-3 py-3 sm:px-4">
@@ -510,6 +538,11 @@ export function BookingsTable({
                     status={row.status}
                     copy={copy}
                     ended={labelEndedBookings && rentalHasEnded(row.dropoffAt)}
+                    phase={
+                      periodStatus && isActiveBookingStatus(row.status)
+                        ? rentalPhase(row.pickupAt, row.dropoffAt)
+                        : null
+                    }
                   />
                 </div>
 

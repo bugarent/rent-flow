@@ -9,14 +9,20 @@ export default async function EditCarPage({
 }) {
   const { id } = await params;
   const session = await requirePartner();
-  const { initialDeliveryCatalog, initialExtrasCatalog, initialTariffs, initialCategories } =
-    await loadPartnerCarFormInitial(session.user);
+  const {
+    initialDeliveryCatalog,
+    initialExtrasCatalog,
+    initialExtraPrefs,
+    initialTariffs,
+    initialCategories,
+  } = await loadPartnerCarFormInitial(session.user);
 
   return (
     <PartnerCreateCarForm
       carId={id}
       initialDeliveryCatalog={initialDeliveryCatalog}
       initialExtrasCatalog={initialExtrasCatalog}
+      initialExtraPrefs={initialExtraPrefs}
       initialTariffs={initialTariffs}
       initialCategories={initialCategories}
     />
