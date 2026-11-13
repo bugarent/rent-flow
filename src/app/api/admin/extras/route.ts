@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { getAdminSession } from "@/lib/auth/sessions";
 import {
   createExtraService,
   listExtraServices,
+  scheduleExtraCopyTranslations,
 } from "@/lib/server/extras-store";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import { adminLimit } from "@/lib/extras/pricing";
@@ -74,6 +75,7 @@ export async function POST(req: Request) {
       sortOrder: body.sortOrder ?? 100,
       checkoutSlot: body.checkoutSlot,
     });
+    after(() => scheduleExtraCopyTranslations({ force: true }));
     return NextResponse.json(row, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

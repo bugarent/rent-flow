@@ -53,11 +53,20 @@ async function translatePair(
     ? targets.filter((code) => !viaOpenAi.description[code]?.trim())
     : [];
   if (!nameGaps.length && !descriptionGaps.length) return viaOpenAi;
-  const { freeTranslate } = await import("@/lib/server/free-translate");
-  const [freeName, freeDescription] = await Promise.all([
-    nameGaps.length && name.trim() ? freeTranslate(name, nameGaps) : Promise.resolve({}),
-    descriptionGaps.length ? freeTranslate(description, descriptionGaps) : Promise.resolve({}),
-  ]);
+  const { freeTranslateMany } = await import("@/lib/server/free-translate");
+  const gaps = [...new Set([...nameGaps, ...descriptionGaps])];
+  const translated = await freeTranslateMany(
+    [name, description],
+    gaps,
+    extraCopySourceLocale(name.trim() || description),
+  );
+  const freeName: ExtraCopyBag = {};
+  const freeDescription: ExtraCopyBag = {};
+  for (const code of gaps) {
+    const [nameText, descriptionText] = translated[code] || [];
+    if (nameGaps.includes(code) && nameText) freeName[code] = nameText.slice(0, 4000);
+    if (descriptionGaps.includes(code) && descriptionText) freeDescription[code] = descriptionText.slice(0, 4000);
+  }
   return {
     name: { ...freeName, ...viaOpenAi.name },
     description: { ...freeDescription, ...viaOpenAi.description },
@@ -159,15 +168,16 @@ function jsonWithI18n(current: unknown, en: string, i18n: ExtraCopyBag): Prisma.
 
 let ensureRun: Promise<void> | null = null;
 let ensureLastFinished = 0;
-const ENSURE_COOLDOWN_MS = 10 * 60_000;
+const ENSURE_COOLDOWN_MS = 2 * 60_000;
 
 /**
  * Same as `ensureExtraCopyTranslations`, run at most once at a time and not more often than the cooldown.
- * Meant for `after()` on cabinet pages so a page view never waits on machine translation.
+ * Meant for `after()` so a page view or a save never waits on machine translation.
+ * `force` skips the cooldown: a service was just saved and its gaps should fill now.
  */
-export function scheduleExtraCopyTranslations(): Promise<void> {
+export function scheduleExtraCopyTranslations(opts?: { force?: boolean }): Promise<void> {
   if (ensureRun) return ensureRun;
-  if (Date.now() - ensureLastFinished < ENSURE_COOLDOWN_MS) return Promise.resolve();
+  if (!opts?.force && Date.now() - ensureLastFinished < ENSURE_COOLDOWN_MS) return Promise.resolve();
   ensureRun = (async () => {
     try {
       await ensureExtraCopyTranslations();

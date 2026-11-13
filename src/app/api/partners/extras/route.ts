@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { optionalPeriodMoney } from "@/lib/extras/pricing";
 import { requirePartnerApi } from "@/lib/auth/sessions";
@@ -81,6 +81,10 @@ export async function POST(req: Request) {
       ...(Array.isArray(body.carIds) ? { carIds: body.carIds.map(String).filter(Boolean) } : {}),
     });
     await writePartnerExtraPrefs(partnerId, without);
+    after(async () => {
+      const { scheduleExtraCopyTranslations } = await import("@/lib/server/extras-store");
+      await scheduleExtraCopyTranslations({ force: true });
+    });
 
     return NextResponse.json(
       {

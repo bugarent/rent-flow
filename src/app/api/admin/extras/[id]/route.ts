@@ -1,7 +1,11 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { getAdminSession } from "@/lib/auth/sessions";
-import { deleteExtraService, updateExtraService } from "@/lib/server/extras-store";
+import {
+  deleteExtraService,
+  scheduleExtraCopyTranslations,
+  updateExtraService,
+} from "@/lib/server/extras-store";
 import { adminLimit } from "@/lib/extras/pricing";
 
 async function requireAdmin() {
@@ -58,6 +62,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       checkoutSlot: body.checkoutSlot,
     });
     if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (body.name !== undefined || body.description !== undefined) {
+      after(() => scheduleExtraCopyTranslations({ force: true }));
+    }
     return NextResponse.json(row);
   } catch (error) {
     if (error instanceof z.ZodError) {
