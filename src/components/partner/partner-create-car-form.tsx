@@ -529,6 +529,8 @@ export function PartnerCreateCarForm({
   const [deleting, setDeleting] = useState(false);
 
   const [extrasCatalog, setExtrasCatalog] = useState<ExtraServicePricing[]>(initialExtrasCatalog);
+  /** The server catalog lists every service; wait for the partner's own list before showing any. */
+  const [extrasReady, setExtrasReady] = useState(false);
   const [extraSelections, setExtraSelections] = useState<PartnerExtraSelection[]>(() =>
     buildExtraSelections(initialExtrasCatalog),
   );
@@ -768,6 +770,7 @@ export function PartnerCreateCarForm({
                 offerIds.has(service.id),
             );
             setExtrasCatalog(filtered);
+            setExtrasReady(true);
             setExtraSelections(
               buildExtraSelections(
                 filtered,
@@ -971,6 +974,7 @@ export function PartnerCreateCarForm({
               };
             });
             setExtrasCatalog(filtered);
+            setExtrasReady(true);
             setExtraSelections(
               buildExtraSelections(filtered, existingPrices).map((row) => {
                 const service = filtered.find((item) => item.id === row.extraServiceId);
@@ -1152,6 +1156,7 @@ export function PartnerCreateCarForm({
                 return { extraServiceId: service.id, priceEur: price, forbidden };
               });
               setExtrasCatalog(filtered);
+            setExtrasReady(true);
               setExtraSelections(
                 buildExtraSelections(filtered, existingPrices).map((row) => {
                   const service = filtered.find((s) => s.id === row.extraServiceId);
@@ -1277,7 +1282,10 @@ export function PartnerCreateCarForm({
       } finally {
         // Always clear boot UI — partner APIs can hang when DB is offline; admin path must not stick.
         // A cancelled run must not flag locations as ready while the live run is still loading them.
-        if (!cancelled) setBooting(false);
+        if (!cancelled) {
+          setBooting(false);
+          setExtrasReady(true);
+        }
       }
     })();
     return () => {
@@ -2256,7 +2264,13 @@ export function PartnerCreateCarForm({
           title={knownText(locale, cc.sections.extras)}
           changed={isChanged("extras")}
         >
-          {extrasCatalog.length === 0 ? (
+          {!extrasReady ? (
+            <div className="grid grid-cols-1 gap-2 lg:grid-cols-2" aria-busy="true">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="h-12 animate-pulse rounded-md border border-slate-200 bg-slate-100" />
+              ))}
+            </div>
+          ) : extrasCatalog.length === 0 ? (
             <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-500">
               {cc.extrasEmpty}
             </p>
