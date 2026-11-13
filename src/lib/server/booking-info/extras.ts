@@ -114,11 +114,19 @@ export async function catalogExtrasForCar(carId: string): Promise<
     });
     const prefs = owner?.partnerId ? await readPartnerExtraPrefs(owner.partnerId) : [];
     const prefById = new Map(prefs.map((pref) => [pref.extraServiceId, pref]));
+    const { resolveCheckoutSlot } = await import("@/lib/extras/checkout-slot");
     return rows.flatMap((r) => {
       const label = pickServiceLabel(localizedLabel(r.extraService?.name, ""));
       if (!label) return [];
       const pref = prefById.get(r.extraServiceId);
       const usePref = Boolean(pref?.enabled) && !pref?.forbidden;
+      const carPrice = Number(r.priceEur) || 0;
+      const fullCover =
+        resolveCheckoutSlot({
+          slug: r.extraService?.slug,
+          isTpl: r.extraService?.isTpl,
+          name: label,
+        }) === "full";
       const bounds = effectivePeriodBounds(
         caps.get(r.extraServiceId) ?? null,
         usePref ? pref?.maxPeriodEur : null,
@@ -127,7 +135,12 @@ export async function catalogExtrasForCar(carId: string): Promise<
       return [{
         id: r.extraServiceId,
         label,
-        priceEurPerDay: usePref ? Number(pref?.priceEur) || Number(r.priceEur) || 0 : Number(r.priceEur) || 0,
+        priceEurPerDay:
+          fullCover && carPrice > 0
+            ? carPrice
+            : usePref
+              ? Number(pref?.priceEur) || carPrice
+              : carPrice,
         maxPeriodEur: bounds.maxPeriodEur,
         minPeriodEur: bounds.minPeriodEur,
         locked: r.extraService

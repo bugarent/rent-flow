@@ -264,6 +264,10 @@ export type PartnerCreateCarCopy = {
   // Extras table
   extrasTitle: string;
   extrasPricePerDay: string;
+  /** Per-car full-coverage daily price: unlock the amount field. */
+  fullCoverPriceEdit: string;
+  /** Shown after the partner stores that car's full-coverage price. */
+  fullCoverPriceSaved: string;
   extrasMin: string;
   extrasMax: string;
   extrasSelection: string;
@@ -552,6 +556,8 @@ export const partnerUiEn: PartnerUiPack = {
     periodCol: "Period",
     extrasTitle: "Title",
     extrasPricePerDay: "Price per day",
+    fullCoverPriceEdit: "Edit",
+    fullCoverPriceSaved: "Saved",
     extrasMin: "Min",
     extrasMax: "Max",
     extrasSelection: "Selection",
@@ -856,6 +862,8 @@ export const partnerUiKa: PartnerUiPack = {
     periodCol: "პერიოდი",
     extrasTitle: "დასახელება",
     extrasPricePerDay: "ფასი დღეში",
+    fullCoverPriceEdit: "დაკორექტირება",
+    fullCoverPriceSaved: "შენახულია",
     extrasMin: "მინ",
     extrasMax: "მაქს",
     extrasSelection: "არჩევა",
@@ -1160,6 +1168,8 @@ export const partnerUiRu: PartnerUiPack = {
     periodCol: "Период",
     extrasTitle: "Название",
     extrasPricePerDay: "Цена за день",
+    fullCoverPriceEdit: "Изменить",
+    fullCoverPriceSaved: "Сохранено",
     extrasMin: "Мин",
     extrasMax: "Макс",
     extrasSelection: "Выбор",

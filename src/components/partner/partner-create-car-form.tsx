@@ -13,6 +13,7 @@ import {
   isListingInsuranceService,
   isProtectionInsuranceService,
   isTheftProtectionService,
+  resolveCheckoutSlot,
 } from "@/lib/extras/checkout-slot";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import {
@@ -416,6 +417,28 @@ function photoSlotsFromSaved(urls: string[]) {
   return Array.from({ length: MIN_PUBLIC_PHOTOS }, (_, index) => own[index] || "");
 }
 
+/** Full coverage is priced per car. A saved listing amount beats the cabinet default. */
+function savedFullCoverPriceEur(
+  service: { checkoutSlot?: unknown; slug?: string; isTpl?: boolean; name?: string },
+  offerPrice: unknown,
+  carPrice: unknown,
+): string | null {
+  if (resolveCheckoutSlot(service) !== "full") return null;
+  const offer = Number(offerPrice);
+  if (offerPrice != null && String(offerPrice) !== "" && Number.isFinite(offer) && offer > 0) {
+    return String(offer);
+  }
+  const car = Number(carPrice);
+  if (carPrice != null && String(carPrice) !== "" && Number.isFinite(car) && car > 0) return String(car);
+  return null;
+}
+
+function sanitizeMoneyDraft(value: string) {
+  const cleaned = value.replace(",", ".").replace(/[^\d.]/g, "");
+  const [whole, ...rest] = cleaned.split(".");
+  return rest.length ? `${whole}.${rest.join("").slice(0, 2)}` : whole;
+}
+
 const NO_DELIVERY_CATALOG: DeliveryLocationView[] = [];
 const NO_EXTRAS_CATALOG: ExtraServicePricing[] = [];
 
@@ -549,6 +572,13 @@ export function PartnerCreateCarForm({
         }))
       : buildExtraSelections(initialExtrasCatalog),
   );
+  const [fullCoverPriceEdit, setFullCoverPriceEdit] = useState<{
+    id: string;
+    draft: string;
+    editing: boolean;
+    saved: boolean;
+    invalid: boolean;
+  } | null>(null);
   const [pickupPlaces, setPickupPlaces] = useState<PickupPlaceRow[]>([]);
   const [pricingCurrency, setPricingCurrency] = useState<PartnerDisplayCurrency>(
     DEFAULT_PARTNER_PRICING_CURRENCY,
@@ -1156,13 +1186,23 @@ export function PartnerCreateCarForm({
                     : (service ? isMandatoryExtra(service) : false) ||
                       Boolean(row.forbidden) ||
                       carExtraIds.has(row.extraServiceId);
+                  const fromCar = carExtras.find(
+                    (e: { extraServiceId: string; extraService?: { slug?: string } | null; priceEur?: number }) =>
+                      e.extraServiceId === row.extraServiceId ||
+                      (Boolean(service?.slug) && e.extraService?.slug === service?.slug),
+                  );
+                  const ownFull = service
+                    ? savedFullCoverPriceEur(service, offer?.priceEur, fromCar?.priceEur)
+                    : null;
                   const eurPrice = forbidden
                     ? "0"
-                    : cabinetPrice != null
-                      ? String(cabinetPrice)
-                      : offer && offer.priceEur != null && String(offer.priceEur) !== ""
-                        ? String(offer.priceEur)
-                        : row.priceEur;
+                    : ownFull != null
+                      ? ownFull
+                      : cabinetPrice != null
+                        ? String(cabinetPrice)
+                        : offer && offer.priceEur != null && String(offer.priceEur) !== ""
+                          ? String(offer.priceEur)
+                          : row.priceEur;
                   return {
                     ...row,
                     forbidden,
@@ -1458,6 +1498,13 @@ export function PartnerCreateCarForm({
       ];
       tierPinsRef.current = savedTierPins;
       const tierEur = (pin: StickyMoneyPin) => (pin.priceEur === "" ? "0" : pin.priceEur);
+      const fullDraft = fullCoverPriceEdit;
+      const pricedSelections = extraSelections.map((row) => {
+        if (!fullDraft?.editing || row.extraServiceId !== fullDraft.id) return row;
+        const n = Number(fullDraft.draft.trim().replace(",", "."));
+        if (!Number.isFinite(n) || n < 0) return row;
+        return { ...row, priceEur: n.toFixed(2) };
+      });
       const selectedCategory =
         categoryOptions.find((c) => c.slug === categorySlug) ||
         categoryOptions.find((c) => c.name === categorySlug);
@@ -1523,7 +1570,7 @@ export function PartnerCreateCarForm({
         ebd,
         esp,
         music,
-        extraOffers: extraSelections.map((row) => {
+        extraOffers: pricedSelections.map((row) => {
           const service = extrasCatalog.find((item) => item.id === row.extraServiceId);
           const mandatory = Boolean(service && isMandatoryExtra(service));
           const forbidden = !mandatory && Boolean(row.forbidden);
@@ -1539,7 +1586,7 @@ export function PartnerCreateCarForm({
         }),
       };
       const description = `<!--car-details:${JSON.stringify(details)}-->`;
-      const extras = extraSelections.map((row) => {
+      const extras = pricedSelections.map((row) => {
         const service = extrasCatalog.find((s) => s.id === row.extraServiceId);
         const mandatory = Boolean(service && isMandatoryExtra(service));
         const mandatoryFree = service ? isMandatoryFreeExtra(service) : false;
@@ -2307,6 +2354,91 @@ export function PartnerCreateCarForm({
                     )}
                   </span>
                 );
+                const fullCoverActive = resolveCheckoutSlot(service) === "full" && enabled && !forbidden;
+                const priceEditor = fullCoverPriceEdit?.id === service.id ? fullCoverPriceEdit : null;
+                const editingPrice = priceEditor ? priceEditor.editing : fullCoverActive && isFree;
+                const lockedAmount = Number.isFinite(priceNum) && priceNum > 0 ? priceNum.toFixed(2) : "";
+                const priceDraft = editingPrice ? (priceEditor?.draft ?? "") : lockedAmount;
+                const saveFullCoverPrice = () => {
+                  const raw = priceDraft.trim().replace(",", ".");
+                  const n = Number(raw);
+                  if (!raw || !Number.isFinite(n) || n < 0) {
+                    setFullCoverPriceEdit({
+                      id: service.id,
+                      draft: priceDraft,
+                      editing: true,
+                      saved: false,
+                      invalid: true,
+                    });
+                    return;
+                  }
+                  const amount = n.toFixed(2);
+                  setExtraSelections((prev) =>
+                    prev.map((p) => (p.extraServiceId === service.id ? { ...p, priceEur: amount } : p)),
+                  );
+                  setFullCoverPriceEdit({
+                    id: service.id,
+                    draft: amount,
+                    editing: false,
+                    saved: true,
+                    invalid: false,
+                  });
+                };
+                const fullCoverPrice = fullCoverActive ? (
+                  <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+                    <span className="text-xs font-semibold text-slate-600">
+                      {knownText(locale, cc.extrasPricePerDay)}
+                    </span>
+                    <input
+                      value={priceDraft}
+                      disabled={!editingPrice}
+                      inputMode="decimal"
+                      aria-label={knownText(locale, cc.extrasPricePerDay)}
+                      onChange={(e) =>
+                        setFullCoverPriceEdit({
+                          id: service.id,
+                          draft: sanitizeMoneyDraft(e.target.value),
+                          editing: true,
+                          saved: false,
+                          invalid: false,
+                        })
+                      }
+                      className={cn(
+                        "h-10 w-24 rounded-md border bg-white px-2 text-base font-semibold text-[#0b1f4b] outline-none focus:border-[#5b4a8a] disabled:bg-white/80 md:h-9 md:text-sm",
+                        priceEditor?.invalid ? "border-red-500" : "border-[#c5ced8]",
+                      )}
+                    />
+                    <span className="text-sm font-bold text-[#0b1f4b]">{moneySymbol}</span>
+                    <button
+                      type="button"
+                      disabled={!editingPrice}
+                      onClick={saveFullCoverPrice}
+                      className="inline-flex min-h-10 items-center justify-center rounded bg-[#28a745] px-3 text-sm font-bold text-white disabled:opacity-40 md:min-h-9"
+                    >
+                      {common.save}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFullCoverPriceEdit({
+                          id: service.id,
+                          draft: lockedAmount,
+                          editing: true,
+                          saved: false,
+                          invalid: false,
+                        })
+                      }
+                      className="inline-flex min-h-10 items-center justify-center rounded border border-[#0b1f4b] bg-white px-3 text-sm font-bold text-[#0b1f4b] md:min-h-9"
+                    >
+                      {knownText(locale, cc.fullCoverPriceEdit)}
+                    </button>
+                    {priceEditor?.saved && !editingPrice ? (
+                      <span className="text-xs font-semibold text-emerald-800">
+                        {knownText(locale, cc.fullCoverPriceSaved)}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null;
                 const buttons = (
                   <div className={cn(variant === "desktop" ? "flex flex-wrap items-center gap-2 md:justify-end md:gap-1" : "grid grid-cols-3 gap-1")}>
                     {(
@@ -2376,8 +2508,9 @@ export function PartnerCreateCarForm({
                             {knownText(locale, cc.mandatory)}
                           </span>
                         ) : null}
-                        {price}
+                        {fullCoverPrice ? null : price}
                       </div>
+                      {fullCoverPrice}
                       {buttons}
                     </div>
                   );
@@ -2403,7 +2536,9 @@ export function PartnerCreateCarForm({
                           {knownText(locale, cc.mandatory)}
                         </p>
                       ) : null}
-                      <p className="mt-0.5 text-xs font-semibold text-slate-600">{price}</p>
+                      {fullCoverPrice ?? (
+                        <p className="mt-0.5 text-xs font-semibold text-slate-600">{price}</p>
+                      )}
                     </div>
                     {buttons}
                   </div>

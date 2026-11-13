@@ -267,6 +267,20 @@ export async function applyPartnerExtraOfferModes(
         pref.maxPeriodEur,
         pref.minPeriodEur,
       );
+      const fullCover = resolveCheckoutSlot({
+        checkoutSlot: row.extraService?.checkoutSlot,
+        slug: row.extraService?.slug,
+        isTpl: Boolean(row.extraService?.isTpl),
+        name: row.extraService?.name,
+      }) === "full";
+      const carPrice = Number(row.priceEur);
+      // Full coverage is priced per car. A saved amount on the listing beats the cabinet default.
+      const dailyPrice =
+        fullCover && Number.isFinite(carPrice) && carPrice > 0
+          ? carPrice
+          : pref.priceEur != null && Number.isFinite(Number(pref.priceEur))
+            ? Number(pref.priceEur)
+            : carPrice || 0;
       next.push({
         extraServiceId: row.extraServiceId,
         priceEur: isPeriodForcedFreeExtra({ maxPeriodEur: row.extraService?.maxPeriodEur })
@@ -274,9 +288,7 @@ export async function applyPartnerExtraOfferModes(
           : clampPartnerDailyPrice(
               row.extraService?.minPriceEur,
               row.extraService?.maxPriceEur,
-              pref.priceEur != null && Number.isFinite(Number(pref.priceEur))
-                ? Number(pref.priceEur)
-                : Number(row.priceEur) || 0,
+              dailyPrice,
             ),
         extraService: row.extraService
           ? {
