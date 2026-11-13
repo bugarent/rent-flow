@@ -310,7 +310,7 @@ export function PartnerApplicationForm({
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
             {error ? <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
             <div className="rounded-xl border border-slate-200 bg-[#eef3f8] p-3">
-              <div className="grid gap-4 lg:grid-cols-2 lg:gap-5 xl:grid-cols-[1.15fr_1fr_0.9fr]">
+              <div className="grid gap-4 lg:grid-cols-2 lg:gap-5 xl:grid-cols-[1.35fr_1fr_0.8fr]">
                 <div className="space-y-3">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <TextField label={t.firstName} value={firstName} onChange={setFirstName} invalid={mark("firstName")} />
