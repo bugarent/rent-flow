@@ -434,16 +434,23 @@ export function ReserveCheckout({
     () => ageFromDateOfBirth(dateOfBirth, startDate),
     [dateOfBirth, startDate],
   );
+  const fullInsuranceSelected = insuranceExtras.some(
+    (pack) => pack.checkoutSlot === "full" && (pack.locked || (extraQty[pack.id] || 0) > 0),
+  );
   const securityDepositEur = useMemo(() => {
+    // Full coverage waives the refundable hold. The customer does not pay a deposit at pickup.
+    if (fullInsuranceSelected) return 0;
     const n = details?.deposit != null ? Number(details.deposit) : 0;
     return Number.isFinite(n) && n > 0 ? n : 0;
-  }, [details]);
+  }, [details, fullInsuranceSelected]);
 
   const rentalTermsItems = useMemo(() => {
     const age = String(details?.minDriverAge ?? "18");
     const cat = String(details?.licenseCat || "B");
     const years = String(details?.minLicenseYears ?? "—");
-    const deposit = formatDepositLabel(details, formatPrice);
+    const deposit = fullInsuranceSelected
+      ? formatPrice(0)
+      : formatDepositLabel(details, formatPrice);
     const methods = (car?.rentPaymentMethods || []).filter(Boolean);
     const methodsText = methods.length ? methods.join(", ") : "—";
 
@@ -492,7 +499,7 @@ export function ReserveCheckout({
       { id: "out-of-hours", title: t.rtOutOfHours, body: t.rtOutOfHoursBody },
       { id: "extras", title: t.rtExtras, body: t.rtExtrasBody },
     ];
-  }, [car?.rentPaymentMethods, details, formatPrice, t]);
+  }, [car?.rentPaymentMethods, details, formatPrice, fullInsuranceSelected, t]);
   const dailyRate = useMemo(() => {
     if (!car) return 0;
     return resolveDailyRateEur(
