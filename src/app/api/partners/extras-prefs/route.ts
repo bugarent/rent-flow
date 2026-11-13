@@ -24,8 +24,12 @@ import {
 } from "@/lib/extras/pricing";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
 import { isListingInsuranceService } from "@/lib/extras/checkout-slot";
-import { partnerStatusLocked } from "@/lib/extras/partner-service-choice";
-import { parseCarDetails } from "@/lib/cars/car-details";
+import {
+  partnerServiceAdded,
+  partnerServiceAlwaysAdded,
+  partnerStatusLocked,
+} from "@/lib/extras/partner-service-choice";
+import { parseCarDetails, readExtraOffers } from "@/lib/cars/car-details";
 import { syncListingExtraPrices } from "@/lib/server/sync-listing-extra-prices";
 
 async function resolvePartnerId(userId: string, email?: string | null): Promise<string> {
@@ -76,6 +80,16 @@ async function listPartnerCarsForExtras(
     registrationNumber: string | null;
   }> = [];
   const seen = new Set<string>();
+  /** Services already offered on a car (rows or saved offers), by id and by slug. */
+  const usedIds = new Set<string>();
+  const usedSlugs = new Set<string>();
+  const noteOffers = (details: ReturnType<typeof parseCarDetails>) => {
+    for (const offer of readExtraOffers(details)) {
+      if (offer.enabled === false && !offer.forbidden) continue;
+      usedIds.add(offer.extraServiceId);
+      if (offer.slug) usedSlugs.add(offer.slug);
+    }
+  };
 
   try {
     const partner = await prisma.partner.findUnique({ where: { userId: session.user.id } });
@@ -90,12 +104,15 @@ async function listPartnerCarsForExtras(
           year: true,
           categorySlug: true,
           description: true,
+          extras: { select: { extraServiceId: true } },
         },
         orderBy: { updatedAt: "desc" },
       });
       for (const c of dbCars) {
         seen.add(c.id);
         const details = parseCarDetails(c.description);
+        for (const row of c.extras) usedIds.add(row.extraServiceId);
+        noteOffers(details);
         cars.push({
           id: c.id,
           title: c.title,
@@ -120,6 +137,8 @@ async function listPartnerCarsForExtras(
   for (const c of fileCars) {
     if (seen.has(c.id)) continue;
     const details = parseCarDetails(c.description);
+    for (const row of c.extras || []) if (row?.extraServiceId) usedIds.add(row.extraServiceId);
+    noteOffers(details);
     cars.push({
       id: c.id,
       title: c.title,
@@ -132,7 +151,11 @@ async function listPartnerCarsForExtras(
     });
   }
 
-  return cars;
+  return {
+    cars,
+    usedOnCar: (service: { id: string; slug?: string }) =>
+      usedIds.has(service.id) || Boolean(service.slug && usedSlugs.has(service.slug)),
+  };
 }
 
 function cleanCarIds(raw: unknown, allowed: Set<string>): string[] | undefined {
@@ -158,11 +181,12 @@ export async function GET() {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const partnerId = await resolvePartnerId(session.user.id, session.user.email);
-    const [catalog, prefsRaw, cars] = await Promise.all([
+    const [catalog, prefsRaw, fleet] = await Promise.all([
       partnerCatalog(partnerId),
       readPartnerExtraPrefs(partnerId),
       listPartnerCarsForExtras(session, partnerId),
     ]);
+    const cars = fleet.cars;
     const catalogById = new Map(catalog.map((service) => [service.id, service]));
     // Clamp in memory for the response only — never write prefs on GET (was slowing every open).
     const prefs = prefsRaw.map((pref) => {
@@ -198,8 +222,9 @@ export async function GET() {
       const locked = partnerStatusLocked(service);
       const mandatoryFree = isMandatoryFreeExtra(service);
       const pref = prefById.get(service.id);
+      const added = partnerServiceAdded(service, pref, fleet.usedOnCar(service));
       const max = service.maxPriceEur;
-      const forbidden = locked ? false : Boolean(pref?.forbidden);
+      const forbidden = locked || !added ? false : Boolean(pref?.forbidden);
       const insuranceDefault = !pref && isListingInsuranceService(service);
       const defaultPrice =
         mandatoryFree || forbidden || isPeriodForcedFreeExtra(service)
@@ -214,7 +239,16 @@ export async function GET() {
       const carIds = Array.isArray(pref?.carIds) ? pref.carIds.map(String) : allCarIds;
       return {
         service,
-        enabled: locked ? true : forbidden ? true : pref ? Boolean(pref.enabled) : insuranceDefault,
+        added,
+        enabled: locked
+          ? true
+          : !added
+            ? false
+            : forbidden
+              ? true
+              : pref
+                ? Boolean(pref.enabled)
+                : insuranceDefault,
         forbidden,
         priceEur: defaultPrice,
         maxPriceEur: max,
@@ -239,11 +273,12 @@ export async function PUT(req: Request) {
     const partnerId = await resolvePartnerId(session.user.id, session.user.email);
     const body = await req.json();
     const raw = Array.isArray(body?.prefs) ? body.prefs : Array.isArray(body) ? body : [];
-    const [catalog, visibleCatalog, cars] = await Promise.all([
+    const [catalog, visibleCatalog, fleet] = await Promise.all([
       partnerCatalog(partnerId, { scoped: false }),
       partnerCatalog(partnerId),
       listPartnerCarsForExtras(session, partnerId),
     ]);
+    const cars = fleet.cars;
     const visibleIds = new Set(visibleCatalog.map((s) => s.id));
     const byId = new Map(catalog.map((s) => [s.id, s]));
     const allowedCarIds = new Set(cars.map((c) => c.id));
@@ -279,10 +314,16 @@ export async function PUT(req: Request) {
       if (minPeriodEur != null && ceiling != null && minPeriodEur > ceiling) {
         minPeriodEur = ceiling;
       }
+      const added = partnerServiceAlwaysAdded(service)
+        ? true
+        : typeof row?.added === "boolean"
+          ? row.added
+          : undefined;
       next.push({
         extraServiceId: id,
         enabled: locked ? true : forbidden ? true : Boolean(row?.enabled),
         forbidden,
+        ...(added !== undefined ? { added } : {}),
         priceEur:
           mandatoryFree || forbidden || isPeriodForcedFreeExtra(service)
             ? 0

@@ -24,6 +24,8 @@ export type PartnerExtraPref = {
    * - array → only those cars
    */
   carIds?: string[];
+  /** On the partner's own service list. Omitted on saves made before the list existed. */
+  added?: boolean;
 };
 
 type StoreFile = Record<string, PartnerExtraPref[]>;
@@ -176,14 +178,16 @@ export async function writePartnerExtraPrefs(
   const cleaned = prefs
     .filter((p) => p && typeof p.extraServiceId === "string" && p.extraServiceId.trim())
     .map((p) => {
-      const forbidden = Boolean(p.forbidden);
+      const removed = p.added === false;
+      const forbidden = !removed && Boolean(p.forbidden);
       const hasCarIds = Object.prototype.hasOwnProperty.call(p, "carIds");
       const carIds = hasCarIds ? cleanCarIds(p.carIds) ?? [] : undefined;
       return {
         extraServiceId: p.extraServiceId.trim(),
         // Forbidden notices stay attached; enabled means sellable when not forbidden.
-        enabled: forbidden ? true : Boolean(p.enabled),
+        enabled: removed ? false : forbidden ? true : Boolean(p.enabled),
         forbidden,
+        ...(typeof p.added === "boolean" ? { added: p.added } : {}),
         priceEur: forbidden
           ? 0
           : Number.isFinite(Number(p.priceEur))

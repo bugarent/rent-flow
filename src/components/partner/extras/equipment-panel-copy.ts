@@ -59,6 +59,16 @@ function baseCopy(locale: string) {
         "ადმინის მიერ სავალდებულოა — სერვისი ყოველთვის ჩართულია. 0 = მომხმარებლისთვის უფასო, ან დააწესეთ ფასი ლიმიტამდე.",
       nameRequired: "ჩაწერეთ სახელი",
       carsRequired: "აირჩიეთ მინიმუმ ერთი მანქანა",
+      activeTitle: "თქვენი მომსახურებები",
+      inactiveTitle: "არააქტიური მომსახურებები",
+      inactiveHint:
+        "დააჭირეთ „დამატება“ — მომსახურება გამოჩნდება თქვენს სიაში, მანქანის განცხადებაში და მომხმარებლისთვის.",
+      addOne: "დამატება",
+      allAdded: "ყველა მომსახურება უკვე დამატებულია.",
+      createNew: "+ ახალი მომსახურების შექმნა",
+      remove: "სიიდან ამოღება",
+      removeConfirm: "ამოვიღოთ ეს მომსახურება სიიდან? ის აღარ გამოჩნდება თქვენს მანქანებზე.",
+      close: "დახურვა",
     };
   }
   if (locale === "ru") {
@@ -117,6 +127,15 @@ function baseCopy(locale: string) {
         "Обязательно по решению админа — услуга всегда включена. 0 = бесплатно для клиента, или задайте цену до лимита.",
       nameRequired: "Укажите название",
       carsRequired: "Выберите хотя бы один автомобиль",
+      activeTitle: "Ваши услуги",
+      inactiveTitle: "Неактивные услуги",
+      inactiveHint: "Нажмите «Добавить» — услуга появится в вашем списке, в объявлении авто и для клиента.",
+      addOne: "Добавить",
+      allAdded: "Все услуги уже добавлены.",
+      createNew: "+ Создать новую услугу",
+      remove: "Убрать из списка",
+      removeConfirm: "Убрать эту услугу из списка? Она больше не будет показываться на ваших машинах.",
+      close: "Закрыть",
     };
   }
   return {
@@ -174,6 +193,15 @@ function baseCopy(locale: string) {
       "Mandatory by admin — this service is always on. 0 = free for the customer, or set a price up to the limit.",
     nameRequired: "Enter a name",
     carsRequired: "Select at least one car",
+    activeTitle: "Your services",
+    inactiveTitle: "Inactive services",
+    inactiveHint: "Press “Add” — the service appears in your list, on your car listings and for customers.",
+    addOne: "Add",
+    allAdded: "Every service is already added.",
+    createNew: "+ Create a new service",
+    remove: "Remove from list",
+    removeConfirm: "Remove this service from your list? It will no longer show on your cars.",
+    close: "Close",
   };
 }
 

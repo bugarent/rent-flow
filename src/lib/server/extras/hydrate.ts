@@ -215,6 +215,7 @@ export async function applyPartnerExtraOfferModes(
       minPeriodEur?: number | null;
       maxPeriodEur?: number | null;
       carIds?: string[];
+      added?: boolean;
     }> = [];
     let resolvedPartnerId = id;
     for (const pid of candidateIds) {
@@ -244,6 +245,8 @@ export async function applyPartnerExtraOfferModes(
         next.push(row);
         continue;
       }
+      // Taken off the partner's service list: no longer offered on any listing.
+      if (pref.added === false && !mandatoryPriced) continue;
       if (!partnerExtraPrefAppliesToCar(pref, carId)) {
         // Pref scoped to other cars — leave the car's own extra row as-is.
         next.push(row);
@@ -327,6 +330,7 @@ export async function mergePartnerOfferedExtras(
       minPeriodEur?: number | null;
       maxPeriodEur?: number | null;
       carIds?: string[];
+      added?: boolean;
     }> = [];
     let resolvedPartnerId = id;
     for (const pid of candidateIds) {
@@ -360,6 +364,7 @@ export async function mergePartnerOfferedExtras(
       if (!service) continue;
       const mandatoryPriced = isMandatoryPricedExtra(service);
       if (!mandatoryPriced && (service.isTpl || isMandatoryExtra(service))) continue;
+      if (!mandatoryPriced && pref.added === false) continue;
       if (!mandatoryPriced && !pref.enabled && !pref.forbidden) continue;
       const forbidden = !mandatoryPriced && Boolean(pref.forbidden);
       const bounds = effectivePeriodBounds(service.maxPeriodEur, pref.maxPeriodEur, pref.minPeriodEur);

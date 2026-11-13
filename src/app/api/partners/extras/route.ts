@@ -74,6 +74,7 @@ export async function POST(req: Request) {
     without.push({
       extraServiceId: row.id,
       enabled: true,
+      added: true,
       forbidden,
       priceEur: forbidden ? 0 : row.defaultPriceEur,
       minPeriodEur: forbidden ? null : optionalPeriodMoney(body.minPeriodEur),

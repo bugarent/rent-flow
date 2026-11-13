@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Lock, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, Lock, MinusCircle, Pencil, Plus, Trash2, X } from "lucide-react";
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
 import {
   capPartnerMaxPeriod,
@@ -12,13 +12,17 @@ import {
 } from "@/lib/extras/pricing";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
 import { compareListingServices, isListingInsuranceService } from "@/lib/extras/checkout-slot";
-import { partnerStatusLocked } from "@/lib/extras/partner-service-choice";
+import {
+  partnerServiceAlwaysAdded,
+  partnerStatusLocked,
+} from "@/lib/extras/partner-service-choice";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { usePartnerMoney } from "@/components/providers/partner-money-context";
 import { PartnerEurMoneyInput } from "@/components/partner/partner-eur-money-input";
 import { partnerCurrencySymbol } from "@/lib/partners/pricing-currency";
 import { localizedExtraCopy } from "@/lib/extras/localized-copy";
 import { equipmentPanelCopy } from "@/components/partner/extras/equipment-panel-copy";
+import { ServicePicker } from "@/components/partner/extras/service-picker";
 import {
   PartnerExtraCarPicker,
   type PartnerExtraCarOption,
@@ -30,6 +34,8 @@ type OfferMode = "on" | "forbidden" | "off";
 
 type RowState = {
   service: ExtraServicePricing;
+  /** On the partner's own list. Services not added wait in the "add" list. */
+  added: boolean;
   mode: OfferMode;
   priceEur: string;
   /** Minimum total when the customer selects the service. Empty = no floor. */
@@ -177,10 +183,11 @@ export function PartnerEquipmentServicePanel({
       .sort(compareListingServices)
       .map((service) => {
         const locked = partnerStatusLocked(service);
-        const insuranceOn = isListingInsuranceService(service);
+        const added = partnerServiceAlwaysAdded(service);
         return {
           service,
-          mode: locked || insuranceOn ? ("on" as const) : ("off" as const),
+          added,
+          mode: locked || added ? ("on" as const) : ("off" as const),
           priceEur: locked
             ? String(clampPartnerDailyPrice(service.minPriceEur, service.maxPriceEur, 0))
             : String(
@@ -206,6 +213,7 @@ export function PartnerEquipmentServicePanel({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [openServiceId, setOpenServiceId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
   const [draftPrice, setDraftPrice] = useState("0");
@@ -237,6 +245,7 @@ export function PartnerEquipmentServicePanel({
             data.items.map(
               (item: {
                 service: ExtraServicePricing;
+                added?: boolean;
                 enabled: boolean;
                 forbidden?: boolean;
                 priceEur: number;
@@ -272,6 +281,7 @@ export function PartnerEquipmentServicePanel({
                 const dailyZero = Number(priceEur) <= 0 || periodFree || mandatoryFree;
                 return {
                   service: item.service,
+                  added: item.added !== false,
                   mode,
                   priceEur,
                   // Daily 0 → period windows inactive (shown as —); keep values only when daily > 0.
@@ -315,8 +325,9 @@ export function PartnerEquipmentServicePanel({
         override && row.service.id === override.id ? { ...row, ...override.patch } : row;
       return {
         extraServiceId: merged.service.id,
-        enabled: merged.mode === "on" || merged.mode === "forbidden",
-        forbidden: merged.mode === "forbidden",
+        added: merged.added,
+        enabled: merged.added && (merged.mode === "on" || merged.mode === "forbidden"),
+        forbidden: merged.added && merged.mode === "forbidden",
         priceEur:
           merged.mode === "forbidden" || merged.mode === "off"
             ? 0
@@ -408,6 +419,31 @@ export function PartnerEquipmentServicePanel({
     void persistCurrentRows();
   };
 
+  const setAddedState = (row: RowState, added: boolean) => {
+    const patch: Partial<RowState> = added
+      ? {
+          added: true,
+          mode: "on",
+          carIds: row.carIds.length ? row.carIds : cars.map((car) => car.id),
+        }
+      : { added: false, mode: "off" };
+    const next = rowsRef.current.map((item) =>
+      item.service.id === row.service.id ? { ...item, ...patch } : item,
+    );
+    rowsRef.current = next;
+    setRows(next);
+    void persistCurrentRows();
+  };
+
+  const addToList = (row: RowState) => setAddedState(row, true);
+
+  const removeFromList = (row: RowState) => {
+    if (partnerServiceAlwaysAdded(row.service)) return;
+    if (!window.confirm(t.removeConfirm)) return;
+    if (openServiceId === row.service.id) setOpenServiceId(null);
+    setAddedState(row, false);
+  };
+
   const saveAll = async () => {
     if (rowsRef.current.some((row) => row.mode === "on" && periodsConflict(row.minPeriodEur, row.maxPeriodEur))) {
       setError(t.boundsError);
@@ -475,6 +511,7 @@ export function PartnerEquipmentServicePanel({
         ...prev,
         {
           service,
+          added: true,
           mode,
           priceEur: mode === "forbidden" ? "0" : String(service.defaultPriceEur ?? 0),
           minPeriodEur: draftMin,
@@ -485,6 +522,7 @@ export function PartnerEquipmentServicePanel({
         },
       ]);
       setCreating(false);
+      setPickerOpen(false);
       setSavedFlash(true);
       window.setTimeout(() => setSavedFlash(false), 2000);
     } catch (err) {
@@ -586,7 +624,7 @@ export function PartnerEquipmentServicePanel({
 
   /* —— Create / Edit detail view —— */
   if (creating || editingRow) {
-    const title = creating ? t.add.replace("+ ", "") : localizedExtraCopy(locale, editingRow!.service.name, editingRow!.service.nameI18n);
+    const title = creating ? t.createNew.replace("+ ", "") : localizedExtraCopy(locale, editingRow!.service.name, editingRow!.service.nameI18n);
     const statusLocked = editingRow ? partnerStatusLocked(editingRow.service) : false;
     const mandatoryFree = editingRow ? isMandatoryFreeExtra(editingRow.service) : false;
     const periodFree = editingRow ? isPeriodForcedFreeExtra(editingRow.service) : false;
@@ -940,9 +978,27 @@ export function PartnerEquipmentServicePanel({
     );
   }
 
-  const orderedRows = [...rows].sort((a, b) => compareListingServices(a.service, b.service));
+  const sortedRows = [...rows].sort((a, b) => compareListingServices(a.service, b.service));
+  const orderedRows = sortedRows.filter((row) => row.added);
+  const inactiveRows = sortedRows.filter((row) => !row.added);
   const phoneInsuranceRows = orderedRows.filter((row) => isListingInsuranceService(row.service));
   const phoneServiceRows = orderedRows.filter((row) => !isListingInsuranceService(row.service));
+  const pickerPriceHint = (service: ExtraServicePricing) => {
+    const min = service.minPriceEur;
+    const max = service.maxPriceEur;
+    if (max != null && max > 0) {
+      return min != null && min > 0
+        ? fillMoney(t.adminDailyCap, { min, max })
+        : fillMoney(t.adminDailyMaxOnly, { n: max });
+    }
+    return showMoney(service.defaultPriceEur ?? 0);
+  };
+  const openPicker = () => {
+    setPickerOpen(true);
+    window.setTimeout(() => {
+      document.getElementById("partner-service-picker")?.scrollIntoView({ block: "start", behavior: "smooth" });
+    }, 40);
+  };
 
   /* —— List table view —— */
   return (
@@ -957,7 +1013,37 @@ export function PartnerEquipmentServicePanel({
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 pb-28">
         {error ? <p className="mb-3 text-sm font-medium text-red-600">{error}</p> : null}
 
-        {rows.length === 0 ? (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-extrabold text-[#0b1f4b]">{t.activeTitle}</h2>
+          <button
+            type="button"
+            onClick={() => (pickerOpen ? setPickerOpen(false) : openPicker())}
+            aria-expanded={pickerOpen}
+            aria-controls="partner-service-picker"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-md bg-[#28a745] px-4 text-sm font-bold text-white hover:bg-[#23923d]"
+          >
+            <Plus className="h-4 w-4" />
+            {t.add.replace("+ ", "")}
+          </button>
+        </div>
+
+        {pickerOpen ? (
+          <ServicePicker
+            id="partner-service-picker"
+            rows={inactiveRows}
+            locale={locale}
+            t={t}
+            priceHint={pickerPriceHint}
+            onAdd={(serviceId) => {
+              const row = rowsRef.current.find((item) => item.service.id === serviceId);
+              if (row) addToList(row);
+            }}
+            onCreate={startCreate}
+            onClose={() => setPickerOpen(false)}
+          />
+        ) : null}
+
+        {orderedRows.length === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-sm text-slate-500">
             {t.empty}
           </p>
@@ -1146,6 +1232,16 @@ export function PartnerEquipmentServicePanel({
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
+                              ) : !partnerServiceAlwaysAdded(row.service) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => removeFromList(row)}
+                                  title={t.remove}
+                                  aria-label={t.remove}
+                                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                                >
+                                  <MinusCircle className="h-3.5 w-3.5" />
+                                </button>
                               ) : null}
                             </div>
                           </td>
@@ -1291,6 +1387,15 @@ export function PartnerEquipmentServicePanel({
                             <Trash2 className="h-3.5 w-3.5" />
                             {t.delete}
                           </button>
+                        ) : !partnerServiceAlwaysAdded(row.service) ? (
+                          <button
+                            type="button"
+                            onClick={() => removeFromList(row)}
+                            className="mt-1 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50"
+                          >
+                            <MinusCircle className="h-3.5 w-3.5" />
+                            {t.remove}
+                          </button>
                         ) : null}
                         {open && canEditPrices ? (
                           <div className="mt-1 space-y-1.5 border-t border-slate-100 pt-1.5">
@@ -1408,7 +1513,7 @@ export function PartnerEquipmentServicePanel({
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={startCreate}
+            onClick={openPicker}
             className="inline-flex items-center gap-1.5 rounded-md bg-[#28a745] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#23923d]"
           >
             <Plus className="h-4 w-4" />

@@ -79,6 +79,8 @@ export function buildExtraSelections(
 
 export type CarFormExtraPref = {
   service?: { id?: string; slug?: string };
+  /** On the partner's own service list (Equipment & services page). */
+  added?: boolean;
   enabled?: boolean;
   forbidden?: boolean;
   priceEur?: number;
@@ -126,9 +128,9 @@ export function catalogIdsForOffers(catalog: ExtraServicePricing[], offers: CarE
 }
 
 /**
- * Services that stay on the car form: every active catalog service, so the partner
- * switches each one on or off per listing. Cabinet prefs only set the default state.
- * Cross-border stays gated by its cabinet permission.
+ * Services on the car form: the ones on the partner's own list (Equipment & services page),
+ * each switched on or off per listing. Cabinet prefs set the default state.
+ * Cross-border stays gated by its cabinet permission. If the cabinet list could not load, every service stays.
  */
 export function extrasVisibleOnCarForm(
   catalog: ExtraServicePricing[],
@@ -140,11 +142,18 @@ export function extrasVisibleOnCarForm(
   },
 ): ExtraServicePricing[] {
   const prefs = indexExtraPrefs(opts.prefs);
+  const onCar = (service: ExtraServicePricing) =>
+    Boolean(opts.carExtraIds?.has(service.id) || opts.offerIds?.has(service.id));
   return catalog.filter((service) => {
-    if (!isCrossBorderExtra(service) || partnerStatusLocked(service)) return true;
+    if (partnerStatusLocked(service)) return true;
     const pref = prefs.forService(service);
-    if (pref) return Boolean(pref.enabled || pref.forbidden);
-    return Boolean(opts.carExtraIds?.has(service.id) || opts.offerIds?.has(service.id));
+    if (isCrossBorderExtra(service)) {
+      if (pref) return Boolean(pref.enabled || pref.forbidden);
+      return onCar(service);
+    }
+    if (!prefs.trusted) return true;
+    if (pref) return pref.added !== false;
+    return onCar(service);
   });
 }
 

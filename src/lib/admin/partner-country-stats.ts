@@ -26,7 +26,8 @@ export function partnerCountryStats(rows: Row[]): PartnerCountryStat[] {
       byIso.set(raw, stat);
     }
   }
+  // Most uploaded cars first.
   return [...byIso.values()].sort(
-    (a, b) => b.partners - a.partners || b.listings - a.listings || a.name.localeCompare(b.name),
+    (a, b) => b.listings - a.listings || b.partners - a.partners || a.name.localeCompare(b.name),
   );
 }
