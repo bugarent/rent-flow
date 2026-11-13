@@ -201,8 +201,10 @@ export function PartnerApplicationForm({
     address: !address.trim(),
     languages: languages.length === 0,
     countries: countryIso2s.length === 0,
-    primaryPhone: !phoneOk(primaryPhone) || primaryMessengers.length === 0,
-    managerPhone: !phoneOk(managerPhone) || managerMessengers.length === 0,
+    primaryPhone: !phoneOk(primaryPhone),
+    primaryMessengers: primaryMessengers.length === 0,
+    managerPhone: !phoneOk(managerPhone),
+    managerMessengers: managerMessengers.length === 0,
     website: !noWebsite && !websiteOk(website),
     login: !emailOk(loginEmail),
     password: password.length < 6,
@@ -444,6 +446,7 @@ export function PartnerApplicationForm({
                     onMessengers={setPrimaryMessengers}
                     messengerLabels={messengerLabels}
                     invalid={mark("primaryPhone")}
+                    messengersInvalid={mark("primaryMessengers")}
                     hint={t.phoneCodeRequired}
                   />
                   <PhoneRow
@@ -456,6 +459,7 @@ export function PartnerApplicationForm({
                     onMessengers={setManagerMessengers}
                     messengerLabels={messengerLabels}
                     invalid={mark("managerPhone")}
+                    messengersInvalid={mark("managerMessengers")}
                     hint={t.phoneCodeRequired}
                   />
                 </div>
@@ -603,6 +607,7 @@ function PhoneRow({
   onMessengers,
   messengerLabels,
   invalid,
+  messengersInvalid,
   hint,
 }: {
   label: string;
@@ -613,11 +618,14 @@ function PhoneRow({
   messengers: PartnerSocialPlatform[];
   onMessengers: (next: PartnerSocialPlatform[]) => void;
   messengerLabels: Record<PartnerSocialPlatform, string>;
+  /** Number missing or malformed: the whole row turns red. */
   invalid: boolean;
+  /** No messenger picked: only the messenger logos turn red. */
+  messengersInvalid: boolean;
   hint: string;
 }) {
   return (
-    <div data-invalid={invalid ? "true" : undefined}>
+    <div data-invalid={invalid || messengersInvalid ? "true" : undefined}>
       <p className={cn("mb-1.5 text-sm font-semibold", invalid ? "text-red-700" : "text-[#3a4553]")}>
         {label} <span className="text-[#e11d48]">*</span>
       </p>
@@ -638,7 +646,12 @@ function PhoneRow({
             aria-invalid={invalid || undefined}
             placeholder="555123456"
           />
-          <PhoneMessengerIcons selected={messengers} onChange={onMessengers} labels={messengerLabels} />
+          <PhoneMessengerIcons
+            selected={messengers}
+            onChange={onMessengers}
+            labels={messengerLabels}
+            invalid={messengersInvalid}
+          />
         </div>
       </div>
       {invalid ? <p className="mt-1 text-sm font-semibold leading-snug text-red-700">{hint}</p> : null}
