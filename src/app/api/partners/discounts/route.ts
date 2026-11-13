@@ -38,24 +38,23 @@ async function listPartnerCars(session: { user: { id: string; email?: string | n
     status: string;
   };
 
-  let cars: CarRow[] = [];
-  try {
-    if (partnerId && !partnerId.startsWith("file-partner-")) {
-      cars = (
-        await prisma.car.findMany({
-          where: { partnerId },
-          select: {
-            id: true,
-            make: true,
-            model: true,
-            year: true,
-            title: true,
-            categorySlug: true,
-            registrationNumber: true,
-            status: true,
-          },
-        })
-      ).map((c) => ({
+  const dbCars = async (): Promise<CarRow[]> => {
+    if (!partnerId || partnerId.startsWith("file-partner-")) return [];
+    try {
+      const rows = await prisma.car.findMany({
+        where: { partnerId },
+        select: {
+          id: true,
+          make: true,
+          model: true,
+          year: true,
+          title: true,
+          categorySlug: true,
+          registrationNumber: true,
+          status: true,
+        },
+      });
+      return rows.map((c) => ({
         id: c.id,
         make: c.make,
         model: c.model,
@@ -65,17 +64,20 @@ async function listPartnerCars(session: { user: { id: string; email?: string | n
         registrationNumber: c.registrationNumber,
         status: String(c.status),
       }));
+    } catch (error) {
+      if (!isDbOfflineError(error)) throw error;
+      return [];
     }
-  } catch (error) {
-    if (!isDbOfflineError(error)) throw error;
-    cars = [];
-  }
+  };
 
-  const fileCars = await listFileCarsForPartner({
-    userId: session.user.id,
-    email: session.user.email,
-    partnerId,
-  });
+  const [cars, fileCars] = await Promise.all([
+    dbCars(),
+    listFileCarsForPartner({
+      userId: session.user.id,
+      email: session.user.email,
+      partnerId,
+    }),
+  ]);
   const seen = new Set(cars.map((c) => c.id));
   for (const fileCar of fileCars) {
     if (seen.has(fileCar.id)) continue;

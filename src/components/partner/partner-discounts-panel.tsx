@@ -348,7 +348,16 @@ export function PartnerDiscountsPanel() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "save failed");
-      await load();
+      const saved = data?.item as DiscountItem | undefined;
+      if (saved?.id) {
+        setItems((prev) =>
+          prev.some((item) => item.id === saved.id)
+            ? prev.map((item) => (item.id === saved.id ? saved : item))
+            : [...prev, saved],
+        );
+      } else {
+        await load();
+      }
       setMode("list");
     } catch {
       setError(t.errSave);
@@ -365,7 +374,7 @@ export function PartnerDiscountsPanel() {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("delete failed");
-      await load();
+      setItems((prev) => prev.filter((item) => item.id !== id));
       setMode("list");
     } catch {
       setError(t.errSave);
