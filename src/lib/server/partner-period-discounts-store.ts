@@ -16,9 +16,9 @@ export type PartnerPeriodDiscount = {
   /** Positive percent; discounts reduce price, markups increase. */
   percent: number;
   kind: PartnerPeriodDiscountKind;
-  /** Inclusive YYYY-MM-DD */
+  /** Inclusive MM-DD, repeats every year (may wrap past New Year, e.g. 12-20 → 01-10). */
   from: string;
-  /** Inclusive YYYY-MM-DD */
+  /** Inclusive MM-DD */
   to: string;
   carIds: string[];
   createdAt: string;
@@ -42,13 +42,38 @@ function dayMs(isoDay: string): number {
   return Date.UTC(y, m - 1, d);
 }
 
-export function periodDaysOverlap(aFrom: string, aTo: string, bFrom: string, bTo: string): boolean {
-  const af = toDay(aFrom);
-  const at = toDay(aTo);
-  const bf = toDay(bFrom);
-  const bt = toDay(bTo);
-  if (!af || !at || !bf || !bt) return false;
-  return dayMs(af) <= dayMs(bt) && dayMs(bf) <= dayMs(at);
+const MONTH_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/** "MM-DD" from "MM-DD" or a dated "YYYY-MM-DD" (the year is dropped: periods repeat yearly). */
+export function toMonthDay(value: string): string {
+  const s = String(value || "").trim();
+  const m = /^(?:\d{4}-)?(\d{1,2})-(\d{1,2})/.exec(s);
+  if (!m) return "";
+  const month = Number(m[1]);
+  const day = Number(m[2]);
+  if (month < 1 || month > 12 || day < 1 || day > MONTH_DAYS[month - 1]) return "";
+  return `${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function inYearlyWindow(md: string, fromMd: string, toMd: string): boolean {
+  return fromMd <= toMd ? md >= fromMd && md <= toMd : md >= fromMd || md <= toMd;
+}
+
+/** Does any day of the rental (`YYYY-MM-DD` … `YYYY-MM-DD`) fall in the yearly MM-DD window? */
+export function yearlyPeriodHitsRange(fromMd: string, toMd: string, rangeFrom: string, rangeTo: string): boolean {
+  const f = toMonthDay(fromMd);
+  const t = toMonthDay(toMd);
+  const rf = toDay(rangeFrom);
+  const rt = toDay(rangeTo);
+  if (!f || !t || !rf || !rt) return false;
+  const start = dayMs(rf);
+  const end = Math.max(start, dayMs(rt));
+  const DAY = 86_400_000;
+  if (end - start >= 365 * DAY) return true;
+  for (let ms = start; ms <= end; ms += DAY) {
+    if (inYearlyWindow(new Date(ms).toISOString().slice(5, 10), f, t)) return true;
+  }
+  return false;
 }
 
 async function readStore(): Promise<StoreFile> {
@@ -56,7 +81,13 @@ async function readStore(): Promise<StoreFile> {
     const raw = await readFile(STORE, "utf8");
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object") return emptyStore();
-    const items = Array.isArray((parsed as StoreFile).items) ? (parsed as StoreFile).items : [];
+    const rows = Array.isArray((parsed as StoreFile).items) ? (parsed as StoreFile).items : [];
+    // Older entries saved a full date; they now repeat every year on the same days.
+    const items = rows.map((item) => ({
+      ...item,
+      from: toMonthDay(item.from) || item.from,
+      to: toMonthDay(item.to) || item.to,
+    }));
     return { items };
   } catch {
     return emptyStore();
@@ -96,9 +127,9 @@ async function readStoreForSearch(): Promise<StoreFile> {
 }
 
 function normalizeItem(raw: Partial<PartnerPeriodDiscount> & { partnerId: string }): PartnerPeriodDiscount | null {
-  const from = toDay(String(raw.from || ""));
-  const to = toDay(String(raw.to || ""));
-  if (!from || !to || dayMs(from) > dayMs(to)) return null;
+  const from = toMonthDay(String(raw.from || ""));
+  const to = toMonthDay(String(raw.to || ""));
+  if (!from || !to) return null;
   const percent = Number(raw.percent);
   if (!Number.isFinite(percent) || percent <= 0 || percent > 100) return null;
   const carIds = Array.isArray(raw.carIds)
@@ -211,7 +242,7 @@ export async function periodDiscountPercentByCarId(
   const { items } = opts?.fresh ? await readStore() : await readStoreForSearch();
   for (const item of items) {
     if (item.kind !== "discount") continue;
-    if (!periodDaysOverlap(item.from, item.to, from, to)) continue;
+    if (!yearlyPeriodHitsRange(item.from, item.to, from, to)) continue;
     for (const carId of item.carIds) {
       if (idFilter && !idFilter.has(carId)) continue;
       const prev = map.get(carId) ?? 0;

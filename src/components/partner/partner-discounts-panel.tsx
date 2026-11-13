@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { RacInlineLoader } from "@/components/layout/route-loading-spinner";
-import { DateInput } from "@/components/ui/date-input";
+import { DayMonthPicker } from "@/components/partner/day-month-picker";
 import {
   MobileDataCard,
   MobileDataRow,
@@ -33,11 +33,10 @@ type DiscountItem = {
 
 type Mode = "list" | "form";
 
-function formatDay(iso: string, locale: string) {
-  const [y, m, d] = String(iso || "").slice(0, 10).split("-");
-  if (!y || !m || !d) return iso;
-  if (locale === "ka" || locale === "ru") return `${d}.${m}.${y}`;
-  return `${d}.${m}.${y}`;
+/** "10.03" — periods repeat every year, so no year is shown. */
+function formatDay(value: string, _locale: string) {
+  const m = /^(?:\d{4}-)?(\d{2})-(\d{2})/.exec(String(value || ""));
+  return m ? `${m[2]}.${m[1]}` : value;
 }
 
 function carLabel(car: PartnerCar) {
@@ -107,6 +106,7 @@ function copyFor(locale: string) {
       markupNamePh: "მარკაპინგის სახელი",
       from: "დან",
       to: "მდე",
+      everyYear: "მიუთითეთ მხოლოდ რიცხვი და თვე — პერიოდი ყოველ წელს მეორდება.",
       percentPh: "პროცენტული ფასდაკლება",
       markupPercentPh: "პროცენტული ფასნამატი",
       selectAll: "ყველას არჩევა",
@@ -146,6 +146,7 @@ function copyFor(locale: string) {
       markupNamePh: "Название наценки",
       from: "С",
       to: "По",
+      everyYear: "Укажите только число и месяц — период повторяется каждый год.",
       percentPh: "Процент скидки",
       markupPercentPh: "Процент наценки",
       selectAll: "Выбрать все",
@@ -184,6 +185,7 @@ function copyFor(locale: string) {
     markupNamePh: "Markup name",
     from: "From",
     to: "Until",
+    everyYear: "Day and month only — the period repeats every year.",
     percentPh: "Percentage discount",
     markupPercentPh: "Percentage markup",
     selectAll: "Select all",
@@ -204,8 +206,8 @@ function defaultDates() {
   const start = new Date();
   const end = new Date();
   end.setDate(end.getDate() + 7);
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
-  return { from: iso(start), to: iso(end) };
+  const md = (d: Date) => d.toISOString().slice(5, 10);
+  return { from: md(start), to: md(end) };
 }
 
 export function PartnerDiscountsPanel() {
@@ -283,8 +285,8 @@ export function PartnerDiscountsPanel() {
     setEditingId(item.id);
     setTitle(item.title);
     setPercent(String(item.percent));
-    setFrom(item.from);
-    setTo(item.to);
+    setFrom(String(item.from || "").replace(/^\d{4}-/, ""));
+    setTo(String(item.to || "").replace(/^\d{4}-/, ""));
     setSelected(new Set(item.carIds));
     setError("");
     setMode("form");
@@ -437,25 +439,18 @@ export function PartnerDiscountsPanel() {
                     placeholder={formKind === "markup" ? t.markupNamePh : t.namePh}
                     className="w-full rounded-md border border-[#c5ced8] px-3 py-2.5 text-sm outline-none focus:border-[#5b4a8a]"
                   />
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className="block text-xs font-semibold text-slate-600">
-                      {t.from}
-                      <DateInput
-                        type="date"
-                        value={from}
-                        onChange={(e) => setFrom(e.target.value)}
-                        className="mt-1 w-full rounded-md border border-[#c5ced8] px-3 py-2 text-sm outline-none focus:border-[#5b4a8a]"
-                      />
-                    </label>
-                    <label className="block text-xs font-semibold text-slate-600">
-                      {t.to}
-                      <DateInput
-                        type="date"
-                        value={to}
-                        onChange={(e) => setTo(e.target.value)}
-                        className="mt-1 w-full rounded-md border border-[#c5ced8] px-3 py-2 text-sm outline-none focus:border-[#5b4a8a]"
-                      />
-                    </label>
+                  <div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="block text-xs font-semibold text-slate-600">
+                        {t.from}
+                        <DayMonthPicker value={from} onChange={setFrom} locale={locale} label={t.from} />
+                      </div>
+                      <div className="block text-xs font-semibold text-slate-600">
+                        {t.to}
+                        <DayMonthPicker value={to} onChange={setTo} locale={locale} label={t.to} />
+                      </div>
+                    </div>
+                    <p className="mt-1.5 text-xs text-slate-500">{t.everyYear}</p>
                   </div>
                   <input
                     value={percent}
