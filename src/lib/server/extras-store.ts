@@ -21,6 +21,7 @@ export {
   ensureExtrasExistInDb,
   extrasRowsForCarFk,
   ensureExtraCopyTranslations,
+  scheduleExtraCopyTranslations,
   hydrateListingExtras,
   applyPartnerExtraOfferModes,
   mergePartnerOfferedExtras,

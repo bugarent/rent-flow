@@ -47,6 +47,28 @@ async function translatePair(
 ): Promise<{ name: ExtraCopyBag; description: ExtraCopyBag }> {
   const targets = [...new Set(locales)];
   if (!targets.length) return { name: {}, description: {} };
+  const viaOpenAi = await translatePairOpenAi(name, description, targets);
+  const nameGaps = targets.filter((code) => !viaOpenAi.name[code]?.trim());
+  const descriptionGaps = description.trim()
+    ? targets.filter((code) => !viaOpenAi.description[code]?.trim())
+    : [];
+  if (!nameGaps.length && !descriptionGaps.length) return viaOpenAi;
+  const { freeTranslate } = await import("@/lib/server/free-translate");
+  const [freeName, freeDescription] = await Promise.all([
+    nameGaps.length && name.trim() ? freeTranslate(name, nameGaps) : Promise.resolve({}),
+    descriptionGaps.length ? freeTranslate(description, descriptionGaps) : Promise.resolve({}),
+  ]);
+  return {
+    name: { ...freeName, ...viaOpenAi.name },
+    description: { ...freeDescription, ...viaOpenAi.description },
+  };
+}
+
+async function translatePairOpenAi(
+  name: string,
+  description: string,
+  targets: Locale[],
+): Promise<{ name: ExtraCopyBag; description: ExtraCopyBag }> {
   const apiKey = await openAiKey();
   if (!apiKey) return { name: {}, description: {} };
 
@@ -133,6 +155,32 @@ function jsonWithI18n(current: unknown, en: string, i18n: ExtraCopyBag): Prisma.
       ? { ...(current as Record<string, unknown>) }
       : {};
   return { ...base, en, i18n } as Prisma.InputJsonValue;
+}
+
+let ensureRun: Promise<void> | null = null;
+let ensureLastFinished = 0;
+const ENSURE_COOLDOWN_MS = 10 * 60_000;
+
+/**
+ * Same as `ensureExtraCopyTranslations`, run at most once at a time and not more often than the cooldown.
+ * Meant for `after()` on cabinet pages so a page view never waits on machine translation.
+ */
+export function scheduleExtraCopyTranslations(): Promise<void> {
+  if (ensureRun) return ensureRun;
+  if (Date.now() - ensureLastFinished < ENSURE_COOLDOWN_MS) return Promise.resolve();
+  ensureRun = (async () => {
+    try {
+      await ensureExtraCopyTranslations();
+      const { ensurePartnerCustomExtraCopy } = await import("@/lib/server/partner-custom-extras-store");
+      await ensurePartnerCustomExtraCopy();
+    } catch (error) {
+      console.warn("[extra-copy] scheduled fill", error);
+    } finally {
+      ensureLastFinished = Date.now();
+      ensureRun = null;
+    }
+  })();
+  return ensureRun;
 }
 
 /** Fill missing name and description translations for the extras catalog. */

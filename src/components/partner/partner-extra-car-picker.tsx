@@ -2,6 +2,14 @@
 
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { EQUIPMENT_PICKER_EN, equipmentText } from "@/components/partner/extras/equipment-panel-copy";
+
+function pickerText(locale: string, ka: string, ru: string, english: string) {
+  if (locale === "ka") return ka;
+  if (locale === "ru") return ru;
+  if (locale === "en") return english;
+  return equipmentText(locale, english);
+}
 
 export type PartnerExtraCarOption = {
   id: string;
@@ -16,7 +24,7 @@ export type PartnerExtraCarOption = {
 function categoryLabel(slug: string | null | undefined, locale: string) {
   const key = String(slug || "").trim().toLowerCase();
   if (!key) {
-    return locale === "ka" ? "სხვა" : locale === "ru" ? "Другое" : "Other";
+    return pickerText(locale, "სხვა", "Другое", EQUIPMENT_PICKER_EN.other);
   }
   return key;
 }
@@ -75,11 +83,12 @@ export function PartnerExtraCarPicker({
   if (!cars.length) {
     return (
       <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-        {locale === "ka"
-          ? "ჯერ ატვირთეთ მანქანის განცხადება — აქ გამოჩნდება სია."
-          : locale === "ru"
-            ? "Сначала загрузите объявления авто — здесь появится список."
-            : "Upload car listings first — they will appear here."}
+        {pickerText(
+          locale,
+          "ჯერ ატვირთეთ მანქანის განცხადება — აქ გამოჩნდება სია.",
+          "Сначала загрузите объявления авто — здесь появится список.",
+          EQUIPMENT_PICKER_EN.noCars,
+        )}
       </p>
     );
   }
@@ -110,16 +119,16 @@ export function PartnerExtraCarPicker({
   }
 
   const copy = {
-    cars: locale === "ka" ? "მანქანები" : locale === "ru" ? "Автомобили" : "Cars",
-    selectAll: locale === "ka" ? "ყველას მონიშვნა" : locale === "ru" ? "Выбрать все" : "Select all",
-    reset: locale === "ka" ? "გაუქმება" : locale === "ru" ? "Сбросить" : "Reset",
-    selected: locale === "ka" ? "არჩეული" : locale === "ru" ? "выбрано" : "selected",
-    hint:
-      locale === "ka"
-        ? "მონიშნეთ მანქანები, რომლებზეც ეს მომსახურება გააქტიურდება."
-        : locale === "ru"
-          ? "Отметьте авто, для которых включить эту услугу."
-          : "Select cars this service should apply to.",
+    cars: pickerText(locale, "მანქანები", "Автомобили", EQUIPMENT_PICKER_EN.cars),
+    selectAll: pickerText(locale, "ყველას მონიშვნა", "Выбрать все", EQUIPMENT_PICKER_EN.selectAll),
+    reset: pickerText(locale, "გაუქმება", "Сбросить", EQUIPMENT_PICKER_EN.reset),
+    selected: pickerText(locale, "არჩეული", "выбрано", EQUIPMENT_PICKER_EN.selected),
+    hint: pickerText(
+      locale,
+      "მონიშნეთ მანქანები, რომლებზეც ეს მომსახურება გააქტიურდება.",
+      "Отметьте авто, для которых включить эту услугу.",
+      EQUIPMENT_PICKER_EN.hint,
+    ),
   };
 
   return (

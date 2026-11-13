@@ -9,7 +9,11 @@ export type {
 
 export { syncExtrasFileToDb, listExtraServices, clearExtrasCatalogCache } from "./list";
 
-export { ensureExtraCopyTranslations, fillExtraCopy } from "./translate-copy";
+export {
+  ensureExtraCopyTranslations,
+  fillExtraCopy,
+  scheduleExtraCopyTranslations,
+} from "./translate-copy";
 
 export {
   createExtraService,

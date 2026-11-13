@@ -121,6 +121,27 @@ export function isListingInsuranceService(input: {
   return slot === "tpl" || slot === "basic" || slot === "full" || slot === "accident";
 }
 
+/** Partner cabinet order: TPL, full coverage, basic (CDW), then windshield/wheels/glass (WUG). */
+const LISTING_INSURANCE_RANK: Partial<Record<ExtraCheckoutSlot, number>> = {
+  tpl: 0,
+  full: 1,
+  basic: 2,
+  accident: 3,
+};
+
+/** Insurance packs come first in a fixed order; everything else keeps the admin order. */
+export function compareListingServices(
+  a: { checkoutSlot?: unknown; slug?: string; isTpl?: boolean; name?: string; sortOrder: number },
+  b: { checkoutSlot?: unknown; slug?: string; isTpl?: boolean; name?: string; sortOrder: number },
+): number {
+  const rank = (s: typeof a) => LISTING_INSURANCE_RANK[resolveCheckoutSlot(s)] ?? 99;
+  return (
+    rank(a) - rank(b) ||
+    a.sortOrder - b.sortOrder ||
+    String(a.name || "").localeCompare(String(b.name || ""))
+  );
+}
+
 export function extractCheckoutSlotFromDescription(description: unknown): ExtraCheckoutSlot {
   if (description && typeof description === "object" && "checkoutSlot" in description) {
     return normalizeCheckoutSlot((description as { checkoutSlot?: unknown }).checkoutSlot);

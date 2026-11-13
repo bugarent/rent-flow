@@ -8,6 +8,7 @@ import {
   toExtraServicePricing,
   type ExtraServicePricing,
 } from "@/lib/extras/pricing";
+import { readExtraI18n } from "@/lib/extras/localized-copy";
 import { ensureDataDir, resolveDataFile } from "@/lib/server/data-paths";
 import type { StoredExtraService } from "./types";
 
@@ -252,6 +253,8 @@ export async function readFileStore(): Promise<StoredExtraService[]> {
           isTpl,
           name,
         }),
+        nameI18n: readExtraI18n({ i18n: item.nameI18n }),
+        descriptionI18n: readExtraI18n({ i18n: item.descriptionI18n }),
         createdAt: String(item.createdAt || new Date().toISOString()),
         updatedAt: String(item.updatedAt || new Date().toISOString()),
       };

@@ -16,6 +16,11 @@ import {
   toExtraServicePricing,
   type ExtraServicePricing,
 } from "@/lib/extras/pricing";
+import {
+  missingExtraCopyLocales,
+  readExtraI18n,
+  type ExtraCopyBag,
+} from "@/lib/extras/localized-copy";
 
 const STORE = join(dataRoot(), "partner-custom-extras.json");
 
@@ -24,12 +29,80 @@ export type PartnerCustomExtra = {
   slug: string;
   name: string;
   description: string;
+  nameI18n?: ExtraCopyBag;
+  descriptionI18n?: ExtraCopyBag;
   defaultPriceEur: number;
   maxPriceEur: number | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 };
+
+async function readStoreForUpdate(): Promise<StoreFile> {
+  const raw = await readFileForUpdate(STORE);
+  if (raw == null) return {};
+  const parsed = JSON.parse(raw) as unknown;
+  if (!parsed || typeof parsed !== "object") throw new StoreUnavailableError();
+  return parsed as StoreFile;
+}
+
+async function translateCustomCopy(
+  name: string,
+  description: string,
+  existing?: { name?: ExtraCopyBag; description?: ExtraCopyBag },
+): Promise<{ nameI18n: ExtraCopyBag; descriptionI18n: ExtraCopyBag }> {
+  try {
+    const { fillExtraCopy } = await import("@/lib/server/extras/translate-copy");
+    return await fillExtraCopy(name, description, existing);
+  } catch (error) {
+    console.warn("[partner-custom-extras] translate", error);
+    return { nameI18n: existing?.name || {}, descriptionI18n: existing?.description || {} };
+  }
+}
+
+function needsCopy(row: PartnerCustomExtra) {
+  return (
+    missingExtraCopyLocales(row.name, readExtraI18n({ i18n: row.nameI18n })).length > 0 ||
+    missingExtraCopyLocales(row.description || "", readExtraI18n({ i18n: row.descriptionI18n })).length > 0
+  );
+}
+
+/** Fill missing translations of partner-created services. Only the two i18n fields of a row change. */
+export async function ensurePartnerCustomExtraCopy(): Promise<void> {
+  const store = await readStore();
+  const pending: Array<{ id: string; nameI18n: ExtraCopyBag; descriptionI18n: ExtraCopyBag }> = [];
+  for (const rows of Object.values(store)) {
+    if (!Array.isArray(rows)) continue;
+    for (const row of rows) {
+      if (row.isActive === false || !needsCopy(row)) continue;
+      const filled = await translateCustomCopy(row.name, row.description || "", {
+        name: readExtraI18n({ i18n: row.nameI18n }),
+        description: readExtraI18n({ i18n: row.descriptionI18n }),
+      });
+      pending.push({ id: row.id, ...filled });
+    }
+  }
+  if (!pending.length) return;
+  const byId = new Map(pending.map((item) => [item.id, item]));
+  await withStoreLock(STORE, async () => {
+    const latest = await readStoreForUpdate();
+    const next: StoreFile = {};
+    for (const [partnerId, rows] of Object.entries(latest)) {
+      next[partnerId] = Array.isArray(rows)
+        ? rows.map((row) => {
+            const filled = byId.get(row.id);
+            if (!filled) return row;
+            return {
+              ...row,
+              nameI18n: { ...filled.nameI18n, ...readExtraI18n({ i18n: row.nameI18n }) },
+              descriptionI18n: { ...filled.descriptionI18n, ...readExtraI18n({ i18n: row.descriptionI18n }) },
+            };
+          })
+        : rows;
+    }
+    await writeStore(next);
+  });
+}
 
 type StoreFile = Record<string, PartnerCustomExtra[]>;
 
@@ -55,6 +128,8 @@ export function partnerCustomToPricing(row: PartnerCustomExtra): ExtraServicePri
     slug: row.slug,
     name: row.name,
     description: row.description,
+    nameI18n: readExtraI18n({ i18n: row.nameI18n }),
+    descriptionI18n: readExtraI18n({ i18n: row.descriptionI18n }),
     isTpl: false,
     isActive: row.isActive !== false,
     sortOrder: 900,
@@ -131,32 +206,38 @@ export async function createPartnerCustomExtra(
   if (maxPriceEur != null && (!Number.isFinite(maxPriceEur) || maxPriceEur < 0)) maxPriceEur = null;
   if (maxPriceEur != null && maxPriceEur < defaultPriceEur) maxPriceEur = defaultPriceEur;
 
-  const store = await readStore();
-  const existing = Array.isArray(store[pid]) ? store[pid] : [];
-  const baseSlug = slugifyExtraName(name) || "custom-extra";
-  let slug = `p-${baseSlug}`;
-  let n = 1;
-  const used = new Set(existing.map((r) => r.slug));
-  while (used.has(slug)) {
-    slug = `p-${baseSlug}-${++n}`;
-    if (n > 50) throw new Error("Could not allocate a unique slug");
-  }
+  const description = String(input.description || "").trim();
+  const copy = await translateCustomCopy(name, description);
 
-  const now = new Date().toISOString();
-  const row: PartnerCustomExtra = {
-    id: randomUUID(),
-    slug,
-    name,
-    description: String(input.description || "").trim(),
-    defaultPriceEur,
-    maxPriceEur,
-    isActive: true,
-    createdAt: now,
-    updatedAt: now,
-  };
-  store[pid] = [...existing, row];
-  await writeStore(store);
-  return row;
+  return withStoreLock(STORE, async () => {
+    const store = await readStoreForUpdate();
+    const existing = Array.isArray(store[pid]) ? store[pid] : [];
+    const baseSlug = slugifyExtraName(name) || "custom-extra";
+    let slug = `p-${baseSlug}`;
+    let n = 1;
+    const used = new Set(existing.map((r) => r.slug));
+    while (used.has(slug)) {
+      slug = `p-${baseSlug}-${++n}`;
+      if (n > 50) throw new Error("Could not allocate a unique slug");
+    }
+
+    const now = new Date().toISOString();
+    const row: PartnerCustomExtra = {
+      id: randomUUID(),
+      slug,
+      name,
+      description,
+      ...(Object.keys(copy.nameI18n).length ? { nameI18n: copy.nameI18n } : {}),
+      ...(Object.keys(copy.descriptionI18n).length ? { descriptionI18n: copy.descriptionI18n } : {}),
+      defaultPriceEur,
+      maxPriceEur,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await writeStore({ ...store, [pid]: [...existing, row] });
+    return row;
+  });
 }
 
 /**
