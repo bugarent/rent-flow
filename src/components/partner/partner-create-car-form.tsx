@@ -59,7 +59,10 @@ import {
   partnerCurrencySymbol,
   eurToPartnerAmount,
   rebasePartnerAmount,
+  displayStickyMoney,
+  readStickyPin,
   type PartnerDisplayCurrency,
+  type StickyMoneyPin,
 } from "@/lib/partners/pricing-currency";
 import { DEFAULT_FX_RATES, type FxRates } from "@/lib/fx";
 import {
@@ -134,17 +137,53 @@ function formatExtrasChange(raw: string, locale: string): string {
     .join("; ");
 }
 
-function ratesToPartner(
+const SEASON_RATE_KEYS = ["d1_3", "d4_5", "d6_30", "d31"] as const;
+
+type SeasonEnteredCell = { amount?: unknown; currency?: unknown };
+
+function seasonMoneyFromSaved(
   rates: Record<string, string | number> | undefined,
+  entered: unknown,
   currency: PartnerDisplayCurrency,
   fx: FxRates,
-): CarSeasonRates {
-  return {
-    d1_3: partnerMoney(rates?.d1_3, currency, fx),
-    d4_5: partnerMoney(rates?.d4_5, currency, fx),
-    d6_30: partnerMoney(rates?.d6_30, currency, fx),
-    d31: partnerMoney(rates?.d31, currency, fx),
-  };
+): { rates: CarSeasonRates; pins: Partial<Record<keyof CarSeasonRates, StickyMoneyPin>> } {
+  const enteredMap =
+    entered && typeof entered === "object" ? (entered as Record<string, SeasonEnteredCell>) : {};
+  const pins: Partial<Record<keyof CarSeasonRates, StickyMoneyPin>> = {};
+  const out = emptyRates();
+  for (const key of SEASON_RATE_KEYS) {
+    const cell = enteredMap[key];
+    const pin = readStickyPin({
+      enteredAmount: cell?.amount,
+      enteredCurrency: cell?.currency,
+      priceEur: rates?.[key],
+    });
+    pins[key] = pin;
+    out[key] = displayStickyMoney(pin, currency, fx);
+  }
+  return { rates: out, pins };
+}
+
+function depositFromSaved(
+  details: { deposit?: unknown; depositEnteredAmount?: unknown; depositEnteredCurrency?: unknown } | null,
+  currency: PartnerDisplayCurrency,
+  fx: FxRates,
+): { text: string; pin: StickyMoneyPin } {
+  const pin = readStickyPin({
+    enteredAmount: details?.depositEnteredAmount,
+    enteredCurrency: details?.depositEnteredCurrency,
+    priceEur: details?.deposit,
+  });
+  return { text: displayStickyMoney(pin, currency, fx) || "0", pin };
+}
+
+function tiersFromSaved(
+  tiers: Array<{ priceEur?: unknown; enteredAmount?: unknown; enteredCurrency?: unknown }>,
+  currency: PartnerDisplayCurrency,
+  fx: FxRates,
+): { prices: string[]; pins: StickyMoneyPin[] } {
+  const pins = tiers.map((tier) => readStickyPin(tier));
+  return { prices: pins.map((pin) => displayStickyMoney(pin, currency, fx)), pins };
 }
 
 const SECTION_IDS = [
@@ -552,6 +591,9 @@ export function PartnerCreateCarForm({
   const [tariffPrices, setTariffPrices] = useState<string[]>(() =>
     Array.from({ length: (initialTariffs?.length || 3) + 1 }, () => ""),
   );
+  const tierPinsRef = useRef<StickyMoneyPin[]>([]);
+  const depositPinRef = useRef<StickyMoneyPin | null>(null);
+  const seasonPinsRef = useRef<Array<Partial<Record<keyof CarSeasonRates, StickyMoneyPin>>>>([]);
   const [cardRequired, setCardRequired] = useState(false);
   const [seats, setSeats] = useState("5");
   const [doors, setDoors] = useState("4");
@@ -594,6 +636,47 @@ export function PartnerCreateCarForm({
   const moneySymbol = partnerCurrencySymbol(pricingCurrency);
   const toEur = (amount: string | number | null | undefined) =>
     partnerAmountToEur(amount, pricingCurrency, fxRates);
+  const commitSticky = (display: string, pin: StickyMoneyPin | undefined): StickyMoneyPin => {
+    if (pin && !pin.edited) return { ...pin, edited: false };
+    const amount = String(display ?? "").trim();
+    const blank = amount === "" || amount === "." || amount === "-";
+    return {
+      amount: blank ? "" : amount,
+      currency: pricingCurrency,
+      priceEur: blank ? "" : String(toEur(amount)),
+      edited: false,
+    };
+  };
+  const markTierEdited = (index: number) => {
+    const pins = tierPinsRef.current;
+    while (pins.length <= index) {
+      pins.push({ amount: "", currency: pricingCurrency, priceEur: "", edited: false });
+    }
+    pins[index] = { ...pins[index], edited: true };
+  };
+  const markDepositEdited = () => {
+    const prev = depositPinRef.current;
+    depositPinRef.current = {
+      amount: prev?.amount ?? "",
+      currency: prev?.currency ?? pricingCurrency,
+      priceEur: prev?.priceEur ?? "",
+      edited: true,
+    };
+  };
+  const markSeasonEdited = (rowIndex: number, key: keyof CarSeasonRates) => {
+    const rows = seasonPinsRef.current;
+    while (rows.length <= rowIndex) rows.push({});
+    const prev = rows[rowIndex]?.[key];
+    rows[rowIndex] = {
+      ...rows[rowIndex],
+      [key]: {
+        amount: prev?.amount ?? "",
+        currency: prev?.currency ?? pricingCurrency,
+        priceEur: prev?.priceEur ?? "",
+        edited: true,
+      },
+    };
+  };
   const fromEurLabel = (amountEur: number) => formatMoney(amountEur, pricingCurrency, fxRates);
 
   const fxStamp = moneyCtx
@@ -756,7 +839,11 @@ export function PartnerCreateCarForm({
           setFuel(String(car.fuelType || "PETROL"));
           setMileageLimit(Boolean(details?.mileageLimit));
           setMileageKm(String(details?.mileageKm ?? ""));
-          setDeposit(partnerMoney(details?.deposit, nextCurrency, nextRates) || "0");
+          {
+            const savedDeposit = depositFromSaved(details, nextCurrency, nextRates);
+            depositPinRef.current = savedDeposit.pin;
+            setDeposit(savedDeposit.text);
+          }
           {
             const raw = Number(details?.franchise);
             if (!Number.isFinite(raw) || raw <= 0) setFranchise("0");
@@ -793,11 +880,9 @@ export function PartnerCreateCarForm({
 
           const tiers = Array.isArray(details?.pricingTiers) ? details.pricingTiers : [];
           if (tiers.length) {
-            setTariffPrices(
-              Array.from({ length: Math.max(tiers.length, 1) }, (_, i) =>
-                partnerMoney(tiers[i]?.priceEur, nextCurrency, nextRates),
-              ),
-            );
+            const savedTiers = tiersFromSaved(tiers, nextCurrency, nextRates);
+            tierPinsRef.current = savedTiers.pins;
+            setTariffPrices(savedTiers.prices);
           }
 
           const carExtras = Array.isArray(car.extras) ? car.extras : [];
@@ -1135,7 +1220,11 @@ export function PartnerCreateCarForm({
           setFuel(String(car.fuelType || "PETROL"));
           setMileageLimit(Boolean(details?.mileageLimit));
           setMileageKm(String(details?.mileageKm ?? ""));
-          setDeposit(partnerMoney(details?.deposit, nextCurrency, nextRates) || "0");
+          {
+            const savedDeposit = depositFromSaved(details, nextCurrency, nextRates);
+            depositPinRef.current = savedDeposit.pin;
+            setDeposit(savedDeposit.text);
+          }
           {
             const raw = Number(details?.franchise);
             if (!Number.isFinite(raw) || raw <= 0) {
@@ -1177,28 +1266,32 @@ export function PartnerCreateCarForm({
 
           const tiers = Array.isArray(details?.pricingTiers) ? details.pricingTiers : [];
           if (tiers.length) {
-            setTariffPrices(
-              Array.from({ length: Math.max(tiers.length, 1) }, (_, i) =>
-                partnerMoney(tiers[i]?.priceEur, nextCurrency, nextRates),
-              ),
-            );
+            const savedTiers = tiersFromSaved(tiers, nextCurrency, nextRates);
+            tierPinsRef.current = savedTiers.pins;
+            setTariffPrices(savedTiers.prices);
           }
 
           const seasonRows = Array.isArray(details?.seasons) ? details.seasons : [];
           if (seasonRows.length) {
-            setSeasonRates(
-              seasonRows.map((row) =>
-                ratesToPartner(
-                  (row.rates as Record<string, string | number> | undefined) || undefined,
-                  nextCurrency,
-                  nextRates,
-                ),
+            const savedSeasons = seasonRows.map((row) =>
+              seasonMoneyFromSaved(
+                (row.rates as Record<string, string | number> | undefined) || undefined,
+                (row as { enteredRates?: unknown }).enteredRates,
+                nextCurrency,
+                nextRates,
               ),
             );
+            seasonPinsRef.current = savedSeasons.map((row) => row.pins);
+            setSeasonRates(savedSeasons.map((row) => row.rates));
           } else if (details?.rates) {
-            setSeasonRates([
-              ratesToPartner(details.rates as Record<string, string | number>, nextCurrency, nextRates),
-            ]);
+            const saved = seasonMoneyFromSaved(
+              details.rates as Record<string, string | number>,
+              (details as { enteredRates?: unknown }).enteredRates,
+              nextCurrency,
+              nextRates,
+            );
+            seasonPinsRef.current = [saved.pins];
+            setSeasonRates([saved.rates]);
           }
 
           const carExtras = Array.isArray(car.extras) ? car.extras : [];
@@ -1409,6 +1502,7 @@ export function PartnerCreateCarForm({
   }, [tariffPrices, seasonRates]);
 
   const setSeasonRateField = (rowIndex: number, key: keyof CarSeasonRates, value: string) => {
+    markSeasonEdited(rowIndex, key);
     setSeasonRates((prev) => {
       const next = prev.map((row) => ({ ...row }));
       while (next.length <= rowIndex) next.push(emptyRates());
@@ -1626,12 +1720,32 @@ export function PartnerCreateCarForm({
           seasons: seasonalPricing.seasons,
         });
       }
-      const convertSeasonRates = (row: CarSeasonRates): CarSeasonRates => ({
-        d1_3: String(toEur(row.d1_3)),
-        d4_5: String(toEur(row.d4_5)),
-        d6_30: String(toEur(row.d6_30)),
-        d31: String(toEur(row.d31)),
-      });
+      const convertSeasonRates = (row: CarSeasonRates, rowIndex: number) => {
+        const prev = seasonPinsRef.current[rowIndex] || {};
+        const nextPins: Partial<Record<keyof CarSeasonRates, StickyMoneyPin>> = {};
+        const rates = emptyRates();
+        const enteredRates: Record<string, { amount: string; currency: PartnerDisplayCurrency }> = {};
+        for (const key of SEASON_RATE_KEYS) {
+          const pin = commitSticky(row[key], prev[key]);
+          nextPins[key] = pin;
+          rates[key] = pin.priceEur === "" ? "0" : pin.priceEur;
+          if (pin.amount) enteredRates[key] = { amount: pin.amount, currency: pin.currency };
+        }
+        seasonPinsRef.current[rowIndex] = nextPins;
+        return { rates, enteredRates };
+      };
+      const savedDeposit = commitSticky(deposit, depositPinRef.current ?? undefined);
+      depositPinRef.current = savedDeposit;
+      const savedTierPins = [
+        ...tariffIntervals.map((_, i) => commitSticky(tariffPrices[i] ?? "", tierPinsRef.current[i])),
+        commitSticky(
+          tariffPrices[tariffIntervals.length] ?? "",
+          tierPinsRef.current[tariffIntervals.length],
+        ),
+      ];
+      tierPinsRef.current = savedTierPins;
+      const tierEur = (pin: StickyMoneyPin) => (pin.priceEur === "" ? "0" : pin.priceEur);
+      const baseSeason = convertSeasonRates(seasonRates[0] ?? emptyRates(), 0);
       const selectedCategory =
         categoryOptions.find((c) => c.slug === categorySlug) ||
         categoryOptions.find((c) => c.name === categorySlug);
@@ -1647,20 +1761,31 @@ export function PartnerCreateCarForm({
           from: seasonMeta[0]?.from ?? "01-01",
           to: seasonMeta[0]?.to ?? "12-31",
         },
-        rates: convertSeasonRates(seasonRates[0] ?? emptyRates()),
-        seasons: seasonMeta.map((meta, i) => ({
-          index: meta.index,
-          from: meta.from,
-          to: meta.to,
-          rates: convertSeasonRates(seasonRates[i] ?? emptyRates()),
-        })),
+        rates: baseSeason.rates,
+        ...(Object.keys(baseSeason.enteredRates).length ? { enteredRates: baseSeason.enteredRates } : {}),
+        seasons: seasonMeta.map((meta, i) => {
+          const saved = i === 0 ? baseSeason : convertSeasonRates(seasonRates[i] ?? emptyRates(), i);
+          return {
+            index: meta.index,
+            from: meta.from,
+            to: meta.to,
+            rates: saved.rates,
+            ...(Object.keys(saved.enteredRates).length ? { enteredRates: saved.enteredRates } : {}),
+          };
+        }),
         pickupPlaces: pickupPayload.map((p) => ({
           ...p,
           priceEur: toEur(p.priceEur),
         })),
         mileageLimit,
         mileageKm,
-        deposit: String(toEur(deposit)),
+        deposit: tierEur(savedDeposit),
+        ...(savedDeposit.amount
+          ? {
+              depositEnteredAmount: savedDeposit.amount,
+              depositEnteredCurrency: savedDeposit.currency,
+            }
+          : {}),
         franchise: franchiseEnabled
           ? String(Math.min(100, Math.max(0, Number(franchise) || 0)))
           : "0",
@@ -1671,12 +1796,21 @@ export function PartnerCreateCarForm({
           ...tariffIntervals.map((t, i) => ({
             fromDays: t.fromDays,
             toDays: t.toDays,
-            priceEur: String(toEur(tariffPrices[i] ?? "")),
+            priceEur: tierEur(savedTierPins[i]),
+            ...(savedTierPins[i].amount
+              ? { enteredAmount: savedTierPins[i].amount, enteredCurrency: savedTierPins[i].currency }
+              : {}),
           })),
           {
             fromDays: tariffPlusFromDays(tariffIntervals),
             toDays: 9999,
-            priceEur: String(toEur(tariffPrices[tariffIntervals.length] ?? "")),
+            priceEur: tierEur(savedTierPins[tariffIntervals.length]),
+            ...(savedTierPins[tariffIntervals.length].amount
+              ? {
+                  enteredAmount: savedTierPins[tariffIntervals.length].amount,
+                  enteredCurrency: savedTierPins[tariffIntervals.length].currency,
+                }
+              : {}),
           },
         ],
         cardRequired,
@@ -1741,7 +1875,25 @@ export function PartnerCreateCarForm({
           year: Number(year),
           title: `${make.trim()} ${model.trim()} ${year}`.trim(),
           description,
-          dailyRateEur: toEur(dailyRate),
+          dailyRateEur: (() => {
+            for (let i = 0; i < savedTierPins.length; i++) {
+              const n = Number(tariffPrices[i]);
+              if (!Number.isFinite(n) || n <= 0) continue;
+              const eur = Number(savedTierPins[i].priceEur);
+              if (Number.isFinite(eur)) return eur;
+            }
+            for (let i = 0; i < seasonRates.length; i++) {
+              const row = seasonRates[i];
+              if (!row) continue;
+              for (const key of SEASON_RATE_KEYS) {
+                const n = Number(row[key]);
+                if (!Number.isFinite(n) || n <= 0) continue;
+                const eur = Number(seasonPinsRef.current[i]?.[key]?.priceEur);
+                if (Number.isFinite(eur)) return eur;
+              }
+            }
+            return 0;
+          })(),
           seats: Number(seats) || 5,
           doors: Number(doors) || 4,
           transmission,
@@ -2330,14 +2482,15 @@ export function PartnerCreateCarForm({
                   symbol={moneySymbol}
                   value={tariffPrices[index] ?? ""}
                   invalid={fieldInvalid(`tariff-${index}`)}
-                  onChange={(v) =>
+                  onChange={(v) => {
+                    markTierEdited(index);
                     setTariffPrices((prev) => {
                       const next = [...prev];
                       while (next.length <= index) next.push("");
                       next[index] = v;
                       return next;
-                    })
-                  }
+                    });
+                  }}
                 />
               </Field>
             ))}
@@ -2349,14 +2502,15 @@ export function PartnerCreateCarForm({
                 symbol={moneySymbol}
                 value={tariffPrices[tariffIntervals.length] ?? ""}
                 invalid={fieldInvalid(`tariff-${tariffIntervals.length}`)}
-                onChange={(v) =>
+                onChange={(v) => {
+                  markTierEdited(tariffIntervals.length);
                   setTariffPrices((prev) => {
                     const next = [...prev];
                     while (next.length <= tariffIntervals.length) next.push("");
                     next[tariffIntervals.length] = v;
                     return next;
-                  })
-                }
+                  });
+                }}
               />
             </Field>
           </div>
@@ -2520,7 +2674,10 @@ export function PartnerCreateCarForm({
               <MoneyInput
                 symbol={moneySymbol}
                 value={deposit}
-                onChange={setDeposit}
+                onChange={(v) => {
+                  markDepositEdited();
+                  setDeposit(v);
+                }}
                 invalid={fieldInvalid("deposit")}
               />
             </Field>

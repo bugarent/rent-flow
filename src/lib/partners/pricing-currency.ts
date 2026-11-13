@@ -1,5 +1,5 @@
 import type { FxRates } from "@/lib/fx";
-import type { Currency } from "@/lib/i18n/config";
+import { isCurrency, type Currency } from "@/lib/i18n/config";
 import { DEFAULT_PARTNER_PRICING_CURRENCY } from "@/lib/partners/company-settings";
 import { convertFromEur, convertToEur, currencySymbol, formatAmountNumber, toNumber } from "@/lib/utils";
 
@@ -27,8 +27,77 @@ function originKey(text: string, currency: PartnerDisplayCurrency) {
 
 function rememberOrigin(text: string, currency: PartnerDisplayCurrency, origin: MoneyOrigin) {
   if (typeof window === "undefined") return;
+  const keyText = formatPartnerAmount(toNumber(text, 0));
   if (moneyOrigins.size >= MAX_MONEY_ORIGINS) moneyOrigins.clear();
-  moneyOrigins.set(originKey(text, currency), origin);
+  moneyOrigins.set(originKey(keyText, currency), origin);
+}
+
+/** Remember that a shown amount came from a typed figure, so a currency round-trip restores it. */
+export function pinMoneyOrigin(
+  shownText: string,
+  shownCurrency: PartnerDisplayCurrency,
+  originAmount: number,
+  originCurrency: PartnerDisplayCurrency,
+) {
+  rememberOrigin(shownText, shownCurrency, { amount: originAmount, currency: originCurrency });
+}
+
+/**
+ * The figure the partner typed, plus the EUR snapshot taken at that moment.
+ * The form shows `amount` again whenever the working currency matches; rate moves do not rewrite it.
+ */
+export type StickyMoneyPin = {
+  amount: string;
+  currency: PartnerDisplayCurrency;
+  priceEur: string;
+  edited: boolean;
+};
+
+export function readStickyPin(raw: {
+  enteredAmount?: unknown;
+  enteredCurrency?: unknown;
+  priceEur?: unknown;
+}): StickyMoneyPin {
+  const amount =
+    typeof raw.enteredAmount === "string"
+      ? raw.enteredAmount.trim()
+      : typeof raw.enteredAmount === "number" && Number.isFinite(raw.enteredAmount)
+        ? String(raw.enteredAmount)
+        : "";
+  const currencyRaw = typeof raw.enteredCurrency === "string" ? raw.enteredCurrency : "";
+  const hasEntered = amount !== "" && isCurrency(currencyRaw);
+  const priceRaw = raw.priceEur;
+  const priceEur =
+    priceRaw == null || priceRaw === ""
+      ? ""
+      : typeof priceRaw === "number" || typeof priceRaw === "string"
+        ? String(priceRaw)
+        : "";
+  return {
+    amount: hasEntered ? amount : "",
+    currency: hasEntered && isCurrency(currencyRaw) ? currencyRaw : "EUR",
+    priceEur,
+    edited: false,
+  };
+}
+
+/** Show the typed amount when the currency matches. Otherwise derive the other currency from that typed amount. */
+export function displayStickyMoney(
+  pin: Pick<StickyMoneyPin, "amount" | "currency" | "priceEur">,
+  currency: PartnerDisplayCurrency,
+  rates: FxRates,
+): string {
+  const amount = pin.amount.trim();
+  const originAmount = toNumber(amount, Number.NaN);
+  if (amount && Number.isFinite(originAmount) && isCurrency(pin.currency)) {
+    if (pin.currency === currency) {
+      pinMoneyOrigin(amount, currency, originAmount, pin.currency);
+      return amount;
+    }
+    return rebasePartnerAmount(amount, pin.currency, currency, rates);
+  }
+  if (pin.priceEur === "") return "";
+  return eurToPartnerAmount(pin.priceEur, currency, rates);
 }
 
 function originOf(amount: string | number, currency: PartnerDisplayCurrency): MoneyOrigin {

@@ -6,6 +6,9 @@ export type CarDetailsPricingTier = Array<{
   fromDays: number;
   toDays: number;
   priceEur: string | number;
+  /** Amount the partner typed. The listing form shows this again in `enteredCurrency`. */
+  enteredAmount?: string;
+  enteredCurrency?: string;
 }>;
 
 export type CarDetailsBlob = {
@@ -123,16 +126,27 @@ export function descriptionWithTariffRanges(
   const bounded = openIndex >= 0 ? sorted.filter((_, i) => i !== openIndex) : sorted;
   const open = openIndex >= 0 ? sorted[openIndex] : undefined;
 
-  let carry: string | number = bounded[0]?.priceEur ?? "";
+  let carry = bounded[0];
   const nextTiers: CarDetailsPricingTier = intervals.map((interval, i) => {
-    const priceEur = bounded[i]?.priceEur ?? carry;
-    carry = priceEur;
-    return { fromDays: interval.fromDays, toDays: interval.toDays, priceEur };
+    const source = bounded[i] ?? carry;
+    carry = source ?? carry;
+    return {
+      fromDays: interval.fromDays,
+      toDays: interval.toDays,
+      priceEur: source?.priceEur ?? "",
+      ...(source?.enteredAmount
+        ? { enteredAmount: source.enteredAmount, enteredCurrency: source.enteredCurrency }
+        : {}),
+    };
   });
+  const openSource = open ?? carry;
   nextTiers.push({
     fromDays: intervals[intervals.length - 1].toDays + 1,
     toDays: OPEN_TIER_TO_DAYS,
-    priceEur: open?.priceEur ?? carry,
+    priceEur: openSource?.priceEur ?? "",
+    ...(openSource?.enteredAmount
+      ? { enteredAmount: openSource.enteredAmount, enteredCurrency: openSource.enteredCurrency }
+      : {}),
   });
 
   const same =
