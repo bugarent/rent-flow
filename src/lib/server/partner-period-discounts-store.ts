@@ -220,8 +220,8 @@ export async function deletePeriodDiscount(id: string, partnerId: string): Promi
 }
 
 /**
- * For each carId, returns the strongest overlapping discount % (kind=discount only).
- * Markups are ignored for public search pricing for now.
+ * For each carId, the period adjustment for the rental: the strongest overlapping discount minus the
+ * strongest overlapping markup. Positive = cheaper, negative = markup.
  */
 export async function periodDiscountPercentByCarId(
   rangeFrom: string,
@@ -240,22 +240,32 @@ export async function periodDiscountPercentByCarId(
 
   const idFilter = carIds?.length ? new Set(carIds) : null;
   const { items } = opts?.fresh ? await readStore() : await readStoreForSearch();
+  const discounts = new Map<string, number>();
+  const markups = new Map<string, number>();
   for (const item of items) {
-    if (item.kind !== "discount") continue;
     if (!yearlyPeriodHitsRange(item.from, item.to, from, to)) continue;
+    const target = item.kind === "markup" ? markups : discounts;
     for (const carId of item.carIds) {
       if (idFilter && !idFilter.has(carId)) continue;
-      const prev = map.get(carId) ?? 0;
-      if (item.percent > prev) map.set(carId, item.percent);
+      if (item.percent > (target.get(carId) ?? 0)) target.set(carId, item.percent);
     }
+  }
+  for (const carId of new Set([...discounts.keys(), ...markups.keys()])) {
+    const net = (discounts.get(carId) ?? 0) - (markups.get(carId) ?? 0);
+    if (net !== 0) map.set(carId, net);
   }
   return map;
 }
 
+/**
+ * Listing price adjustment: the larger of the listing's own discount and a period discount,
+ * or the listing discount minus a period markup. Positive = cheaper, negative = markup.
+ */
 export function mergeListingDiscountPercent(basePercent: number, periodPercent: number): number {
   const base = Number.isFinite(basePercent) ? Math.max(0, basePercent) : 0;
-  const period = Number.isFinite(periodPercent) ? Math.max(0, periodPercent) : 0;
-  return Math.min(100, Math.max(base, period));
+  const period = Number.isFinite(periodPercent) ? periodPercent : 0;
+  const merged = period < 0 ? base + period : Math.max(base, period);
+  return Math.min(100, Math.max(-100, merged));
 }
 
 /** Listing discount used when a booking is created, including an active period discount. */

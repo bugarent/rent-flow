@@ -36,7 +36,8 @@ export function resolveDailyRateEur(
     const tierPrice = match != null ? Number(match.priceEur) : NaN;
     if (Number.isFinite(tierPrice) && tierPrice > 0) base = tierPrice;
   }
-  const discount = Number.isFinite(discountPercent) ? Math.min(100, Math.max(0, discountPercent)) / 100 : 0;
+  // Negative = partner period markup.
+  const discount = Number.isFinite(discountPercent) ? Math.min(100, Math.max(-100, discountPercent)) / 100 : 0;
   return Math.max(0, base * (1 - discount));
 }
 

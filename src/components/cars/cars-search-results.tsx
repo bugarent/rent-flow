@@ -168,6 +168,8 @@ const COPY: Record<
     luggageLarge: string;
     lowDeposit: string;
     siteDiscount: string;
+    /** Badge on the photo when the partner's discount applies to these dates. */
+    discountBadge: string;
     freeDelivery: string;
     unlimitedMileage: string;
     freeInsurance: string;
@@ -249,6 +251,7 @@ const COPY: Record<
     luggageLarge: "Large",
     lowDeposit: "Low deposit",
     siteDiscount: "Site discount {n}%",
+    discountBadge: "Discount",
     freeDelivery: "Free delivery",
     unlimitedMileage: "Unlimited mileage",
     freeInsurance: "Free insurance",
@@ -329,6 +332,7 @@ const COPY: Record<
     luggageLarge: "დიდი",
     lowDeposit: "დაბალი დეპოზიტი",
     siteDiscount: "საიტის ფასდაკლება {n}%",
+    discountBadge: "ფასდაკლება",
     freeDelivery: "უფასო მიწოდება",
     unlimitedMileage: "ულიმიტო გარბენი",
     freeInsurance: "უფასო დაზღვევა",
@@ -409,6 +413,7 @@ const COPY: Record<
     luggageLarge: "Большой",
     lowDeposit: "Низкий депозит",
     siteDiscount: "Скидка сайта {n}%",
+    discountBadge: "Скидка",
     freeDelivery: "Бесплатная доставка",
     unlimitedMileage: "Пробег без ограничений",
     freeInsurance: "Бесплатная страховка",
@@ -489,6 +494,7 @@ const COPY: Record<
     luggageLarge: "Grand",
     lowDeposit: "Caution faible",
     siteDiscount: "Remise du site {n}%",
+    discountBadge: "Remise",
     freeDelivery: "Livraison gratuite",
     unlimitedMileage: "Kilométrage illimité",
     freeInsurance: "Assurance gratuite",
@@ -569,6 +575,7 @@ const COPY: Record<
     luggageLarge: "Groß",
     lowDeposit: "Niedrige Kaution",
     siteDiscount: "Website-Rabatt {n}%",
+    discountBadge: "Rabatt",
     freeDelivery: "Kostenlose Lieferung",
     unlimitedMileage: "Unbegrenzte Kilometer",
     freeInsurance: "Kostenlose Versicherung",
@@ -649,6 +656,7 @@ const COPY: Record<
     luggageLarge: "Duży",
     lowDeposit: "Niski depozyt",
     siteDiscount: "Rabat serwisu {n}%",
+    discountBadge: "Rabat",
     freeDelivery: "Bezpłatna dostawa",
     unlimitedMileage: "Bez limitu kilometrów",
     freeInsurance: "Bezpłatne ubezpieczenie",
@@ -729,6 +737,7 @@ const COPY: Record<
     luggageLarge: "كبير",
     lowDeposit: "تأمين منخفض",
     siteDiscount: "خصم الموقع {n}%",
+    discountBadge: "خصم",
     freeDelivery: "توصيل مجاني",
     unlimitedMileage: "كيلومترات غير محدودة",
     freeInsurance: "تأمين مجاني",
@@ -1961,6 +1970,21 @@ function CarResultCard({
   const total = priced.totalEur;
   /** Hero price: (rental for days + pickup delivery + return delivery) ÷ days. */
   const displayDaily = priced.displayDailyEur;
+  /** Partner discount for these dates (listing or period). Markups are negative and get no badge. */
+  const partnerDiscount = Math.round(toNumber(car.discountPercent, 0));
+  const undiscountedDaily =
+    partnerDiscount > 0
+      ? listingDailyWithDeliveryEur({
+          dailyRateEur: toNumber(car.dailyRateEur, 0),
+          days,
+          pickupDeliveryFeeEur: car.pickupDeliveryFeeEur,
+          dropoffDeliveryFeeEur: car.dropoffDeliveryFeeEur,
+          deliveryFeeEur: car.deliveryFeeEur,
+          details,
+          discountPercent: 0,
+          referralDiscountPercent,
+        }).displayDailyEur
+      : 0;
   const depositEur = car.depositEur != null ? toNumber(car.depositEur, Number.NaN) : Number.NaN;
   const noDeposit = Number.isFinite(depositEur) && depositEur <= 0;
   // 100 EUR is the low-deposit amount partners enter. Exactly 100 still counts.
@@ -1994,6 +2018,16 @@ function CarResultCard({
         {siteDiscountPercent > 0 ? (
           <span className="absolute left-0 top-0 z-[5] max-w-[85%] truncate rounded-br-md bg-orange-500 px-3 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-white shadow-md">
             {copy.siteDiscount.replace("{n}", String(siteDiscountPercent))}
+          </span>
+        ) : null}
+
+        {partnerDiscount > 0 ? (
+          <span
+            className="absolute right-2 top-2 z-[5] flex flex-col items-center rounded-md bg-red-600 px-2 py-1 leading-none text-white shadow-md ring-2 ring-white/80"
+            aria-label={`${copy.discountBadge} ${partnerDiscount}%`}
+          >
+            <span className="text-[15px] font-extrabold">−{partnerDiscount}%</span>
+            <span className="mt-0.5 text-[9px] font-bold uppercase tracking-wide">{copy.discountBadge}</span>
           </span>
         ) : null}
 
@@ -2079,7 +2113,17 @@ function CarResultCard({
 
         <div className="mt-auto flex items-center justify-between gap-3 pt-1">
           <div className="min-w-0">
-            <p className="text-[22px] font-extrabold leading-none text-[#1e293b]">
+            {undiscountedDaily > displayDaily ? (
+              <p className="mb-0.5 text-[13px] font-semibold leading-none text-slate-400 line-through decoration-red-500 decoration-2">
+                <CardMoney amountEur={undiscountedDaily} formatPrice={formatPrice} />
+              </p>
+            ) : null}
+            <p
+              className={cn(
+                "text-[22px] font-extrabold leading-none",
+                undiscountedDaily > displayDaily ? "text-red-600" : "text-[#1e293b]",
+              )}
+            >
               <CardMoney amountEur={displayDaily} formatPrice={formatPrice} />
             </p>
             <p className="mt-1 truncate text-[12px] font-medium text-slate-400">

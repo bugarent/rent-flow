@@ -17,6 +17,7 @@ export const SEARCH_EXTRA: Record<string, Record<string, string>> = {
     close: "Cerrar",
     resetFilters: "Restablecer filtros",
     showCars: "Mostrar {n} coches",
+    discountBadge: "Descuento",
   },
   it: {
     carsAvailable: "{n} auto disponibili",
@@ -35,6 +36,7 @@ export const SEARCH_EXTRA: Record<string, Record<string, string>> = {
     close: "Chiudi",
     resetFilters: "Azzera filtri",
     showCars: "Mostra {n} auto",
+    discountBadge: "Sconto",
   },
   nl: {
     carsAvailable: "{n} auto's beschikbaar",
@@ -53,6 +55,7 @@ export const SEARCH_EXTRA: Record<string, Record<string, string>> = {
     close: "Sluiten",
     resetFilters: "Filters wissen",
     showCars: "Toon {n} auto's",
+    discountBadge: "Korting",
   },
   tr: {
     carsAvailable: "{n} araç uygun",
@@ -71,6 +74,7 @@ export const SEARCH_EXTRA: Record<string, Record<string, string>> = {
     close: "Kapat",
     resetFilters: "Filtreleri sıfırla",
     showCars: "{n} araç göster",
+    discountBadge: "İndirim",
   },
   zh: {
     carsAvailable: "有 {n} 辆车",
@@ -89,6 +93,7 @@ export const SEARCH_EXTRA: Record<string, Record<string, string>> = {
     close: "关闭",
     resetFilters: "重置筛选",
     showCars: "显示 {n} 辆车",
+    discountBadge: "折扣",
   },
   ko: {
     carsAvailable: "차량 {n}대",
@@ -107,6 +112,7 @@ export const SEARCH_EXTRA: Record<string, Record<string, string>> = {
     close: "닫기",
     resetFilters: "필터 초기화",
     showCars: "차량 {n}대 보기",
+    discountBadge: "할인",
   },
   th: {
     carsAvailable: "มีรถ {n} คัน",
@@ -125,5 +131,6 @@ export const SEARCH_EXTRA: Record<string, Record<string, string>> = {
     close: "ปิด",
     resetFilters: "ล้างตัวกรอง",
     showCars: "แสดง {n} คัน",
+    discountBadge: "ส่วนลด",
   },
 };
