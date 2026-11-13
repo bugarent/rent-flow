@@ -21,10 +21,6 @@ function copyFor(locale: string) {
       firstName: "სახელი",
       lastName: "გვარი",
       country: "ქვეყანა",
-      city: "ვინ ითხოვს პარტნიორობას",
-      kindCompany: "კომპანია",
-      kindPrivate: "კერძო პირი",
-      selectKind: "აირჩიეთ",
       address: "ცენტრალური ოფისის მისამართი",
       languages: "კლიენტთან კომუნიკაციისთვის ხელმისაწვდომი ენები",
       countries: "ოპერირების ქვეყნები",
@@ -60,10 +56,6 @@ function copyFor(locale: string) {
       firstName: "Имя",
       lastName: "Фамилия",
       country: "Страна",
-      city: "Кто запрашивает партнёрство",
-      kindCompany: "Компания",
-      kindPrivate: "Частное лицо",
-      selectKind: "Выберите",
       address: "Адрес центрального офиса",
       languages: "Языки общения с клиентами",
       countries: "Страны операций",
@@ -98,10 +90,6 @@ function copyFor(locale: string) {
     firstName: "First name",
     lastName: "Last name",
     country: "Country",
-    city: "Who is requesting partnership",
-    kindCompany: "Company",
-    kindPrivate: "Private person",
-    selectKind: "Select",
     address: "Central office address",
     languages: "Languages available for client communication",
     countries: "Operating countries",
@@ -178,7 +166,6 @@ export function PartnerApplicationForm({
   const [officeCountry, setOfficeCountry] = useState("");
   const defaultIso2 =
     initialCountry && /^[A-Za-z]{2}$/.test(initialCountry) ? initialCountry.toUpperCase() : "GE";
-  const [applicantKind, setApplicantKind] = useState<"" | "COMPANY" | "PRIVATE">("");
   const [address, setAddress] = useState("");
   const [languages, setLanguages] = useState<string[]>(["en"]);
   const [countryIso2s, setCountryIso2s] = useState<string[]>(
@@ -211,7 +198,6 @@ export function PartnerApplicationForm({
     firstName: !firstName.trim(),
     lastName: !lastName.trim(),
     officeCountry: !officeCountry.trim(),
-    applicantKind: applicantKind !== "COMPANY" && applicantKind !== "PRIVATE",
     address: !address.trim(),
     languages: languages.length === 0,
     countries: countryIso2s.length === 0,
@@ -239,7 +225,7 @@ export function PartnerApplicationForm({
     event.preventDefault();
     setError("");
     setShowErrors(true);
-    if (Object.values(invalid).some(Boolean) || (applicantKind !== "COMPANY" && applicantKind !== "PRIVATE")) {
+    if (Object.values(invalid).some(Boolean)) {
       requestAnimationFrame(() => {
         formRef.current
           ?.querySelector("[data-invalid='true']")
@@ -258,7 +244,6 @@ export function PartnerApplicationForm({
         body: JSON.stringify({
           firstName: firstName.trim(),
           lastName: lastName.trim(),
-          kind: applicantKind,
           identificationNumber,
           email: login,
           contactEmail: login,
@@ -331,7 +316,7 @@ export function PartnerApplicationForm({
                     <TextField label={t.firstName} value={firstName} onChange={setFirstName} invalid={mark("firstName")} />
                     <TextField label={t.lastName} value={lastName} onChange={setLastName} invalid={mark("lastName")} />
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
                     <ResidenceCountrySelect
                       label={t.country}
                       valueIso2={
@@ -347,27 +332,6 @@ export function PartnerApplicationForm({
                       placeholder={t.selectCountry}
                       required
                     />
-                    <label
-                      data-invalid={mark("applicantKind") ? "true" : undefined}
-                      className={cn(
-                        "block text-sm font-semibold",
-                        mark("applicantKind") ? "text-red-700" : "text-[#3a4553]",
-                      )}
-                    >
-                      {t.city} <span className="text-[#e11d48]">*</span>
-                      <select
-                        className={fieldClass(mark("applicantKind"))}
-                        value={applicantKind}
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          setApplicantKind(value === "COMPANY" || value === "PRIVATE" ? value : "");
-                        }}
-                      >
-                        <option value="">{t.selectKind}</option>
-                        <option value="COMPANY">{t.kindCompany}</option>
-                        <option value="PRIVATE">{t.kindPrivate}</option>
-                      </select>
-                    </label>
                   </div>
                   <TextField label={t.address} value={address} onChange={setAddress} invalid={mark("address")} />
                   <div data-invalid={mark("languages") ? "true" : undefined}>

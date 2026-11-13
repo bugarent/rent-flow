@@ -33,7 +33,8 @@ const applicationSchema = z
   .object({
     firstName: z.string().trim().min(1).max(80),
     lastName: z.string().trim().min(1).max(80),
-    kind: z.enum(["COMPANY", "PRIVATE"]),
+    // The form no longer asks company vs private; older clients may still send it.
+    kind: z.enum(["COMPANY", "PRIVATE"]).optional().default("COMPANY"),
     identificationNumber: z.string().trim().min(5).max(40),
     email: z.string().email(),
     contactEmail: z.string().email().optional(),

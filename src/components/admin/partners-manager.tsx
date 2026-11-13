@@ -244,6 +244,7 @@ export function PartnersManager({
         primary: "პირველადი მოდერაცია",
         company: "კომპანიის პარტნიორები",
         private: "კერძო პარტნიორები",
+        partners: "პარტნიორები",
         rejected: "უარყოფილი მოთხოვნები",
         customers: "მომხმარებლები",
         directory: "დირექტორია",
@@ -275,6 +276,7 @@ export function PartnersManager({
         primary: "Первичная модерация",
         company: "Компании-партнёры",
         private: "Частные партнёры",
+        partners: "Партнёры",
         rejected: "Отклонённые заявки",
         customers: "Клиенты",
         directory: "Каталог",
@@ -305,6 +307,7 @@ export function PartnersManager({
       primary: "Primary moderation",
       company: "Company partners",
       private: "Private partners",
+      partners: "Partners",
       rejected: "Rejected requests",
       customers: "Customers",
       directory: "Directory",
@@ -476,8 +479,10 @@ export function PartnersManager({
     router.replace(qs ? `${pathname}?${qs}` : pathname);
   };
 
-  const toggleDirectoryTab = (value: DirectoryPartnerTab) => {
-    const next = tabs.includes(value) ? tabs.filter((tab) => tab !== value) : [...tabs, value];
+  /** A pill can stand for several tabs (company + private partners are one pill). */
+  const toggleDirectoryTab = (group: DirectoryPartnerTab[]) => {
+    const on = group.some((tab) => tabs.includes(tab));
+    const next = on ? tabs.filter((tab) => !group.includes(tab)) : [...tabs, ...group.filter((tab) => !tabs.includes(tab))];
     if (!next.length) return;
     setTabs(next);
     setExpandedId(null);
@@ -515,11 +520,10 @@ export function PartnersManager({
       if (!res.ok) throw new Error(data.error || "Update failed");
       setMessage(data.message || `Status → ${data.status}`);
       const nextStatus = String(data.status || "");
-      const kind = (data.partner?.kind || data.kind) as string | undefined;
       if (mode === "directory") {
         const nextTabs: DirectoryPartnerTab[] =
           nextStatus === "APPROVED"
-            ? [kind === "PRIVATE" ? "PRIVATE" : "COMPANY"]
+            ? ["COMPANY", "PRIVATE"]
             : nextStatus === "REJECTED"
               ? ["REJECTED"]
               : tabs;
@@ -557,7 +561,7 @@ export function PartnersManager({
   const showCustomers = mode === "directory" && tabs.includes("CUSTOMERS");
   const showPartners = !(showCustomers && tabs.length === 1);
 
-  const filters: Array<{ value: Filter; label: string }> =
+  const filters: Array<{ value: Filter; label: string; group?: DirectoryPartnerTab[] }> =
     mode === "queue"
       ? [{ value: "PENDING", label: t.pending }]
       : mode === "primary"
@@ -565,8 +569,7 @@ export function PartnersManager({
         : mode === "catalog"
           ? [{ value: "DIRECTORY", label: t.directory }]
           : [
-            { value: "COMPANY", label: t.company },
-            { value: "PRIVATE", label: t.private },
+            { value: "COMPANY", label: t.partners, group: ["COMPANY", "PRIVATE"] },
             { value: "REJECTED", label: t.rejected },
             { value: "CUSTOMERS", label: t.customers },
           ];
@@ -598,12 +601,18 @@ export function PartnersManager({
       {mode === "directory" || filters.length > 1 ? (
       <div className="mb-4 flex flex-wrap gap-2">
         {filters.map((item) => {
-          const badge = filterBadges[item.value] ?? { count: 0, pending: 0 };
+          const group = item.group ?? [item.value as DirectoryPartnerTab];
+          const badge = group
+            .map((key) => filterBadges[key as Filter] ?? { count: 0, pending: 0 })
+            .reduce((sum, b) => ({ count: sum.count + b.count, pending: sum.pending + b.pending }), {
+              count: 0,
+              pending: 0,
+            });
           const hasPending = item.value === "CUSTOMERS" ? false : badge.pending > 0;
           const count = item.value === "CUSTOMERS" ? customers.length : badge.count;
           const selected =
             mode === "directory"
-              ? tabs.includes(item.value as DirectoryPartnerTab)
+              ? group.some((tab) => tabs.includes(tab))
               : filter === item.value;
           return (
             <button
@@ -611,7 +620,7 @@ export function PartnersManager({
               type="button"
               aria-pressed={selected}
               onClick={() => {
-                if (mode === "directory") toggleDirectoryTab(item.value as DirectoryPartnerTab);
+                if (mode === "directory") toggleDirectoryTab(group);
                 else selectFilter(item.value);
               }}
               className={cn(
