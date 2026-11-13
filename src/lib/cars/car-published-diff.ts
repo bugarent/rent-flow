@@ -99,8 +99,6 @@ export function diffCarAgainstPublished(input: {
   mark("minDriverAge", prevDetails.minDriverAge, input.details?.minDriverAge);
   mark("minLicenseYears", prevDetails.minLicenseYears, input.details?.minLicenseYears);
   mark("deposit", prevDetails.deposit, input.details?.deposit, true);
-  mark("franchise", prevDetails.franchise, input.details?.franchise);
-  mark("franchiseEnabled", prevDetails.franchiseEnabled, input.details?.franchiseEnabled);
   mark("mileageLimit", prevDetails.mileageLimit, input.details?.mileageLimit);
   mark("mileageKm", prevDetails.mileageKm, input.details?.mileageKm);
   mark("engineVolume", prevDetails.engineVolume, input.details?.engineVolume);

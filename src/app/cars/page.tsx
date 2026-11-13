@@ -620,9 +620,7 @@ export default async function CarsPage({
       cardRequired: details?.cardRequired === true,
       depositMethods: partnerDepositMethods.get(partnerId) || ["Cash"],
       rentPaymentMethods: partnerRentPaymentMethods.get(partnerId) || ["Cash"],
-      noDepositPaidService:
-        details?.noDepositPaidService === true ||
-        (details?.franchiseEnabled === true && Number(details?.franchise) > 0),
+      noDepositPaidService: details?.noDepositPaidService === true,
       extraServiceIds,
       minDriverAge: resolveDriverRequirement(details, "minDriverAge", 18),
       minLicenseYears: resolveDriverRequirement(details, "minLicenseYears", 0),

@@ -65,16 +65,6 @@ import {
   type StickyMoneyPin,
 } from "@/lib/partners/pricing-currency";
 import { DEFAULT_FX_RATES, type FxRates } from "@/lib/fx";
-import {
-  buildCreateAutoSeasonRows,
-  emptyRates,
-  emptySeasonalPricing,
-  defaultNewSeasonPeriod,
-  FIXED_BASE_SEASON,
-  normalizeMd,
-  type CarSeasonRates,
-  type PartnerSeasonalPricing,
-} from "@/lib/partners/seasonal-pricing";
 import type { PartnerCreateCarCopy } from "@/lib/i18n/partner-ui";
 import {
   PartnerCarPhotoGallery,
@@ -82,21 +72,8 @@ import {
   photosForSave,
 } from "@/components/partner/partner-car-photo-gallery";
 import { PartnerImageLightbox } from "@/components/partner/partner-image-lightbox";
-import { DateInput } from "@/components/ui/date-input";
 import { CarIcalImport } from "@/components/partner/integration/car-ical-import";
 import { integrationCopy } from "@/components/partner/integration/integration-copy";
-
-function mdToDateInput(md: string): string {
-  const n = normalizeMd(md) || "01-01";
-  const [mm, dd] = n.split("-");
-  return `2026-${mm}-${dd}`;
-}
-
-function dateInputToMd(value: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
-  if (!m) return "";
-  return normalizeMd(`${m[2]}-${m[3]}`);
-}
 
 function partnerMoney(
   amount: string | number | null | undefined,
@@ -135,33 +112,6 @@ function formatExtrasChange(raw: string, locale: string): string {
       return `${name}: ${word(from)} → ${word(to)}`;
     })
     .join("; ");
-}
-
-const SEASON_RATE_KEYS = ["d1_3", "d4_5", "d6_30", "d31"] as const;
-
-type SeasonEnteredCell = { amount?: unknown; currency?: unknown };
-
-function seasonMoneyFromSaved(
-  rates: Record<string, string | number> | undefined,
-  entered: unknown,
-  currency: PartnerDisplayCurrency,
-  fx: FxRates,
-): { rates: CarSeasonRates; pins: Partial<Record<keyof CarSeasonRates, StickyMoneyPin>> } {
-  const enteredMap =
-    entered && typeof entered === "object" ? (entered as Record<string, SeasonEnteredCell>) : {};
-  const pins: Partial<Record<keyof CarSeasonRates, StickyMoneyPin>> = {};
-  const out = emptyRates();
-  for (const key of SEASON_RATE_KEYS) {
-    const cell = enteredMap[key];
-    const pin = readStickyPin({
-      enteredAmount: cell?.amount,
-      enteredCurrency: cell?.currency,
-      priceEur: rates?.[key],
-    });
-    pins[key] = pin;
-    out[key] = displayStickyMoney(pin, currency, fx);
-  }
-  return { rates: out, pins };
 }
 
 function depositFromSaved(
@@ -377,43 +327,6 @@ function MoneyInput({
   );
 }
 
-function PercentInput({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="relative">
-      <input
-        className={cn(inputClass, "pe-8")}
-        value={value}
-        onChange={(e) => {
-          const raw = e.target.value.replace(",", ".").replace(/[^\d.]/g, "");
-          const parts = raw.split(".");
-          const next =
-            parts.length <= 1 ? raw : `${parts[0]}.${parts.slice(1).join("").slice(0, 2)}`;
-          const n = Number(next);
-          if (next !== "" && Number.isFinite(n) && n > 100) {
-            onChange("100");
-            return;
-          }
-          onChange(next);
-        }}
-        placeholder="0"
-        inputMode="decimal"
-        disabled={disabled}
-      />
-      <span className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">
-        %
-      </span>
-    </div>
-  );
-}
-
 const PASSPORT_ACCEPT =
   "image/*,.heic,.heif,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff,.avif,.jfif,application/pdf,.pdf";
 
@@ -569,16 +482,9 @@ export function PartnerCreateCarForm({
   const [licenseCat, setLicenseCat] = useState("B");
   const [minDriverAge, setMinDriverAge] = useState("18");
   const [minLicenseYears, setMinLicenseYears] = useState("0");
-  const [seasonRates, setSeasonRates] = useState<CarSeasonRates[]>([]);
-  const [seasonalPricing, setSeasonalPricing] = useState<PartnerSeasonalPricing>(emptySeasonalPricing());
   const [mileageLimit, setMileageLimit] = useState(false);
   const [mileageKm, setMileageKm] = useState("");
   const [deposit, setDeposit] = useState("0");
-  const [franchise, setFranchise] = useState("0");
-  const [franchiseEnabled, setFranchiseEnabled] = useState(false);
-  const [useSeasonalPricing, setUseSeasonalPricing] = useState(false);
-  const [seasonSaving, setSeasonSaving] = useState(false);
-  const [seasonSaved, setSeasonSaved] = useState(false);
   const [tariffIntervals, setTariffIntervals] = useState<TariffInterval[]>(() =>
     initialTariffs?.length
       ? normalizeTariffIntervals(initialTariffs)
@@ -593,7 +499,6 @@ export function PartnerCreateCarForm({
   );
   const tierPinsRef = useRef<StickyMoneyPin[]>([]);
   const depositPinRef = useRef<StickyMoneyPin | null>(null);
-  const seasonPinsRef = useRef<Array<Partial<Record<keyof CarSeasonRates, StickyMoneyPin>>>>([]);
   const [cardRequired, setCardRequired] = useState(false);
   const [seats, setSeats] = useState("5");
   const [doors, setDoors] = useState("4");
@@ -663,20 +568,6 @@ export function PartnerCreateCarForm({
       edited: true,
     };
   };
-  const markSeasonEdited = (rowIndex: number, key: keyof CarSeasonRates) => {
-    const rows = seasonPinsRef.current;
-    while (rows.length <= rowIndex) rows.push({});
-    const prev = rows[rowIndex]?.[key];
-    rows[rowIndex] = {
-      ...rows[rowIndex],
-      [key]: {
-        amount: prev?.amount ?? "",
-        currency: prev?.currency ?? pricingCurrency,
-        priceEur: prev?.priceEur ?? "",
-        edited: true,
-      },
-    };
-  };
   const fromEurLabel = (amountEur: number) => formatMoney(amountEur, pricingCurrency, fxRates);
 
   const fxStamp = moneyCtx
@@ -706,15 +597,6 @@ export function PartnerCreateCarForm({
     );
     setPickupPlaces((rows) =>
       rows.map((row) => ({ ...row, priceEur: rebaseMoneyField(row.priceEur, from, to, rates) })),
-    );
-    setSeasonRates((rows) =>
-      rows.map((row) => ({
-        ...row,
-        d1_3: rebaseMoneyField(row.d1_3, from, to, rates),
-        d4_5: rebaseMoneyField(row.d4_5, from, to, rates),
-        d6_30: rebaseMoneyField(row.d6_30, from, to, rates),
-        d31: rebaseMoneyField(row.d31, from, to, rates),
-      })),
     );
   }
 
@@ -844,19 +726,6 @@ export function PartnerCreateCarForm({
             depositPinRef.current = savedDeposit.pin;
             setDeposit(savedDeposit.text);
           }
-          {
-            const raw = Number(details?.franchise);
-            if (!Number.isFinite(raw) || raw <= 0) setFranchise("0");
-            else if (raw <= 100) setFranchise(String(raw));
-            else {
-              const depEur = Number(details?.deposit);
-              if (Number.isFinite(depEur) && depEur > 0) {
-                setFranchise(String(Math.min(100, Math.round((raw / depEur) * 10000) / 100)));
-              } else setFranchise("0");
-            }
-          }
-          setFranchiseEnabled(details?.franchiseEnabled === true);
-          setUseSeasonalPricing(Boolean(details?.useSeasonalPricing));
           setCardRequired(Boolean(details?.cardRequired));
           setAc(String(details?.ac || "Air Conditioning"));
           setInterior(String(details?.interior || "Fabric"));
@@ -1131,13 +1000,6 @@ export function PartnerCreateCarForm({
           }
         }
         if (meRes?.ok) {
-          const pricing =
-            me.seasonalPricing && typeof me.seasonalPricing === "object"
-              ? (me.seasonalPricing as PartnerSeasonalPricing)
-              : emptySeasonalPricing();
-          setSeasonalPricing(pricing);
-          const meta = buildCreateAutoSeasonRows(pricing);
-          setSeasonRates((prev) => meta.map((_, i) => prev[i] ?? emptyRates()));
           if (Array.isArray(me.tariffs) && me.tariffs.length) {
             const intervals = normalizeTariffIntervals(me.tariffs as TariffInterval[]);
             setTariffIntervals(intervals);
@@ -1225,23 +1087,6 @@ export function PartnerCreateCarForm({
             depositPinRef.current = savedDeposit.pin;
             setDeposit(savedDeposit.text);
           }
-          {
-            const raw = Number(details?.franchise);
-            if (!Number.isFinite(raw) || raw <= 0) {
-              setFranchise("0");
-            } else if (raw <= 100) {
-              setFranchise(String(raw));
-            } else {
-              const depEur = Number(details?.deposit);
-              if (Number.isFinite(depEur) && depEur > 0) {
-                setFranchise(String(Math.min(100, Math.round((raw / depEur) * 10000) / 100)));
-              } else {
-                setFranchise("0");
-              }
-            }
-          }
-          setFranchiseEnabled(details?.franchiseEnabled === true);
-          setUseSeasonalPricing(Boolean(details?.useSeasonalPricing));
           setCardRequired(Boolean(details?.cardRequired));
           setAc(String(details?.ac || "Air Conditioning"));
           setInterior(String(details?.interior || "Fabric"));
@@ -1269,29 +1114,6 @@ export function PartnerCreateCarForm({
             const savedTiers = tiersFromSaved(tiers, nextCurrency, nextRates);
             tierPinsRef.current = savedTiers.pins;
             setTariffPrices(savedTiers.prices);
-          }
-
-          const seasonRows = Array.isArray(details?.seasons) ? details.seasons : [];
-          if (seasonRows.length) {
-            const savedSeasons = seasonRows.map((row) =>
-              seasonMoneyFromSaved(
-                (row.rates as Record<string, string | number> | undefined) || undefined,
-                (row as { enteredRates?: unknown }).enteredRates,
-                nextCurrency,
-                nextRates,
-              ),
-            );
-            seasonPinsRef.current = savedSeasons.map((row) => row.pins);
-            setSeasonRates(savedSeasons.map((row) => row.rates));
-          } else if (details?.rates) {
-            const saved = seasonMoneyFromSaved(
-              details.rates as Record<string, string | number>,
-              (details as { enteredRates?: unknown }).enteredRates,
-              nextCurrency,
-              nextRates,
-            );
-            seasonPinsRef.current = [saved.pins];
-            setSeasonRates([saved.rates]);
           }
 
           const carExtras = Array.isArray(car.extras) ? car.extras : [];
@@ -1479,92 +1301,12 @@ export function PartnerCreateCarForm({
     return () => observer.disconnect();
   }, []);
 
-  const seasonMeta = useMemo(() => buildCreateAutoSeasonRows(seasonalPricing), [seasonalPricing]);
-  const seasonStamp = seasonMeta.map((row) => `${row.index}:${row.from}:${row.to}`).join("|");
-  const [seasonStampSeen, setSeasonStampSeen] = useState<string | null>(null);
-  if (seasonStamp !== seasonStampSeen) {
-    setSeasonStampSeen(seasonStamp);
-    setSeasonRates((prev) => seasonMeta.map((_, i) => prev[i] ?? emptyRates()));
-  }
-
   const dailyRate = useMemo(() => {
     const fromTariffs = tariffPrices
       .map((v) => Number(v))
       .filter((n) => Number.isFinite(n) && n > 0);
-    if (fromTariffs[0]) return fromTariffs[0];
-    for (const row of seasonRates) {
-      const values = [row.d1_3, row.d4_5, row.d6_30, row.d31]
-        .map((v) => Number(v))
-        .filter((n) => Number.isFinite(n) && n > 0);
-      if (values[0]) return values[0];
-    }
-    return 0;
-  }, [tariffPrices, seasonRates]);
-
-  const setSeasonRateField = (rowIndex: number, key: keyof CarSeasonRates, value: string) => {
-    markSeasonEdited(rowIndex, key);
-    setSeasonRates((prev) => {
-      const next = prev.map((row) => ({ ...row }));
-      while (next.length <= rowIndex) next.push(emptyRates());
-      next[rowIndex] = { ...next[rowIndex], [key]: value };
-      return next;
-    });
-  };
-
-  const persistSeasonalPricing = (next: PartnerSeasonalPricing) => {
-    setSeasonalPricing(next);
-    return fetch("/api/partners/seasonal-pricing", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(next),
-    }).catch(() => undefined);
-  };
-
-  const addSeasonRow = () => {
-    const period = defaultNewSeasonPeriod(seasonalPricing.seasons);
-    setSeasonalPricing({
-      ...seasonalPricing,
-      base: seasonalPricing.base || { ...FIXED_BASE_SEASON },
-      seasons: [...seasonalPricing.seasons, period],
-    });
-    setSeasonSaved(false);
-  };
-
-  const removeSeasonRow = (rowIndex: number) => {
-    const nextSeasons = seasonalPricing.seasons.filter((_, i) => i !== rowIndex);
-    const next: PartnerSeasonalPricing = {
-      enabled: seasonalPricing.enabled,
-      base: seasonalPricing.base || { ...FIXED_BASE_SEASON },
-      seasons: nextSeasons,
-    };
-    void persistSeasonalPricing(next);
-    if (nextSeasons.length === 0) setUseSeasonalPricing(false);
-    setSeasonSaved(false);
-  };
-
-  const updateSeasonPeriod = (rowIndex: number, field: "from" | "to", md: string) => {
-    if (!md) return;
-    setSeasonalPricing((prev) => ({
-      ...prev,
-      seasons: prev.seasons.map((s, i) => (i === rowIndex ? { ...s, [field]: md } : s)),
-    }));
-    setSeasonSaved(false);
-  };
-
-  const saveSeasonPeriods = async () => {
-    setSeasonSaving(true);
-    setSeasonSaved(false);
-    try {
-      await persistSeasonalPricing({
-        ...seasonalPricing,
-        base: seasonalPricing.base || { ...FIXED_BASE_SEASON },
-        seasons: seasonalPricing.seasons,
-      });
-      setSeasonSaved(true);
-    } finally {
-      setSeasonSaving(false);
-    }
-  };
+    return fromTariffs[0] ?? 0;
+  }, [tariffPrices]);
 
   const brandOptions = useMemo(
     () => [...CAR_MAKES_MODELS].map((m) => m.make).sort((a, b) => a.localeCompare(b)),
@@ -1674,7 +1416,7 @@ export function PartnerCreateCarForm({
         ...tariffPrices.map((_, index) => `tariff-${index}`),
         `tariff-${tariffIntervals.length}`,
       ];
-      mark("pricing", ["season-price", ...tariffKeys]);
+      mark("pricing", tariffKeys);
     }
 
     if (forSale && !engineVolume.trim()) mark("specs", ["engineVolume"]);
@@ -1690,7 +1432,7 @@ export function PartnerCreateCarForm({
         fields.map((key) => {
           if (key === "make" || key === "model") return "brand";
           if (key === "color" || key === "bodyType") return "body";
-          if (key.startsWith("tariff-") || key === "season-price") return "price";
+          if (key.startsWith("tariff-")) return "price";
           if (key.startsWith("passport")) return "passport";
           return key;
         }),
@@ -1713,27 +1455,6 @@ export function PartnerCreateCarForm({
 
     setLoading(true);
     try {
-      if (seasonalPricing.seasons.length) {
-        void persistSeasonalPricing({
-          ...seasonalPricing,
-          enabled: useSeasonalPricing,
-          seasons: seasonalPricing.seasons,
-        });
-      }
-      const convertSeasonRates = (row: CarSeasonRates, rowIndex: number) => {
-        const prev = seasonPinsRef.current[rowIndex] || {};
-        const nextPins: Partial<Record<keyof CarSeasonRates, StickyMoneyPin>> = {};
-        const rates = emptyRates();
-        const enteredRates: Record<string, { amount: string; currency: PartnerDisplayCurrency }> = {};
-        for (const key of SEASON_RATE_KEYS) {
-          const pin = commitSticky(row[key], prev[key]);
-          nextPins[key] = pin;
-          rates[key] = pin.priceEur === "" ? "0" : pin.priceEur;
-          if (pin.amount) enteredRates[key] = { amount: pin.amount, currency: pin.currency };
-        }
-        seasonPinsRef.current[rowIndex] = nextPins;
-        return { rates, enteredRates };
-      };
       const savedDeposit = commitSticky(deposit, depositPinRef.current ?? undefined);
       depositPinRef.current = savedDeposit;
       const savedTierPins = [
@@ -1745,7 +1466,6 @@ export function PartnerCreateCarForm({
       ];
       tierPinsRef.current = savedTierPins;
       const tierEur = (pin: StickyMoneyPin) => (pin.priceEur === "" ? "0" : pin.priceEur);
-      const baseSeason = convertSeasonRates(seasonRates[0] ?? emptyRates(), 0);
       const selectedCategory =
         categoryOptions.find((c) => c.slug === categorySlug) ||
         categoryOptions.find((c) => c.name === categorySlug);
@@ -1757,22 +1477,6 @@ export function PartnerCreateCarForm({
         licenseCat,
         minDriverAge: Math.max(18, Math.min(70, Number(minDriverAge) || 18)),
         minLicenseYears: Math.max(0, Math.min(10, Number(minLicenseYears) || 0)),
-        season: {
-          from: seasonMeta[0]?.from ?? "01-01",
-          to: seasonMeta[0]?.to ?? "12-31",
-        },
-        rates: baseSeason.rates,
-        ...(Object.keys(baseSeason.enteredRates).length ? { enteredRates: baseSeason.enteredRates } : {}),
-        seasons: seasonMeta.map((meta, i) => {
-          const saved = i === 0 ? baseSeason : convertSeasonRates(seasonRates[i] ?? emptyRates(), i);
-          return {
-            index: meta.index,
-            from: meta.from,
-            to: meta.to,
-            rates: saved.rates,
-            ...(Object.keys(saved.enteredRates).length ? { enteredRates: saved.enteredRates } : {}),
-          };
-        }),
         pickupPlaces: pickupPayload.map((p) => ({
           ...p,
           priceEur: toEur(p.priceEur),
@@ -1786,11 +1490,6 @@ export function PartnerCreateCarForm({
               depositEnteredCurrency: savedDeposit.currency,
             }
           : {}),
-        franchise: franchiseEnabled
-          ? String(Math.min(100, Math.max(0, Number(franchise) || 0)))
-          : "0",
-        franchiseEnabled,
-        useSeasonalPricing,
         pricingCurrency: isPartnerPricingCurrency(pricingCurrency) ? pricingCurrency : "EUR",
         pricingTiers: [
           ...tariffIntervals.map((t, i) => ({
@@ -1881,16 +1580,6 @@ export function PartnerCreateCarForm({
               if (!Number.isFinite(n) || n <= 0) continue;
               const eur = Number(savedTierPins[i].priceEur);
               if (Number.isFinite(eur)) return eur;
-            }
-            for (let i = 0; i < seasonRates.length; i++) {
-              const row = seasonRates[i];
-              if (!row) continue;
-              for (const key of SEASON_RATE_KEYS) {
-                const n = Number(row[key]);
-                if (!Number.isFinite(n) || n <= 0) continue;
-                const eur = Number(seasonPinsRef.current[i]?.[key]?.priceEur);
-                if (Number.isFinite(eur)) return eur;
-              }
             }
             return 0;
           })(),
@@ -2515,133 +2204,7 @@ export function PartnerCreateCarForm({
             </Field>
           </div>
 
-          <div id="price" className="mt-4 scroll-mt-40">
-            {seasonMeta.length > 0 ? (
-              <div className="overflow-x-auto rounded-lg border border-[#d5dde6]">
-                <table className="w-full min-w-[640px] text-left text-[11px]">
-                  <thead className="bg-[#e8f5ec] text-xs uppercase text-slate-600">
-                    <tr>
-                      <th className="p-2">{cc.seasonCol}</th>
-                      <th className="p-2">{cc.periodCol}</th>
-                      <th className="p-2">1–3 {cc.daysRange}</th>
-                      <th className="p-2">4–5 {cc.daysRange}</th>
-                      <th className="p-2">6–30 {cc.daysRange}</th>
-                      <th className="p-2">31+</th>
-                      <th className="p-2" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {seasonMeta.map((meta, rowIndex) => {
-                      const rates = seasonRates[rowIndex] ?? emptyRates();
-                      const keys: (keyof CarSeasonRates)[] = ["d1_3", "d4_5", "d6_30", "d31"];
-                      return (
-                        <tr key={`season-${rowIndex}`} className="border-t border-slate-200 bg-white">
-                          <td className="p-2 font-semibold">#{meta.index}</td>
-                          <td className="p-2 whitespace-nowrap text-slate-700">
-                            <div className="flex flex-wrap items-center gap-1">
-                              <DateInput
-                                type="date"
-                                className={cn(inputClass, "w-[9.5rem] px-2 py-1.5 text-xs")}
-                                value={mdToDateInput(meta.from)}
-                                onChange={(e) =>
-                                  updateSeasonPeriod(rowIndex, "from", dateInputToMd(e.target.value))
-                                }
-                              />
-                              <span className="text-slate-400">–</span>
-                              <DateInput
-                                type="date"
-                                className={cn(inputClass, "w-[9.5rem] px-2 py-1.5 text-xs")}
-                                value={mdToDateInput(meta.to)}
-                                onChange={(e) =>
-                                  updateSeasonPeriod(rowIndex, "to", dateInputToMd(e.target.value))
-                                }
-                              />
-                            </div>
-                          </td>
-                          {keys.map((key) => (
-                            <td key={key} className="p-2">
-                              <MoneyInput
-                                symbol={moneySymbol}
-                                value={rates[key]}
-                                invalid={fieldInvalid("season-price") && rowIndex === 0 && key === "d1_3"}
-                                onChange={(v) => setSeasonRateField(rowIndex, key, v)}
-                              />
-                            </td>
-                          ))}
-                          <td className="p-2">
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                              <button
-                                type="button"
-                                disabled={seasonSaving}
-                                className="rounded-md px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
-                                style={{ backgroundColor: ACCENT_GREEN }}
-                                onClick={() => void saveSeasonPeriods()}
-                              >
-                                {seasonSaving ? common.saving : common.save}
-                              </button>
-                              <button
-                                type="button"
-                                className="rounded-md border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-50"
-                                onClick={() => removeSeasonRow(rowIndex)}
-                              >
-                                {common.delete}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
-            {seasonSaved ? (
-              <p className="mt-2 text-xs font-semibold text-emerald-700">{cc.seasonSaved}</p>
-            ) : null}
-            <div className={cn("flex flex-wrap items-center justify-between gap-2", seasonMeta.length ? "mt-1.5" : "")}>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={useSeasonalPricing}
-                  disabled={!seasonMeta.length}
-                  onClick={() => {
-                    if (!seasonMeta.length) return;
-                    setUseSeasonalPricing((v) => !v);
-                  }}
-                  className={cn(
-                    "relative h-7 w-12 shrink-0 rounded-full transition",
-                    !seasonMeta.length
-                      ? "cursor-not-allowed bg-slate-200"
-                      : useSeasonalPricing
-                        ? "bg-[#28a745]"
-                        : "bg-slate-300",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition",
-                      useSeasonalPricing && seasonMeta.length ? "start-5" : "start-0.5",
-                    )}
-                  />
-                </button>
-                <div>
-                  <span className="text-[11px] font-bold text-slate-800">{cc.seasonalPricing}</span>
-                  <p className="text-xs text-slate-500">{cc.seasonalHelp}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={addSeasonRow}
-                className="rounded border border-[#28a745] bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-900 hover:bg-emerald-100"
-              >
-                {cc.addSeason}
-              </button>
-            </div>
-            {useSeasonalPricing && seasonMeta.length ? (
-              <p className="mt-2 text-xs text-slate-500">{cc.seasonalActive}</p>
-            ) : null}
-          </div>
+          <div id="price" className="scroll-mt-40" aria-hidden />
         </SectionCard>
 
         {!isAdminReview ? (
@@ -2681,44 +2244,6 @@ export function PartnerCreateCarForm({
                 invalid={fieldInvalid("deposit")}
               />
             </Field>
-            <div>
-              <Field label={cc.franchise}>
-                <PercentInput
-                  value={franchiseEnabled ? franchise : "0"}
-                  onChange={setFranchise}
-                  disabled={!franchiseEnabled}
-                />
-              </Field>
-              <div className="mt-1.5 flex items-center gap-2">
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={franchiseEnabled}
-                  onClick={() => {
-                    setFranchiseEnabled((v) => {
-                      const next = !v;
-                      if (!next) setFranchise("0");
-                      return next;
-                    });
-                  }}
-                  className={cn(
-                    "relative h-6 w-10 shrink-0 rounded-full transition",
-                    franchiseEnabled ? "bg-[#28a745]" : "bg-slate-300",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition",
-                      franchiseEnabled ? "start-4" : "start-0.5",
-                    )}
-                  />
-                </button>
-                <span className="text-[10px] font-semibold text-slate-500">
-                  {franchiseEnabled ? cc.enabled : "—"}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">{cc.franchiseHelp}</p>
-            </div>
           </div>
           <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-800">
             <input type="checkbox" checked={cardRequired} onChange={(e) => setCardRequired(e.target.checked)} />

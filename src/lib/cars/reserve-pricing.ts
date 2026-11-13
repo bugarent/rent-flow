@@ -295,7 +295,6 @@ export function computeReserveTotals(input: {
   fullProtection: boolean;
   cancellationProtection: boolean;
   depositPercent?: number;
-  franchiseEur?: number;
 }) {
   const days = Math.max(1, input.days);
   const rentalTotal = roundMoney(input.dailyRateEur * days);
@@ -312,10 +311,6 @@ export function computeReserveTotals(input: {
   const payNow = fee.payNowBase;
   const payAtPickup = roundMoney(total - payNow);
   const remainingRental = roundMoney(rentalTotal - payNow);
-  const franchise =
-    input.franchiseEur != null && Number.isFinite(input.franchiseEur)
-      ? input.franchiseEur
-      : roundMoney(input.dailyRateEur * 120);
 
   return {
     days,
@@ -330,7 +325,6 @@ export function computeReserveTotals(input: {
     payNow,
     payAtPickup,
     remainingRental: Math.max(0, remainingRental),
-    franchise,
     depositPercent,
   };
 }

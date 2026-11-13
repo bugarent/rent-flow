@@ -44,9 +44,7 @@ import { localizedExtraCopy } from "@/lib/extras/localized-copy";
 import { extraAvailableIn, locationCountryIso2 } from "@/lib/extras/country-scope";
 import {
   formatDepositLabel,
-  formatFranchiseLabel,
   parseCarDetails,
-  resolveFranchiseAmountEur,
   type CarDetailsBlob,
 } from "@/lib/cars/car-details";
 import {
@@ -445,7 +443,6 @@ export function ReserveCheckout({
     const age = String(details?.minDriverAge ?? "18");
     const cat = String(details?.licenseCat || "B");
     const years = String(details?.minLicenseYears ?? "—");
-    const franchise = formatFranchiseLabel(details, formatPrice);
     const deposit = formatDepositLabel(details, formatPrice);
     const methods = (car?.rentPaymentMethods || []).filter(Boolean);
     const methodsText = methods.length ? methods.join(", ") : "—";
@@ -470,11 +467,6 @@ export function ReserveCheckout({
         body: t.rtLicenseBody.replace("{cat}", cat).replace("{years}", years),
       },
       { id: "insurance", title: t.rtInsurance, body: t.rtInsuranceBody },
-      {
-        id: "excess",
-        title: t.rtExcess,
-        body: t.rtExcessBody.replace("{amount}", franchise),
-      },
       { id: "fees", title: t.rtFees, body: t.rtFeesBody },
       { id: "early-return", title: t.rtEarlyReturn, body: t.rtEarlyReturnBody },
       { id: "winter-tires", title: t.rtWinterTires, body: t.rtWinterTiresBody },
@@ -548,7 +540,6 @@ export function ReserveCheckout({
       fullProtection: hasFullInsuranceExtra ? false : fullProtection,
       cancellationProtection,
       depositPercent,
-      franchiseEur: resolveFranchiseAmountEur(details) || undefined,
     });
     const delivery = roundMoney(deliveryFees.totalFeeEur);
     const standard = settleBookingMoney({
@@ -610,7 +601,6 @@ export function ReserveCheckout({
     hasFullInsuranceExtra,
     cancellationProtection,
     depositPercent,
-    details,
     deliveryFees,
     bpReferral.active,
     bpReferral.discountPercent,

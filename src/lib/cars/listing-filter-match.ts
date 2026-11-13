@@ -148,11 +148,7 @@ export function listingHasCreditCardDeposit(car: FilterableListing): boolean {
 
 export function listingHasNoDepositPaidService(car: FilterableListing): boolean {
   const details = parseCarDetails(car.description);
-  if (car.noDepositPaidService || details?.noDepositPaidService === true) return true;
-  // Franchise / deductible as paid alternative when deposit is zero.
-  const deposit = listingDepositEur(car);
-  if (deposit == null || deposit > 0) return false;
-  return details?.franchiseEnabled === true && Number(details?.franchise) > 0;
+  return Boolean(car.noDepositPaidService || details?.noDepositPaidService === true);
 }
 
 export function listingMatchesDepositOptions(
