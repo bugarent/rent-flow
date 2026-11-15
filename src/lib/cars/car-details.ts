@@ -85,9 +85,15 @@ export function descriptionWithCabinetPrices(
   description: string | null | undefined,
   prices: CabinetExtraSync[],
 ): string | null | undefined {
-  if (!description || !prices.length) return description;
-  const details = parseCarDetails(description);
-  if (!details) return description;
+  if (!prices.length) return description;
+  const rawDescription = description ?? "";
+  let details = parseCarDetails(rawDescription);
+  // Listings without a car-details blob still need off/forbid stamped for search.
+  if (!details) {
+    const modeRows = prices.filter((price) => price.forbidden || price.enabled === false);
+    if (!modeRows.length) return description;
+    details = {};
+  }
   const offers = readExtraOffers(details);
   let changed = false;
   const extraOffers = offers.map((offer) => {
@@ -127,10 +133,10 @@ export function descriptionWithCabinetPrices(
   }
   if (!changed) return description;
   const blob = `<!--car-details:${JSON.stringify({ ...details, extraOffers })}-->`;
-  if (/<!--car-details:[\s\S]*?-->/.test(description)) {
-    return description.replace(/<!--car-details:[\s\S]*?-->/, blob);
+  if (/<!--car-details:[\s\S]*?-->/.test(rawDescription)) {
+    return rawDescription.replace(/<!--car-details:[\s\S]*?-->/, blob);
   }
-  return `${description}\n${blob}`;
+  return rawDescription ? `${rawDescription}\n${blob}` : blob;
 }
 
 /** Open-ended last tier saved by the car form (`N+` days). */

@@ -52,16 +52,7 @@ function cleanCarIds(raw: unknown): string[] | undefined {
   return ids;
 }
 
-/** Whether a pref should apply to a specific car listing. */
-export function partnerExtraPrefAppliesToCar(
-  pref: Pick<PartnerExtraPref, "carIds">,
-  carId: string | null | undefined,
-): boolean {
-  const id = String(carId || "").trim();
-  if (!id) return true;
-  if (!pref.carIds) return true;
-  return pref.carIds.includes(id);
-}
+export { partnerExtraPrefAppliesToCar } from "@/lib/extras/partner-extra-pref";
 
 async function readStore(): Promise<StoreFile> {
   try {

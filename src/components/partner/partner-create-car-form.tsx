@@ -33,6 +33,7 @@ import {
 } from "@/components/partner/listing-pickup-places";
 import { isSyntheticDeliveryId } from "@/lib/delivery/pricing";
 import { findCarExtraOffer, parseCarDetails, readExtraOffers } from "@/lib/cars/car-details";
+import { partnerExtraPrefAppliesToCar } from "@/lib/extras/partner-extra-pref";
 import { diffCarAgainstPublished, fieldChangesMapFromRecord } from "@/lib/cars/car-published-diff";
 import type { PublishedCarSnapshot } from "@/lib/server/car-published-store";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
@@ -1178,11 +1179,23 @@ export function PartnerCreateCarForm({
                       ? Number(pref.priceEur)
                       : null;
                   const mandatory = service ? isMandatoryExtra(service) : false;
-                  // Cabinet equipment page is the source of truth until the partner overrides on this listing.
+                  const prefApplies =
+                    Boolean(prefs.trusted && pref) &&
+                    partnerExtraPrefAppliesToCar(
+                      {
+                        carIds: pref?.carIds,
+                        enabled: pref?.enabled,
+                        forbidden: pref?.forbidden,
+                      },
+                      carId,
+                    );
+                  // Cabinet equipment page wins for price / off / forbid on this listing.
                   const cabinetForbidden =
-                    !mandatory && prefs.trusted && pref ? Boolean(pref.forbidden) : false;
+                    !mandatory && prefApplies && Boolean(pref?.forbidden);
                   const cabinetOff =
-                    !mandatory && prefs.trusted && pref && !pref.forbidden && pref.enabled === false;
+                    !mandatory && prefApplies && !pref?.forbidden && pref?.enabled === false;
+                  const cabinetOn =
+                    !mandatory && prefApplies && !pref?.forbidden && pref?.enabled !== false;
                   const forbidden = cabinetForbidden
                     ? true
                     : offer
@@ -1192,7 +1205,7 @@ export function PartnerCreateCarForm({
                     ? true
                     : cabinetOff
                       ? false
-                      : cabinetForbidden
+                      : cabinetForbidden || cabinetOn
                         ? true
                         : offer
                           ? !forbidden && offer.enabled !== false

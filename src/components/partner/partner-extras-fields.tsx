@@ -85,6 +85,8 @@ export type CarFormExtraPref = {
   enabled?: boolean;
   forbidden?: boolean;
   priceEur?: number;
+  /** Cars this cabinet row applies to; omitted = all. */
+  carIds?: string[];
 };
 
 /** Cabinet rows matched by id or slug. An empty list is not a trusted "everything off". */

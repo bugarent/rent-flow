@@ -182,12 +182,16 @@ export async function PUT(req: Request) {
       const mandatoryFree = isMandatoryFreeExtra(service);
       const forbidden = locked ? false : Boolean(row?.forbidden);
       const cleanedIds = cleanCarIds(row?.carIds, allowedCarIds);
-      // undefined = legacy "all cars"; [] = explicitly none; otherwise filtered list.
+      const allIds = [...allowedCarIds];
+      // undefined = legacy "all cars"; [] = explicitly none for "on";
+      // off/forbid with [] must still hit every listing (otherwise cars stay "enabled").
       const carIds = mandatory
-        ? [...allowedCarIds]
+        ? allIds
         : cleanedIds !== undefined
-          ? cleanedIds
-          : [...allowedCarIds];
+          ? cleanedIds.length === 0 && (forbidden || !Boolean(row?.enabled))
+            ? allIds
+            : cleanedIds
+          : allIds;
       let minPeriodEur =
         mandatoryFree || forbidden || isPeriodForcedFreeExtra(service)
           ? null
@@ -251,6 +255,7 @@ export async function PUT(req: Request) {
           priceEur: forbidden || !enabled ? 0 : Number(pref.priceEur) || 0,
           enabled,
           forbidden,
+          ...(pref.carIds ? { carIds: pref.carIds } : {}),
         };
       }),
     });

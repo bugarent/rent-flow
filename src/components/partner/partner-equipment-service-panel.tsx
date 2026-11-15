@@ -409,7 +409,8 @@ export function PartnerEquipmentServicePanel({
       mode,
       priceEur: mode === "forbidden" ? "0" : row.priceEur,
       ...(mode === "forbidden" ? { minPeriodEur: "", maxPeriodEur: "" } : {}),
-      carIds: mode !== "off" && row.carIds.length === 0 ? cars.map((car) => car.id) : row.carIds,
+      // Empty carIds + off/forbid used to apply to nobody, so listings stayed enabled.
+      carIds: row.carIds.length === 0 ? cars.map((car) => car.id) : row.carIds,
     };
     const next = rowsRef.current.map((item) =>
       item.service.id === row.service.id ? { ...item, ...patch } : item,

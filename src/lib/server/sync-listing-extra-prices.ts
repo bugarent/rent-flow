@@ -2,11 +2,16 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 import { descriptionWithCabinetPrices, type CabinetExtraSync } from "@/lib/cars/car-details";
+import { partnerExtraPrefAppliesToCar } from "@/lib/extras/partner-extra-pref";
 import { prisma } from "@/lib/prisma";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import { listFileCarsForPartner, updateFileCar } from "@/lib/server/partner-cars-store";
 import { clearPublicCarPayloadCache } from "@/lib/server/public-car-payload";
 import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
+
+export type CabinetListingExtraSync = CabinetExtraSync & {
+  carIds?: string[];
+};
 
 function sameMoney(a: number, b: number) {
   return Math.abs(a - b) < 0.001;
@@ -19,6 +24,15 @@ function priceFor(prices: CabinetExtraSync[], id: string, slug?: string | null):
   if (!resolved) return null;
   const bySlug = prices.find((price) => price.slug === resolved);
   return bySlug ? (bySlug.forbidden ? 0 : bySlug.priceEur) : null;
+}
+
+function pricesForCar(prices: CabinetListingExtraSync[], carId: string): CabinetExtraSync[] {
+  return prices.filter((price) =>
+    partnerExtraPrefAppliesToCar(
+      { carIds: price.carIds, enabled: price.enabled, forbidden: price.forbidden },
+      carId,
+    ),
+  );
 }
 
 function publishFreshListings() {
@@ -34,7 +48,7 @@ function publishFreshListings() {
 /** Copy cabinet daily prices and offer modes onto every listing of this partner and drop public caches. */
 export async function syncListingExtraPrices(input: {
   carIds: string[];
-  prices: CabinetExtraSync[];
+  prices: CabinetListingExtraSync[];
   userId: string;
   email?: string | null;
   partnerId: string;
@@ -50,6 +64,7 @@ export async function syncListingExtraPrices(input: {
             where: { carId: { in: carIds } },
             select: {
               id: true,
+              carId: true,
               extraServiceId: true,
               priceEur: true,
               extraService: { select: { slug: true } },
@@ -60,13 +75,25 @@ export async function syncListingExtraPrices(input: {
             select: { id: true, description: true },
           }),
         ]);
-        const extraWrites = extras.flatMap((row) => {
-          const next = priceFor(prices, row.extraServiceId, row.extraService?.slug);
-          if (next == null || sameMoney(Number(row.priceEur), next)) return [];
-          return [prisma.carExtra.update({ where: { id: row.id }, data: { priceEur: next } })];
+        const extrasByCar = new Map<string, typeof extras>();
+        for (const row of extras) {
+          const list = extrasByCar.get(row.carId) || [];
+          list.push(row);
+          extrasByCar.set(row.carId, list);
+        }
+        const extraWrites = cars.flatMap((car) => {
+          const scoped = pricesForCar(prices, car.id);
+          if (!scoped.length) return [];
+          return (extrasByCar.get(car.id) || []).flatMap((row) => {
+            const next = priceFor(scoped, row.extraServiceId, row.extraService?.slug);
+            if (next == null || sameMoney(Number(row.priceEur), next)) return [];
+            return [prisma.carExtra.update({ where: { id: row.id }, data: { priceEur: next } })];
+          });
         });
         const descriptionWrites = cars.flatMap((car) => {
-          const description = descriptionWithCabinetPrices(car.description, prices);
+          const scoped = pricesForCar(prices, car.id);
+          if (!scoped.length) return [];
+          const description = descriptionWithCabinetPrices(car.description, scoped);
           if (!description || description === car.description) return [];
           return [prisma.car.update({ where: { id: car.id }, data: { description } })];
         });
@@ -84,12 +111,14 @@ export async function syncListingExtraPrices(input: {
         partnerId: input.partnerId,
       });
       for (const car of fileCars) {
+        const scoped = pricesForCar(prices, car.id);
+        if (!scoped.length) continue;
         const extras = (car.extras || []).map((row) => {
-          const next = priceFor(prices, row.extraServiceId);
+          const next = priceFor(scoped, row.extraServiceId);
           if (next == null || sameMoney(Number(row.priceEur) || 0, next)) return row;
           return { ...row, priceEur: next };
         });
-        const description = descriptionWithCabinetPrices(car.description, prices);
+        const description = descriptionWithCabinetPrices(car.description, scoped);
         const extrasChanged = extras.some((row, index) => row !== car.extras?.[index]);
         const descriptionChanged = description != null && description !== car.description;
         if (!extrasChanged && !descriptionChanged) continue;
