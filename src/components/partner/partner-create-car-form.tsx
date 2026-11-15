@@ -17,11 +17,13 @@ import {
 } from "@/lib/extras/checkout-slot";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import {
+  applyListingCabinetExtras,
   buildExtraSelections,
   catalogIdsForCarExtras,
   catalogIdsForOffers,
   extrasVisibleOnCarForm,
   indexExtraPrefs,
+  readCabinetExtras,
   selectionsFromCabinet,
   type CarFormExtraPref,
   type PartnerExtraSelection,
@@ -817,46 +819,50 @@ export function PartnerCreateCarForm({
             setExtrasCatalog(filtered);
             setExtrasReady(true);
             setExtraSelections(
-              buildExtraSelections(
-                filtered,
-                filtered.map((service: ExtraServicePricing) => {
-                  const fromCar = carExtras.find(
-                    (e: { extraServiceId: string; priceEur?: number; forbidden?: boolean }) =>
-                      e.extraServiceId === service.id,
+              applyListingCabinetExtras(
+                buildExtraSelections(
+                  filtered,
+                  filtered.map((service: ExtraServicePricing) => {
+                    const fromCar = carExtras.find(
+                      (e: { extraServiceId: string; priceEur?: number; forbidden?: boolean }) =>
+                        e.extraServiceId === service.id,
+                    );
+                    return {
+                      extraServiceId: service.id,
+                      priceEur: Number(fromCar?.priceEur ?? service.defaultPriceEur ?? 0),
+                      forbidden: Boolean(fromCar?.forbidden),
+                    };
+                  }),
+                ).map((row) => {
+                  const offer = findCarExtraOffer(
+                    offers,
+                    filtered.find((service) => service.id === row.extraServiceId) || {
+                      id: row.extraServiceId,
+                    },
                   );
-                  return {
-                    extraServiceId: service.id,
-                    priceEur: Number(fromCar?.priceEur ?? service.defaultPriceEur ?? 0),
-                    forbidden: Boolean(fromCar?.forbidden),
-                  };
-                }),
-              ).map((row) => {
-                const offer = findCarExtraOffer(
-                  offers,
-                  filtered.find((service) => service.id === row.extraServiceId) || {
-                    id: row.extraServiceId,
-                  },
-                );
-                if (offer) {
-                  const forbidden = Boolean(offer.forbidden);
+                  if (offer) {
+                    const forbidden = Boolean(offer.forbidden);
+                    return {
+                      ...row,
+                      forbidden,
+                      enabled: !forbidden && offer.enabled !== false,
+                      priceEur:
+                        offer.priceEur != null && String(offer.priceEur) !== ""
+                          ? String(offer.priceEur)
+                          : row.priceEur,
+                    };
+                  }
                   return {
                     ...row,
-                    forbidden,
-                    enabled: !forbidden && offer.enabled !== false,
-                    priceEur:
-                      offer.priceEur != null && String(offer.priceEur) !== ""
-                        ? String(offer.priceEur)
-                        : row.priceEur,
+                    enabled:
+                      Boolean(row.forbidden) ||
+                      carExtraIds.has(row.extraServiceId) ||
+                      Boolean(filtered.find((s) => s.id === row.extraServiceId && isMandatoryExtra(s))),
                   };
-                }
-                return {
-                  ...row,
-                  enabled:
-                    Boolean(row.forbidden) ||
-                    carExtraIds.has(row.extraServiceId) ||
-                    Boolean(filtered.find((s) => s.id === row.extraServiceId && isMandatoryExtra(s))),
-                };
-              }),
+                }),
+                filtered,
+                readCabinetExtras(car.cabinetExtras),
+              ),
             );
           }
 
@@ -1158,8 +1164,9 @@ export function PartnerCreateCarForm({
               setExtrasReady(true);
               // On phone a failed extras-prefs fetch must not replace SSR cabinet off/forbid
               // with raw car rows that still look "enabled".
+              const cabinetExtras = readCabinetExtras(car.cabinetExtras);
               if (!prefs.trusted) {
-                /* keep selectionsFromCabinet / prior state */
+                setExtraSelections((prev) => applyListingCabinetExtras(prev, filtered, cabinetExtras));
               } else {
               const existingPrices = filtered.map((service: ExtraServicePricing) => {
                 const fromCar = carExtras.find(
@@ -1191,6 +1198,7 @@ export function PartnerCreateCarForm({
                 return { extraServiceId: service.id, priceEur: price, forbidden };
               });
               setExtraSelections(
+                applyListingCabinetExtras(
                 buildExtraSelections(filtered, existingPrices).map((row) => {
                   const service = filtered.find((s) => s.id === row.extraServiceId);
                   const offer = service ? findCarExtraOffer(offers, service) : undefined;
@@ -1259,6 +1267,9 @@ export function PartnerCreateCarForm({
                         : eurToPartnerAmount(eurPrice, nextCurrency, nextRates),
                   };
                 }),
+                filtered,
+                cabinetExtras,
+                ),
               );
               }
             }

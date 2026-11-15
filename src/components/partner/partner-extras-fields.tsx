@@ -139,7 +139,68 @@ export function selectionsFromCabinet(
       enabled = true;
       forbidden = false;
     }
-    return { ...row, enabled, forbidden, priceEur: forbidden ? "0" : row.priceEur };
+    return {
+      ...row,
+      enabled,
+      forbidden,
+      priceEur: forbidden || !enabled ? "0" : row.priceEur,
+    };
+  });
+}
+
+export type ListingCabinetExtra = {
+  extraServiceId: string;
+  slug?: string;
+  enabled?: boolean;
+  forbidden?: boolean;
+};
+
+/** Cabinet rows sent with the car. A missing list is not "everything off". */
+export function readCabinetExtras(value: unknown): ListingCabinetExtra[] {
+  if (!Array.isArray(value)) return [];
+  const rows: ListingCabinetExtra[] = [];
+  for (const row of value) {
+    if (!row || typeof row !== "object") continue;
+    const item = row as {
+      extraServiceId?: unknown;
+      slug?: unknown;
+      enabled?: unknown;
+      forbidden?: unknown;
+    };
+    const extraServiceId = String(item.extraServiceId || "").trim();
+    if (!extraServiceId) continue;
+    rows.push({
+      extraServiceId,
+      slug: String(item.slug || "").trim(),
+      enabled: item.enabled !== false,
+      forbidden: Boolean(item.forbidden),
+    });
+  }
+  return rows;
+}
+
+/**
+ * Cabinet off/forbid wins over a saved listing offer.
+ * Per-car prices stay when the cabinet row is still on.
+ */
+export function applyListingCabinetExtras(
+  rows: PartnerExtraSelection[],
+  catalog: ExtraServicePricing[],
+  cabinet: ListingCabinetExtra[],
+): PartnerExtraSelection[] {
+  if (!cabinet.length || !rows.length) return rows;
+  const byId = new Map(cabinet.map((item) => [item.extraServiceId, item]));
+  const bySlug = new Map(
+    cabinet.flatMap((item) => (item.slug ? [[item.slug, item] as const] : [])),
+  );
+  return rows.map((row) => {
+    const service = catalog.find((item) => item.id === row.extraServiceId);
+    if (service && isMandatoryExtra(service)) return row;
+    const match = byId.get(row.extraServiceId) || (service?.slug ? bySlug.get(service.slug) : undefined);
+    if (!match) return row;
+    if (match.forbidden) return { ...row, enabled: true, forbidden: true, priceEur: "0" };
+    if (match.enabled === false) return { ...row, enabled: false, forbidden: false, priceEur: "0" };
+    return row;
   });
 }
 

@@ -12,6 +12,7 @@ import { resolvePartnerDeliveryPrices } from "@/lib/delivery/pricing";
 import { scopePickupPlacesInDescription } from "@/lib/cars/scope-pickup-places";
 import { listPartnerScopedDeliveryLocations, persistableCarDeliveryRows } from "@/lib/server/delivery-locations";
 import { withPartnerDeliveryPrices } from "@/lib/server/partner-delivery-listing-sync";
+import { cabinetExtrasForCar } from "@/lib/server/cabinet-extras-for-car";
 import { readCarInsuranceDoc, readCarInsuranceUrl } from "@/lib/server/car-insurance-store";
 import { ensureExtrasExistInDb, extrasRowsForCarFk, listExtraServices } from "@/lib/server/extras-store";
 import { isDbOfflineError } from "@/lib/server/db-errors";
@@ -42,6 +43,18 @@ import {
   shapeFileCarForApi,
 } from "@/lib/server/public-car-payload";
 import { revalidatePublishedListing } from "@/lib/server/revalidate-public-content";
+
+async function withCabinetExtras<T extends object>(payload: T, partnerId: string | null | undefined, carId: string) {
+  const id = String(partnerId || "").trim();
+  if (!id) return payload;
+  try {
+    const cabinetExtras = await cabinetExtrasForCar(id, carId);
+    return { ...payload, cabinetExtras };
+  } catch (error) {
+    console.warn("[cars] cabinet extras", error);
+    return payload;
+  }
+}
 
 async function resolveCarExtras(rawExtras: unknown) {
   const catalog = await listExtraServices({ activeOnly: true });
@@ -154,7 +167,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     // languages). That work is what made the window sit on "loading" and, when it
     // failed, hid the photos and documents until a later reload.
     if ((isAdmin || isOwner) && !rangeFrom) {
-      return NextResponse.json(await withPublishedSnapshotForAdmin(shaped));
+      return NextResponse.json(
+        await withPublishedSnapshotForAdmin(
+          await withCabinetExtras(shaped, fileCar.partnerId, id),
+        ),
+      );
     }
     const payload = await enrichPublicCar(shaped, fileCar.partnerId, isAdmin || isOwner);
     if (!isAdmin && !isOwner) {
@@ -194,13 +211,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           }
         : undefined;
     return NextResponse.json(
-      await withPublishedSnapshotForAdmin({
-        ...car,
-        ...(passport ? { passport } : {}),
-        insuranceUrl: insuranceUrl || null,
-        insuranceExpiresAt: insuranceExpiresAt || null,
-        rejectionNotice: rejection,
-      }),
+      await withPublishedSnapshotForAdmin(
+        await withCabinetExtras(
+          {
+            ...car,
+            ...(passport ? { passport } : {}),
+            insuranceUrl: insuranceUrl || null,
+            insuranceExpiresAt: insuranceExpiresAt || null,
+            rejectionNotice: rejection,
+          },
+          car.partnerId,
+          id,
+        ),
+      ),
     );
   }
   if (car && "passport" in car && car.passport) {
