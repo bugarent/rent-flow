@@ -1177,12 +1177,26 @@ export function PartnerCreateCarForm({
                     prefs.trusted && pref && pref.priceEur != null && Number.isFinite(Number(pref.priceEur))
                       ? Number(pref.priceEur)
                       : null;
-                  const forbidden = offer ? Boolean(offer.forbidden) : Boolean(pref?.forbidden || row.forbidden);
-                  const enabled = offer
-                    ? !forbidden && offer.enabled !== false
-                    : (service ? isMandatoryExtra(service) : false) ||
-                      Boolean(row.forbidden) ||
-                      carExtraIds.has(row.extraServiceId);
+                  const mandatory = service ? isMandatoryExtra(service) : false;
+                  // Cabinet equipment page is the source of truth until the partner overrides on this listing.
+                  const cabinetForbidden =
+                    !mandatory && prefs.trusted && pref ? Boolean(pref.forbidden) : false;
+                  const cabinetOff =
+                    !mandatory && prefs.trusted && pref && !pref.forbidden && pref.enabled === false;
+                  const forbidden = cabinetForbidden
+                    ? true
+                    : offer
+                      ? Boolean(offer.forbidden)
+                      : Boolean(pref?.forbidden || row.forbidden);
+                  const enabled = mandatory
+                    ? true
+                    : cabinetOff
+                      ? false
+                      : cabinetForbidden
+                        ? true
+                        : offer
+                          ? !forbidden && offer.enabled !== false
+                          : Boolean(row.forbidden) || carExtraIds.has(row.extraServiceId);
                   const fromCar = carExtras.find(
                     (e: { extraServiceId: string; extraService?: { slug?: string } | null; priceEur?: number }) =>
                       e.extraServiceId === row.extraServiceId ||

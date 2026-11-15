@@ -182,9 +182,9 @@ export async function hydrateListingExtras(raw: unknown): Promise<HydratedListin
 
 /**
  * Apply partner equipment prefs onto listing extras for customer checkout:
- * - enabled → normal service (price from car)
+ * - enabled → normal service (cabinet price when set)
  * - forbidden → red notice, no price
- * - off → not added from the cabinet; the car's own row (per-listing choice) stays
+ * - off → hidden on every listing the pref applies to
  * Mandatory/TPL catalog free extras are never hidden or forbidden by prefs.
  */
 export async function applyPartnerExtraOfferModes(
@@ -258,8 +258,7 @@ export async function applyPartnerExtraOfferModes(
         continue;
       }
       if (!pref.enabled && !mandatoryPriced) {
-        // Cabinet "off" is only the default for new listings; the car's own row is the partner's per-listing choice.
-        next.push(row);
+        // Cabinet "off" removes the service from listings (and search) for this partner.
         continue;
       }
       const bounds = effectivePeriodBounds(
@@ -474,7 +473,8 @@ export async function customerExtraQuotes(opts: {
   }>
 > {
   const hydrated = await hydrateListingExtras(opts.rawExtras);
-  const withPrefs = await applyPartnerExtraOfferModes(hydrated, opts.partnerId, opts.carId);
+  const withFree = await mergeFreeInsuranceExtras(hydrated);
+  const withPrefs = await applyPartnerExtraOfferModes(withFree, opts.partnerId, opts.carId);
   const withOffered = await mergePartnerOfferedExtras(withPrefs, opts.partnerId, opts.carId);
   return withOffered
     .filter((row) => !row.forbidden)

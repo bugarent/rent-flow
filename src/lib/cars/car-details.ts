@@ -59,15 +59,36 @@ export function findCarExtraOffer(
   return byName.length === 1 ? byName[0] : undefined;
 }
 
-/** Write cabinet daily prices into the saved per-car offer list. Other details stay as they are. */
+export type CabinetExtraSync = {
+  extraServiceId: string;
+  slug?: string;
+  name?: string;
+  priceEur: number;
+  /** When set, also write enabled/forbidden onto the listing's extraOffers. */
+  enabled?: boolean;
+  forbidden?: boolean;
+};
+
+function cabinetOfferPatch(match: CabinetExtraSync): Pick<CarExtraOffer, "priceEur" | "enabled" | "forbidden"> {
+  const forbidden = Boolean(match.forbidden);
+  const priceEur = forbidden ? 0 : Number(match.priceEur);
+  const enabled = forbidden ? true : match.enabled !== false;
+  return {
+    priceEur: Number.isFinite(priceEur) ? priceEur : 0,
+    enabled,
+    forbidden,
+  };
+}
+
+/** Write cabinet daily prices and offer modes into the saved per-car offer list. */
 export function descriptionWithCabinetPrices(
   description: string | null | undefined,
-  prices: Array<{ extraServiceId: string; slug?: string; name?: string; priceEur: number }>,
+  prices: CabinetExtraSync[],
 ): string | null | undefined {
   if (!description || !prices.length) return description;
   const details = parseCarDetails(description);
+  if (!details) return description;
   const offers = readExtraOffers(details);
-  if (!details || !offers.length) return description;
   let changed = false;
   const extraOffers = offers.map((offer) => {
     const match = prices.find((price) =>
@@ -78,19 +99,38 @@ export function descriptionWithCabinetPrices(
       }),
     );
     if (!match) return offer;
-    const priceEur = Number(match.priceEur);
-    if (!Number.isFinite(priceEur)) return offer;
+    const patch = cabinetOfferPatch(match);
     const current = Number(offer.priceEur);
-    if (Number.isFinite(current) && Math.abs(current - priceEur) < 0.001) return offer;
+    const samePrice =
+      Number.isFinite(current) && Math.abs(current - Number(patch.priceEur)) < 0.001;
+    const sameMode =
+      Boolean(offer.forbidden) === Boolean(patch.forbidden) &&
+      (offer.enabled !== false) === Boolean(patch.enabled);
+    if (samePrice && sameMode) return offer;
     changed = true;
-    return { ...offer, priceEur };
+    return { ...offer, ...patch };
   });
+  // Listings with no matching extraOffers still need cabinet off/forbid to stick in search.
+  for (const match of prices) {
+    if (findCarExtraOffer(extraOffers, { id: match.extraServiceId, slug: match.slug, name: match.name })) {
+      continue;
+    }
+    const patch = cabinetOfferPatch(match);
+    if (patch.enabled && !patch.forbidden) continue;
+    changed = true;
+    extraOffers.push({
+      extraServiceId: match.extraServiceId,
+      ...(match.slug ? { slug: match.slug } : {}),
+      ...(match.name ? { name: match.name } : {}),
+      ...patch,
+    });
+  }
   if (!changed) return description;
   const blob = `<!--car-details:${JSON.stringify({ ...details, extraOffers })}-->`;
   if (/<!--car-details:[\s\S]*?-->/.test(description)) {
     return description.replace(/<!--car-details:[\s\S]*?-->/, blob);
   }
-  return description;
+  return `${description}\n${blob}`;
 }
 
 /** Open-ended last tier saved by the car form (`N+` days). */
@@ -244,7 +284,8 @@ export function filterExtrasByCarOffers<
       next.push(row);
       continue;
     }
-    if (offer.forbidden) {
+    // Cabinet hydrate may already mark forbidden; do not clear it when a stale offer still says "on".
+    if (row.forbidden || offer.forbidden) {
       next.push({ ...row, forbidden: true, priceEur: 0 });
       continue;
     }

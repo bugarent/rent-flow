@@ -1,31 +1,24 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
-import { descriptionWithCabinetPrices } from "@/lib/cars/car-details";
+import { descriptionWithCabinetPrices, type CabinetExtraSync } from "@/lib/cars/car-details";
 import { prisma } from "@/lib/prisma";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import { listFileCarsForPartner, updateFileCar } from "@/lib/server/partner-cars-store";
 import { clearPublicCarPayloadCache } from "@/lib/server/public-car-payload";
 import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
 
-type CabinetPrice = {
-  extraServiceId: string;
-  slug?: string;
-  name?: string;
-  priceEur: number;
-};
-
 function sameMoney(a: number, b: number) {
   return Math.abs(a - b) < 0.001;
 }
 
-function priceFor(prices: CabinetPrice[], id: string, slug?: string | null): number | null {
+function priceFor(prices: CabinetExtraSync[], id: string, slug?: string | null): number | null {
   const direct = prices.find((price) => price.extraServiceId === id);
-  if (direct) return direct.priceEur;
+  if (direct) return direct.forbidden ? 0 : direct.priceEur;
   const resolved = String(slug || "").trim();
   if (!resolved) return null;
   const bySlug = prices.find((price) => price.slug === resolved);
-  return bySlug ? bySlug.priceEur : null;
+  return bySlug ? (bySlug.forbidden ? 0 : bySlug.priceEur) : null;
 }
 
 function publishFreshListings() {
@@ -38,10 +31,10 @@ function publishFreshListings() {
   }
 }
 
-/** Copy cabinet daily prices onto every listing of this partner and drop public caches. */
+/** Copy cabinet daily prices and offer modes onto every listing of this partner and drop public caches. */
 export async function syncListingExtraPrices(input: {
   carIds: string[];
-  prices: CabinetPrice[];
+  prices: CabinetExtraSync[];
   userId: string;
   email?: string | null;
   partnerId: string;

@@ -56,9 +56,10 @@ async function hydratedExtras(partnerId: string, carId: string, extras: unknown)
       mergePartnerOfferedExtras,
     } = await import("@/lib/server/extras-store");
     const hydrated = await hydrateListingExtras(extras);
-    const withPrefs = await applyPartnerExtraOfferModes(hydrated, partnerId, carId);
-    const withOffered = await mergePartnerOfferedExtras(withPrefs, partnerId, carId);
-    return await mergeFreeInsuranceExtras(withOffered);
+    // Free catalog rows first, then cabinet modes (off/forbid/price), then inject missing offered prefs.
+    const withFree = await mergeFreeInsuranceExtras(hydrated);
+    const withPrefs = await applyPartnerExtraOfferModes(withFree, partnerId, carId);
+    return await mergePartnerOfferedExtras(withPrefs, partnerId, carId);
   } catch {
     return undefined;
   }

@@ -61,9 +61,14 @@ export async function catalogExtrasForCar(carId: string): Promise<
   try {
     const fileCar = await getFileCar(carId);
     if (fileCar?.extras?.length) {
-      const { hydrateListingExtras, applyPartnerExtraOfferModes, mergePartnerOfferedExtras } =
-        await import("@/lib/server/extras-store");
+      const {
+        hydrateListingExtras,
+        mergeFreeInsuranceExtras,
+        applyPartnerExtraOfferModes,
+        mergePartnerOfferedExtras,
+      } = await import("@/lib/server/extras-store");
       let hydrated = await hydrateListingExtras(fileCar.extras);
+      hydrated = await mergeFreeInsuranceExtras(hydrated);
       hydrated = await applyPartnerExtraOfferModes(hydrated, fileCar.partnerId, carId);
       hydrated = await mergePartnerOfferedExtras(hydrated, fileCar.partnerId, carId);
       return hydrated
@@ -118,7 +123,18 @@ export async function catalogExtrasForCar(carId: string): Promise<
     return rows.flatMap((r) => {
       const label = pickServiceLabel(localizedLabel(r.extraService?.name, ""));
       if (!label) return [];
+      const locked = r.extraService
+        ? isMandatoryFreeExtra({
+            slug: r.extraService.slug,
+            isTpl: r.extraService.isTpl,
+            minPriceEur: r.extraService.minPriceEur == null ? null : Number(r.extraService.minPriceEur),
+            maxPriceEur: r.extraService.maxPriceEur == null ? null : Number(r.extraService.maxPriceEur),
+          })
+        : false;
       const pref = prefById.get(r.extraServiceId);
+      if (!locked && pref) {
+        if (pref.added === false || pref.forbidden || !pref.enabled) return [];
+      }
       const usePref = Boolean(pref?.enabled) && !pref?.forbidden;
       const carPrice = Number(r.priceEur) || 0;
       const fullCover =
@@ -143,14 +159,7 @@ export async function catalogExtrasForCar(carId: string): Promise<
               : carPrice,
         maxPeriodEur: bounds.maxPeriodEur,
         minPeriodEur: bounds.minPeriodEur,
-        locked: r.extraService
-          ? isMandatoryFreeExtra({
-              slug: r.extraService.slug,
-              isTpl: r.extraService.isTpl,
-              minPriceEur: r.extraService.minPriceEur == null ? null : Number(r.extraService.minPriceEur),
-              maxPriceEur: r.extraService.maxPriceEur == null ? null : Number(r.extraService.maxPriceEur),
-            })
-          : false,
+        locked,
       }];
     });
   } catch {

@@ -242,11 +242,15 @@ export async function PUT(req: Request) {
       partnerId,
       prices: saved.map((pref) => {
         const service = catalogById.get(pref.extraServiceId);
+        const forbidden = Boolean(pref.forbidden);
+        const enabled = forbidden ? true : Boolean(pref.enabled);
         return {
           extraServiceId: pref.extraServiceId,
           slug: service?.slug,
           name: service?.name,
-          priceEur: pref.forbidden ? 0 : Number(pref.priceEur) || 0,
+          priceEur: forbidden || !enabled ? 0 : Number(pref.priceEur) || 0,
+          enabled,
+          forbidden,
         };
       }),
     });

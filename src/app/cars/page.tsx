@@ -569,6 +569,10 @@ export default async function CarsPage({
     const pickupRows = pickupIata ? matchDeliveryRowsForPlace(car.deliveryPrices, pickupIata) : [];
     const pickupFree = pickupIata ? pickupRows.length > 0 && fees.pickupFeeEur <= 0 : undefined;
     const offeredFromPrefs: string[] = [];
+    const prefByExtraId = new Map<
+      string,
+      { enabled: boolean; forbidden?: boolean; added?: boolean; carIds?: string[] }
+    >();
     const prefCandidates = [
       partnerId,
       partnerId.startsWith("file-partner-") ? partnerId.replace(/^file-partner-/, "") : "",
@@ -578,21 +582,27 @@ export default async function CarsPage({
       const prefs = extrasPrefsByPartner.get(pid) || [];
       if (!prefs.length) continue;
       for (const pref of prefs) {
-        if (!pref.enabled || pref.forbidden) continue;
+        prefByExtraId.set(pref.extraServiceId, pref);
+        if (!pref.enabled || pref.forbidden || pref.added === false) continue;
         if (!partnerExtraPrefAppliesToCar(pref, car.id)) continue;
         offeredFromPrefs.push(pref.extraServiceId);
       }
       break;
     }
+    const fromCarExtras = (car.extras || [])
+      .map((row) => String(row.extraServiceId || "").trim())
+      .filter(Boolean)
+      .filter((extraServiceId) => {
+        const pref = prefByExtraId.get(extraServiceId);
+        if (!pref || !partnerExtraPrefAppliesToCar(pref, car.id)) return true;
+        if (pref.added === false) return false;
+        if (pref.forbidden) return false;
+        return Boolean(pref.enabled);
+      });
     const extraServiceIds = filterExtrasByCarOffers(
-      [
-        ...new Set([
-          ...(car.extras || [])
-            .map((row) => String(row.extraServiceId || "").trim())
-            .filter(Boolean),
-          ...offeredFromPrefs,
-        ]),
-      ].map((extraServiceId) => ({ extraServiceId })),
+      [...new Set([...fromCarExtras, ...offeredFromPrefs])].map((extraServiceId) => ({
+        extraServiceId,
+      })),
       car.description,
     ).map((row) => row.extraServiceId);
     return {
