@@ -555,8 +555,10 @@ export function PartnerCreateCarForm({
   const [deleting, setDeleting] = useState(false);
 
   const [extrasCatalog, setExtrasCatalog] = useState<ExtraServicePricing[]>(initialExtrasCatalog);
-  const serverExtraPrefs = Boolean(initialExtraPrefs) && !isAdminReview;
+  const serverExtraPrefs = Boolean(initialExtraPrefs?.length) && !isAdminReview;
   const initialExtraPrefsRef = useRef(serverExtraPrefs);
+  /** SSR cabinet prefs — used on phone when /extras-prefs is slow or fails. */
+  const initialExtraPrefsDataRef = useRef<CarFormExtraPref[] | undefined>(initialExtraPrefs);
   /** Without the partner's list from the server, wait for it before showing any service. */
   const [extrasReady, setExtrasReady] = useState(serverExtraPrefs);
   const [extraSelections, setExtraSelections] = useState<PartnerExtraSelection[]>(() =>
@@ -1134,7 +1136,13 @@ export function PartnerCreateCarForm({
 
           const carExtras = Array.isArray(car.extras) ? car.extras : [];
           if (extrasRes?.ok && Array.isArray(extras) && extras.length) {
-            const prefItems = Array.isArray(prefsData?.items) ? prefsData.items : [];
+            const prefItems =
+              Array.isArray(prefsData?.items) && prefsData.items.length
+                ? (prefsData.items as CarFormExtraPref[])
+                : Array.isArray(initialExtraPrefsDataRef.current) &&
+                    initialExtraPrefsDataRef.current.length
+                  ? initialExtraPrefsDataRef.current
+                  : [];
             const prefs = indexExtraPrefs(prefItems);
             const offers = readExtraOffers(details);
             const carExtraIds = catalogIdsForCarExtras(extras, carExtras);
@@ -1146,6 +1154,13 @@ export function PartnerCreateCarForm({
               offerIds,
             });
             if (!cancelled && (prefs.trusted || filtered.length > 0 || extrasFallbackRef.current.length === 0)) {
+              setExtrasCatalog(filtered);
+              setExtrasReady(true);
+              // On phone a failed extras-prefs fetch must not replace SSR cabinet off/forbid
+              // with raw car rows that still look "enabled".
+              if (!prefs.trusted) {
+                /* keep selectionsFromCabinet / prior state */
+              } else {
               const existingPrices = filtered.map((service: ExtraServicePricing) => {
                 const fromCar = carExtras.find(
                   (e: { extraServiceId: string; extraService?: { slug?: string } | null; priceEur?: number; forbidden?: boolean }) =>
@@ -1153,22 +1168,28 @@ export function PartnerCreateCarForm({
                     (Boolean(service.slug) && e.extraService?.slug === service.slug),
                 );
                 const pref = prefs.forService(service);
+                const prefApplies = Boolean(pref) &&
+                  partnerExtraPrefAppliesToCar(
+                    { carIds: pref?.carIds, enabled: pref?.enabled, forbidden: pref?.forbidden },
+                    carId,
+                  );
+                const cabinetForbidden = prefApplies && Boolean(pref?.forbidden);
+                const cabinetOff = prefApplies && !pref?.forbidden && pref?.enabled === false;
                 const cabinetPrice =
-                  prefs.trusted && pref && pref.priceEur != null && Number.isFinite(Number(pref.priceEur))
+                  prefApplies && pref && pref.priceEur != null && Number.isFinite(Number(pref.priceEur))
                     ? Number(pref.priceEur)
                     : null;
-                const forbidden = Boolean(pref?.forbidden || fromCar?.forbidden);
-                const price = forbidden
-                  ? 0
-                  : cabinetPrice != null
-                    ? cabinetPrice
-                    : fromCar?.priceEur != null
-                      ? Number(fromCar.priceEur)
-                      : Number(service.defaultPriceEur ?? service.minPriceEur ?? 0);
+                const forbidden = Boolean(cabinetForbidden || fromCar?.forbidden);
+                const price =
+                  forbidden || cabinetOff
+                    ? 0
+                    : cabinetPrice != null
+                      ? cabinetPrice
+                      : fromCar?.priceEur != null
+                        ? Number(fromCar.priceEur)
+                        : Number(service.defaultPriceEur ?? service.minPriceEur ?? 0);
                 return { extraServiceId: service.id, priceEur: price, forbidden };
               });
-              setExtrasCatalog(filtered);
-            setExtrasReady(true);
               setExtraSelections(
                 buildExtraSelections(filtered, existingPrices).map((row) => {
                   const service = filtered.find((s) => s.id === row.extraServiceId);
@@ -1218,26 +1239,28 @@ export function PartnerCreateCarForm({
                   const ownFull = service
                     ? savedFullCoverPriceEur(service, offer?.priceEur, fromCar?.priceEur)
                     : null;
-                  const eurPrice = forbidden
-                    ? "0"
-                    : ownFull != null
-                      ? ownFull
-                      : cabinetPrice != null
-                        ? String(cabinetPrice)
-                        : offer && offer.priceEur != null && String(offer.priceEur) !== ""
-                          ? String(offer.priceEur)
-                          : row.priceEur;
+                  const eurPrice =
+                    forbidden || cabinetOff
+                      ? "0"
+                      : ownFull != null
+                        ? ownFull
+                        : cabinetPrice != null
+                          ? String(cabinetPrice)
+                          : offer && offer.priceEur != null && String(offer.priceEur) !== ""
+                            ? String(offer.priceEur)
+                            : row.priceEur;
                   return {
                     ...row,
                     forbidden,
                     enabled,
                     priceEur:
-                      forbidden || !eurPrice || eurPrice === "0"
+                      forbidden || cabinetOff || !eurPrice || eurPrice === "0"
                         ? eurPrice || "0"
                         : eurToPartnerAmount(eurPrice, nextCurrency, nextRates),
                   };
                 }),
               );
+              }
             }
           }
 

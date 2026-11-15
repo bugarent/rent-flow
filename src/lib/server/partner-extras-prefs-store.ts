@@ -186,14 +186,29 @@ export async function writePartnerExtraPrefs(
             : 0,
         minPeriodEur: forbidden ? null : optionalStoredPeriod(p.minPeriodEur),
         maxPeriodEur: forbidden ? null : optionalStoredPeriod(p.maxPeriodEur),
-        // Always persist explicit arrays (including []) so "no cars" is not lost.
-        ...(hasCarIds ? { carIds: carIds ?? [] } : {}),
+        // Persist carIds when set. Off/forbid with [] meant "nobody" and left
+        // listings enabled — omit so the pref applies to every car instead.
+        ...(hasCarIds &&
+        !(carIds && carIds.length === 0 && (forbidden || (!removed && !Boolean(p.enabled))))
+          ? { carIds: carIds ?? [] }
+          : {}),
       };
     });
   const store = await readStore();
   store[partnerId] = cleaned;
   await writeStore(store);
   return cleaned;
+}
+
+/** Every partner id → prefs (for fleet-wide listing resync). */
+export async function readAllPartnerExtraPrefs(): Promise<Record<string, PartnerExtraPref[]>> {
+  const store = await readStore();
+  const out: Record<string, PartnerExtraPref[]> = {};
+  for (const [partnerId, rows] of Object.entries(store)) {
+    if (!Array.isArray(rows) || !rows.length) continue;
+    out[partnerId] = rows;
+  }
+  return out;
 }
 
 /** Enable or disable the catalog cross-border extra for all of a partner's cars. */

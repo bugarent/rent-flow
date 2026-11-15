@@ -15,7 +15,8 @@
     "db:push": "prisma db push",
     "db:up": "powershell -ExecutionPolicy Bypass -File ./scripts/start-db.ps1",
     "backup:partners": "node --env-file=.env scripts/backup-partners.mjs",
-    "restore:hosted-files": "node --env-file=.env scripts/restore-hosted-files.mjs"
+    "restore:hosted-files": "node --env-file=.env scripts/restore-hosted-files.mjs",
+    "resync:listing-extras": "node --require ./scripts/register-server-only.cjs --import tsx --env-file=.env scripts/resync-listing-extras.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

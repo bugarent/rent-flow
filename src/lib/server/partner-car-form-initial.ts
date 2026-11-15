@@ -78,10 +78,14 @@ export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
       company?.deliveryCountryIso2s,
     );
     const initialExtraPrefs: CarFormExtraPref[] | undefined = fleet
-      ? initialExtrasCatalog.map((service) => ({
-          service: { id: service.id, slug: service.slug },
-          ...partnerCabinetDefaults(service, prefById.get(service.id), fleet.usedOnCar(service)),
-        }))
+      ? initialExtrasCatalog.map((service) => {
+          const pref = prefById.get(service.id);
+          return {
+            service: { id: service.id, slug: service.slug },
+            ...partnerCabinetDefaults(service, pref, fleet.usedOnCar(service)),
+            ...(pref?.carIds ? { carIds: pref.carIds } : {}),
+          };
+        })
       : undefined;
     return {
       initialDeliveryCatalog: delivery,
