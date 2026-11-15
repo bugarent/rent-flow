@@ -89,7 +89,7 @@ export async function GET(req: Request) {
 
     const partners = await prisma.partner.findMany({
       where: { status: "APPROVED" },
-      orderBy: [{ sequentialNumber: "asc" }, { createdAt: "asc" }],
+      orderBy: [{ sequentialNumber: "desc" }, { createdAt: "desc" }],
       include: {
         user: { select: { firstName: true, lastName: true, status: true } },
         cars: { select: { status: true } },

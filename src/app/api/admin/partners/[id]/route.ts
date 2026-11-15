@@ -1214,6 +1214,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       data: {
         status: "REJECTED",
         rejectionNote: body.rejectionNote ?? existing.rejectionNote,
+        // Free PRT slot so new partners can fill numbering gaps.
+        sequentialNumber: null,
       },
     });
     const { retirePartnerSearchPlaces } = await import("@/lib/server/partner-search-coverage");

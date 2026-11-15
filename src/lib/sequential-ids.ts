@@ -58,8 +58,114 @@ async function nextSequentialValue(key: SequentialIdKey): Promise<number> {
   return value;
 }
 
+const PARTNER_SEQ_LOCK_KEY = 0x50525431; // "PRT1"
+
+async function collectUsedPartnerSequentialNumbers(): Promise<Set<number>> {
+  const used = new Set<number>();
+
+  try {
+    const rows = await db.partner.findMany({
+      where: {
+        sequentialNumber: { not: null, gte: PORTAL_ID_START },
+        NOT: { status: "REJECTED" },
+      },
+      select: { sequentialNumber: true },
+    });
+    for (const row of rows) {
+      if (row.sequentialNumber != null) used.add(row.sequentialNumber);
+    }
+  } catch {
+    /* DB unavailable — fall through to file/local sources */
+  }
+
+  try {
+    const { listFilePartnerApplications } = await import(
+      "@/lib/server/partner-applications-store"
+    );
+    for (const partner of await listFilePartnerApplications()) {
+      if (
+        partner.status !== "REJECTED" &&
+        partner.sequentialNumber != null &&
+        partner.sequentialNumber >= PORTAL_ID_START
+      ) {
+        used.add(partner.sequentialNumber);
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const { loadLocalPartner } = await import("@/lib/auth/local-partner-store");
+    const local = loadLocalPartner();
+    if (
+      local?.sequentialNumber != null &&
+      local.sequentialNumber >= PORTAL_ID_START
+    ) {
+      used.add(local.sequentialNumber);
+    }
+  } catch {
+    /* ignore */
+  }
+
+  return used;
+}
+
+/** Free PRT slots held by cancelled/rejected applications so gaps can be reused. */
+async function releaseRejectedPartnerSequentialNumbers(): Promise<void> {
+  try {
+    await db.partner.updateMany({
+      where: { status: "REJECTED", sequentialNumber: { not: null } },
+      data: { sequentialNumber: null },
+    });
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const { clearRejectedFilePartnerSequentialNumbers } = await import(
+      "@/lib/server/partner-applications-store"
+    );
+    await clearRejectedFilePartnerSequentialNumbers();
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Next PRT number: lowest free slot from PORTAL_ID_START (fills gaps after delete/reject).
+ */
 export async function nextPartnerSequentialNumber(): Promise<number> {
-  return nextSequentialValue("partner");
+  try {
+    await db.$executeRaw`SELECT pg_advisory_lock(${PARTNER_SEQ_LOCK_KEY})`;
+    try {
+      await releaseRejectedPartnerSequentialNumbers();
+      const used = await collectUsedPartnerSequentialNumbers();
+      let next = PORTAL_ID_START;
+      while (used.has(next)) next += 1;
+      try {
+        await setSequenceFloor("partner", next);
+      } catch {
+        /* sequence table optional */
+      }
+      return next;
+    } finally {
+      await db.$executeRaw`SELECT pg_advisory_unlock(${PARTNER_SEQ_LOCK_KEY})`;
+    }
+  } catch (error) {
+    console.error(
+      "[nextPartnerSequentialNumber] gap-fill failed, using aggregate fallback",
+      error,
+    );
+    try {
+      const used = await collectUsedPartnerSequentialNumbers();
+      let next = PORTAL_ID_START;
+      while (used.has(next)) next += 1;
+      return next;
+    } catch {
+      return nextSequentialValue("partner");
+    }
+  }
 }
 
 export async function nextCustomerNumber(): Promise<number> {

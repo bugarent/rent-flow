@@ -102,7 +102,7 @@ export async function loadAdminPartnerRows(): Promise<{
           },
         },
       },
-      orderBy: [{ sequentialNumber: "asc" }, { createdAt: "desc" }],
+      orderBy: [{ sequentialNumber: "desc" }, { createdAt: "desc" }],
     });
 
     for (const p of partners) {

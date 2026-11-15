@@ -19,6 +19,7 @@ import {
   partnerReapplyWindowStart,
   type PartnerApplicationMessageSnapshot,
 } from "@/lib/partner-application-messages";
+import { PORTAL_ID_START } from "@/lib/ids";
 import { nextPartnerSequentialNumber } from "@/lib/sequential-ids";
 
 function asMessenger(value: string | undefined): Messenger {
@@ -290,6 +291,11 @@ export async function POST(req: Request) {
         messages.push(buildPartnerApplicationMessage("REAPPLY", snapshot, false));
         const unreadReapplyCount = messages.filter((m) => m.kind === "REAPPLY" && !m.readByAdmin).length;
 
+        let sequentialNumber = reopenCandidate.sequentialNumber;
+        if (sequentialNumber == null || sequentialNumber < PORTAL_ID_START) {
+          sequentialNumber = await nextPartnerSequentialNumber();
+        }
+
         const updated = await prisma.partner.update({
           where: { id: reopenCandidate.id },
           data: {
@@ -312,6 +318,8 @@ export async function POST(req: Request) {
             companySettings: placeSettings,
             applicationMessages: messages,
             unreadReapplyCount,
+            sequentialNumber,
+            status: "PENDING",
           },
         });
 

@@ -4,6 +4,7 @@ import "server-only";
 import { mkdir, readFile, writeFile } from "@/lib/server/durable-fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { PORTAL_ID_START } from "@/lib/ids";
 import {
   buildPartnerApplicationMessage,
   parsePartnerApplicationMessages,
@@ -49,7 +50,7 @@ type StoreFile = {
 };
 
 function emptyStore(): StoreFile {
-  return { nextSequentialNumber: 1000, partners: [] };
+  return { nextSequentialNumber: PORTAL_ID_START, partners: [] };
 }
 
 async function readStore(): Promise<StoreFile> {
@@ -57,7 +58,7 @@ async function readStore(): Promise<StoreFile> {
     const raw = await readFile(DATA_FILE, "utf8");
     const parsed = JSON.parse(raw) as Partial<StoreFile>;
     return {
-      nextSequentialNumber: Number(parsed.nextSequentialNumber) || 1000,
+      nextSequentialNumber: Number(parsed.nextSequentialNumber) || PORTAL_ID_START,
       partners: Array.isArray(parsed.partners) ? (parsed.partners as FilePartnerApplication[]) : [],
     };
   } catch {
@@ -100,13 +101,50 @@ export async function findFilePartnerSequentialByEmail(email: string): Promise<n
   return match?.sequentialNumber ?? null;
 }
 
-/** Allocate the next PRT sequential number from the local applications counter. */
-export async function allocateFilePartnerSequentialNumber(): Promise<number> {
+/** Release PRT numbers held by rejected/cancelled file applications. */
+export async function clearRejectedFilePartnerSequentialNumbers(): Promise<void> {
   const store = await readStore();
-  const seq = Math.max(1000, Number(store.nextSequentialNumber) || 1000);
-  store.nextSequentialNumber = seq + 1;
-  await writeStore(store);
-  return seq;
+  let changed = false;
+  for (let i = 0; i < store.partners.length; i++) {
+    if (store.partners[i].status === "REJECTED" && store.partners[i].sequentialNumber != null) {
+      store.partners[i] = { ...store.partners[i], sequentialNumber: null };
+      changed = true;
+    }
+  }
+  if (changed) await writeStore(store);
+}
+
+/**
+ * Allocate the lowest free PRT number (fills gaps after delete/reject).
+ * Prefers the shared DB allocator; falls back to file-store gap scan offline.
+ */
+export async function allocateFilePartnerSequentialNumber(): Promise<number> {
+  try {
+    const { nextPartnerSequentialNumber } = await import("@/lib/sequential-ids");
+    const seq = await nextPartnerSequentialNumber();
+    const store = await readStore();
+    store.nextSequentialNumber = Math.max(store.nextSequentialNumber, seq + 1);
+    await writeStore(store);
+    return seq;
+  } catch {
+    await clearRejectedFilePartnerSequentialNumbers();
+    const store = await readStore();
+    const used = new Set<number>();
+    for (const p of store.partners) {
+      if (
+        p.status !== "REJECTED" &&
+        p.sequentialNumber != null &&
+        p.sequentialNumber >= PORTAL_ID_START
+      ) {
+        used.add(p.sequentialNumber);
+      }
+    }
+    let seq = PORTAL_ID_START;
+    while (used.has(seq)) seq += 1;
+    store.nextSequentialNumber = Math.max(store.nextSequentialNumber, seq + 1);
+    await writeStore(store);
+    return seq;
+  }
 }
 
 export async function findFilePartnerByEmail(email: string): Promise<FilePartnerApplication | null> {
@@ -152,6 +190,9 @@ export async function updateFilePartnerStatus(
     ...store.partners[index],
     status,
     rejectionNote: rejectionNote ?? store.partners[index].rejectionNote,
+    // Free the PRT slot when cancelled/rejected so new partners can fill gaps.
+    sequentialNumber:
+      status === "REJECTED" ? null : store.partners[index].sequentialNumber,
     updatedAt: new Date().toISOString(),
   };
   await writeStore(store);
@@ -204,6 +245,12 @@ export async function createOrReapplyFilePartner(input: {
     }
     messages.push(buildPartnerApplicationMessage("REAPPLY", snapshot, false));
     const unreadReapplyCount = messages.filter((m) => m.kind === "REAPPLY" && !m.readByAdmin).length;
+    let sequentialNumber = existing.sequentialNumber;
+    if (sequentialNumber == null || sequentialNumber < PORTAL_ID_START) {
+      sequentialNumber = await allocateFilePartnerSequentialNumber();
+    }
+    const fresh = await readStore();
+    const freshIndex = fresh.partners.findIndex((p) => p.id === existing.id);
     const updated: FilePartnerApplication = {
       ...existing,
       kind: snapshot.kind,
@@ -222,13 +269,16 @@ export async function createOrReapplyFilePartner(input: {
       fleetSize: snapshot.fleetSize,
       fleetAgeRange: snapshot.fleetAgeRange,
       operatingCountryIso2s: snapshot.countryIso2s,
+      status: existing.status === "REJECTED" ? "PENDING" : existing.status,
       applicationMessages: messages,
       unreadReapplyCount,
       unreadForAdmin: unreadReapplyCount || 1,
+      sequentialNumber,
       updatedAt: new Date().toISOString(),
     };
-    store.partners[index] = updated;
-    await writeStore(store);
+    if (freshIndex >= 0) fresh.partners[freshIndex] = updated;
+    else fresh.partners.unshift(updated);
+    await writeStore(fresh);
     return { partner: updated, reapplied: true };
   }
 
@@ -260,8 +310,7 @@ export async function createOrReapplyFilePartner(input: {
   }
 
   const now = new Date().toISOString();
-  const seq = store.nextSequentialNumber;
-  store.nextSequentialNumber = seq + 1;
+  const seq = await allocateFilePartnerSequentialNumber();
   const initial = buildPartnerApplicationMessage("INITIAL", snapshot, true);
   const partner: FilePartnerApplication = {
     id: randomUUID(),
@@ -289,7 +338,9 @@ export async function createOrReapplyFilePartner(input: {
     createdAt: now,
     updatedAt: now,
   };
-  store.partners.unshift(partner);
-  await writeStore(store);
+  const fresh = await readStore();
+  fresh.partners.unshift(partner);
+  fresh.nextSequentialNumber = Math.max(fresh.nextSequentialNumber, seq + 1);
+  await writeStore(fresh);
   return { partner, reapplied: false };
 }

@@ -361,9 +361,10 @@ export function PartnersManager({
       )
       .sort((a, b) => {
         if (mode === "directory") {
-          const na = a.sequentialNumber ?? Number.POSITIVE_INFINITY;
-          const nb = b.sequentialNumber ?? Number.POSITIVE_INFINITY;
-          if (na !== nb) return na - nb;
+          // Highest PRT first; earliest numbers land on the last page.
+          const na = a.sequentialNumber ?? Number.NEGATIVE_INFINITY;
+          const nb = b.sequentialNumber ?? Number.NEGATIVE_INFINITY;
+          if (na !== nb) return nb - na;
           return a.displayName.localeCompare(b.displayName);
         }
         const ua = partnerAttention(a);
