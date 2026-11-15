@@ -29,9 +29,20 @@ for (const row of cars.rows) {
   console.log("--- car", row.make, row.model, row.year, row.registrationNumber, row.partnerId);
   console.log(String(row.tiers || "").slice(0, 800));
   const settings = await client.query(
-    `SELECT payload->'tariffs' AS tariffs FROM "JsonStore" WHERE key = $1`,
-    [`partner-company-settings:${row.partnerId}`],
+    `SELECT payload->$1->'tariffs' AS tariffs,
+            payload->$1->>'title' AS title,
+            payload->$1->>'email' AS email
+     FROM "JsonStore" WHERE key = 'partner-company-settings.json'`,
+    [row.partnerId],
   );
+const meta = await client.query(
+  `SELECT "companySettings"->>'title' AS title,
+          "companySettings"->>'email' AS email,
+          "companySettings"->>'legalName' AS legal
+   FROM "Partner" WHERE id = $1`,
+  [row.partnerId],
+);
+console.log("db meta", meta.rows[0]);
   const partner = await client.query(
     `SELECT "companySettings"->'tariffs' AS tariffs FROM "Partner" WHERE id = $1`,
     [row.partnerId],
