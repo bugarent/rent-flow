@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { requireAdmin } from "@/lib/auth/guards";
 import {
   ensureHomepageDefaults,
@@ -40,16 +41,12 @@ import { AdminPageHeading, AdminSearchCountriesHeading } from "@/components/admi
 
 export default async function AdminOperationsHomePage() {
   await requireAdmin();
-  try {
-    await ensureHomepageDefaults();
-  } catch {
-    /* database may be offline */
-  }
-  try {
-    await syncListedPartnerDeliveryLocations();
-  } catch (error) {
-    console.warn("[admin homepage] sync partner delivery locations", error);
-  }
+  after(() => {
+    ensureHomepageDefaults().catch(() => undefined);
+    syncListedPartnerDeliveryLocations().catch((error) =>
+      console.warn("[admin homepage] sync partner delivery locations", error),
+    );
+  });
   const [
     categories,
     airports,

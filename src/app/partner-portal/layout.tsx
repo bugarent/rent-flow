@@ -48,10 +48,10 @@ export default async function PartnerPortalLayout({ children }: { children: Reac
   const cookieCurrency = await readPartnerDisplayCurrency("" as PartnerPricingCurrency);
   const [locale, fxRates, companyCurrency] = await Promise.all([
     readPartnerLocale(),
-    softTimeout(cachedFxRates(), defaultFxRates(), 1200),
+    softTimeout(cachedFxRates(), defaultFxRates(), 300),
     cookieCurrency
       ? Promise.resolve(cookieCurrency)
-      : softTimeout(readPartnerPricingCurrency(), DEFAULT_PARTNER_PRICING_CURRENCY, 1500),
+      : softTimeout(readPartnerPricingCurrency(), DEFAULT_PARTNER_PRICING_CURRENCY, 400),
   ]);
   const pricingCurrency = cookieCurrency || companyCurrency;
 

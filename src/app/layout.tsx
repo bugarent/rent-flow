@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { headers } from "next/headers";
 import { BootSplash } from "@/components/layout/boot-splash";
 import { RouteLoadingIndicator } from "@/components/layout/route-loading-indicator";
 import { PressFeedback } from "@/components/layout/press-feedback";
@@ -15,6 +16,7 @@ import { readPreferences } from "@/lib/server/preferences";
 import { cachedFooterContact, cachedFxRates } from "@/lib/server/public-page-data";
 import { isRtl } from "@/lib/i18n/config";
 import { SITE_URL, PRIMARY_KEYWORDS } from "@/lib/seo/config";
+import { isAdminPath, isBusinessPartnerPath, isPartnerPath } from "@/lib/routes";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 import {
   buildLocalBusinessJsonLd,
@@ -84,15 +86,20 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const { locale, currency } = await readPreferences();
+  const path = (await headers()).get("x-rac-path") || "";
+  const portal = isAdminPath(path) || isPartnerPath(path) || isBusinessPartnerPath(path);
   const { softTimeout } = await import("@/lib/server/soft-timeout");
   const { defaultFxRates } = await import("@/lib/server/preferences");
   const { emptyFooterContact } = await import("@/lib/catalog/footer-contact");
-  const [fxRates, footerContact] = await Promise.all([
-    softTimeout(cachedFxRates(), defaultFxRates(), 400),
-    // Postgres often needs longer than the shell budget. A short wait used to
-    // send an empty contact and hide the phone, email, and address.
-    softTimeout(cachedFooterContact(), emptyFooterContact(), 1500),
-  ]);
+  // Admin and partner pages do not show this contact. A cold database must not
+  // hold their first byte. Public pages wait only briefly; the shell fills the
+  // rest from the last visit and /api/footer-contact.
+  const [fxRates, footerContact] = portal
+    ? [defaultFxRates(), emptyFooterContact()]
+    : await Promise.all([
+        softTimeout(cachedFxRates(), defaultFxRates(), 250),
+        softTimeout(cachedFooterContact(), cachedFooterContact.peek() ?? emptyFooterContact(), 400),
+      ]);
   const dir = isRtl(locale) ? "rtl" : "ltr";
 
   return (

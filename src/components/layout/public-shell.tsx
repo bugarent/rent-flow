@@ -1,14 +1,15 @@
 "use client";
 
-import { Suspense } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import { Header } from "@/components/layout/header";
-import { Footer } from "@/components/layout/footer";
-import { FloatingOnlineChat } from "@/components/layout/floating-online-chat";
-import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import type { FooterContactConfig } from "@/lib/catalog/footer-contact";
 import { isAdminPath, isBusinessPartnerPath, isPartnerPath } from "@/lib/routes";
 import { useResolvedFooterContact } from "@/components/layout/use-resolved-footer-contact";
+
+const PublicChrome = dynamic(
+  () => import("@/components/layout/public-chrome").then((mod) => mod.PublicChrome),
+  { loading: () => <div className="min-h-full flex-1" /> },
+);
 
 export function PublicShell({
   children,
@@ -32,18 +33,8 @@ export function PublicShell({
   const isHome = pathname === "/";
 
   return (
-    <>
-      <Suspense
-        fallback={
-          isHome ? null : <div className="h-[7.25rem] sm:h-[76px] lg:h-[84px]" aria-hidden />
-        }
-      >
-        <Header overlay={isHome} />
-      </Suspense>
-      <main className="relative min-w-0 flex-1 overflow-x-clip pb-20 md:pb-0">{children}</main>
-      <Footer contact={contact} />
-      <FloatingOnlineChat email={contact?.email} phone={contact?.phone} />
-      <MobileBottomNav />
-    </>
+    <PublicChrome contact={contact} isHome={isHome}>
+      {children}
+    </PublicChrome>
   );
 }

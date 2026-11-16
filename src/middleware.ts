@@ -48,6 +48,14 @@ function sameOriginMutation(req: NextRequest) {
   }
 }
 
+function continueRequest(req: NextRequest, opts?: { noIndex?: boolean }) {
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-rac-path", req.nextUrl.pathname);
+  const res = NextResponse.next({ request: { headers: requestHeaders } });
+  if (opts?.noIndex) res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+  return res;
+}
+
 function withSecurityHeaders(res: NextResponse) {
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -82,7 +90,7 @@ export async function middleware(req: NextRequest) {
     if (!token || token.role !== "CUSTOMER") {
       return NextResponse.redirect(new URL("/", req.url));
     }
-    return NextResponse.next();
+    return continueRequest(req);
   }
 
   if (isAdminPath(pathname)) {
@@ -92,7 +100,7 @@ export async function middleware(req: NextRequest) {
       if (token?.role === "ADMIN") {
         return noIndex(NextResponse.redirect(new URL(ADMIN_BASE, req.url)));
       }
-      return noIndex(NextResponse.next());
+      return continueRequest(req, { noIndex: true });
     }
     if (!token) {
       const url = new URL(ADMIN_LOGIN, req.url);
@@ -102,7 +110,7 @@ export async function middleware(req: NextRequest) {
     if (token.role !== "ADMIN") {
       return deny();
     }
-    return noIndex(NextResponse.next());
+    return continueRequest(req, { noIndex: true });
   }
 
   if (isPartnerPath(pathname)) {
@@ -112,7 +120,7 @@ export async function middleware(req: NextRequest) {
       if (pathname === PARTNER_LOGIN && token?.role === "VENDOR") {
         return noIndex(NextResponse.redirect(new URL(PARTNER_BASE, req.url)));
       }
-      return noIndex(NextResponse.next());
+      return continueRequest(req, { noIndex: true });
     }
     if (!token) {
       const url = new URL(PARTNER_LOGIN, req.url);
@@ -122,7 +130,7 @@ export async function middleware(req: NextRequest) {
     if (token.role !== "VENDOR") {
       return deny();
     }
-    return noIndex(NextResponse.next());
+    return continueRequest(req, { noIndex: true });
   }
 
   if (isBusinessPartnerPath(pathname)) {
@@ -133,15 +141,15 @@ export async function middleware(req: NextRequest) {
       if (hasSession) {
         return noIndex(NextResponse.redirect(new URL(BUSINESS_PARTNER_BASE, req.url)));
       }
-      return noIndex(NextResponse.next());
+      return continueRequest(req, { noIndex: true });
     }
     if (!hasSession) {
       return noIndex(NextResponse.redirect(new URL(BUSINESS_PARTNER_LOGIN, req.url)));
     }
-    return noIndex(NextResponse.next());
+    return continueRequest(req, { noIndex: true });
   }
 
-  return NextResponse.next();
+  return continueRequest(req);
 }
 
 export const config = {

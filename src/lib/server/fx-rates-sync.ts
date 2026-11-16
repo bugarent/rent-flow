@@ -210,10 +210,11 @@ async function readStoredFxRates(): Promise<FxRates> {
 
 let dailySync: Promise<FxRates> | null = null;
 
-/** Refresh platform rates once per Tbilisi calendar day, then return the stored rates. */
+/** Return the stored rates immediately. A stale day refreshes in the background. */
 export async function ensureDailyFxRates(): Promise<FxRates> {
   const { getPlatformSettings } = await import("@/lib/server/platform-settings-store");
   const current = await getPlatformSettings();
+  const stored = await readStoredFxRates();
   const savedAt = current.fxRatesUpdatedAt ? new Date(current.fxRatesUpdatedAt) : null;
   const fresh =
     savedAt != null &&
@@ -221,15 +222,12 @@ export async function ensureDailyFxRates(): Promise<FxRates> {
     tbilisiDay(savedAt) === tbilisiDay(new Date()) &&
     current.eurUsdRate > 0 &&
     current.eurGelRate > 0;
-  if (fresh) return readStoredFxRates();
-  if (!dailySync) {
-    dailySync = (async () => {
-      const result = await syncFxRatesToPlatform();
-      if (result.ok) return result.rates;
-      return readStoredFxRates();
-    })().finally(() => {
-      dailySync = null;
-    });
+  if (!fresh && !dailySync) {
+    dailySync = syncFxRatesToPlatform()
+      .then((result) => (result.ok ? result.rates : stored))
+      .finally(() => {
+        dailySync = null;
+      });
   }
-  return dailySync;
+  return stored;
 }

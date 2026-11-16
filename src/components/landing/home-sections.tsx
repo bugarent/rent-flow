@@ -33,12 +33,12 @@ import { popularPlacesListName } from "@/lib/seo/home-seo";
 import { buildPlacesItemListJsonLd } from "@/lib/seo/json-ld";
 import { plainHeading } from "@/lib/catalog/airport-seo";
 
-const DATA_WAIT_MS = 1200;
+const DATA_WAIT_MS = 700;
 /**
- * The sections below the hero stream in after it, so waiting for a waking database here
- * delays nothing on screen; giving up early showed the built-in cards instead of the saved ones.
+ * Below-fold sections stream after the hero. The wait stays short so a cold
+ * database cannot hold the document; the last saved cards are the fallback.
  */
-const SECTION_WAIT_MS = 6000;
+const SECTION_WAIT_MS = 900;
 
 /** Fresh value, else this instance's last good one, else `fallback`. */
 function readOr<T>(read: CachedPublicRead<T>, fallback: T, ms: number): Promise<T> {
@@ -77,7 +77,7 @@ export function HomeHeroPlaceholder() {
 }
 
 /** The hero placeholder is already on screen, so waiting longer here delays nothing visible. */
-const HERO_PLACES_WAIT_MS = 3000;
+const HERO_PLACES_WAIT_MS = 700;
 
 export async function HomeHeroSection() {
   const [options, bookingChannels, popularAirports, cachedCovers, crossBorderReturns] = await Promise.all([
