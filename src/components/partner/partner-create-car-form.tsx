@@ -9,21 +9,14 @@ import { isStudioCoverUrl } from "@/lib/cars/studio-cover-url";
 import { PARTNER_BASE } from "@/lib/routes";
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
 import { isMandatoryExtra, isMandatoryFreeExtra } from "@/lib/extras/pricing";
-import {
-  isListingInsuranceService,
-  isProtectionInsuranceService,
-  isTheftProtectionService,
-  resolveCheckoutSlot,
-} from "@/lib/extras/checkout-slot";
+import { isListingInsuranceService, resolveCheckoutSlot } from "@/lib/extras/checkout-slot";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import {
-  applyListingCabinetExtras,
   buildExtraSelections,
-  catalogIdsForCarExtras,
-  catalogIdsForOffers,
+  cabinetRowsToPrefs,
   extrasVisibleOnCarForm,
   indexExtraPrefs,
-  readCabinetExtras,
+  selectionsForCar,
   selectionsFromCabinet,
   type CarFormExtraPref,
   type PartnerExtraSelection,
@@ -34,8 +27,7 @@ import {
   type PickupPlaceRow,
 } from "@/components/partner/listing-pickup-places";
 import { isSyntheticDeliveryId } from "@/lib/delivery/pricing";
-import { findCarExtraOffer, parseCarDetails, readExtraOffers } from "@/lib/cars/car-details";
-import { partnerExtraPrefAppliesToCar } from "@/lib/extras/partner-extra-pref";
+import { parseCarDetails } from "@/lib/cars/car-details";
 import { diffCarAgainstPublished, fieldChangesMapFromRecord } from "@/lib/cars/car-published-diff";
 import type { PublishedCarSnapshot } from "@/lib/server/car-published-store";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
@@ -421,20 +413,18 @@ function photoSlotsFromSaved(urls: string[]) {
   return Array.from({ length: MIN_PUBLIC_PHOTOS }, (_, index) => own[index] || "");
 }
 
-/** Full coverage is priced per car. A saved listing amount beats the cabinet default. */
-function savedFullCoverPriceEur(
-  service: { checkoutSlot?: unknown; slug?: string; isTpl?: boolean; name?: string },
-  offerPrice: unknown,
-  carPrice: unknown,
-): string | null {
-  if (resolveCheckoutSlot(service) !== "full") return null;
-  const offer = Number(offerPrice);
-  if (offerPrice != null && String(offerPrice) !== "" && Number.isFinite(offer) && offer > 0) {
-    return String(offer);
-  }
-  const car = Number(carPrice);
-  if (carPrice != null && String(carPrice) !== "" && Number.isFinite(car) && car > 0) return String(car);
-  return null;
+function displayExtraPrices(
+  rows: PartnerExtraSelection[],
+  currency: PartnerDisplayCurrency,
+  rates: FxRates,
+): PartnerExtraSelection[] {
+  return rows.map((row) => ({
+    ...row,
+    priceEur:
+      row.forbidden || !row.priceEur || row.priceEur === "0"
+        ? "0"
+        : eurToPartnerAmount(row.priceEur, currency, rates),
+  }));
 }
 
 function sanitizeMoneyDraft(value: string) {
@@ -556,24 +546,33 @@ export function PartnerCreateCarForm({
   const [docPreview, setDocPreview] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const [extrasCatalog, setExtrasCatalog] = useState<ExtraServicePricing[]>(initialExtrasCatalog);
   const serverExtraPrefs = Boolean(initialExtraPrefs?.length) && !isAdminReview;
   const initialExtraPrefsRef = useRef(serverExtraPrefs);
   /** SSR cabinet prefs — used on phone when /extras-prefs is slow or fails. */
   const initialExtraPrefsDataRef = useRef<CarFormExtraPref[] | undefined>(initialExtraPrefs);
-  /** Without the partner's list from the server, wait for it before showing any service. */
-  const [extrasReady, setExtrasReady] = useState(serverExtraPrefs);
-  const [extraSelections, setExtraSelections] = useState<PartnerExtraSelection[]>(() =>
-    initialExtraPrefs && serverExtraPrefs
-      ? selectionsFromCabinet(initialExtrasCatalog, initialExtraPrefs).map((row) => ({
-          ...row,
-          priceEur:
-            !row.priceEur || row.priceEur === "0"
-              ? row.priceEur
-              : eurToPartnerAmount(row.priceEur, DEFAULT_PARTNER_PRICING_CURRENCY, DEFAULT_FX_RATES),
-        }))
-      : buildExtraSelections(initialExtrasCatalog),
+  const initialListing =
+    serverExtraPrefs && carId && initialExtraPrefs
+      ? selectionsForCar(initialExtrasCatalog, initialExtraPrefs, carId)
+      : null;
+  const [extrasCatalog, setExtrasCatalog] = useState<ExtraServicePricing[]>(
+    initialListing?.catalog ?? initialExtrasCatalog,
   );
+  /** Edit waits for this car's cabinet list. A new car can paint the partner's list immediately. */
+  const [extrasReady, setExtrasReady] = useState(Boolean(initialListing) || (serverExtraPrefs && !carId));
+  const [extraSelections, setExtraSelections] = useState<PartnerExtraSelection[]>(() => {
+    const rows = initialListing
+      ? initialListing.selections
+      : initialExtraPrefs && serverExtraPrefs
+        ? selectionsFromCabinet(initialExtrasCatalog, initialExtraPrefs)
+        : buildExtraSelections(initialExtrasCatalog);
+    return rows.map((row) => ({
+      ...row,
+      priceEur:
+        !row.priceEur || row.priceEur === "0"
+          ? row.priceEur || "0"
+          : eurToPartnerAmount(row.priceEur, DEFAULT_PARTNER_PRICING_CURRENCY, DEFAULT_FX_RATES),
+    }));
+  });
   const [fullCoverPriceEdit, setFullCoverPriceEdit] = useState<{
     id: string;
     draft: string;
@@ -803,67 +802,14 @@ export function PartnerCreateCarForm({
             setTariffPrices(savedTiers.prices);
           }
 
-          const carExtras = Array.isArray(car.extras) ? car.extras : [];
           if (Array.isArray(extras) && extras.length) {
-            const offers = readExtraOffers(details);
-            const carExtraIds = catalogIdsForCarExtras(extras, carExtras);
-            const offerIds = catalogIdsForOffers(extras, offers);
-            const filtered = extras.filter(
-              (service: ExtraServicePricing) =>
-                isMandatoryExtra(service) ||
-                isProtectionInsuranceService(service) ||
-                isTheftProtectionService(service) ||
-                carExtraIds.has(service.id) ||
-                offerIds.has(service.id),
-            );
-            setExtrasCatalog(filtered);
+            const cabinetPrefs = cabinetRowsToPrefs(car.cabinetExtras);
+            const listing = selectionsForCar(extras, cabinetPrefs, carId, {
+              whenUntrusted: "mandatory",
+            });
+            setExtrasCatalog(listing.catalog);
             setExtrasReady(true);
-            setExtraSelections(
-              applyListingCabinetExtras(
-                buildExtraSelections(
-                  filtered,
-                  filtered.map((service: ExtraServicePricing) => {
-                    const fromCar = carExtras.find(
-                      (e: { extraServiceId: string; priceEur?: number; forbidden?: boolean }) =>
-                        e.extraServiceId === service.id,
-                    );
-                    return {
-                      extraServiceId: service.id,
-                      priceEur: Number(fromCar?.priceEur ?? service.defaultPriceEur ?? 0),
-                      forbidden: Boolean(fromCar?.forbidden),
-                    };
-                  }),
-                ).map((row) => {
-                  const offer = findCarExtraOffer(
-                    offers,
-                    filtered.find((service) => service.id === row.extraServiceId) || {
-                      id: row.extraServiceId,
-                    },
-                  );
-                  if (offer) {
-                    const forbidden = Boolean(offer.forbidden);
-                    return {
-                      ...row,
-                      forbidden,
-                      enabled: !forbidden && offer.enabled !== false,
-                      priceEur:
-                        offer.priceEur != null && String(offer.priceEur) !== ""
-                          ? String(offer.priceEur)
-                          : row.priceEur,
-                    };
-                  }
-                  return {
-                    ...row,
-                    enabled:
-                      Boolean(row.forbidden) ||
-                      carExtraIds.has(row.extraServiceId) ||
-                      Boolean(filtered.find((s) => s.id === row.extraServiceId && isMandatoryExtra(s))),
-                  };
-                }),
-                filtered,
-                readCabinetExtras(car.cabinetExtras),
-              ),
-            );
+            setExtraSelections(displayExtraPrices(listing.selections, nextCurrency, nextRates));
           }
 
           const adminDel = delRes?.ok ? await delRes.json().catch(() => null) : null;
@@ -1140,139 +1086,27 @@ export function PartnerCreateCarForm({
             setTariffPrices(savedTiers.prices);
           }
 
-          const carExtras = Array.isArray(car.extras) ? car.extras : [];
-          if (extrasRes?.ok && Array.isArray(extras) && extras.length) {
-            const prefItems =
-              Array.isArray(prefsData?.items) && prefsData.items.length
-                ? (prefsData.items as CarFormExtraPref[])
-                : Array.isArray(initialExtraPrefsDataRef.current) &&
-                    initialExtraPrefsDataRef.current.length
-                  ? initialExtraPrefsDataRef.current
-                  : [];
-            const prefs = indexExtraPrefs(prefItems);
-            const offers = readExtraOffers(details);
-            const carExtraIds = catalogIdsForCarExtras(extras, carExtras);
-            const offerIds = catalogIdsForOffers(extras, offers);
-            const filtered = extrasVisibleOnCarForm(extras, {
-              prefs: prefItems,
-              fallback: extrasFallbackRef.current,
-              carExtraIds,
-              offerIds,
-            });
-            if (!cancelled && (prefs.trusted || filtered.length > 0 || extrasFallbackRef.current.length === 0)) {
-              setExtrasCatalog(filtered);
-              setExtrasReady(true);
-              // On phone a failed extras-prefs fetch must not replace SSR cabinet off/forbid
-              // with raw car rows that still look "enabled".
-              const cabinetExtras = readCabinetExtras(car.cabinetExtras);
-              if (!prefs.trusted) {
-                setExtraSelections((prev) => applyListingCabinetExtras(prev, filtered, cabinetExtras));
-              } else {
-              const existingPrices = filtered.map((service: ExtraServicePricing) => {
-                const fromCar = carExtras.find(
-                  (e: { extraServiceId: string; extraService?: { slug?: string } | null; priceEur?: number; forbidden?: boolean }) =>
-                    e.extraServiceId === service.id ||
-                    (Boolean(service.slug) && e.extraService?.slug === service.slug),
-                );
-                const pref = prefs.forService(service);
-                const prefApplies = Boolean(pref) &&
-                  partnerExtraPrefAppliesToCar(
-                    { carIds: pref?.carIds, enabled: pref?.enabled, forbidden: pref?.forbidden },
-                    carId,
-                  );
-                const cabinetForbidden = prefApplies && Boolean(pref?.forbidden);
-                const cabinetOff = prefApplies && !pref?.forbidden && pref?.enabled === false;
-                const cabinetPrice =
-                  prefApplies && pref && pref.priceEur != null && Number.isFinite(Number(pref.priceEur))
-                    ? Number(pref.priceEur)
-                    : null;
-                const forbidden = Boolean(cabinetForbidden || fromCar?.forbidden);
-                const price =
-                  forbidden || cabinetOff
-                    ? 0
-                    : cabinetPrice != null
-                      ? cabinetPrice
-                      : fromCar?.priceEur != null
-                        ? Number(fromCar.priceEur)
-                        : Number(service.defaultPriceEur ?? service.minPriceEur ?? 0);
-                return { extraServiceId: service.id, priceEur: price, forbidden };
-              });
-              setExtraSelections(
-                applyListingCabinetExtras(
-                buildExtraSelections(filtered, existingPrices).map((row) => {
-                  const service = filtered.find((s) => s.id === row.extraServiceId);
-                  const offer = service ? findCarExtraOffer(offers, service) : undefined;
-                  const pref = service ? prefs.forService(service) : undefined;
-                  const cabinetPrice =
-                    prefs.trusted && pref && pref.priceEur != null && Number.isFinite(Number(pref.priceEur))
-                      ? Number(pref.priceEur)
-                      : null;
-                  const mandatory = service ? isMandatoryExtra(service) : false;
-                  const prefApplies =
-                    Boolean(prefs.trusted && pref) &&
-                    partnerExtraPrefAppliesToCar(
-                      {
-                        carIds: pref?.carIds,
-                        enabled: pref?.enabled,
-                        forbidden: pref?.forbidden,
-                      },
-                      carId,
-                    );
-                  // Cabinet equipment page wins for price / off / forbid on this listing.
-                  const cabinetForbidden =
-                    !mandatory && prefApplies && Boolean(pref?.forbidden);
-                  const cabinetOff =
-                    !mandatory && prefApplies && !pref?.forbidden && pref?.enabled === false;
-                  const cabinetOn =
-                    !mandatory && prefApplies && !pref?.forbidden && pref?.enabled !== false;
-                  const forbidden = cabinetForbidden
-                    ? true
-                    : offer
-                      ? Boolean(offer.forbidden)
-                      : Boolean(pref?.forbidden || row.forbidden);
-                  const enabled = mandatory
-                    ? true
-                    : cabinetOff
-                      ? false
-                      : cabinetForbidden || cabinetOn
-                        ? true
-                        : offer
-                          ? !forbidden && offer.enabled !== false
-                          : Boolean(row.forbidden) || carExtraIds.has(row.extraServiceId);
-                  const fromCar = carExtras.find(
-                    (e: { extraServiceId: string; extraService?: { slug?: string } | null; priceEur?: number }) =>
-                      e.extraServiceId === row.extraServiceId ||
-                      (Boolean(service?.slug) && e.extraService?.slug === service?.slug),
-                  );
-                  const ownFull = service
-                    ? savedFullCoverPriceEur(service, offer?.priceEur, fromCar?.priceEur)
-                    : null;
-                  const eurPrice =
-                    forbidden || cabinetOff
-                      ? "0"
-                      : ownFull != null
-                        ? ownFull
-                        : cabinetPrice != null
-                          ? String(cabinetPrice)
-                          : offer && offer.priceEur != null && String(offer.priceEur) !== ""
-                            ? String(offer.priceEur)
-                            : row.priceEur;
-                  return {
-                    ...row,
-                    forbidden,
-                    enabled,
-                    priceEur:
-                      forbidden || cabinetOff || !eurPrice || eurPrice === "0"
-                        ? eurPrice || "0"
-                        : eurToPartnerAmount(eurPrice, nextCurrency, nextRates),
-                  };
-                }),
-                filtered,
-                cabinetExtras,
-                ),
-              );
-              }
-            }
+          const fromApi =
+            Array.isArray(prefsData?.items) && prefsData.items.length
+              ? (prefsData.items as CarFormExtraPref[])
+              : [];
+          const fromCar = cabinetRowsToPrefs(car.cabinetExtras);
+          const prefItems = fromApi.length
+            ? fromApi
+            : fromCar.length
+              ? fromCar
+              : initialExtraPrefsDataRef.current ?? [];
+          const catalogSource =
+            extrasRes?.ok && Array.isArray(extras) && extras.length
+              ? (extras as ExtraServicePricing[])
+              : extrasFallbackRef.current;
+          // Phone and desktop both paint the cabinet. A failed prefs request keeps the
+          // car payload, and a saved offer cannot add or flip a service.
+          if (!cancelled && prefItems.length && catalogSource.length) {
+            const listing = selectionsForCar(catalogSource, prefItems, carId);
+            setExtrasCatalog(listing.catalog);
+            setExtrasReady(true);
+            setExtraSelections(displayExtraPrices(listing.selections, nextCurrency, nextRates));
           }
 
           let deliveryList =

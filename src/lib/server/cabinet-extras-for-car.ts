@@ -1,42 +1,52 @@
 import "server-only";
 
-import { partnerExtraPrefAppliesToCar } from "@/lib/extras/partner-extra-pref";
+import { partnerCabinetDefaults } from "@/lib/extras/partner-service-choice";
+import type { ExtraServicePricing } from "@/lib/extras/pricing";
 import { listExtraServices } from "@/lib/server/extras-store";
+import { listPartnerCustomExtrasAsPricing } from "@/lib/server/partner-custom-extras-store";
 import { readPartnerExtraPrefs } from "@/lib/server/partner-extras-prefs-store";
 
 export type CarCabinetExtra = {
   extraServiceId: string;
   slug: string;
+  added: boolean;
   enabled: boolean;
   forbidden: boolean;
   priceEur: number;
+  carIds?: string[];
 };
 
-/** Cabinet rows that apply to this listing. Off and forbid are explicit. */
+/** Every cabinet row for this partner, in the same shape the equipment page saves. */
 export async function cabinetExtrasForCar(partnerId: string, carId: string): Promise<CarCabinetExtra[]> {
   const id = String(partnerId || "").trim();
   if (!id || !String(carId || "").trim()) return [];
-  const [prefs, catalog] = await Promise.all([
+  const [prefs, catalog, customs] = await Promise.all([
     readPartnerExtraPrefs(id),
     listExtraServices({ activeOnly: false }),
+    listPartnerCustomExtrasAsPricing(id, { activeOnly: false }).catch(() => [] as ExtraServicePricing[]),
   ]);
-  const slugById = new Map(catalog.map((service) => [service.id, String(service.slug || "")]));
-  return prefs
-    .filter((pref) =>
-      partnerExtraPrefAppliesToCar(
-        { carIds: pref.carIds, enabled: pref.enabled, forbidden: pref.forbidden },
-        carId,
-      ),
-    )
-    .map((pref) => {
-      const forbidden = Boolean(pref.forbidden);
-      const enabled = forbidden ? true : Boolean(pref.enabled);
-      return {
-        extraServiceId: pref.extraServiceId,
-        slug: slugById.get(pref.extraServiceId) || "",
-        enabled,
-        forbidden,
-        priceEur: forbidden || !enabled ? 0 : Number(pref.priceEur) || 0,
-      };
-    });
+  const byId = new Map(catalog.map((service) => [service.id, service]));
+  for (const custom of customs) {
+    if (!byId.has(custom.id)) byId.set(custom.id, custom);
+  }
+  return prefs.map((pref) => {
+    const service = byId.get(pref.extraServiceId);
+    const defaults = service
+      ? partnerCabinetDefaults(service, pref, false)
+      : {
+          added: pref.added !== false,
+          enabled: Boolean(pref.forbidden) || Boolean(pref.enabled),
+          forbidden: Boolean(pref.forbidden),
+          priceEur: Number(pref.priceEur) || 0,
+        };
+    return {
+      extraServiceId: pref.extraServiceId,
+      slug: String(service?.slug || ""),
+      added: defaults.added,
+      enabled: defaults.enabled,
+      forbidden: defaults.forbidden,
+      priceEur: defaults.forbidden ? 0 : defaults.priceEur,
+      ...(pref.carIds ? { carIds: pref.carIds } : {}),
+    };
+  });
 }

@@ -11,6 +11,7 @@ import { findCarExtraOffer, type CarExtraOffer } from "@/lib/cars/car-details";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
 import { isListingInsuranceService } from "@/lib/extras/checkout-slot";
 import { partnerStatusLocked } from "@/lib/extras/partner-service-choice";
+import { partnerExtraPrefAppliesToCar } from "@/lib/extras/partner-extra-pref";
 import { formatAmountNumber } from "@/lib/utils";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { knownText } from "@/lib/i18n/known-record-text";
@@ -151,8 +152,11 @@ export function selectionsFromCabinet(
 export type ListingCabinetExtra = {
   extraServiceId: string;
   slug?: string;
+  added?: boolean;
   enabled?: boolean;
   forbidden?: boolean;
+  priceEur?: number;
+  carIds?: string[];
 };
 
 /** Cabinet rows sent with the car. A missing list is not "everything off". */
@@ -164,19 +168,41 @@ export function readCabinetExtras(value: unknown): ListingCabinetExtra[] {
     const item = row as {
       extraServiceId?: unknown;
       slug?: unknown;
+      added?: unknown;
       enabled?: unknown;
       forbidden?: unknown;
+      priceEur?: unknown;
+      carIds?: unknown;
     };
     const extraServiceId = String(item.extraServiceId || "").trim();
     if (!extraServiceId) continue;
+    const price = Number(item.priceEur);
+    const carIds = Array.isArray(item.carIds)
+      ? item.carIds.map((id) => String(id || "").trim()).filter(Boolean)
+      : undefined;
     rows.push({
       extraServiceId,
       slug: String(item.slug || "").trim(),
+      ...(typeof item.added === "boolean" ? { added: item.added } : {}),
       enabled: item.enabled !== false,
       forbidden: Boolean(item.forbidden),
+      ...(Number.isFinite(price) ? { priceEur: price } : {}),
+      ...(carIds ? { carIds } : {}),
     });
   }
   return rows;
+}
+
+/** Same shape the car form already uses for `/api/partners/extras-prefs` items. */
+export function cabinetRowsToPrefs(value: unknown): CarFormExtraPref[] {
+  return readCabinetExtras(value).map((row) => ({
+    service: { id: row.extraServiceId, slug: row.slug },
+    ...(typeof row.added === "boolean" ? { added: row.added } : {}),
+    enabled: row.enabled,
+    forbidden: row.forbidden,
+    ...(row.priceEur != null ? { priceEur: row.priceEur } : {}),
+    ...(row.carIds ? { carIds: row.carIds } : {}),
+  }));
 }
 
 /**
@@ -239,6 +265,8 @@ export function extrasVisibleOnCarForm(
     fallback?: ExtraServicePricing[];
     carExtraIds?: Set<string>;
     offerIds?: Set<string>;
+    /** Empty cabinet that did load: mandatory services only, not the whole catalog. */
+    whenUntrusted?: "all" | "mandatory";
   },
 ): ExtraServicePricing[] {
   const prefs = indexExtraPrefs(opts.prefs);
@@ -251,10 +279,52 @@ export function extrasVisibleOnCarForm(
       if (pref) return Boolean(pref.enabled || pref.forbidden);
       return onCar(service);
     }
-    if (!prefs.trusted) return true;
+    if (!prefs.trusted) {
+      if (opts.whenUntrusted === "mandatory") return partnerStatusLocked(service);
+      return true;
+    }
     if (pref) return pref.added !== false;
     return onCar(service);
   });
+}
+
+/**
+ * One listing's extras, taken from the partner's cabinet.
+ * The same list, on/off and price on the partner's phone, desktop and the admin review.
+ * A saved offer on the car does not add services or flip a switch.
+ */
+export function selectionsForCar(
+  catalog: ExtraServicePricing[],
+  prefItems: CarFormExtraPref[],
+  carId: string,
+  opts?: { whenUntrusted?: "all" | "mandatory" },
+): { catalog: ExtraServicePricing[]; selections: PartnerExtraSelection[] } {
+  const visible = extrasVisibleOnCarForm(catalog, {
+    prefs: prefItems,
+    whenUntrusted: opts?.whenUntrusted,
+  });
+  const prefs = indexExtraPrefs(prefItems);
+  const selections = selectionsFromCabinet(visible, prefItems).map((row) => {
+    const service = visible.find((item) => item.id === row.extraServiceId);
+    if (!service || isMandatoryExtra(service)) return row;
+    const pref = prefs.forService(service);
+    if (!pref) return { ...row, enabled: false, forbidden: false, priceEur: "0" };
+    const applies = partnerExtraPrefAppliesToCar(
+      { carIds: pref.carIds, enabled: pref.enabled, forbidden: pref.forbidden },
+      carId,
+    );
+    if (!applies) return { ...row, enabled: false, forbidden: false, priceEur: "0" };
+    if (pref.forbidden) return { ...row, enabled: true, forbidden: true, priceEur: "0" };
+    if (pref.enabled === false) return { ...row, enabled: false, forbidden: false, priceEur: "0" };
+    const price = Number(pref.priceEur);
+    return {
+      ...row,
+      enabled: true,
+      forbidden: false,
+      priceEur: Number.isFinite(price) ? String(price) : row.priceEur,
+    };
+  });
+  return { catalog: visible, selections };
 }
 
 export function PartnerExtrasFields({
