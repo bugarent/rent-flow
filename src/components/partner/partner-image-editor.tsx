@@ -7,12 +7,21 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import { Eraser, Move, RotateCcw, RotateCw, X } from "lucide-react";
+import { RotateCcw, RotateCw, X } from "lucide-react";
 import { compressImageForUpload } from "@/lib/files/compress-image";
 import { cn } from "@/lib/utils";
 
 type AspectId = "free" | "4:3" | "1:1" | "3:4" | "16:9";
-type ToolId = "move" | "erase";
+type Handle =
+  | "left"
+  | "right"
+  | "top"
+  | "bottom"
+  | "top-left"
+  | "top-right"
+  | "bottom-left"
+  | "bottom-right"
+  | "pan";
 
 const ASPECT_VALUES: Record<AspectId, number | null> = {
   free: null,
@@ -22,25 +31,20 @@ const ASPECT_VALUES: Record<AspectId, number | null> = {
   "16:9": 16 / 9,
 };
 
-const MAX_INSET = 0.4;
+const MIN_CROP = 0.18;
+const MAX_INSET = 1 - MIN_CROP;
+
+type Insets = { left: number; right: number; top: number; bottom: number };
 
 function copyFor(locale: string) {
   if (locale === "ka") {
     return {
       title: "სურათის კორექტირება",
-      hint: "მოჭერით გვერდები, დახარეთ, წაშალეთ ზედმეტი დეტალები და შეინახეთ ჩარჩო.",
+      hint: "გადაათრიეთ ჩარჩოს კიდეები ან კუთხეები — როგორც ტელეფონზე მოჭრისას. შიგნით გადათრევა სურათს გადაადგილებს.",
       aspect: "ფორმა",
       free: "თავისუფალი",
       zoom: "მასშტაბი",
       tilt: "დახრა",
-      sides: "გვერდების მოჭრა",
-      left: "მარცხენა",
-      right: "მარჯვენა",
-      top: "ზედა",
-      bottom: "ქვედა",
-      toolMove: "გადაადგილება",
-      toolErase: "წაშლა",
-      brush: "ფუნჯი",
       rotateLeft: "90° მარცხნივ",
       rotateRight: "90° მარჯვნივ",
       cancel: "გაუქმება",
@@ -53,19 +57,11 @@ function copyFor(locale: string) {
   if (locale === "ru") {
     return {
       title: "Правка изображения",
-      hint: "Обрежьте края, наклоните, сотрите лишнее и сохраните кадр.",
+      hint: "Тяните края или углы рамки — как обрезка на телефоне. Перетаскивание внутри сдвигает фото.",
       aspect: "Формат",
       free: "Свободно",
       zoom: "Масштаб",
       tilt: "Наклон",
-      sides: "Обрезка сторон",
-      left: "Слева",
-      right: "Справа",
-      top: "Сверху",
-      bottom: "Снизу",
-      toolMove: "Сдвиг",
-      toolErase: "Ластик",
-      brush: "Кисть",
       rotateLeft: "90° влево",
       rotateRight: "90° вправо",
       cancel: "Отмена",
@@ -77,19 +73,11 @@ function copyFor(locale: string) {
   }
   return {
     title: "Edit image",
-    hint: "Trim sides, tilt, erase unwanted details, then save the frame.",
+    hint: "Drag the frame edges or corners — like phone crop. Drag inside to move the photo.",
     aspect: "Shape",
     free: "Free",
     zoom: "Zoom",
     tilt: "Tilt",
-    sides: "Side trim",
-    left: "Left",
-    right: "Right",
-    top: "Top",
-    bottom: "Bottom",
-    toolMove: "Move",
-    toolErase: "Erase",
-    brush: "Brush",
     rotateLeft: "90° left",
     rotateRight: "90° right",
     cancel: "Cancel",
@@ -144,54 +132,6 @@ async function rotateCanvas90(src: string, degrees: 90 | -90): Promise<string> {
   return canvasToObjectUrl(canvas);
 }
 
-/** Soft heal brush: fill the stroke with averaged nearby pixels so spots fade. */
-function healBrush(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  radius: number,
-  imgW: number,
-  imgH: number,
-) {
-  const r = Math.max(4, Math.round(radius));
-  const sampleR = Math.round(r * 2.2);
-  let sumR = 0;
-  let sumG = 0;
-  let sumB = 0;
-  let count = 0;
-  const sx0 = Math.max(0, Math.floor(x - sampleR));
-  const sy0 = Math.max(0, Math.floor(y - sampleR));
-  const sx1 = Math.min(imgW, Math.ceil(x + sampleR));
-  const sy1 = Math.min(imgH, Math.ceil(y + sampleR));
-  if (sx1 <= sx0 || sy1 <= sy0) return;
-  const sample = ctx.getImageData(sx0, sy0, sx1 - sx0, sy1 - sy0);
-  const data = sample.data;
-  for (let py = sy0; py < sy1; py++) {
-    for (let px = sx0; px < sx1; px++) {
-      const dx = px - x;
-      const dy = py - y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < r * 1.15 || dist > sampleR) continue;
-      const i = ((py - sy0) * (sx1 - sx0) + (px - sx0)) * 4;
-      sumR += data[i]!;
-      sumG += data[i + 1]!;
-      sumB += data[i + 2]!;
-      count += 1;
-    }
-  }
-  if (!count) return;
-  const fill = `rgb(${Math.round(sumR / count)},${Math.round(sumG / count)},${Math.round(sumB / count)})`;
-  const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
-  grad.addColorStop(0, fill);
-  grad.addColorStop(0.65, fill);
-  grad.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.globalCompositeOperation = "source-over";
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fill();
-}
-
 async function uploadEdited(file: File, asDocument: boolean): Promise<string> {
   const payload = asDocument
     ? await compressImageForUpload(file, { maxEdge: 2200, targetBytes: 1_100_000 })
@@ -205,9 +145,67 @@ async function uploadEdited(file: File, asDocument: boolean): Promise<string> {
   return String(data.url);
 }
 
-type Insets = { left: number; right: number; top: number; bottom: number };
+function clampInsets(next: Insets): Insets {
+  const out = { ...next };
+  out.left = Math.min(MAX_INSET, Math.max(0, out.left));
+  out.right = Math.min(MAX_INSET, Math.max(0, out.right));
+  out.top = Math.min(MAX_INSET, Math.max(0, out.top));
+  out.bottom = Math.min(MAX_INSET, Math.max(0, out.bottom));
+  if (out.left + out.right > 1 - MIN_CROP) {
+    const overflow = out.left + out.right - (1 - MIN_CROP);
+    if (out.left >= out.right) out.left = Math.max(0, out.left - overflow);
+    else out.right = Math.max(0, out.right - overflow);
+  }
+  if (out.top + out.bottom > 1 - MIN_CROP) {
+    const overflow = out.top + out.bottom - (1 - MIN_CROP);
+    if (out.top >= out.bottom) out.top = Math.max(0, out.top - overflow);
+    else out.bottom = Math.max(0, out.bottom - overflow);
+  }
+  return out;
+}
 
-/** Crop / tilt / side-trim / erase an existing listing or passport image. */
+function applyAspectToInsets(
+  insets: Insets,
+  viewportAspect: number,
+  targetAspect: number | null,
+  prefer: "width" | "height" = "width",
+): Insets {
+  if (!targetAspect || !viewportAspect) return clampInsets(insets);
+  let next = { ...insets };
+  const availW = 1 - next.left - next.right;
+  const availH = 1 - next.top - next.bottom;
+  const boxAspect = (availW * viewportAspect) / availH;
+  if (Math.abs(boxAspect - targetAspect) < 0.01) return clampInsets(next);
+
+  if (prefer === "width" || boxAspect > targetAspect) {
+    const needH = (availW * viewportAspect) / targetAspect;
+    const diff = availH - needH;
+    if (diff > 0) {
+      next.top += diff / 2;
+      next.bottom += diff / 2;
+    } else {
+      const needW = (availH * targetAspect) / viewportAspect;
+      const d = availW - needW;
+      next.left += d / 2;
+      next.right += d / 2;
+    }
+  } else {
+    const needW = (availH * targetAspect) / viewportAspect;
+    const diff = availW - needW;
+    if (diff > 0) {
+      next.left += diff / 2;
+      next.right += diff / 2;
+    } else {
+      const needH = (availW * viewportAspect) / targetAspect;
+      const d = availH - needH;
+      next.top += d / 2;
+      next.bottom += d / 2;
+    }
+  }
+  return clampInsets(next);
+}
+
+/** Crop / tilt an existing listing or passport image with Android-style edge handles. */
 export function PartnerImageEditor({
   src,
   open,
@@ -225,8 +223,6 @@ export function PartnerImageEditor({
 }) {
   const copy = copyFor(locale);
   const viewportRef = useRef<HTMLDivElement>(null);
-  const paintCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const viewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [workSrc, setWorkSrc] = useState<string | null>(null);
   const [revokeWork, setRevokeWork] = useState(false);
   const [natural, setNatural] = useState({ w: 0, h: 0 });
@@ -234,33 +230,21 @@ export function PartnerImageEditor({
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [tilt, setTilt] = useState(0);
-  const [insets, setInsets] = useState<Insets>({ left: 0, right: 0, top: 0, bottom: 0 });
-  const [aspectId, setAspectId] = useState<AspectId>(asDocument ? "3:4" : "4:3");
-  const [tool, setTool] = useState<ToolId>("move");
-  const [brush, setBrush] = useState(28);
-  const [dragging, setDragging] = useState(false);
+  const [insets, setInsets] = useState<Insets>({ left: 0.05, right: 0.05, top: 0.05, bottom: 0.05 });
+  const [aspectId, setAspectId] = useState<AspectId>("free");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [usingPaint, setUsingPaint] = useState(false);
-  const dragStart = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
-  const lastErase = useRef<{ x: number; y: number } | null>(null);
+  const [activeHandle, setActiveHandle] = useState<Handle | null>(null);
+  const dragStart = useRef({
+    x: 0,
+    y: 0,
+    ox: 0,
+    oy: 0,
+    insets: { left: 0, right: 0, top: 0, bottom: 0 },
+  });
   const revokeWorkRef = useRef(false);
   revokeWorkRef.current = revokeWork;
-
-  const syncViewCanvas = () => {
-    const paint = paintCanvasRef.current;
-    const view = viewCanvasRef.current;
-    if (!paint || !view) return;
-    if (view.width !== paint.width || view.height !== paint.height) {
-      view.width = paint.width;
-      view.height = paint.height;
-    }
-    const ctx = view.getContext("2d");
-    if (!ctx) return;
-    ctx.clearRect(0, 0, view.width, view.height);
-    ctx.drawImage(paint, 0, 0);
-  };
 
   useEffect(() => {
     setMounted(true);
@@ -273,13 +257,10 @@ export function PartnerImageEditor({
     setZoom(1);
     setOffset({ x: 0, y: 0 });
     setTilt(0);
-    setInsets({ left: 0, right: 0, top: 0, bottom: 0 });
+    setInsets({ left: 0.05, right: 0.05, top: 0.05, bottom: 0.05 });
     setNatural({ w: 0, h: 0 });
-    setAspectId(asDocument ? "3:4" : "4:3");
-    setTool("move");
-    setUsingPaint(false);
-    paintCanvasRef.current = null;
-    lastErase.current = null;
+    setAspectId("free");
+    setActiveHandle(null);
     void blobUrlFromRemote(src).then((loaded) => {
       if (cancelled) {
         if (loaded.revoke) URL.revokeObjectURL(loaded.url);
@@ -314,34 +295,13 @@ export function PartnerImageEditor({
       window.cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [open, aspectId, workSrc, insets.left, insets.right, insets.top, insets.bottom]);
-
-  const ensurePaintCanvas = async () => {
-    if (paintCanvasRef.current) {
-      syncViewCanvas();
-      setUsingPaint(true);
-      return paintCanvasRef.current;
-    }
-    if (!workSrc) throw new Error(copy.loadFailed);
-    const img = await loadImage(workSrc);
-    const canvas = globalThis.document.createElement("canvas");
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) throw new Error(copy.failed);
-    ctx.drawImage(img, 0, 0);
-    paintCanvasRef.current = canvas;
-    setNatural({ w: canvas.width, h: canvas.height });
-    setUsingPaint(true);
-    requestAnimationFrame(syncViewCanvas);
-    return canvas;
-  };
+  }, [open, workSrc]);
 
   if (!open || !mounted) return null;
 
-  const aspect =
-    ASPECT_VALUES[aspectId] ??
-    (natural.w && natural.h ? natural.w / natural.h : asDocument ? 3 / 4 : 4 / 3);
+  const viewportAspect =
+    viewportSize.w && viewportSize.h ? viewportSize.w / viewportSize.h : asDocument ? 3 / 4 : 4 / 3;
+  const lockedAspect = ASPECT_VALUES[aspectId];
 
   const coverScale =
     natural.w && viewportSize.w
@@ -350,80 +310,104 @@ export function PartnerImageEditor({
   const drawW = natural.w * coverScale * zoom;
   const drawH = natural.h * coverScale * zoom;
 
-  const mapPointerToImage = (clientX: number, clientY: number) => {
-    const vp = viewportRef.current;
-    if (!vp || !natural.w) return null;
-    const rect = vp.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    let dx = clientX - cx - offset.x;
-    let dy = clientY - cy - offset.y;
-    const rad = (-tilt * Math.PI) / 180;
-    const rx = dx * Math.cos(rad) - dy * Math.sin(rad);
-    const ry = dx * Math.sin(rad) + dy * Math.cos(rad);
-    const x = rx / (coverScale * zoom) + natural.w / 2;
-    const y = ry / (coverScale * zoom) + natural.h / 2;
-    return { x, y };
+  const startHandle = (handle: Handle, e: ReactPointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setActiveHandle(handle);
+    dragStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      ox: offset.x,
+      oy: offset.y,
+      insets: { ...insets },
+    };
   };
 
-  const eraseAt = async (clientX: number, clientY: number, continuous: boolean) => {
+  const onHandleMove = (e: ReactPointerEvent) => {
+    if (!activeHandle || !viewportSize.w || !viewportSize.h) return;
+    const dx = (e.clientX - dragStart.current.x) / viewportSize.w;
+    const dy = (e.clientY - dragStart.current.y) / viewportSize.h;
+    const base = dragStart.current.insets;
+
+    if (activeHandle === "pan") {
+      setOffset({
+        x: dragStart.current.ox + (e.clientX - dragStart.current.x),
+        y: dragStart.current.oy + (e.clientY - dragStart.current.y),
+      });
+      return;
+    }
+
+    let next: Insets = { ...base };
+    const moveLeft = () => {
+      next.left = base.left + dx;
+    };
+    const moveRight = () => {
+      next.right = base.right - dx;
+    };
+    const moveTop = () => {
+      next.top = base.top + dy;
+    };
+    const moveBottom = () => {
+      next.bottom = base.bottom - dy;
+    };
+
+    if (activeHandle === "left" || activeHandle === "top-left" || activeHandle === "bottom-left") {
+      moveLeft();
+    }
+    if (activeHandle === "right" || activeHandle === "top-right" || activeHandle === "bottom-right") {
+      moveRight();
+    }
+    if (activeHandle === "top" || activeHandle === "top-left" || activeHandle === "top-right") {
+      moveTop();
+    }
+    if (
+      activeHandle === "bottom" ||
+      activeHandle === "bottom-left" ||
+      activeHandle === "bottom-right"
+    ) {
+      moveBottom();
+    }
+
+    next = clampInsets(next);
+
+    if (lockedAspect) {
+      // Keep aspect: when dragging a side, adjust the opposite pair centered.
+      const prefer =
+        activeHandle === "left" ||
+        activeHandle === "right" ||
+        activeHandle.includes("left") ||
+        activeHandle.includes("right")
+          ? "width"
+          : "height";
+      if (prefer === "width") {
+        const availW = 1 - next.left - next.right;
+        const needH = (availW * viewportAspect) / lockedAspect;
+        const curH = 1 - base.top - base.bottom;
+        const diff = curH - needH;
+        next.top = base.top + diff / 2;
+        next.bottom = base.bottom + diff / 2;
+      } else {
+        const availH = 1 - next.top - next.bottom;
+        const needW = (availH * lockedAspect) / viewportAspect;
+        const curW = 1 - base.left - base.right;
+        const diff = curW - needW;
+        next.left = base.left + diff / 2;
+        next.right = base.right + diff / 2;
+      }
+      next = clampInsets(next);
+    }
+
+    setInsets(next);
+  };
+
+  const endHandle = (e: ReactPointerEvent) => {
     try {
-      const canvas = await ensurePaintCanvas();
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      if (!ctx) return;
-      const pt = mapPointerToImage(clientX, clientY);
-      if (!pt) return;
-      const radius = brush / (coverScale * zoom);
-      const points: Array<{ x: number; y: number }> = [pt];
-      if (continuous && lastErase.current) {
-        const prev = lastErase.current;
-        const dist = Math.hypot(pt.x - prev.x, pt.y - prev.y);
-        const steps = Math.max(1, Math.floor(dist / Math.max(2, radius * 0.35)));
-        for (let i = 1; i < steps; i++) {
-          const t = i / steps;
-          points.push({
-            x: prev.x + (pt.x - prev.x) * t,
-            y: prev.y + (pt.y - prev.y) * t,
-          });
-        }
-      }
-      for (const p of points) {
-        if (p.x < -radius || p.y < -radius || p.x > canvas.width + radius || p.y > canvas.height + radius) {
-          continue;
-        }
-        healBrush(ctx, p.x, p.y, radius, canvas.width, canvas.height);
-      }
-      lastErase.current = pt;
-      syncViewCanvas();
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     } catch {
-      setError(copy.failed);
+      /* already released */
     }
-  };
-
-  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setDragging(true);
-    if (tool === "erase") {
-      lastErase.current = null;
-      void eraseAt(e.clientX, e.clientY, false);
-      return;
-    }
-    dragStart.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y };
-  };
-  const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!dragging) return;
-    if (tool === "erase") {
-      void eraseAt(e.clientX, e.clientY, true);
-      return;
-    }
-    setOffset({
-      x: dragStart.current.ox + (e.clientX - dragStart.current.x),
-      y: dragStart.current.oy + (e.clientY - dragStart.current.y),
-    });
-  };
-  const onPointerUp = () => {
-    setDragging(false);
-    lastErase.current = null;
+    setActiveHandle(null);
   };
 
   const applyRotate90 = async (degrees: 90 | -90) => {
@@ -431,21 +415,16 @@ export function PartnerImageEditor({
     setBusy(true);
     setError(null);
     try {
-      const sourceUrl = paintCanvasRef.current
-        ? await canvasToObjectUrl(paintCanvasRef.current, 0.95)
-        : workSrc;
-      const next = await rotateCanvas90(sourceUrl, degrees);
-      if (sourceUrl !== workSrc) URL.revokeObjectURL(sourceUrl);
+      const next = await rotateCanvas90(workSrc, degrees);
       setWorkSrc((prev) => {
         if (prev && revokeWorkRef.current) URL.revokeObjectURL(prev);
         return next;
       });
       setRevokeWork(true);
-      paintCanvasRef.current = null;
-      setUsingPaint(false);
       setOffset({ x: 0, y: 0 });
       setZoom(1);
       setTilt(0);
+      setInsets({ left: 0.05, right: 0.05, top: 0.05, bottom: 0.05 });
       setNatural({ w: 0, h: 0 });
     } catch {
       setError(copy.loadFailed);
@@ -454,19 +433,11 @@ export function PartnerImageEditor({
     }
   };
 
-  const setInset = (key: keyof Insets, value: number) => {
-    setInsets((prev) => {
-      const next = { ...prev, [key]: Math.min(MAX_INSET, Math.max(0, value)) };
-      const pair =
-        key === "left" || key === "right"
-          ? next.left + next.right
-          : next.top + next.bottom;
-      if (pair > 0.75) {
-        const other = key === "left" ? "right" : key === "right" ? "left" : key === "top" ? "bottom" : "top";
-        next[other] = Math.max(0, 0.75 - next[key]);
-      }
-      return next;
-    });
+  const setAspect = (id: AspectId) => {
+    setAspectId(id);
+    const target = ASPECT_VALUES[id];
+    if (!target) return;
+    setInsets((prev) => applyAspectToInsets(prev, viewportAspect, target));
   };
 
   const exportAndSave = async () => {
@@ -479,10 +450,7 @@ export function PartnerImageEditor({
     setBusy(true);
     setError(null);
     try {
-      await ensurePaintCanvas();
-      const source = paintCanvasRef.current;
-      if (!source) throw new Error(copy.failed);
-
+      const img = await loadImage(workSrc);
       const cropX = vw * insets.left;
       const cropY = vh * insets.top;
       const cropW = Math.max(8, vw * (1 - insets.left - insets.right));
@@ -496,7 +464,6 @@ export function PartnerImageEditor({
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error(copy.failed);
 
-      // Render the full viewport, then crop the inset window.
       const full = globalThis.document.createElement("canvas");
       full.width = Math.max(1, Math.round(vw));
       full.height = Math.max(1, Math.round(vh));
@@ -507,7 +474,7 @@ export function PartnerImageEditor({
       fctx.save();
       fctx.translate(full.width / 2 + offset.x, full.height / 2 + offset.y);
       fctx.rotate((tilt * Math.PI) / 180);
-      fctx.drawImage(source, -drawW / 2, -drawH / 2, drawW, drawH);
+      fctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
       fctx.restore();
 
       ctx.drawImage(full, cropX, cropY, cropW, cropH, 0, 0, outW, outH);
@@ -524,6 +491,13 @@ export function PartnerImageEditor({
     } finally {
       setBusy(false);
     }
+  };
+
+  const frameStyle = {
+    left: `${insets.left * 100}%`,
+    right: `${insets.right * 100}%`,
+    top: `${insets.top * 100}%`,
+    bottom: `${insets.bottom * 100}%`,
   };
 
   return createPortal(
@@ -553,66 +527,11 @@ export function PartnerImageEditor({
         </div>
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3 sm:px-4">
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              onClick={() => setTool("move")}
-              className={cn(
-                "inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3 text-xs font-bold",
-                tool === "move"
-                  ? "border-sky-600 bg-sky-50 text-sky-800"
-                  : "border-slate-200 text-slate-700 hover:bg-slate-50",
-              )}
-            >
-              <Move className="h-3.5 w-3.5" />
-              {copy.toolMove}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setTool("erase");
-                void ensurePaintCanvas().catch(() => setError(copy.loadFailed));
-              }}
-              className={cn(
-                "inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3 text-xs font-bold",
-                tool === "erase"
-                  ? "border-amber-500 bg-amber-50 text-amber-900"
-                  : "border-slate-200 text-slate-700 hover:bg-slate-50",
-              )}
-            >
-              <Eraser className="h-3.5 w-3.5" />
-              {copy.toolErase}
-            </button>
-          </div>
-
           <div
             ref={viewportRef}
-            className={cn(
-              "relative mx-auto w-full max-w-md overflow-hidden rounded-xl bg-slate-900 touch-none",
-              tool === "erase" ? "cursor-crosshair" : dragging ? "cursor-grabbing" : "cursor-grab",
-            )}
-            style={{ aspectRatio: String(aspect) }}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
+            className="relative mx-auto aspect-[4/3] w-full max-w-md overflow-hidden rounded-xl bg-slate-900 touch-none"
           >
-            {usingPaint ? (
-              <canvas
-                ref={(el) => {
-                  viewCanvasRef.current = el;
-                  if (el) syncViewCanvas();
-                }}
-                className="pointer-events-none absolute select-none"
-                style={{
-                  width: drawW || "100%",
-                  height: drawH || "auto",
-                  left: "50%",
-                  top: "50%",
-                  transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px)) rotate(${tilt}deg)`,
-                }}
-              />
-            ) : workSrc ? (
+            {workSrc ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={workSrc}
@@ -634,33 +553,144 @@ export function PartnerImageEditor({
                 }}
               />
             ) : null}
-            <div className="pointer-events-none absolute inset-0 ring-2 ring-inset ring-white/75" />
-            {/* Side-trim guides */}
+
+            {/* Dim outside crop */}
             <div
-              className="pointer-events-none absolute inset-y-0 left-0 bg-slate-950/55"
+              className="pointer-events-none absolute inset-y-0 left-0 bg-black/55"
               style={{ width: `${insets.left * 100}%` }}
             />
             <div
-              className="pointer-events-none absolute inset-y-0 right-0 bg-slate-950/55"
+              className="pointer-events-none absolute inset-y-0 right-0 bg-black/55"
               style={{ width: `${insets.right * 100}%` }}
             />
             <div
-              className="pointer-events-none absolute inset-x-0 top-0 bg-slate-950/55"
-              style={{ height: `${insets.top * 100}%` }}
-            />
-            <div
-              className="pointer-events-none absolute inset-x-0 bottom-0 bg-slate-950/55"
-              style={{ height: `${insets.bottom * 100}%` }}
-            />
-            <div
-              className="pointer-events-none absolute border-2 border-sky-300/90"
+              className="pointer-events-none absolute bg-black/55"
               style={{
                 left: `${insets.left * 100}%`,
                 right: `${insets.right * 100}%`,
-                top: `${insets.top * 100}%`,
-                bottom: `${insets.bottom * 100}%`,
+                top: 0,
+                height: `${insets.top * 100}%`,
               }}
             />
+            <div
+              className="pointer-events-none absolute bg-black/55"
+              style={{
+                left: `${insets.left * 100}%`,
+                right: `${insets.right * 100}%`,
+                bottom: 0,
+                height: `${insets.bottom * 100}%`,
+              }}
+            />
+
+            {/* Crop frame + pan area */}
+            <div
+              className={cn(
+                "absolute border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.25)]",
+                activeHandle === "pan" ? "cursor-grabbing" : "cursor-grab",
+              )}
+              style={frameStyle}
+              onPointerDown={(e) => startHandle("pan", e)}
+              onPointerMove={onHandleMove}
+              onPointerUp={endHandle}
+              onPointerCancel={endHandle}
+            >
+              {/* Rule-of-thirds lines like Android */}
+              <div className="pointer-events-none absolute inset-y-0 left-1/3 w-px bg-white/35" />
+              <div className="pointer-events-none absolute inset-y-0 left-2/3 w-px bg-white/35" />
+              <div className="pointer-events-none absolute inset-x-0 top-1/3 h-px bg-white/35" />
+              <div className="pointer-events-none absolute inset-x-0 top-2/3 h-px bg-white/35" />
+            </div>
+
+            {/* Edge + corner handles (Android-style) */}
+            <div
+              role="presentation"
+              className="absolute z-20 w-10 -translate-x-1/2 cursor-ew-resize touch-none"
+              style={{ left: `${insets.left * 100}%`, top: `${insets.top * 100}%`, bottom: `${insets.bottom * 100}%` }}
+              onPointerDown={(e) => startHandle("left", e)}
+              onPointerMove={onHandleMove}
+              onPointerUp={endHandle}
+              onPointerCancel={endHandle}
+            >
+              <span className="absolute left-1/2 top-1/2 h-12 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow" />
+            </div>
+            <div
+              role="presentation"
+              className="absolute z-20 w-10 translate-x-1/2 cursor-ew-resize touch-none"
+              style={{ right: `${insets.right * 100}%`, top: `${insets.top * 100}%`, bottom: `${insets.bottom * 100}%` }}
+              onPointerDown={(e) => startHandle("right", e)}
+              onPointerMove={onHandleMove}
+              onPointerUp={endHandle}
+              onPointerCancel={endHandle}
+            >
+              <span className="absolute left-1/2 top-1/2 h-12 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow" />
+            </div>
+            <div
+              role="presentation"
+              className="absolute z-20 h-10 -translate-y-1/2 cursor-ns-resize touch-none"
+              style={{ top: `${insets.top * 100}%`, left: `${insets.left * 100}%`, right: `${insets.right * 100}%` }}
+              onPointerDown={(e) => startHandle("top", e)}
+              onPointerMove={onHandleMove}
+              onPointerUp={endHandle}
+              onPointerCancel={endHandle}
+            >
+              <span className="absolute left-1/2 top-1/2 h-1.5 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow" />
+            </div>
+            <div
+              role="presentation"
+              className="absolute z-20 h-10 translate-y-1/2 cursor-ns-resize touch-none"
+              style={{ bottom: `${insets.bottom * 100}%`, left: `${insets.left * 100}%`, right: `${insets.right * 100}%` }}
+              onPointerDown={(e) => startHandle("bottom", e)}
+              onPointerMove={onHandleMove}
+              onPointerUp={endHandle}
+              onPointerCancel={endHandle}
+            >
+              <span className="absolute left-1/2 top-1/2 h-1.5 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow" />
+            </div>
+
+            <div
+              role="presentation"
+              className="absolute z-30 h-11 w-11 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize touch-none sm:h-10 sm:w-10"
+              style={{ left: `${insets.left * 100}%`, top: `${insets.top * 100}%` }}
+              onPointerDown={(e) => startHandle("top-left", e)}
+              onPointerMove={onHandleMove}
+              onPointerUp={endHandle}
+              onPointerCancel={endHandle}
+            >
+              <span className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 border-white bg-sky-500 shadow" />
+            </div>
+            <div
+              role="presentation"
+              className="absolute z-30 h-11 w-11 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize touch-none sm:h-10 sm:w-10"
+              style={{ right: `${insets.right * 100}%`, top: `${insets.top * 100}%` }}
+              onPointerDown={(e) => startHandle("top-right", e)}
+              onPointerMove={onHandleMove}
+              onPointerUp={endHandle}
+              onPointerCancel={endHandle}
+            >
+              <span className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 border-white bg-sky-500 shadow" />
+            </div>
+            <div
+              role="presentation"
+              className="absolute z-30 h-11 w-11 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize touch-none sm:h-10 sm:w-10"
+              style={{ left: `${insets.left * 100}%`, bottom: `${insets.bottom * 100}%` }}
+              onPointerDown={(e) => startHandle("bottom-left", e)}
+              onPointerMove={onHandleMove}
+              onPointerUp={endHandle}
+              onPointerCancel={endHandle}
+            >
+              <span className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 border-white bg-sky-500 shadow" />
+            </div>
+            <div
+              role="presentation"
+              className="absolute z-30 h-11 w-11 translate-x-1/2 translate-y-1/2 cursor-nwse-resize touch-none sm:h-10 sm:w-10"
+              style={{ right: `${insets.right * 100}%`, bottom: `${insets.bottom * 100}%` }}
+              onPointerDown={(e) => startHandle("bottom-right", e)}
+              onPointerMove={onHandleMove}
+              onPointerUp={endHandle}
+              onPointerCancel={endHandle}
+            >
+              <span className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 border-white bg-sky-500 shadow" />
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
@@ -669,11 +699,7 @@ export function PartnerImageEditor({
               <button
                 key={id}
                 type="button"
-                onClick={() => {
-                  setAspectId(id);
-                  setOffset({ x: 0, y: 0 });
-                  setZoom(1);
-                }}
+                onClick={() => setAspect(id)}
                 className={cn(
                   "min-h-9 rounded-full border px-2.5 text-xs font-bold",
                   aspectId === id
@@ -683,32 +709,6 @@ export function PartnerImageEditor({
               >
                 {id === "free" ? copy.free : id}
               </button>
-            ))}
-          </div>
-
-          <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
-            <p className="text-xs font-extrabold text-slate-700">{copy.sides}</p>
-            {(
-              [
-                ["left", copy.left],
-                ["right", copy.right],
-                ["top", copy.top],
-                ["bottom", copy.bottom],
-              ] as const
-            ).map(([key, label]) => (
-              <label key={key} className="grid grid-cols-[4.5rem_1fr_2.25rem] items-center gap-2 text-xs font-semibold text-slate-700">
-                <span>{label}</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={MAX_INSET}
-                  step={0.01}
-                  value={insets[key]}
-                  onChange={(e) => setInset(key, Number(e.target.value))}
-                  className="w-full"
-                />
-                <span className="tabular-nums text-slate-500">{Math.round(insets[key] * 100)}%</span>
-              </label>
             ))}
           </div>
 
@@ -763,21 +763,6 @@ export function PartnerImageEditor({
               className="mt-1 w-full"
             />
           </label>
-
-          {tool === "erase" ? (
-            <label className="block text-xs font-bold text-slate-700">
-              {copy.brush}
-              <input
-                type="range"
-                min={12}
-                max={72}
-                step={1}
-                value={brush}
-                onChange={(e) => setBrush(Number(e.target.value))}
-                className="mt-1 w-full"
-              />
-            </label>
-          ) : null}
 
           {error ? <p className="text-xs font-semibold text-red-600">{error}</p> : null}
         </div>
