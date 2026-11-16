@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { uiText } from "@/lib/i18n/ui-text";
 import { displayImageUrl } from "@/lib/media/display-image";
@@ -41,6 +42,158 @@ function matchesPartnerNumber(car: AdminCarRow, q: string) {
 /** Shared columns: photo | plate | partner PRT | details | action */
 const COL =
   "grid grid-cols-[4.5rem_7rem_8.5rem_minmax(0,1fr)_auto] items-center gap-x-3";
+
+function partnerNumberValue(code: string) {
+  const n = Number(code.replace(/\D/g, ""));
+  return Number.isFinite(n) && n > 0 ? n : Number.MAX_SAFE_INTEGER;
+}
+
+/** Pending listings for this page only, one collapsible block per partner number. */
+function groupByPartner(cars: AdminCarRow[]) {
+  const groups = new Map<
+    string,
+    { key: string; code: string; name: string; cars: AdminCarRow[] }
+  >();
+  for (const car of cars) {
+    const key = car.partnerId || car.partnerCode || car.id;
+    const group = groups.get(key);
+    if (group) {
+      group.cars.push(car);
+      continue;
+    }
+    groups.set(key, {
+      key,
+      code: car.partnerCode || "—",
+      name: car.partnerName,
+      cars: [car],
+    });
+  }
+  return [...groups.values()].sort((a, b) => {
+    const byNumber = partnerNumberValue(a.code) - partnerNumberValue(b.code);
+    if (byNumber !== 0) return byNumber;
+    return a.code.localeCompare(b.code);
+  });
+}
+
+function CarListingCard({
+  car,
+  plateLabel,
+  partnerNumberLabel,
+  partnerLabel,
+  perDay,
+  inSearch,
+  notInSearch,
+  blockerLabel,
+  detailsLabel,
+  deleteLabel,
+  deleting,
+  onDelete,
+}: {
+  car: AdminCarRow;
+  plateLabel: string;
+  partnerNumberLabel: string;
+  partnerLabel: string;
+  perDay: string;
+  inSearch: string;
+  notInSearch: string;
+  blockerLabel: (code: AdminCarRow["searchBlockers"][number]) => string;
+  detailsLabel: string;
+  deleteLabel: string;
+  deleting: boolean;
+  onDelete: (car: AdminCarRow) => void;
+}) {
+  return (
+    <article
+      className={`${COL} rounded-lg border border-slate-200 bg-white px-3 py-1.5 shadow-sm max-sm:!flex max-sm:!grid-cols-none max-sm:flex-col max-sm:items-stretch max-sm:gap-2 max-sm:px-2.5`}
+    >
+      <div className="h-12 w-[4.5rem] shrink-0 overflow-hidden rounded bg-slate-100 ring-1 ring-slate-200">
+        {car.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={displayImageUrl(car.photoUrl, 128)}
+            alt=""
+            className="h-full w-full object-cover"
+            loading="lazy"
+            decoding="async"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center text-[10px] text-slate-400">—</div>
+        )}
+      </div>
+
+      <div className="min-w-0 leading-tight">
+        <p className="mb-0.5 text-[10px] font-bold uppercase text-slate-400 sm:hidden">{plateLabel}</p>
+        <p className="truncate font-mono text-xs font-black tracking-wide text-[#0b1f4b]">{car.listingCode}</p>
+      </div>
+
+      <div className="min-w-0 leading-tight">
+        <p className="mb-0.5 text-[10px] font-bold uppercase text-slate-400 sm:hidden">{partnerNumberLabel}</p>
+        {car.partnerCode && car.partnerDetailId ? (
+          <Link
+            href={`${ADMIN_BASE}/partners/${encodeURIComponent(car.partnerDetailId)}`}
+            title={car.partnerName}
+            className="inline-flex min-h-10 items-center truncate font-mono text-xs font-black tracking-wide text-[#1d6fe8] underline-offset-2 hover:underline"
+          >
+            {car.partnerCode}
+          </Link>
+        ) : (
+          <p className="truncate font-mono text-xs font-black tracking-wide text-[#0b1f4b]">
+            {car.partnerCode || "—"}
+          </p>
+        )}
+      </div>
+
+      <div className="min-w-0 leading-tight">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <p className="truncate text-sm font-extrabold text-[#0b1f4b]">
+            {car.make} {car.model}
+          </p>
+          <span
+            className={`rounded-full px-1.5 py-px text-[9px] font-extrabold uppercase leading-none ${statusClass(car.status)}`}
+          >
+            {car.status}
+          </span>
+        </div>
+        <p className="mt-0.5 break-words text-xs font-semibold text-slate-600">
+          {car.year} · {car.country} · {car.bodyType}
+          <span className="ms-2 font-medium text-slate-400">
+            {partnerLabel}: {car.partnerName}
+          </span>
+        </p>
+        <p className="mt-0.5 text-xs font-bold text-sky-700">
+          {money(car.dailyRateEur)}
+          <span className="ms-1 text-[10px] font-semibold text-slate-500">/ {perDay}</span>
+        </p>
+        {car.searchBlockers.length ? (
+          <p className="mt-0.5 break-words text-[11px] font-bold text-rose-700">
+            {notInSearch}: {car.searchBlockers.map((code) => blockerLabel(code)).join(", ")}
+          </p>
+        ) : (
+          <p className="mt-0.5 break-words text-[11px] font-bold text-emerald-700">
+            {inSearch}: {car.searchAirports.join(", ")}
+          </p>
+        )}
+      </div>
+
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5 justify-self-end">
+        <Link
+          href={`${ADMIN_BASE}/moderation/listings/${encodeURIComponent(car.id)}`}
+          className="inline-flex min-h-10 items-center rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-bold text-[#0b1f4b] hover:bg-slate-50"
+        >
+          {detailsLabel}
+        </Link>
+        <button
+          type="button"
+          disabled={deleting}
+          onClick={() => onDelete(car)}
+          className="inline-flex min-h-10 items-center rounded-md bg-rose-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-rose-500 disabled:opacity-50"
+        >
+          {deleting ? "…" : deleteLabel}
+        </button>
+      </div>
+    </article>
+  );
+}
 
 export function AdminCarsPanel({
   cars,
@@ -143,6 +296,7 @@ export function AdminCarsPanel({
   const [deleteError, setDeleteError] = useState("");
   /** Main list = approved and visible in search; the other tab holds everything else. */
   const [view, setView] = useState<"live" | "pending">("live");
+  const [openPartnerIds, setOpenPartnerIds] = useState<Set<string>>(() => new Set());
 
   const plateNorm = normalizeQuery(plateQuery);
   const partnerNorm = normalizeQuery(partnerQuery);
@@ -164,6 +318,19 @@ export function AdminCarsPanel({
       ),
     [viewRows, plateNorm, partnerNorm],
   );
+  const pendingGroups = useMemo(
+    () => (view === "pending" ? groupByPartner(filtered) : []),
+    [view, filtered],
+  );
+
+  const togglePartner = (key: string) => {
+    setOpenPartnerIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   const removeCar = async (car: AdminCarRow) => {
     const plate = car.listingCode || car.id;
@@ -271,6 +438,7 @@ export function AdminCarsPanel({
       ) : null}
 
       <div className="space-y-2 overflow-x-auto">
+        {view === "live" ? (
         <div
           className={`hidden sm:grid ${COL} rounded-lg bg-[#0b1f4b] px-3 py-2 text-[11px] font-extrabold uppercase tracking-wide text-white`}
         >
@@ -280,110 +448,74 @@ export function AdminCarsPanel({
           <span />
           <span />
         </div>
+        ) : null}
 
-        {filtered.map((car) => (
-          <article
-            key={car.id}
-            className={`${COL} rounded-lg border border-slate-200 bg-white px-3 py-1.5 shadow-sm max-sm:!flex max-sm:!grid-cols-none max-sm:flex-col max-sm:items-stretch max-sm:gap-2 max-sm:px-2.5`}
-          >
-            <div className="h-12 w-[4.5rem] shrink-0 overflow-hidden rounded bg-slate-100 ring-1 ring-slate-200">
-              {car.photoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={displayImageUrl(car.photoUrl, 128)}
-                  alt=""
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                  decoding="async"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-[10px] text-slate-400">
-                  —
-                </div>
-              )}
-            </div>
-
-            <div className="min-w-0 leading-tight">
-              <p className="mb-0.5 text-[10px] font-bold uppercase text-slate-400 sm:hidden">
-                {labels.colPlate}
-              </p>
-              <p className="truncate font-mono text-xs font-black tracking-wide text-[#0b1f4b]">
-                {car.listingCode}
-              </p>
-            </div>
-
-            <div className="min-w-0 leading-tight">
-              <p className="mb-0.5 text-[10px] font-bold uppercase text-slate-400 sm:hidden">
-                {labels.colPartnerNumber}
-              </p>
-              {car.partnerCode && car.partnerDetailId ? (
-                <Link
-                  href={`${ADMIN_BASE}/partners/${encodeURIComponent(car.partnerDetailId)}`}
-                  title={car.partnerName}
-                  className="inline-flex min-h-8 items-center truncate font-mono text-xs font-black tracking-wide text-[#1d6fe8] underline-offset-2 hover:underline"
-                >
-                  {car.partnerCode}
-                </Link>
-              ) : (
-                <p className="truncate font-mono text-xs font-black tracking-wide text-[#0b1f4b]">
-                  {car.partnerCode || "—"}
-                </p>
-              )}
-            </div>
-
-            <div className="min-w-0 leading-tight">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                <p className="truncate text-sm font-extrabold text-[#0b1f4b]">
-                  {car.make} {car.model}
-                </p>
-                <span
-                  className={`rounded-full px-1.5 py-px text-[9px] font-extrabold uppercase leading-none ${statusClass(car.status)}`}
-                >
-                  {car.status}
-                </span>
-              </div>
-              <p className="mt-0.5 text-xs font-semibold text-slate-600">
-                {car.year} · {car.country} · {car.bodyType}
-                <span className="ms-2 font-medium text-slate-400">
-                  {labels.partner}: {car.partnerName}
-                </span>
-              </p>
-              <p className="mt-0.5 text-xs font-bold text-sky-700">
-                {money(car.dailyRateEur)}
-                <span className="ms-1 text-[10px] font-semibold text-slate-500">
-                  / {labels.perDay}
-                </span>
-              </p>
-              {car.searchBlockers.length ? (
-                <p className="mt-0.5 break-words text-[11px] font-bold text-rose-700">
-                  {labels.notInSearch}:{" "}
-                  {car.searchBlockers.map((code) => labels.blockers[code]).join(", ")}
-                </p>
-              ) : (
-                <p className="mt-0.5 break-words text-[11px] font-bold text-emerald-700">
-                  {labels.inSearch}: {car.searchAirports.join(", ")}
-                </p>
-              )}
-            </div>
-
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5 justify-self-end">
-              <Link
-                href={`${ADMIN_BASE}/moderation/listings/${encodeURIComponent(car.id)}`}
-                className="inline-flex rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-bold text-[#0b1f4b] hover:bg-slate-50"
-              >
-                {labels.details}
-              </Link>
-              <button
-                type="button"
-                disabled={deletingId === car.id}
-                onClick={() => void removeCar(car)}
-                className="inline-flex rounded-md bg-rose-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-rose-500 disabled:opacity-50"
-              >
-                {deletingId === car.id ? "…" : labels.delete}
-              </button>
-            </div>
-          </article>
-        ))}
+        {view === "pending"
+          ? pendingGroups.map((group) => {
+              const open = hasActiveSearch || openPartnerIds.has(group.key);
+              return (
+                <section key={group.key} className="overflow-hidden rounded-lg border border-amber-200 bg-white shadow-sm">
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    onClick={() => togglePartner(group.key)}
+                    className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left hover:bg-amber-50"
+                  >
+                    <ChevronDown
+                      aria-hidden="true"
+                      className={`h-4 w-4 shrink-0 text-amber-800 transition ${open ? "rotate-180" : ""}`}
+                    />
+                    <span className="shrink-0 font-mono text-sm font-black tracking-wide text-[#0b1f4b]">
+                      {group.code}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-600">
+                      {group.name}
+                    </span>
+                    <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-amber-500 px-2 text-xs font-extrabold text-white">
+                      {group.cars.length}
+                    </span>
+                  </button>
+                  {open ? (
+                    <div className="space-y-2 border-t border-amber-100 bg-slate-50 p-2">
+                      {group.cars.map((car) => (
+                        <CarListingCard
+                          key={car.id}
+                          car={car}
+                          plateLabel={labels.colPlate}
+                          partnerNumberLabel={labels.colPartnerNumber}
+                          partnerLabel={labels.partner}
+                          perDay={labels.perDay}
+                          inSearch={labels.inSearch}
+                          notInSearch={labels.notInSearch}
+                          blockerLabel={(code) => labels.blockers[code]}
+                          detailsLabel={labels.details}
+                          deleteLabel={labels.delete}
+                          deleting={deletingId === car.id}
+                          onDelete={(row) => void removeCar(row)}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+              );
+            })
+          : filtered.map((car) => (
+              <CarListingCard
+                key={car.id}
+                car={car}
+                plateLabel={labels.colPlate}
+                partnerNumberLabel={labels.colPartnerNumber}
+                partnerLabel={labels.partner}
+                perDay={labels.perDay}
+                inSearch={labels.inSearch}
+                notInSearch={labels.notInSearch}
+                blockerLabel={(code) => labels.blockers[code]}
+                detailsLabel={labels.details}
+                deleteLabel={labels.delete}
+                deleting={deletingId === car.id}
+                onDelete={(row) => void removeCar(row)}
+              />
+            ))}
 
         {viewRows.length === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
