@@ -75,6 +75,7 @@ export function PartnerCarPhotoGallery({
   const copy = REORDER_COPY[locale as keyof typeof REORDER_COPY] || REORDER_COPY.en;
   const slots = padSlots(photos);
   const fileRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const galleryRef = useRef<HTMLDivElement | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
@@ -202,7 +203,7 @@ export function PartnerCarPhotoGallery({
   };
 
   return (
-    <div className="space-y-3">
+    <div ref={galleryRef} className="space-y-3">
       <p className="text-xs text-slate-500">{labels.formats}</p>
       <p className="text-xs font-semibold text-sky-800">{copy.hint}</p>
 
@@ -354,7 +355,11 @@ export function PartnerCarPhotoGallery({
         <p className="text-xs font-semibold text-slate-600">{labels.uploading}</p>
       ) : null}
 
-      <PartnerImageLightbox src={lightbox} onClose={() => setLightbox(null)} />
+      <PartnerImageLightbox
+        src={lightbox}
+        onClose={() => setLightbox(null)}
+        anchorRef={galleryRef}
+      />
     </div>
   );
 }

@@ -1,6 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject,
+  type WheelEvent as ReactWheelEvent,
+} from "react";
+import { createPortal } from "react-dom";
 import { Download, Minus, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -44,20 +53,49 @@ async function downloadImage(src: string) {
   }
 }
 
+type AnchorBox = { top: number; left: number; width: number; maxHeight: number };
+
+function boxNearAnchor(el: HTMLElement): AnchorBox {
+  const rect = el.getBoundingClientRect();
+  const pad = 12;
+  const width = Math.min(860, Math.max(280, Math.min(Math.max(rect.width, 280), window.innerWidth - pad * 2)));
+  // Keep the dialog on the gallery block (not viewport-centered above it).
+  let top = Math.max(pad, rect.top);
+  let maxHeight = window.innerHeight - top - pad;
+  const minUsable = Math.min(320, window.innerHeight - pad * 2);
+  if (maxHeight < minUsable) {
+    top = Math.max(pad, window.innerHeight - pad - minUsable);
+    maxHeight = window.innerHeight - top - pad;
+  }
+  maxHeight = Math.min(maxHeight, Math.max(minUsable, window.innerHeight * 0.82));
+  let left = rect.left + rect.width / 2 - width / 2;
+  left = Math.max(pad, Math.min(left, window.innerWidth - width - pad));
+  return { top, left, width, maxHeight };
+}
+
 /** Preview dialog with zoom, pan (drag), and download — shared by partner + admin. */
 export function PartnerImageLightbox({
   src,
   onClose,
   title,
+  /** When set, the dialog opens over/near this element (e.g. the photo gallery) instead of page center. */
+  anchorRef,
 }: {
   src: string | null;
   onClose: () => void;
   title?: string;
+  anchorRef?: RefObject<HTMLElement | null>;
 }) {
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [anchorBox, setAnchorBox] = useState<AnchorBox | null>(null);
   const dragOrigin = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     setZoom(1);
@@ -70,8 +108,40 @@ export function PartnerImageLightbox({
     if (zoom <= 1) setOffset({ x: 0, y: 0 });
   }, [zoom]);
 
+  useLayoutEffect(() => {
+    if (!src || !anchorRef?.current) {
+      setAnchorBox(null);
+      return;
+    }
+    const el = anchorRef.current;
+    // Bring the gallery into view first so the preview can sit on top of it.
+    el.scrollIntoView({ block: "center", inline: "nearest" });
+    const update = () => setAnchorBox(boxNearAnchor(el));
+    update();
+    // After scroll settles, remeasure once more.
+    const raf = window.requestAnimationFrame(update);
+    window.addEventListener("resize", update);
+    const scrollParents: Array<Element | Window> = [window];
+    let parent: HTMLElement | null = el.parentElement;
+    while (parent) {
+      const style = window.getComputedStyle(parent);
+      if (/(auto|scroll|overlay)/.test(style.overflowY) || /(auto|scroll|overlay)/.test(style.overflow)) {
+        scrollParents.push(parent);
+      }
+      parent = parent.parentElement;
+    }
+    for (const node of scrollParents) node.addEventListener("scroll", update, { passive: true });
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener("resize", update);
+      for (const node of scrollParents) node.removeEventListener("scroll", update);
+    };
+  }, [src, anchorRef]);
+
   useEffect(() => {
     if (!src) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
       if (e.key === "+" || e.key === "=") setZoom((z) => Math.min(ZOOM_MAX, +(z + ZOOM_STEP).toFixed(2)));
@@ -99,14 +169,20 @@ export function PartnerImageLightbox({
       }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
   }, [src, onClose, zoom]);
 
-  if (!src) return null;
+  if (!src || !mounted) return null;
+  // Wait for the first anchor measure so we never flash a page-top / centered dialog.
+  if (anchorRef && !anchorBox) return null;
 
   const zoomIn = () => setZoom((z) => Math.min(ZOOM_MAX, +(z + ZOOM_STEP).toFixed(2)));
   const zoomOut = () => setZoom((z) => Math.max(ZOOM_MIN, +(z - ZOOM_STEP).toFixed(2)));
   const canPan = zoom > 1;
+  const anchored = Boolean(anchorBox);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!canPan || e.button !== 0) return;
@@ -145,15 +221,32 @@ export function PartnerImageLightbox({
     }));
   };
 
-  return (
+  const dialog = (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/45 p-4 sm:p-8"
+      className={cn(
+        "fixed inset-0 z-[80] bg-slate-900/45 p-3 sm:p-6",
+        anchored ? "block" : "flex items-center justify-center",
+      )}
       role="dialog"
       aria-modal="true"
       onClick={onClose}
     >
       <div
-        className="relative flex max-h-[min(88vh,820px)] w-full max-w-[min(94vw,860px)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className={cn(
+          "relative flex w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl",
+          anchored ? "max-w-none" : "max-h-[min(88vh,820px)] max-w-[min(94vw,860px)]",
+        )}
+        style={
+          anchored && anchorBox
+            ? {
+                position: "fixed",
+                top: anchorBox.top,
+                left: anchorBox.left,
+                width: anchorBox.width,
+                maxHeight: anchorBox.maxHeight,
+              }
+            : undefined
+        }
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2">
@@ -221,6 +314,7 @@ export function PartnerImageLightbox({
             draggable={false}
             className={cn(
               "max-h-[min(70vh,640px)] w-auto max-w-full origin-center select-none object-contain",
+              anchored && anchorBox ? "max-h-[min(58vh,520px)]" : null,
               !dragging && "transition-transform duration-150",
             )}
             style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})` }}
@@ -229,4 +323,6 @@ export function PartnerImageLightbox({
       </div>
     </div>
   );
+
+  return createPortal(dialog, document.body);
 }
