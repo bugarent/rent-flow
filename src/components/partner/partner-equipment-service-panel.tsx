@@ -209,6 +209,7 @@ export function PartnerEquipmentServicePanel({
   const [saving, setSaving] = useState(false);
   const [adding, setAdding] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [savedNeedsApproval, setSavedNeedsApproval] = useState(false);
   const [error, setError] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [openServiceId, setOpenServiceId] = useState<string | null>(null);
@@ -376,6 +377,7 @@ export function PartnerEquipmentServicePanel({
       setSaving(true);
       setError("");
       setSavedFlash(false);
+      setSavedNeedsApproval(false);
       try {
         const res = await fetch("/api/partners/extras-prefs", {
           method: "PUT",
@@ -384,8 +386,13 @@ export function PartnerEquipmentServicePanel({
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "Save failed");
+        const needsApproval = Number(data.listingsRemoderated) > 0;
+        setSavedNeedsApproval(needsApproval);
         setSavedFlash(true);
-        window.setTimeout(() => setSavedFlash(false), 2000);
+        window.setTimeout(() => {
+          setSavedFlash(false);
+          setSavedNeedsApproval(false);
+        }, needsApproval ? 5000 : 2000);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Save failed");
       } finally {
@@ -972,7 +979,11 @@ export function PartnerEquipmentServicePanel({
               <ArrowLeft className="h-4 w-4" />
               {t.back}
             </button>
-            {savedFlash ? <span className="text-sm font-semibold text-emerald-200">{t.saved}</span> : null}
+            {savedFlash ? (
+              <span className="max-w-full text-sm font-semibold leading-snug text-emerald-200 sm:max-w-md">
+                {savedNeedsApproval ? t.savedRemoderation : t.saved}
+              </span>
+            ) : null}
           </div>
         </div>
       </div>
@@ -1528,7 +1539,11 @@ export function PartnerEquipmentServicePanel({
           >
             {saving ? t.saving : t.save}
           </button>
-          {savedFlash ? <span className="text-sm font-semibold text-emerald-200">{t.saved}</span> : null}
+          {savedFlash ? (
+            <span className="max-w-full text-sm font-semibold leading-snug text-emerald-200 sm:max-w-md">
+              {savedNeedsApproval ? t.savedRemoderation : t.saved}
+            </span>
+          ) : null}
         </div>
       </div>
     </div>

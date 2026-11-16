@@ -237,29 +237,66 @@ export async function PUT(req: Request) {
       next.push(pref);
     }
 
+    const beforeKey = JSON.stringify(
+      existing
+        .map((pref) => ({
+          id: pref.extraServiceId,
+          added: pref.added !== false,
+          enabled: Boolean(pref.enabled),
+          forbidden: Boolean(pref.forbidden),
+          priceEur: Number(pref.priceEur) || 0,
+          minPeriodEur: pref.minPeriodEur ?? null,
+          maxPeriodEur: pref.maxPeriodEur ?? null,
+          carIds: pref.carIds || null,
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id)),
+    );
     const saved = await writePartnerExtraPrefs(partnerId, next);
+    const afterKey = JSON.stringify(
+      saved
+        .map((pref) => ({
+          id: pref.extraServiceId,
+          added: pref.added !== false,
+          enabled: Boolean(pref.enabled),
+          forbidden: Boolean(pref.forbidden),
+          priceEur: Number(pref.priceEur) || 0,
+          minPeriodEur: pref.minPeriodEur ?? null,
+          maxPeriodEur: pref.maxPeriodEur ?? null,
+          carIds: pref.carIds || null,
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id)),
+    );
+    const prefsChanged = beforeKey !== afterKey;
     const catalogById = new Map(catalog.map((service) => [service.id, service]));
-    await syncListingExtraPrices({
+    const sync = await syncListingExtraPrices({
       carIds: cars.map((car) => car.id),
       userId: session.user.id,
       email: session.user.email,
       partnerId,
+      forceRemoderation: prefsChanged,
       prices: saved.map((pref) => {
         const service = catalogById.get(pref.extraServiceId);
         const forbidden = Boolean(pref.forbidden);
         const enabled = forbidden ? true : Boolean(pref.enabled);
+        const keepRow = Boolean(service && partnerStatusLocked(service));
         return {
           extraServiceId: pref.extraServiceId,
           slug: service?.slug,
           name: service?.name,
           priceEur: forbidden || !enabled ? 0 : Number(pref.priceEur) || 0,
-          enabled,
-          forbidden,
+          enabled: keepRow ? true : enabled,
+          forbidden: keepRow ? false : forbidden,
+          keepRow,
           ...(pref.carIds ? { carIds: pref.carIds } : {}),
         };
       }),
     });
-    return NextResponse.json({ ok: true, prefs: saved });
+    return NextResponse.json({
+      ok: true,
+      prefs: saved,
+      listingsUpdated: sync.updated,
+      listingsRemoderated: sync.remoderated,
+    });
   } catch (error) {
     console.error("[partners/extras-prefs PUT]", error);
     return NextResponse.json({ error: "Could not save extras preferences" }, { status: 500 });

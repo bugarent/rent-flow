@@ -18,6 +18,8 @@ function baseCopy(locale: string) {
       save: "შენახვა",
       saving: "ინახება…",
       saved: "შენახულია",
+      savedRemoderation:
+        "შენახულია. ცვლილება ასახულია თქვენს განცხადებებზე და გაეგზავნა ადმინს — ძიებაში გამოჩნდება დამტკიცების შემდეგ.",
       back: "უკან",
       settings: "პარამეტრები",
       cars: "მანქანები",
@@ -87,6 +89,8 @@ function baseCopy(locale: string) {
       save: "Сохранить",
       saving: "Сохранение…",
       saved: "Сохранено",
+      savedRemoderation:
+        "Сохранено. Изменение отражено в ваших объявлениях и отправлено админу — в поиске появится после одобрения.",
       back: "Назад",
       settings: "Настройки",
       cars: "Автомобили",
@@ -153,6 +157,8 @@ function baseCopy(locale: string) {
     save: "Save",
     saving: "Saving…",
     saved: "Saved",
+    savedRemoderation:
+      "Saved. The change is on your listings and sent to admin — it appears in search after approval.",
     back: "Back",
     settings: "Settings",
     cars: "Cars",

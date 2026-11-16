@@ -81,11 +81,40 @@ export async function POST(req: Request) {
       maxPeriodEur: forbidden ? null : optionalPeriodMoney(body.maxPeriodEur),
       ...(Array.isArray(body.carIds) ? { carIds: body.carIds.map(String).filter(Boolean) } : {}),
     });
-    await writePartnerExtraPrefs(partnerId, without);
+    const savedPrefs = await writePartnerExtraPrefs(partnerId, without);
     after(async () => {
       const { scheduleExtraCopyTranslations } = await import("@/lib/server/extras-store");
       await scheduleExtraCopyTranslations({ force: true });
     });
+
+    try {
+      const { listPartnerCarsForExtras } = await import("@/lib/server/partner-extras-fleet");
+      const { syncListingExtraPrices } = await import("@/lib/server/sync-listing-extra-prices");
+      const fleet = await listPartnerCarsForExtras(session, partnerId);
+      const pref = savedPrefs.find((p) => p.extraServiceId === row.id);
+      if (pref && fleet.cars.length) {
+        await syncListingExtraPrices({
+          carIds: fleet.cars.map((car) => car.id),
+          userId: session.user.id,
+          email: session.user.email,
+          partnerId,
+          forceRemoderation: true,
+          prices: [
+            {
+              extraServiceId: pref.extraServiceId,
+              slug: row.slug,
+              name: row.name,
+              priceEur: pref.forbidden ? 0 : Number(pref.priceEur) || 0,
+              enabled: Boolean(pref.enabled) || Boolean(pref.forbidden),
+              forbidden: Boolean(pref.forbidden),
+              ...(pref.carIds ? { carIds: pref.carIds } : {}),
+            },
+          ],
+        });
+      }
+    } catch (syncError) {
+      console.warn("[partners/extras POST] listing sync", syncError);
+    }
 
     return NextResponse.json(
       {
@@ -123,6 +152,30 @@ export async function DELETE(req: Request) {
         partnerId,
         prefs.filter((p) => p.extraServiceId !== id),
       );
+    }
+    try {
+      const { listPartnerCarsForExtras } = await import("@/lib/server/partner-extras-fleet");
+      const { syncListingExtraPrices } = await import("@/lib/server/sync-listing-extra-prices");
+      const fleet = await listPartnerCarsForExtras(session, partnerId);
+      if (fleet.cars.length) {
+        await syncListingExtraPrices({
+          carIds: fleet.cars.map((car) => car.id),
+          userId: session.user.id,
+          email: session.user.email,
+          partnerId,
+          forceRemoderation: true,
+          prices: [
+            {
+              extraServiceId: id,
+              priceEur: 0,
+              enabled: false,
+              forbidden: false,
+            },
+          ],
+        });
+      }
+    } catch (syncError) {
+      console.warn("[partners/extras DELETE] listing sync", syncError);
     }
     return NextResponse.json({ ok: true, id });
   } catch (error) {

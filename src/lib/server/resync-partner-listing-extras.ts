@@ -87,6 +87,7 @@ export async function resyncAllPartnerListingExtras(): Promise<{
       partnerId,
       userId: partnerId,
       email: null,
+      remoderate: false,
       prices: saved.map((pref) => {
         const service = catalogById.get(pref.extraServiceId);
         const forbidden = Boolean(pref.forbidden);
