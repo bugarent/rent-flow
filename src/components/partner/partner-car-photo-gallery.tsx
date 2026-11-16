@@ -76,7 +76,7 @@ export function PartnerCarPhotoGallery({
   const slots = padSlots(photos);
   const fileRefs = useRef<Array<HTMLInputElement | null>>([]);
   const galleryRef = useRef<HTMLDivElement | null>(null);
-  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const longPressTimer = useRef<number | null>(null);
@@ -268,7 +268,7 @@ export function PartnerCarPhotoGallery({
                           suppressClick.current = false;
                           return;
                         }
-                        setLightbox(url);
+                        setLightboxIndex(index);
                       }}
                     />
                     <button
@@ -356,9 +356,16 @@ export function PartnerCarPhotoGallery({
       ) : null}
 
       <PartnerImageLightbox
-        src={lightbox}
-        onClose={() => setLightbox(null)}
+        src={lightboxIndex != null ? slots[lightboxIndex] || null : null}
+        onClose={() => setLightboxIndex(null)}
         anchorRef={galleryRef}
+        locale={locale}
+        onEdited={(url) => {
+          if (lightboxIndex == null) return;
+          const next = padSlots(photosRef.current);
+          next[lightboxIndex] = url;
+          commitSlots(next);
+        }}
       />
     </div>
   );

@@ -10,7 +10,8 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import { Download, Minus, Plus, X } from "lucide-react";
+import { Crop, Download, Minus, Plus, X } from "lucide-react";
+import { PartnerImageEditor } from "@/components/partner/partner-image-editor";
 import { cn } from "@/lib/utils";
 
 const ZOOM_MIN = 0.5;
@@ -80,17 +81,25 @@ export function PartnerImageLightbox({
   title,
   /** When set, the dialog opens over/near this element (e.g. the photo gallery) instead of page center. */
   anchorRef,
+  /** When set, shows Edit — crop / rotate / reshape and replace the saved image. */
+  onEdited,
+  asDocument = false,
+  locale = "en",
 }: {
   src: string | null;
   onClose: () => void;
   title?: string;
   anchorRef?: RefObject<HTMLElement | null>;
+  onEdited?: (url: string) => void;
+  asDocument?: boolean;
+  locale?: string;
 }) {
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [anchorBox, setAnchorBox] = useState<AnchorBox | null>(null);
+  const [editing, setEditing] = useState(false);
   const dragOrigin = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
 
   useEffect(() => {
@@ -101,6 +110,7 @@ export function PartnerImageLightbox({
     setZoom(1);
     setOffset({ x: 0, y: 0 });
     setDragging(false);
+    setEditing(false);
     dragOrigin.current = null;
   }, [src]);
 
@@ -286,6 +296,19 @@ export function PartnerImageLightbox({
           >
             <Plus className="h-4 w-4" />
           </button>
+          {onEdited ? (
+            <button
+              type="button"
+              className="inline-flex h-8 items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 text-xs font-bold text-sky-800 hover:bg-sky-100"
+              onClick={() => setEditing(true)}
+              title={locale === "ka" ? "კორექტირება" : locale === "ru" ? "Править" : "Edit"}
+            >
+              <Crop className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">
+                {locale === "ka" ? "კორექტირება" : locale === "ru" ? "Править" : "Edit"}
+              </span>
+            </button>
+          ) : null}
           <button
             type="button"
             className="inline-flex h-8 items-center gap-1 rounded-full border border-slate-200 px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
@@ -332,5 +355,19 @@ export function PartnerImageLightbox({
     </div>
   );
 
-  return createPortal(dialog, document.body);
+  return (
+    <>
+      {createPortal(dialog, document.body)}
+      {onEdited && src ? (
+        <PartnerImageEditor
+          src={src}
+          open={editing}
+          onClose={() => setEditing(false)}
+          onSaved={onEdited}
+          asDocument={asDocument}
+          locale={locale}
+        />
+      ) : null}
+    </>
+  );
 }

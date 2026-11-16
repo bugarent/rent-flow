@@ -541,7 +541,7 @@ export function PartnerCreateCarForm({
   const [passportFront, setPassportFront] = useState("");
   const [passportBack, setPassportBack] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [docPreview, setDocPreview] = useState<string | null>(null);
+  const [docPreview, setDocPreview] = useState<{ url: string; side: "front" | "back" } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const serverExtraPrefs = Boolean(initialExtraPrefs?.length) && !isAdminReview;
@@ -2659,7 +2659,10 @@ export function PartnerCreateCarForm({
               <p className="mb-0.5 text-[11px] font-semibold">{cc.front}</p>
               {passportFront ? (
                 <>
-                  <DocThumb url={passportFront} onOpen={() => setDocPreview(passportFront)} />
+                  <DocThumb
+                    url={passportFront}
+                    onOpen={() => setDocPreview({ url: passportFront, side: "front" })}
+                  />
                   <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                     <button
                       type="button"
@@ -2712,7 +2715,10 @@ export function PartnerCreateCarForm({
               <p className="mb-0.5 text-[11px] font-semibold">{cc.back}</p>
               {passportBack ? (
                 <>
-                  <DocThumb url={passportBack} onOpen={() => setDocPreview(passportBack)} />
+                  <DocThumb
+                    url={passportBack}
+                    onOpen={() => setDocPreview({ url: passportBack, side: "back" })}
+                  />
                   <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                     <button
                       type="button"
@@ -2947,7 +2953,18 @@ export function PartnerCreateCarForm({
         </div>
       ) : null}
 
-      <PartnerImageLightbox src={docPreview} onClose={() => setDocPreview(null)} />
+      <PartnerImageLightbox
+        src={docPreview?.url ?? null}
+        onClose={() => setDocPreview(null)}
+        locale={locale}
+        asDocument
+        onEdited={(url) => {
+          if (!docPreview) return;
+          if (docPreview.side === "front") setPassportFront(url);
+          else setPassportBack(url);
+          setDocPreview({ url, side: docPreview.side });
+        }}
+      />
     </div>
   );
 }
