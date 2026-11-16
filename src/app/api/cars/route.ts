@@ -343,6 +343,13 @@ export async function POST(req: Request) {
       }
       const deliveryCatalog = await listPartnerScopedDeliveryLocations(partner.id);
       description = scopePickupPlacesInDescription(description, deliveryCatalog);
+      const { alignPublicListingDescription } = await import("@/lib/server/align-listing-tariffs");
+      const alignedDescription = await alignPublicListingDescription(
+        description,
+        partner.id,
+        partner.companySettings,
+      );
+      if (typeof alignedDescription === "string") description = alignedDescription;
       const resolved = resolvePartnerDeliveryPrices(
         deliveryCatalog,
         deliveryCatalog.map((loc) => ({ deliveryLocationId: loc.id, enabled: true, priceEur: 0 })),

@@ -526,6 +526,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           ...(passwordPlain ? { passwordHash: hashSecret(passwordPlain) } : {}),
         });
       }
+      if (JSON.stringify(previous.tariffs) !== JSON.stringify(nextSettings.tariffs)) {
+        try {
+          const { syncListingTariffRanges } = await import("@/lib/server/sync-listing-tariff-ranges");
+          await syncListingTariffRanges({
+            partnerId: id,
+            userId: id,
+            email: nextSettings.email,
+            intervals: nextSettings.tariffs,
+          });
+        } catch (syncError) {
+          console.warn("[admin/partners] tariff range sync", syncError);
+        }
+      }
       return nextSettings;
     };
 
@@ -681,6 +694,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           where: { id: partnerExisting.userId },
           data: { email: loginEmail },
         });
+      }
+    }
+
+    if (JSON.stringify(previous.tariffs) !== JSON.stringify(nextSettings.tariffs)) {
+      try {
+        const { syncListingTariffRanges } = await import("@/lib/server/sync-listing-tariff-ranges");
+        await syncListingTariffRanges({
+          partnerId: id,
+          userId: partnerExisting.userId || id,
+          email: partnerExisting.email,
+          intervals: nextSettings.tariffs,
+        });
+      } catch (syncError) {
+        console.warn("[admin/partners] tariff range sync", syncError);
       }
     }
 

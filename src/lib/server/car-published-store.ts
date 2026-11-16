@@ -1,5 +1,6 @@
+import { descriptionWithTariffRanges } from "@/lib/cars/car-details";
 import { dataRoot } from "@/lib/persistent-paths";
-import { readFile, writeFile, mkdir } from "@/lib/server/durable-fs";
+import { readFile, readFileForUpdate, withStoreLock, writeFile, mkdir } from "@/lib/server/durable-fs";
 import { join } from "node:path";
 
 const SNAP_STORE = join(dataRoot(), "car-published-snapshots.json");
@@ -164,6 +165,29 @@ export function nextListingStatusAfterPartnerEdit(status: string): string {
   if (shouldEnterListingRemoderation(status)) return "PENDING_REMODERATION";
   if (status === "DRAFT") return "PENDING";
   return status === "PENDING" ? "PENDING" : status;
+}
+
+/** Keep approved snapshot day ranges on the partner's current tariff columns. Prices stay put. */
+export async function alignSnapshotTariffRanges(
+  intervalsByCarId: Map<string, Array<{ fromDays: number; toDays: number }>>,
+): Promise<number> {
+  if (!intervalsByCarId.size) return 0;
+  return withStoreLock(SNAP_STORE, async () => {
+    const raw = await readFileForUpdate(SNAP_STORE);
+    if (!raw) return 0;
+    const store = JSON.parse(raw) as SnapStoreFile;
+    let updated = 0;
+    for (const [carId, intervals] of intervalsByCarId) {
+      const snap = store[carId];
+      if (!snap?.description || !intervals.length) continue;
+      const description = descriptionWithTariffRanges(snap.description, intervals);
+      if (!description || description === snap.description) continue;
+      store[carId] = { ...snap, description };
+      updated += 1;
+    }
+    if (updated) await writeJsonFile(SNAP_STORE, store);
+    return updated;
+  });
 }
 
 export async function readPublishedSnapshotsMap(): Promise<Map<string, PublishedCarSnapshot>> {

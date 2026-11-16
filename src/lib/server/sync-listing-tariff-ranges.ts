@@ -22,6 +22,7 @@ export async function syncListingTariffRanges(input: {
 }): Promise<{ updated: number }> {
   if (!input.intervals.length) return { updated: 0 };
   let updated = 0;
+  const carIds = new Set<string>();
 
   try {
     if (!input.partnerId.startsWith("file-partner-")) {
@@ -30,6 +31,7 @@ export async function syncListingTariffRanges(input: {
           where: { partnerId: input.partnerId },
           select: { id: true, description: true },
         });
+        for (const car of cars) carIds.add(car.id);
         const writes = cars.flatMap((car) => {
           const description = descriptionWithTariffRanges(car.description, input.intervals);
           if (!description || description === car.description) return [];
@@ -50,9 +52,18 @@ export async function syncListingTariffRanges(input: {
       partnerId: input.partnerId,
     });
     for (const car of fileCars) {
+      carIds.add(car.id);
       const description = descriptionWithTariffRanges(car.description, input.intervals);
       if (!description || description === car.description) continue;
       if (await updateFileCar(car.id, { description })) updated += 1;
+    }
+
+    try {
+      const { alignSnapshotTariffRanges } = await import("@/lib/server/car-published-store");
+      const intervalsByCarId = new Map([...carIds].map((id) => [id, input.intervals]));
+      updated += await alignSnapshotTariffRanges(intervalsByCarId);
+    } catch (error) {
+      console.warn("[tariff range sync] snapshots", error);
     }
   } finally {
     if (updated) {

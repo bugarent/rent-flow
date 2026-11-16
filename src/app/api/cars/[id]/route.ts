@@ -370,9 +370,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         nextCategorySlug = fileCar.categorySlug;
       }
     }
+    let nextDescription = fileBody.description ?? fileCar.description;
+    if (typeof fileBody.description === "string") {
+      const { alignPublicListingDescription } = await import("@/lib/server/align-listing-tariffs");
+      const alignedDescription = await alignPublicListingDescription(fileBody.description, fileCar.partnerId);
+      if (typeof alignedDescription === "string") nextDescription = alignedDescription;
+    }
     const updated = await updateFileCar(id, {
       title: fileBody.title ?? fileCar.title,
-      description: fileBody.description ?? fileCar.description,
+      description: nextDescription,
       dailyRateEur: fileBody.dailyRateEur != null ? Number(fileBody.dailyRateEur) : fileCar.dailyRateEur,
       make: nextMake,
       model: nextModel,
@@ -666,6 +672,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         } catch {
           nextCategorySlug = car.categorySlug;
         }
+      }
+
+      if (typeof body.description === "string") {
+        const { alignPublicListingDescription } = await import("@/lib/server/align-listing-tariffs");
+        const alignedDescription = await alignPublicListingDescription(body.description, car.partnerId);
+        if (typeof alignedDescription === "string") body.description = alignedDescription;
       }
 
       const updated = await prisma.$transaction(async (tx) => {
