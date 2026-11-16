@@ -207,7 +207,7 @@ export function ReserveCheckout({
     loadLegalDocumentModal,
   );
   const { data: session } = useSession();
-  const { dictionary, formatPrice, locale } = usePreferences();
+  const { dictionary, formatPrice, locale, currency, fxRates } = usePreferences();
   const record = (value: string) => knownText(locale, value);
   const extraName = (extra: { name: string; nameI18n?: Parameters<typeof localizedExtraCopy>[2] }) =>
     localizedExtraCopy(locale, extra.name, extra.nameI18n);
@@ -437,20 +437,21 @@ export function ReserveCheckout({
   const fullInsuranceSelected = insuranceExtras.some(
     (pack) => pack.checkoutSlot === "full" && (pack.locked || (extraQty[pack.id] || 0) > 0),
   );
-  const securityDepositEur = useMemo(() => {
+  const securityDepositLabel = useMemo(() => {
     // Full coverage waives the refundable hold. The customer does not pay a deposit at pickup.
-    if (fullInsuranceSelected) return 0;
-    const n = details?.deposit != null ? Number(details.deposit) : 0;
-    return Number.isFinite(n) && n > 0 ? n : 0;
-  }, [details, fullInsuranceSelected]);
+    if (fullInsuranceSelected) return formatPrice(0);
+    return formatDepositLabel(details, {
+      currency,
+      rates: fxRates,
+      formatEur: formatPrice,
+    });
+  }, [currency, details, formatPrice, fxRates, fullInsuranceSelected]);
 
   const rentalTermsItems = useMemo(() => {
     const age = String(details?.minDriverAge ?? "18");
     const cat = String(details?.licenseCat || "B");
     const years = String(details?.minLicenseYears ?? "—");
-    const deposit = fullInsuranceSelected
-      ? formatPrice(0)
-      : formatDepositLabel(details, formatPrice);
+    const deposit = securityDepositLabel;
     const methods = (car?.rentPaymentMethods || []).filter(Boolean);
     const methodsText = methods.length ? methods.join(", ") : "—";
 
@@ -499,7 +500,7 @@ export function ReserveCheckout({
       { id: "out-of-hours", title: t.rtOutOfHours, body: t.rtOutOfHoursBody },
       { id: "extras", title: t.rtExtras, body: t.rtExtrasBody },
     ];
-  }, [car?.rentPaymentMethods, details, formatPrice, fullInsuranceSelected, t]);
+  }, [car?.rentPaymentMethods, details, securityDepositLabel, t]);
   const dailyRate = useMemo(() => {
     if (!car) return 0;
     return resolveDailyRateEur(
@@ -1962,7 +1963,7 @@ export function ReserveCheckout({
                 extraQty={extraQty}
                 totals={totals}
                 extrasLineTotal={extrasLineTotal}
-                securityDepositEur={securityDepositEur}
+                securityDepositLabel={securityDepositLabel}
                 loading={loading}
                 error={error}
                 onPayNow={() => goToPaymentStep()}
@@ -2108,7 +2109,7 @@ function PriceSummaryCard({
   paidExtras,
   extraQty,
   totals,
-  securityDepositEur,
+  securityDepositLabel,
   loading,
   error,
   onPayNow,
@@ -2138,7 +2139,7 @@ function PriceSummaryCard({
     bpDiscountPercent?: number;
   };
   extrasLineTotal?: number;
-  securityDepositEur: number;
+  securityDepositLabel: string;
   loading: boolean;
   error?: string;
   onPayNow?: () => void;
@@ -2256,7 +2257,7 @@ function PriceSummaryCard({
         <div className="flex items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-100 px-3.5 py-2.5">
           <span className="text-base font-semibold text-slate-700">{copy.refundableDeposit}</span>
           <span className="shrink-0 text-base font-extrabold text-[#0b1f4b]">
-            {formatPrice(securityDepositEur)}
+            {securityDepositLabel}
           </span>
         </div>
 

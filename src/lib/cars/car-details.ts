@@ -1,4 +1,7 @@
-import { formatMoney } from "@/lib/utils";
+import type { FxRates } from "@/lib/fx";
+import { isCurrency, type Currency } from "@/lib/i18n/config";
+import { displayStickyMoney, readStickyPin } from "@/lib/partners/pricing-currency";
+import { formatMoney, formatMoneyAmount, toNumber } from "@/lib/utils";
 
 /** Parse `<!--car-details:{...}-->` blob from car.description for public/partner UIs. */
 
@@ -13,6 +16,10 @@ export type CarDetailsPricingTier = Array<{
 
 export type CarDetailsBlob = {
   deposit?: string | number;
+  /** Amount the partner typed for the refundable deposit. */
+  depositEnteredAmount?: string | number;
+  /** Currency of `depositEnteredAmount` — display this figure when the site currency matches. */
+  depositEnteredCurrency?: string;
   pricingTiers?: CarDetailsPricingTier;
   plate?: string;
   color?: string;
@@ -314,12 +321,43 @@ export function parseCarDetails(description: string | null | undefined): CarDeta
   }
 }
 
+/**
+ * Refundable deposit as the partner set it. When they typed 200 USD, USD viewers
+ * always see 200$ — FX moves must not rewrite that figure via the EUR snapshot.
+ */
 export function formatDepositLabel(
-  details: CarDetailsBlob | null,
-  format: (amountEur: number) => string = (n) => formatMoney(n, "EUR"),
+  details: CarDetailsBlob | null | undefined,
+  formatOrOpts:
+    | ((amountEur: number) => string)
+    | {
+        currency: Currency;
+        rates: FxRates;
+        formatEur?: (amountEur: number) => string;
+      } = (n) => formatMoney(n, "EUR"),
 ): string {
   if (!details) return "—";
+  if (typeof formatOrOpts === "function") {
+    const n = Number(details.deposit);
+    if (!Number.isFinite(n)) return "—";
+    return formatOrOpts(n);
+  }
+  const { currency, rates, formatEur } = formatOrOpts;
+  const pin = readStickyPin({
+    enteredAmount: details.depositEnteredAmount,
+    enteredCurrency: details.depositEnteredCurrency,
+    priceEur: details.deposit,
+  });
+  const entered = String(pin.amount || "").trim();
+  if (entered && isCurrency(pin.currency)) {
+    if (pin.currency === currency) {
+      const amount = toNumber(entered, Number.NaN);
+      return Number.isFinite(amount) ? formatMoneyAmount(amount, currency) : "—";
+    }
+    const shown = displayStickyMoney(pin, currency, rates);
+    const amount = toNumber(shown, Number.NaN);
+    return Number.isFinite(amount) ? formatMoneyAmount(amount, currency) : "—";
+  }
   const n = Number(details.deposit);
   if (!Number.isFinite(n)) return "—";
-  return format(n);
+  return formatEur ? formatEur(n) : formatMoney(n, currency, rates);
 }
