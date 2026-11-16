@@ -1,19 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { knownText } from "@/lib/i18n/known-record-text";
 import { SiteImage } from "@/components/ui/site-image";
-import { defaultSearchDateRange } from "@/lib/catalog/default-search-dates";
-import { useHomeCountry } from "@/lib/catalog/home-country-store";
-import { useIntentPrefetch } from "@/lib/client/prefetch-route";
+import { requestHomeCategorySearch } from "@/lib/catalog/home-country-store";
 
 const AUTO_MS = 4000;
 const SLIDE_MS = 600;
 
 type Category = { id: string; slug: string; name: string; details: string; imageUrl: string };
+
+function scrollToHomeSearch() {
+  const target = document.getElementById("home-search");
+  if (!target) return;
+  target.scrollIntoView({ behavior: "smooth", block: "center" });
+}
 
 function CategoryCard({
   category,
@@ -26,11 +29,11 @@ function CategoryCard({
   loopCopy?: boolean;
 }) {
   const { locale } = usePreferences();
-  const country = useHomeCountry();
-  const intentPrefetch = useIntentPrefetch();
-  const { startDate, endDate } = defaultSearchDateRange();
   const name = knownText(locale, category.name);
-  const href = `/cars?category=${encodeURIComponent(category.slug)}${country ? `&country=${encodeURIComponent(country)}` : ""}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
+  const openSearch = () => {
+    requestHomeCategorySearch(category.slug, name);
+    scrollToHomeSearch();
+  };
   return (
     <article
       className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
@@ -48,15 +51,15 @@ function CategoryCard({
       </div>
       <div className="p-4">
         <h3 className="mb-3 text-lg font-bold text-[#0b1f4b]">{name}</h3>
-        <Link
-          href={href}
-          {...intentPrefetch(href)}
+        <button
+          type="button"
           tabIndex={loopCopy ? -1 : undefined}
           aria-label={`${viewLabel}: ${name}`}
+          onClick={openSearch}
           className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#1d6fe8] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#1558c0]"
         >
           {viewLabel}
-        </Link>
+        </button>
       </div>
     </article>
   );

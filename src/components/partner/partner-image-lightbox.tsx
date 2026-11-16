@@ -114,12 +114,18 @@ export function PartnerImageLightbox({
       return;
     }
     const el = anchorRef.current;
-    // Bring the gallery into view first so the preview can sit on top of it.
-    el.scrollIntoView({ block: "center", inline: "nearest" });
+    // Instant scroll so we can measure before body scroll-lock (overflow:hidden) runs.
+    try {
+      el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
+    } catch {
+      el.scrollIntoView({ block: "center", inline: "nearest" });
+    }
     const update = () => setAnchorBox(boxNearAnchor(el));
     update();
-    // After scroll settles, remeasure once more.
-    const raf = window.requestAnimationFrame(update);
+    const raf = window.requestAnimationFrame(() => {
+      update();
+      window.requestAnimationFrame(update);
+    });
     window.addEventListener("resize", update);
     const scrollParents: Array<Element | Window> = [window];
     let parent: HTMLElement | null = el.parentElement;
@@ -140,6 +146,8 @@ export function PartnerImageLightbox({
 
   useEffect(() => {
     if (!src) return;
+    // Lock scroll only after the gallery has been scrolled into place + measured.
+    if (anchorRef && !anchorBox) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
@@ -173,7 +181,7 @@ export function PartnerImageLightbox({
       document.body.style.overflow = prev;
       window.removeEventListener("keydown", onKey);
     };
-  }, [src, onClose, zoom]);
+  }, [src, onClose, zoom, anchorRef, anchorBox]);
 
   if (!src || !mounted) return null;
   // Wait for the first anchor measure so we never flash a page-top / centered dialog.

@@ -538,6 +538,26 @@ add("Economy Class", row("Economy Class", "ეკონომ კლასი", 
 add("Convertibles", row("Convertibles", "კაბრიოლეტი", "Cabrios", "Descapotables", "Cabriolets", "Cabrio", "Cabriolets", "Kabriolety", "Üstü açık", "Кабриолеты", "مكشوفة", "敞篷车", "컨버터블", "เปิดประทุน"));
 add("Van", row("Van", "ვენი", "Van", "Furgoneta", "Fourgon", "Furgone", "Bestelwagen", "Van", "Van", "Фургон", "فان", "厢式车", "밴", "แวน"));
 
+add(
+  "Choose country, location and dates, then search — {category} cars at that place will show if available.",
+  row(
+    "Choose country, location and dates, then search — {category} cars at that place will show if available.",
+    "აირჩიეთ ქვეყანა, ადგილი და თარიღები, შემდეგ დააჭირეთ ძებნას — ამ ადგილზე გამოჩნდება {category} კატეგორიის მანქანები, თუ არის.",
+    "Land, Ort und Daten wählen, dann suchen — {category}-Fahrzeuge an diesem Ort erscheinen, falls verfügbar.",
+    "Elige país, lugar y fechas, luego busca — si hay, verás coches {category} en ese lugar.",
+    "Choisissez pays, lieu et dates, puis cherchez — les voitures {category} de ce lieu s’affichent si disponibles.",
+    "Scegli paese, luogo e date, poi cerca — se disponibili, vedrai auto {category} in quel luogo.",
+    "Kies land, plek en data, zoek daarna — {category}-auto’s op die plek verschijnen als ze er zijn.",
+    "Wybierz kraj, miejsce i daty, potem szukaj — auta {category} w tym miejscu pojawią się, jeśli są.",
+    "Ülke, yer ve tarihleri seçin, sonra arayın — varsa o yerdeki {category} araçlar görünür.",
+    "Выберите страну, место и даты, затем поиск — автомобили {category} в этом месте появятся, если есть.",
+    "اختر الدولة والمكان والتواريخ ثم ابحث — ستظهر سيارات {category} في ذلك المكان إن توفرت.",
+    "请先选择国家、地点和日期再搜索 — 该地点若有 {category} 车辆将显示。",
+    "국가·장소·날짜를 선택한 뒤 검색하세요 — 있으면 그 장소의 {category} 차량이 표시됩니다.",
+    "เลือกประเทศ สถานที่ และวันที่ แล้วค้นหา — จะแสดงรถ {category} ในที่นั้นหากมี",
+  ),
+);
+
 export type InfoAdminLabels = {
   help: string;
   whySection: string;

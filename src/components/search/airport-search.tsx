@@ -18,7 +18,17 @@ import { CalendarDays, ChevronDown, Clock3, Globe, MapPin, Plane, PlaneTakeoff, 
 import type { CatalogAirport } from "@/lib/catalog/airports";
 import { isCityLocationCode } from "@/lib/catalog/search-places";
 import { defaultSearchDateRange } from "@/lib/catalog/default-search-dates";
-import { setHomeCountry } from "@/lib/catalog/home-country-store";
+import {
+  clearPendingHomeCategory,
+  HOME_CATEGORY_FOCUS_EVENT,
+  HOME_RESET_EVENT,
+  peekPendingHomeCategory,
+  setHomeCountry,
+  usePendingHomeCategoryName,
+  usePendingHomeCategorySlug,
+} from "@/lib/catalog/home-country-store";
+import { cn } from "@/lib/utils";
+import { knownText } from "@/lib/i18n/known-record-text";
 import { worldCountryName } from "@/lib/catalog/world-countries";
 import { placeLabel, regionName } from "@/lib/i18n/place-label";
 import { CountryFlag } from "@/components/ui/country-flag";
@@ -736,6 +746,23 @@ export function AirportSearch({
   const locked = countries.length <= 1;
   // Empty until the visitor picks a country or a place; a single-country site needs no choice.
   const [countryIso2, setCountryIso2] = useState(() => (locked ? countries[0]?.iso2 || "" : ""));
+  const pendingCategorySlug = usePendingHomeCategorySlug();
+  const pendingCategoryName = usePendingHomeCategoryName();
+  const [searchAttention, setSearchAttention] = useState(false);
+
+  useEffect(() => {
+    const onFocus = () => {
+      setSearchAttention(true);
+      window.setTimeout(() => setSearchAttention(false), 4200);
+    };
+    const onReset = () => setSearchAttention(false);
+    window.addEventListener(HOME_CATEGORY_FOCUS_EVENT, onFocus);
+    window.addEventListener(HOME_RESET_EVENT, onReset);
+    return () => {
+      window.removeEventListener(HOME_CATEGORY_FOCUS_EVENT, onFocus);
+      window.removeEventListener(HOME_RESET_EVENT, onReset);
+    };
+  }, []);
 
   const locations = useMemo(() => {
     const preferred = countryIso2?.toUpperCase() || "";
@@ -923,14 +950,29 @@ export function AirportSearch({
     const params = new URLSearchParams({ pickup, dropoff: drop, startDate, endDate, time: safePickupTime });
     if (pickupIsCity && pickupAddress.trim()) params.set("pickupAddress", pickupAddress.trim());
     if (dropoffIsCity && dropoffAddress.trim()) params.set("dropoffAddress", dropoffAddress.trim());
+    const category = peekPendingHomeCategory().slug || pendingCategorySlug;
+    if (category) params.set("category", category);
     return `/cars?${params.toString()}`;
   };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const href = searchHref();
-    if (href) router.push(href);
+    if (!href) {
+      setSearchAttention(true);
+      window.setTimeout(() => setSearchAttention(false), 4200);
+      return;
+    }
+    clearPendingHomeCategory();
+    router.push(href);
   };
+
+  const categoryHint = pendingCategorySlug
+    ? knownText(
+        locale,
+        "Choose country, location and dates, then search — {category} cars at that place will show if available.",
+      ).replace("{category}", pendingCategoryName || pendingCategorySlug)
+    : "";
 
   const prefetchSearch = () => {
     const href = searchHref();
@@ -945,8 +987,23 @@ export function AirportSearch({
   return (
     <form
       onSubmit={submit}
-      className="box-border w-full min-w-0 max-w-full overflow-x-clip rounded-2xl border border-white/30 bg-[#0b1f4b]/20 px-3 py-1.5 text-white shadow-xl backdrop-blur-[2px] sm:px-3.5 sm:py-2"
+      className={cn(
+        "box-border w-full min-w-0 max-w-full overflow-x-clip rounded-2xl border border-white/30 bg-[#0b1f4b]/20 px-3 py-1.5 text-white shadow-xl backdrop-blur-[2px] transition-[box-shadow,border-color] sm:px-3.5 sm:py-2",
+        searchAttention &&
+          "border-emerald-300 shadow-[0_0_0_3px_rgba(52,211,153,0.55),0_8px_28px_rgba(15,23,42,0.35)] animate-[home-search-pulse_1.1s_ease-in-out_3]",
+      )}
     >
+      {categoryHint ? (
+        <p
+          role="status"
+          className={cn(
+            "mb-1.5 rounded-lg border border-emerald-300/80 bg-emerald-500/20 px-2.5 py-1.5 text-center text-[11px] font-semibold leading-snug text-white [text-shadow:0_1px_2px_rgba(2,6,23,0.65)] sm:text-xs",
+            searchAttention && "animate-[home-search-pulse_1.1s_ease-in-out_3]",
+          )}
+        >
+          {categoryHint}
+        </p>
+      ) : null}
       <ul className="mb-1.5 grid grid-cols-2 gap-1 sm:mb-2 sm:grid-cols-3 sm:gap-1.5">
         {(
           [

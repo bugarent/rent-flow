@@ -70,6 +70,22 @@ body {
   animation: partner-booking-updated-blink 0.9s ease-in-out infinite;
 }
 
+@keyframes home-search-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.35), 0 8px 28px rgba(15, 23, 42, 0.28);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(52, 211, 153, 0.7), 0 10px 32px rgba(15, 23, 42, 0.4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[home-search-pulse_1\.1s_ease-in-out_3\] {
+    animation: none !important;
+  }
+}
+
 @keyframes about-fade-up {
   from {
     opacity: 0;
