@@ -32,6 +32,7 @@ import { getCrossBorderReturnPlaces } from "@/lib/server/cross-border-returns";
 import { popularPlacesListName } from "@/lib/seo/home-seo";
 import { buildPlacesItemListJsonLd } from "@/lib/seo/json-ld";
 import { plainHeading } from "@/lib/catalog/airport-seo";
+import { PopularDestinations } from "@/components/seo/popular-destinations";
 
 const DATA_WAIT_MS = 700;
 /**
@@ -195,6 +196,7 @@ export async function HomeBelowFold() {
       />
       <WhyChooseUsPanel content={infoContent} />
       {googleReviews ? <GoogleReviewsCarousel {...googleReviews} /> : null}
+      <PopularDestinations locale={locale} limit={18} variant="home" />
     </>
   );
 }

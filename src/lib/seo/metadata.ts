@@ -19,6 +19,8 @@ export type PageSeoInput = {
   imageAlt?: string;
   noIndex?: boolean;
   type?: "website" | "article";
+  /** When set, used for hreflang alternates (keys like en, ka, ru, x-default). Absolute or site paths. */
+  languages?: Record<string, string>;
 };
 
 export function buildPageMetadata({
@@ -31,9 +33,23 @@ export function buildPageMetadata({
   imageAlt = DEFAULT_OG_IMAGE_ALT,
   noIndex = false,
   type = "website",
+  languages,
 }: PageSeoInput): Metadata {
   const url = absoluteUrl(path);
   const ogImage = image.startsWith("http") ? image : absoluteUrl(image);
+  const languageMap = languages
+    ? Object.fromEntries(
+        Object.entries(languages).map(([key, href]) => [
+          key,
+          href.startsWith("http") ? href : absoluteUrl(href),
+        ]),
+      )
+    : {
+        "x-default": url,
+        en: url,
+        ka: url,
+        ru: url,
+      };
 
   return {
     title,
@@ -42,11 +58,7 @@ export function buildPageMetadata({
     keywords: keywords.length ? keywords : undefined,
     alternates: {
       canonical: url,
-      languages: {
-        "x-default": url,
-        en: url,
-        ka: url,
-      },
+      languages: languageMap,
     },
     openGraph: {
       type,

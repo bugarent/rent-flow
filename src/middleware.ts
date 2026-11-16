@@ -14,6 +14,8 @@ import {
   isPartnerPublicPath,
   isRetiredManagementPath,
 } from "@/lib/routes";
+import { LOCALE_COOKIE } from "@/lib/i18n/config";
+import { parseSeoLandingPath } from "@/lib/seo/location-landing-path";
 
 /** Must match `BP_SESSION_COOKIE` in business-partner-session.ts (edge-safe string). */
 const BP_SESSION_COOKIE = "bp_session";
@@ -149,6 +151,21 @@ export async function middleware(req: NextRequest) {
     return continueRequest(req, { noIndex: true });
   }
 
+  // SEO city/airport landings: /en/car-rental-kutaisi, /ka/mankanis-daqiraveba-tbilisi, …
+  const seoMatch = pathname.match(/^\/([^/]+)\/([^/]+)\/?$/);
+  if (seoMatch) {
+    const parsed = parseSeoLandingPath(seoMatch[1] || "", seoMatch[2] || "");
+    if (parsed) {
+      const res = continueRequest(req);
+      res.cookies.set(LOCALE_COOKIE, parsed.locale, {
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+        sameSite: "lax",
+      });
+      return withSecurityHeaders(res);
+    }
+  }
+
   return continueRequest(req);
 }
 
@@ -167,5 +184,16 @@ export const config = {
     "/vendor",
     "/vendor/:path*",
     "/api/:path*",
+    // SEO landing locales (must stay after static routes; invalid combos fall through as 404 in page)
+    "/en/:path*",
+    "/ka/:path*",
+    "/ru/:path*",
+    "/pl/:path*",
+    "/de/:path*",
+    "/es/:path*",
+    "/fr/:path*",
+    "/it/:path*",
+    "/nl/:path*",
+    "/tr/:path*",
   ],
 };

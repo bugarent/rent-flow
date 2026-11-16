@@ -14,9 +14,11 @@ const PublicChrome = dynamic(
 export function PublicShell({
   children,
   footerContact,
+  destinations = [],
 }: {
   children: React.ReactNode;
   footerContact?: FooterContactConfig | null;
+  destinations?: Array<{ href: string; label: string }>;
 }) {
   const pathname = usePathname() || "/";
   const contact = useResolvedFooterContact(footerContact);
@@ -33,7 +35,7 @@ export function PublicShell({
   const isHome = pathname === "/";
 
   return (
-    <PublicChrome contact={contact} isHome={isHome}>
+    <PublicChrome contact={contact} isHome={isHome} destinations={destinations}>
       {children}
     </PublicChrome>
   );

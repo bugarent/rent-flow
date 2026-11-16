@@ -1,6 +1,12 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/seo/config";
 import { softTimeout } from "@/lib/server/soft-timeout";
+import {
+  SEO_LANDING_LOCALES,
+  SEO_LANDING_PREFIX,
+  listSeoLocations,
+  seoLandingPath,
+} from "@/lib/seo/location-landings";
 
 type CarSitemapRow = { id: string; updatedAt?: Date | string | null };
 
@@ -19,7 +25,7 @@ async function loadApprovedCarIds(): Promise<CarSitemapRow[]> {
   }
 }
 
-async function loadAirportCards(): Promise<Array<{ iata: string; updatedAt?: string }>> {
+async function loadAirportCards(): Promise<Array<{ iata: string; updatedAt?: string }> > {
   try {
     const { listHomepageAirports } = await import("@/lib/server/homepage-airports-store");
     return (await listHomepageAirports()).filter((row) => row.iata.trim());
@@ -71,5 +77,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.9,
   }));
 
-  return [...staticEntries, ...airportEntries, ...carEntries];
+  const seoLocations = await softTimeout(listSeoLocations(), [], 4000);
+  const locationEntries: MetadataRoute.Sitemap = [];
+  for (const locale of SEO_LANDING_LOCALES) {
+    for (const loc of seoLocations) {
+      locationEntries.push({
+        url: `${SITE_URL}${seoLandingPath(locale, loc.slug)}`,
+        lastModified: now,
+        changeFrequency: "weekly",
+        priority: loc.kind === "airport" ? 0.92 : 0.88,
+      });
+    }
+  }
+
+  // Ensure prefix roots are discoverable even if empty (helps Search Console).
+  for (const locale of SEO_LANDING_LOCALES) {
+    void SEO_LANDING_PREFIX[locale];
+  }
+
+  return [...staticEntries, ...locationEntries, ...airportEntries, ...carEntries];
 }

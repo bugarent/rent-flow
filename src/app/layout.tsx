@@ -94,11 +94,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   // Admin and partner pages do not show this contact. A cold database must not
   // hold their first byte. Public pages wait only briefly; the shell fills the
   // rest from the last visit and /api/footer-contact.
-  const [fxRates, footerContact] = portal
-    ? [defaultFxRates(), emptyFooterContact()]
+  const { listSeoDestinationLinks } = await import("@/lib/seo/destination-links");
+  const [fxRates, footerContact, destinations] = portal
+    ? [defaultFxRates(), emptyFooterContact(), [] as Array<{ href: string; label: string }>]
     : await Promise.all([
         softTimeout(cachedFxRates(), defaultFxRates(), 250),
         softTimeout(cachedFooterContact(), cachedFooterContact.peek() ?? emptyFooterContact(), 400),
+        softTimeout(listSeoDestinationLinks(locale, 24), [], 500),
       ]);
   const dir = isRtl(locale) ? "rtl" : "ltr";
 
@@ -133,7 +135,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           ]}
         />
         <AppProviders locale={locale} currency={currency} fxRates={fxRates}>
-          <PublicShell footerContact={footerContact}>{children}</PublicShell>
+          <PublicShell footerContact={footerContact} destinations={destinations}>
+            {children}
+          </PublicShell>
         </AppProviders>
         <Suspense fallback={null}>
           <RouteLoadingIndicator />

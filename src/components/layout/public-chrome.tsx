@@ -12,10 +12,12 @@ export function PublicChrome({
   children,
   contact,
   isHome,
+  destinations = [],
 }: {
   children: React.ReactNode;
   contact: FooterContactConfig | null;
   isHome: boolean;
+  destinations?: Array<{ href: string; label: string }>;
 }) {
   return (
     <>
@@ -27,7 +29,7 @@ export function PublicChrome({
         <Header overlay={isHome} />
       </Suspense>
       <main className="relative min-w-0 flex-1 overflow-x-clip pb-20 md:pb-0">{children}</main>
-      <Footer contact={contact} />
+      <Footer contact={contact} destinations={destinations} />
       <FloatingOnlineChat email={contact?.email} phone={contact?.phone} />
       <MobileBottomNav />
     </>
