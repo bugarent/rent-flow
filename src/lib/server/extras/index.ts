@@ -26,6 +26,7 @@ export {
 
 export {
   hydrateListingExtras,
+  hydratePartnerListingExtras,
   applyPartnerExtraOfferModes,
   mergePartnerOfferedExtras,
   mergeFreeInsuranceExtras,

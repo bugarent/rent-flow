@@ -11,7 +11,10 @@ import { findCarExtraOffer, type CarExtraOffer } from "@/lib/cars/car-details";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
 import { isListingInsuranceService } from "@/lib/extras/checkout-slot";
 import { partnerStatusLocked } from "@/lib/extras/partner-service-choice";
-import { partnerExtraPrefAppliesToCar } from "@/lib/extras/partner-extra-pref";
+import {
+  partnerExtraOfferedOnListing,
+  partnerExtraPrefAppliesToCar,
+} from "@/lib/extras/partner-extra-pref";
 import { formatAmountNumber } from "@/lib/utils";
 import { usePartnerLocale } from "@/components/providers/partner-locale-context";
 import { knownText } from "@/lib/i18n/known-record-text";
@@ -254,8 +257,8 @@ export function catalogIdsForOffers(catalog: ExtraServicePricing[], offers: CarE
 }
 
 /**
- * Services on the car form: the ones on the partner's own list (Equipment & services page),
- * each switched on or off per listing. Cabinet prefs set the default state.
+ * Services on the car form (partner + admin review): cabinet On or Forbidden only.
+ * Cabinet Off never appears on listings — same rule for existing and new partners.
  * Cross-border stays gated by its cabinet permission. If the cabinet list could not load, every service stays.
  */
 export function extrasVisibleOnCarForm(
@@ -265,6 +268,8 @@ export function extrasVisibleOnCarForm(
     fallback?: ExtraServicePricing[];
     carExtraIds?: Set<string>;
     offerIds?: Set<string>;
+    /** When set, Off scoped to other cars is also hidden. */
+    carId?: string | null;
     /** Empty cabinet that did load: mandatory services only, not the whole catalog. */
     whenUntrusted?: "all" | "mandatory";
   },
@@ -283,15 +288,25 @@ export function extrasVisibleOnCarForm(
       if (opts.whenUntrusted === "mandatory") return partnerStatusLocked(service);
       return true;
     }
-    if (pref) return pref.added !== false;
+    if (pref) {
+      return partnerExtraOfferedOnListing(
+        {
+          added: pref.added,
+          enabled: pref.enabled,
+          forbidden: pref.forbidden,
+          carIds: pref.carIds,
+        },
+        opts.carId,
+      );
+    }
     return onCar(service);
   });
 }
 
 /**
  * One listing's extras, taken from the partner's cabinet.
- * The same list, on/off and price on the partner's phone, desktop and the admin review.
- * A saved offer on the car does not add services or flip a switch.
+ * Same On/Forbidden list and prices on partner phone, desktop and admin review.
+ * Cabinet Off is omitted. A saved offer on the car does not add services or flip a switch.
  */
 export function selectionsForCar(
   catalog: ExtraServicePricing[],
@@ -301,6 +316,7 @@ export function selectionsForCar(
 ): { catalog: ExtraServicePricing[]; selections: PartnerExtraSelection[] } {
   const visible = extrasVisibleOnCarForm(catalog, {
     prefs: prefItems,
+    carId,
     whenUntrusted: opts?.whenUntrusted,
   });
   const prefs = indexExtraPrefs(prefItems);

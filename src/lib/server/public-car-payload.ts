@@ -1,6 +1,5 @@
 import "server-only";
 
-import { filterExtrasByCarOffers } from "@/lib/cars/car-details";
 
 type PartnerRef = { partnerId?: string; partner?: { id?: string } };
 
@@ -47,19 +46,20 @@ async function deliveryRows(partnerId: string, rows: unknown) {
   }
 }
 
-async function hydratedExtras(partnerId: string, carId: string, extras: unknown) {
+async function hydratedExtras(
+  partnerId: string,
+  carId: string,
+  extras: unknown,
+  description?: string | null,
+) {
   try {
-    const {
-      hydrateListingExtras,
-      mergeFreeInsuranceExtras,
-      applyPartnerExtraOfferModes,
-      mergePartnerOfferedExtras,
-    } = await import("@/lib/server/extras-store");
-    const hydrated = await hydrateListingExtras(extras);
-    // Free catalog rows first, then cabinet modes (off/forbid/price), then inject missing offered prefs.
-    const withFree = await mergeFreeInsuranceExtras(hydrated);
-    const withPrefs = await applyPartnerExtraOfferModes(withFree, partnerId, carId);
-    return await mergePartnerOfferedExtras(withPrefs, partnerId, carId);
+    const { hydratePartnerListingExtras } = await import("@/lib/server/extras-store");
+    return await hydratePartnerListingExtras({
+      rawExtras: extras,
+      partnerId,
+      carId,
+      description,
+    });
   } catch {
     return undefined;
   }
@@ -150,14 +150,12 @@ export async function enrichPublicCarPayload<T extends object>(
       deliveryRows(partnerId, fields.deliveryPrices),
       input.keepStoredExtras
         ? Promise.resolve(undefined)
-        : hydratedExtras(partnerId, carId, fields.extras),
+        : hydratedExtras(partnerId, carId, fields.extras, String(fields.description || "")),
       companyPayments(partnerId),
       clientLanguages(partnerId),
       borderRoutes(partnerId),
     ]);
-  const extras = Array.isArray(hydrated)
-    ? filterExtrasByCarOffers(hydrated, String(fields.description || ""))
-    : hydrated;
+  const extras = hydrated;
   return {
     ...payload,
     ...(discountPercent !== undefined ? { discountPercent } : {}),

@@ -459,11 +459,32 @@ export async function mergeFreeInsuranceExtras(
   return sortHydratedExtras(merged);
 }
 
+/**
+ * Catalog free rows → cabinet on/forbid/off → inject missing offered prefs →
+ * drop per-listing Off stamps from the car description. Same order for checkout,
+ * booking quotes and the public car payload.
+ */
+export async function hydratePartnerListingExtras(opts: {
+  rawExtras: unknown;
+  partnerId?: string | null;
+  carId?: string | null;
+  description?: string | null;
+}): Promise<HydratedListingExtra[]> {
+  const hydrated = await hydrateListingExtras(opts.rawExtras);
+  const withFree = await mergeFreeInsuranceExtras(hydrated);
+  const withPrefs = await applyPartnerExtraOfferModes(withFree, opts.partnerId, opts.carId);
+  const withOffered = await mergePartnerOfferedExtras(withPrefs, opts.partnerId, opts.carId);
+  if (opts.description == null || opts.description === undefined) return withOffered;
+  const { filterExtrasByCarOffers } = await import("@/lib/cars/car-details");
+  return filterExtrasByCarOffers(withOffered, opts.description);
+}
+
 /** Prices the customer can actually be charged: partner daily inside admin min/max, rental total inside the admin period cap. */
 export async function customerExtraQuotes(opts: {
   rawExtras: unknown;
   partnerId?: string | null;
   carId?: string | null;
+  description?: string | null;
 }): Promise<
   Array<{
     extraServiceId: string;
@@ -472,10 +493,7 @@ export async function customerExtraQuotes(opts: {
     minPeriodEur: number | null;
   }>
 > {
-  const hydrated = await hydrateListingExtras(opts.rawExtras);
-  const withFree = await mergeFreeInsuranceExtras(hydrated);
-  const withPrefs = await applyPartnerExtraOfferModes(withFree, opts.partnerId, opts.carId);
-  const withOffered = await mergePartnerOfferedExtras(withPrefs, opts.partnerId, opts.carId);
+  const withOffered = await hydratePartnerListingExtras(opts);
   return withOffered
     .filter((row) => !row.forbidden)
     .map((row) => {

@@ -23,6 +23,7 @@ export {
   ensureExtraCopyTranslations,
   scheduleExtraCopyTranslations,
   hydrateListingExtras,
+  hydratePartnerListingExtras,
   applyPartnerExtraOfferModes,
   mergePartnerOfferedExtras,
   mergeFreeInsuranceExtras,

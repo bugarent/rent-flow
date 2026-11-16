@@ -14,10 +14,8 @@ import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import {
   buildExtraSelections,
   cabinetRowsToPrefs,
-  extrasVisibleOnCarForm,
   indexExtraPrefs,
   selectionsForCar,
-  selectionsFromCabinet,
   type CarFormExtraPref,
   type PartnerExtraSelection,
 } from "@/components/partner/partner-extras-fields";
@@ -563,7 +561,7 @@ export function PartnerCreateCarForm({
     const rows = initialListing
       ? initialListing.selections
       : initialExtraPrefs && serverExtraPrefs
-        ? selectionsFromCabinet(initialExtrasCatalog, initialExtraPrefs)
+        ? selectionsForCar(initialExtrasCatalog, initialExtraPrefs, carId || "").selections
         : buildExtraSelections(initialExtrasCatalog);
     return rows.map((row) => ({
       ...row,
@@ -951,22 +949,11 @@ export function PartnerCreateCarForm({
         if (!carId && !initialExtraPrefsRef.current && extrasRes?.ok && Array.isArray(extras) && extras.length) {
           const prefItems = Array.isArray(prefsData?.items) ? prefsData.items : [];
           const prefs = indexExtraPrefs(prefItems);
-          const filtered = extrasVisibleOnCarForm(extras, {
-            prefs: prefItems,
-            fallback: extrasFallbackRef.current,
-          });
-          if (!cancelled && (prefs.trusted || filtered.length > 0)) {
-            setExtrasCatalog(filtered);
+          const listing = selectionsForCar(extras, prefItems, "");
+          if (!cancelled && (prefs.trusted || listing.catalog.length > 0)) {
+            setExtrasCatalog(listing.catalog);
             setExtrasReady(true);
-            setExtraSelections(
-              selectionsFromCabinet(filtered, prefItems).map((row) => ({
-                ...row,
-                priceEur:
-                  !row.priceEur || row.priceEur === "0"
-                    ? row.priceEur
-                    : eurToPartnerAmount(row.priceEur, nextCurrency, nextRates),
-              })),
-            );
+            setExtraSelections(displayExtraPrices(listing.selections, nextCurrency, nextRates));
           }
         }
         if (meRes?.ok) {
@@ -2201,7 +2188,14 @@ export function PartnerCreateCarForm({
             <>
             {(() => {
               const sorted = [...extrasCatalog]
-                .filter((service) => service.isActive !== false)
+                .filter((service) => {
+                  if (service.isActive === false) return false;
+                  if (isMandatoryExtra(service)) return true;
+                  const row = extraSelections.find((s) => s.extraServiceId === service.id);
+                  // Cabinet or per-listing Off: keep in state for save stamps, hide in the UI.
+                  if (row && !row.forbidden && !row.enabled) return false;
+                  return true;
+                })
                 .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
               const insuranceServices = sorted.filter((service) => isListingInsuranceService(service));
               const otherServices = sorted.filter((service) => !isListingInsuranceService(service));

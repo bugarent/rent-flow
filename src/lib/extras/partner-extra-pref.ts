@@ -4,6 +4,7 @@ export type PartnerExtraPrefScope = {
   carIds?: string[];
   enabled?: boolean;
   forbidden?: boolean;
+  added?: boolean;
 };
 
 /**
@@ -34,4 +35,19 @@ export function partnerExtraPrefAppliesToCar(
     const otherBare = other.replace(/^file-partner-/, "");
     return Boolean(bare) && otherBare === bare;
   });
+}
+
+/**
+ * Cabinet On or Forbidden for this car → show on listing forms / customer offers.
+ * Cabinet Off (or not on this car / removed from the partner list) → hide everywhere.
+ */
+export function partnerExtraOfferedOnListing(
+  pref: PartnerExtraPrefScope | null | undefined,
+  carId?: string | null,
+): boolean {
+  if (!pref) return false;
+  if (pref.added === false) return false;
+  if (!partnerExtraPrefAppliesToCar(pref, carId)) return false;
+  if (pref.forbidden) return true;
+  return pref.enabled !== false;
 }

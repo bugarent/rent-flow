@@ -531,6 +531,7 @@ export async function POST(req: Request) {
           rawExtras: fileCar.extras,
           partnerId: fileCar.partnerId,
           carId: id,
+          description: pricedFileCar.description ?? fileCar.description,
         });
         const extraLines = buildBookingExtraLines({
           extras,
@@ -859,6 +860,7 @@ export async function POST(req: Request) {
       rawExtras: car.extras,
       partnerId: car.partner?.id,
       carId: car.id,
+      description: pricedCar.description ?? car.description,
     });
     const quoteById = new Map(quotes.map((quote) => [quote.extraServiceId, quote]));
     let extrasTotal = 0;

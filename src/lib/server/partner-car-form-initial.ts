@@ -70,7 +70,10 @@ export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
       const pref = prefById.get(service.id);
       if (isCrossBorderExtra(service)) return Boolean(pref?.enabled || pref?.forbidden);
       if (!fleet) return true;
-      return partnerServiceAdded(service, pref, fleet.usedOnCar(service));
+      if (!partnerServiceAdded(service, pref, fleet.usedOnCar(service))) return false;
+      // Cabinet Off stays off listing forms (partner + admin); customer hydrate drops it too.
+      if (pref && !pref.forbidden && pref.enabled === false) return false;
+      return true;
     });
     const initialExtrasCatalog = await scopeExtrasToPartner(
       offered,

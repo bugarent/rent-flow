@@ -61,16 +61,13 @@ export async function catalogExtrasForCar(carId: string): Promise<
   try {
     const fileCar = await getFileCar(carId);
     if (fileCar?.extras?.length) {
-      const {
-        hydrateListingExtras,
-        mergeFreeInsuranceExtras,
-        applyPartnerExtraOfferModes,
-        mergePartnerOfferedExtras,
-      } = await import("@/lib/server/extras-store");
-      let hydrated = await hydrateListingExtras(fileCar.extras);
-      hydrated = await mergeFreeInsuranceExtras(hydrated);
-      hydrated = await applyPartnerExtraOfferModes(hydrated, fileCar.partnerId, carId);
-      hydrated = await mergePartnerOfferedExtras(hydrated, fileCar.partnerId, carId);
+      const { hydratePartnerListingExtras } = await import("@/lib/server/extras-store");
+      const hydrated = await hydratePartnerListingExtras({
+        rawExtras: fileCar.extras,
+        partnerId: fileCar.partnerId,
+        carId,
+        description: fileCar.description,
+      });
       return hydrated
         .filter((e) => !e.forbidden && e.extraService?.isActive !== false)
         .filter((e) => pickServiceLabel(localizedLabel(e.extraService?.name, "")))

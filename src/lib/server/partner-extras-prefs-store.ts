@@ -52,7 +52,10 @@ function cleanCarIds(raw: unknown): string[] | undefined {
   return ids;
 }
 
-export { partnerExtraPrefAppliesToCar } from "@/lib/extras/partner-extra-pref";
+export {
+  partnerExtraOfferedOnListing,
+  partnerExtraPrefAppliesToCar,
+} from "@/lib/extras/partner-extra-pref";
 
 async function readStore(): Promise<StoreFile> {
   try {
