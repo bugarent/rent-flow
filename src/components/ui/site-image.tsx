@@ -14,13 +14,20 @@ const siteLoader: ImageLoader = ({ src, width }) => displayImageUrl(src, width, 
  * next/image with the site loader: responsive srcset from `sizes`, lazy by default.
  * Above-the-fold images pass loading="eager" and fetchPriority="high".
  */
-export function SiteImage({ src, alt, unoptimized, ...props }: Omit<ImageProps, "loader">) {
+export function SiteImage({
+  src,
+  alt,
+  unoptimized,
+  decoding = "async",
+  ...props
+}: Omit<ImageProps, "loader">) {
   const url = typeof src === "string" ? src : "";
   return (
     <Image
       {...props}
       src={src}
       alt={alt}
+      decoding={decoding}
       loader={siteLoader}
       unoptimized={unoptimized ?? (url ? !canResizeImage(url) : false)}
     />

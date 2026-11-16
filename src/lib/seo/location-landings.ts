@@ -157,9 +157,23 @@ export type LocationSeoCopy = {
   cta: string;
   popularTitle: string;
   breadcrumbHome: string;
+  breadcrumbCountry: string;
   keywords: string[];
   anchor: string;
 };
+
+/** Localized country label for breadcrumbs (catalog first, then Intl). */
+export function countryDisplayName(iso2: string, locale: Locale): string {
+  const key = iso2.trim().toUpperCase();
+  if (!key) return "";
+  const hit = CATALOG_AIRPORTS.find((a) => a.countryIso2 === key);
+  if (hit) return hit.countryName[locale] || hit.countryName.en;
+  try {
+    return new Intl.DisplayNames([locale], { type: "region" }).of(key) || key;
+  } catch {
+    return key;
+  }
+}
 
 function localizedCity(location: SeoLocation, locale: Locale): string {
   if (location.iata) return cityDisplayName(location.iata, locale) || location.cityName;
@@ -179,6 +193,7 @@ export function locationLandingCopy(location: SeoLocation, locale: Locale): Loca
   const city = localizedCity(location, locale);
   const airportName = localizedAirportLabel(location, locale);
   const airportCode = location.iata || (location.kind === "airport" ? location.code : city);
+  const country = countryDisplayName(location.countryIso2, locale) || location.countryIso2;
   const place =
     location.kind === "airport"
       ? `${airportName}${location.iata ? ` (${location.iata})` : ""}`
@@ -196,6 +211,7 @@ export function locationLandingCopy(location: SeoLocation, locale: Locale): Loca
       cta: "მანქანების ნახვა",
       popularTitle: "პოპულარული მიმართულებები",
       breadcrumbHome: "მთავარი",
+      breadcrumbCountry: country,
       keywords: [
         `მანქანის დაქირავება ${city}`,
         `მანქანის ქირაობა ${city}`,
@@ -224,6 +240,7 @@ export function locationLandingCopy(location: SeoLocation, locale: Locale): Loca
       cta: "Смотреть автомобили",
       popularTitle: "Популярные направления",
       breadcrumbHome: "Главная",
+      breadcrumbCountry: country,
       keywords: [
         `аренда авто ${city}`,
         `прокат автомобилей ${city}`,
@@ -254,6 +271,7 @@ export function locationLandingCopy(location: SeoLocation, locale: Locale): Loca
     cta: "Browse cars",
     popularTitle: "Popular destinations",
     breadcrumbHome: "Home",
+    breadcrumbCountry: country,
     keywords: [
       `car rental ${city}`,
       `car rental ${place}`,

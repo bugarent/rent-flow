@@ -95,14 +95,40 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   // hold their first byte. Public pages wait only briefly; the shell fills the
   // rest from the last visit and /api/footer-contact.
   const { listSeoDestinationLinks } = await import("@/lib/seo/destination-links");
-  const [fxRates, footerContact, destinations] = portal
-    ? [defaultFxRates(), emptyFooterContact(), [] as Array<{ href: string; label: string }>]
+  const [fxRates, footerContact, destinations, googleReviews] = portal
+    ? [
+        defaultFxRates(),
+        emptyFooterContact(),
+        [] as Array<{ href: string; label: string }>,
+        null as { placeRating: number | null; userRatingsTotal: number | null } | null,
+      ]
     : await Promise.all([
         softTimeout(cachedFxRates(), defaultFxRates(), 250),
         softTimeout(cachedFooterContact(), cachedFooterContact.peek() ?? emptyFooterContact(), 400),
         softTimeout(listSeoDestinationLinks(locale, 24), [], 500),
+        softTimeout(
+          import("@/lib/server/homepage-google-reviews-store").then(async (m) => {
+            const cfg = await m.getHomepageGoogleReviewsConfig();
+            return {
+              placeRating: cfg.placeRating,
+              userRatingsTotal: cfg.userRatingsTotal,
+            };
+          }),
+          { placeRating: null, userRatingsTotal: null },
+          300,
+        ),
       ]);
   const dir = isRtl(locale) ? "rtl" : "ltr";
+  const aggregateRating =
+    googleReviews?.placeRating != null &&
+    googleReviews.placeRating > 0 &&
+    googleReviews.userRatingsTotal != null &&
+    googleReviews.userRatingsTotal > 0
+      ? {
+          ratingValue: googleReviews.placeRating,
+          reviewCount: googleReviews.userRatingsTotal,
+        }
+      : null;
 
   return (
     <html
@@ -126,11 +152,14 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <JsonLd
           data={[
             buildWebSiteJsonLd(),
-            buildLocalBusinessJsonLd({
-              phone: footerContact.phone,
-              email: footerContact.email,
-              address: footerContact.address,
-            }),
+            buildLocalBusinessJsonLd(
+              {
+                phone: footerContact.phone,
+                email: footerContact.email,
+                address: footerContact.address,
+              },
+              aggregateRating,
+            ),
             buildServiceJsonLd(),
           ]}
         />

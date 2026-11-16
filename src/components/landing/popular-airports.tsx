@@ -34,13 +34,17 @@ function AirportCard({
       className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
       aria-hidden={loopCopy || undefined}
     >
-      <div className="relative h-40 bg-slate-200 sm:h-44">
+      <div className="relative aspect-[16/10] w-full bg-slate-200">
         <SiteImage
           src={airport.image}
-          alt=""
+          alt={localizedAirportTitle(
+            { iata: airport.iata, title: airport.name, translations: airport.translations },
+            locale,
+          )}
           fill
           sizes="(max-width: 639px) 90vw, (max-width: 1023px) 45vw, 360px"
           className="object-cover"
+          loading="lazy"
           fetchPriority="low"
         />
       </div>

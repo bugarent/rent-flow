@@ -19,9 +19,13 @@ import { SiteImage } from "@/components/ui/site-image";
 import { JsonLd } from "@/components/seo/json-ld";
 import { readPreferences } from "@/lib/server/preferences";
 import { buildPageMetadata } from "@/lib/seo/metadata";
-import { buildBreadcrumbJsonLd } from "@/lib/seo/json-ld";
-import { absoluteUrl, SITE_URL } from "@/lib/seo/config";
-import { SEO_SITE_NAME } from "@/lib/brand";
+import { buildBreadcrumbJsonLd, buildLocationAutoRentalJsonLd } from "@/lib/seo/json-ld";
+import { absoluteUrl } from "@/lib/seo/config";
+import { CATALOG_AIRPORTS } from "@/lib/catalog/airports";
+import { countryDisplayName } from "@/lib/seo/location-landings";
+import { emptyFooterContact } from "@/lib/catalog/footer-contact";
+import { getFooterContactConfig } from "@/lib/server/footer-contact-store";
+import { softTimeout } from "@/lib/server/soft-timeout";
 
 export const dynamic = "force-dynamic";
 
@@ -94,38 +98,61 @@ export default async function AirportInfoPage({
   );
 
   const url = absoluteUrl(pagePath(code));
+  const footerContact = await softTimeout(getFooterContactConfig(), emptyFooterContact(), 1500);
+  const catalog = CATALOG_AIRPORTS.find((a) => a.iata === code);
+  const countryLabel = country
+    ? countryDisplayName(country, asCardLocale(locale)) || country
+    : "";
+  const breadcrumb = [
+    { name: copy.home, path: "/" },
+    ...(countryLabel ? [{ name: countryLabel, path: "/locations" as const }] : []),
+    { name: title, path: pagePath(code) },
+  ];
   const jsonLd = [
-    buildBreadcrumbJsonLd([
-      { name: SEO_SITE_NAME, path: "/" },
-      { name: title, path: pagePath(code) },
-    ]),
-    {
-      "@context": "https://schema.org",
-      "@type": "Service",
-      serviceType: "Car rental",
+    buildBreadcrumbJsonLd(breadcrumb),
+    buildLocationAutoRentalJsonLd({
       name: title,
       description: seo.description,
       url,
-      ...(airport.imageUrl ? { image: absoluteUrl(airport.imageUrl) } : {}),
-      provider: { "@type": "Organization", name: SEO_SITE_NAME, url: SITE_URL },
+      image: airport.imageUrl || undefined,
+      telephone: footerContact.phone,
+      email: footerContact.email,
+      addressLocality: findSearchPlace(code)?.cityName || airportName,
+      addressCountry: country || undefined,
+      latitude: catalog?.latitude ?? null,
+      longitude: catalog?.longitude ?? null,
       areaServed: /^CITY-/i.test(code)
         ? { "@type": "City", name: airportName }
         : { "@type": "Airport", name: airportName, iataCode: code },
-    },
+    }),
   ];
 
   return (
     <article className="mx-auto w-full max-w-3xl px-4 py-10 sm:py-14">
       <JsonLd data={jsonLd} />
       <nav aria-label="Breadcrumb" className="mb-4 text-xs text-slate-500">
-        <Link href="/" className="hover:text-sky-700 hover:underline">
-          {copy.home}
-        </Link>
-        <span className="mx-1.5">›</span>
-        <span className="text-slate-700">{title}</span>
+        <ol className="flex flex-wrap items-center gap-1.5">
+          <li>
+            <Link href="/" className="hover:text-sky-700 hover:underline">
+              {copy.home}
+            </Link>
+          </li>
+          {countryLabel ? (
+            <>
+              <li aria-hidden>›</li>
+              <li>
+                <Link href="/locations" className="hover:text-sky-700 hover:underline">
+                  {countryLabel}
+                </Link>
+              </li>
+            </>
+          ) : null}
+          <li aria-hidden>›</li>
+          <li className="text-slate-700">{title}</li>
+        </ol>
       </nav>
       {airport.imageUrl ? (
-        <div className="relative mb-6 h-52 w-full overflow-hidden rounded-2xl sm:h-72">
+        <div className="relative mb-6 aspect-[16/9] w-full overflow-hidden rounded-2xl bg-slate-200 sm:aspect-[2/1]">
           <SiteImage
             src={airport.imageUrl}
             alt={title}

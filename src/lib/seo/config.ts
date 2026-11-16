@@ -5,7 +5,7 @@ export const SITE_URL =
   (typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "")) ||
   `https://${SITE_DOMAIN}`;
 
-export const DEFAULT_OG_IMAGE = "/images/hero-tarmac.jpg";
+export const DEFAULT_OG_IMAGE = "/images/hero-tarmac.webp";
 export const DEFAULT_OG_IMAGE_ALT =
   "Airport car rental in Georgia — Kutaisi, Tbilisi and Batumi";
 

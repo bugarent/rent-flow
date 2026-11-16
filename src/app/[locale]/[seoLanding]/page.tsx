@@ -2,10 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { JsonLd } from "@/components/seo/json-ld";
+import { SiteImage } from "@/components/ui/site-image";
 import { SEO_SITE_NAME } from "@/lib/brand";
 import { buildPageMetadata } from "@/lib/seo/metadata";
-import { buildBreadcrumbJsonLd } from "@/lib/seo/json-ld";
-import { absoluteUrl, SITE_URL } from "@/lib/seo/config";
+import {
+  buildBreadcrumbJsonLd,
+  buildLocationAutoRentalJsonLd,
+  buildVehicleOffersItemListJsonLd,
+} from "@/lib/seo/json-ld";
+import { absoluteUrl } from "@/lib/seo/config";
 import {
   findSeoLocationBySlug,
   listSeoLocations,
@@ -16,7 +21,10 @@ import {
   seoLandingStaticParams,
   type SeoLocation,
 } from "@/lib/seo/location-landings";
+import { loadLocationLandingExtras } from "@/lib/seo/location-landing-data";
 import { softTimeout } from "@/lib/server/soft-timeout";
+import { emptyFooterContact } from "@/lib/catalog/footer-contact";
+import { getFooterContactConfig } from "@/lib/server/footer-contact-store";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +57,11 @@ export async function generateMetadata({
   const { parsed, location } = loaded;
   const copy = locationLandingCopy(location, parsed.locale);
   const path = seoLandingPath(parsed.locale, location.slug);
+  const extras = await softTimeout(
+    loadLocationLandingExtras(location),
+    { samples: [], lowPriceEur: null, offerCount: null, imageUrl: undefined },
+    2500,
+  );
   return buildPageMetadata({
     title: copy.title,
     description: copy.description,
@@ -56,6 +69,8 @@ export async function generateMetadata({
     locale: parsed.locale,
     keywords: copy.keywords,
     languages: seoLandingLanguageAlternates(location.slug),
+    image: extras.imageUrl,
+    imageAlt: copy.h1,
   });
 }
 
@@ -73,6 +88,14 @@ export default async function SeoLocationLandingPage({
   const path = seoLandingPath(parsed.locale, location.slug);
   const pickup = encodeURIComponent(location.code);
   const searchHref = `/cars?pickup=${pickup}`;
+  const [extras, footerContact] = await Promise.all([
+    softTimeout(
+      loadLocationLandingExtras(location),
+      { samples: [], lowPriceEur: null, offerCount: null, imageUrl: undefined },
+      2500,
+    ),
+    softTimeout(getFooterContactConfig(), emptyFooterContact(), 1500),
+  ]);
 
   const related = locations
     .filter((row) => row.code !== location.code && row.countryIso2 === location.countryIso2)
@@ -82,19 +105,29 @@ export default async function SeoLocationLandingPage({
     16,
   );
 
+  const breadcrumb = [
+    { name: copy.breadcrumbHome, path: "/" },
+    ...(copy.breadcrumbCountry
+      ? [{ name: copy.breadcrumbCountry, path: "/locations" as const }]
+      : []),
+    { name: copy.h1, path },
+  ];
+
   const jsonLd = [
-    buildBreadcrumbJsonLd([
-      { name: SEO_SITE_NAME, path: "/" },
-      { name: copy.h1, path },
-    ]),
-    {
-      "@context": "https://schema.org",
-      "@type": "Service",
-      serviceType: "Car rental",
+    buildBreadcrumbJsonLd(breadcrumb),
+    buildLocationAutoRentalJsonLd({
       name: copy.h1,
       description: copy.description,
       url: absoluteUrl(path),
-      provider: { "@type": "Organization", name: SEO_SITE_NAME, url: SITE_URL },
+      image: extras.imageUrl,
+      telephone: footerContact.phone,
+      email: footerContact.email,
+      addressLocality: location.cityName,
+      addressCountry: location.countryIso2 || undefined,
+      latitude: extras.latitude,
+      longitude: extras.longitude,
+      lowPriceEur: extras.lowPriceEur,
+      offerCount: extras.offerCount,
       areaServed:
         location.kind === "city"
           ? { "@type": "City", name: location.cityName }
@@ -103,7 +136,24 @@ export default async function SeoLocationLandingPage({
               name: location.placeName,
               ...(location.iata ? { iataCode: location.iata } : {}),
             },
-    },
+    }),
+    ...(extras.samples.length
+      ? [
+          buildVehicleOffersItemListJsonLd(
+            copy.h1,
+            extras.samples.map((sample) => ({
+              id: sample.id,
+              name: sample.name,
+              brand: sample.brand,
+              model: sample.model,
+              priceEur: sample.priceEur,
+              image: sample.image,
+              path: sample.path,
+              description: `${sample.name} — ${copy.h1}`,
+            })),
+          ),
+        ]
+      : []),
   ];
 
   return (
@@ -116,10 +166,35 @@ export default async function SeoLocationLandingPage({
               {copy.breadcrumbHome}
             </Link>
           </li>
+          {copy.breadcrumbCountry ? (
+            <>
+              <li aria-hidden>/</li>
+              <li>
+                <Link href="/locations" className="hover:text-slate-800">
+                  {copy.breadcrumbCountry}
+                </Link>
+              </li>
+            </>
+          ) : null}
           <li aria-hidden>/</li>
           <li className="font-semibold text-slate-700">{copy.h1}</li>
         </ol>
       </nav>
+
+      {extras.imageUrl ? (
+        <div className="relative mb-6 aspect-[16/9] w-full overflow-hidden rounded-2xl bg-slate-200">
+          <SiteImage
+            src={extras.imageUrl}
+            alt={copy.h1}
+            fill
+            sizes="(max-width: 800px) 100vw, 768px"
+            className="object-cover"
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+          />
+        </div>
+      ) : null}
 
       <header className="space-y-3">
         <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">

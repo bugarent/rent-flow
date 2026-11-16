@@ -39,13 +39,14 @@ function CategoryCard({
       className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
       aria-hidden={loopCopy || undefined}
     >
-      <div className="relative h-36 bg-slate-100">
+      <div className="relative aspect-[16/10] w-full bg-slate-100">
         <SiteImage
           src={category.imageUrl}
-          alt=""
+          alt={name}
           fill
           sizes="(max-width: 639px) 80vw, 300px"
           className="object-cover"
+          loading="lazy"
           fetchPriority="low"
         />
       </div>

@@ -54,16 +54,33 @@ function cacheSet(key: string, value: { bytes: Buffer; contentType: string }) {
   }
 }
 
-async function maybeResize(bytes: Buffer, contentType: string, width: number | null) {
+type ResizeFormat = "avif" | "webp";
+
+function preferredFormat(accept: string | null): ResizeFormat {
+  const header = (accept || "").toLowerCase();
+  // Prefer AVIF when the client advertises it (Chrome/Edge/Firefox); else WebP.
+  if (header.includes("image/avif")) return "avif";
+  return "webp";
+}
+
+async function maybeResize(
+  bytes: Buffer,
+  contentType: string,
+  width: number | null,
+  format: ResizeFormat = "webp",
+) {
   if (!width || contentType === "application/pdf" || contentType === "image/gif") {
     return { bytes, contentType };
   }
   try {
-    const out = await sharp(bytes, { failOn: "none" })
+    const pipeline = sharp(bytes, { failOn: "none" })
       .rotate()
-      .resize({ width, withoutEnlargement: true })
-      .webp({ quality: 72 })
-      .toBuffer();
+      .resize({ width, withoutEnlargement: true });
+    if (format === "avif") {
+      const out = await pipeline.avif({ quality: 55, effort: 4 }).toBuffer();
+      return { bytes: out, contentType: "image/avif" };
+    }
+    const out = await pipeline.webp({ quality: 72 }).toBuffer();
     return { bytes: out, contentType: "image/webp" };
   } catch {
     try {
@@ -127,7 +144,8 @@ export async function GET(
   const type = TYPES[extname(file).toLowerCase()];
   if (!type) return new NextResponse("Not found", { status: 404 });
   const width = clampWidth(new URL(req.url).searchParams.get("w"));
-  const cacheKey = `${rel.replace(/\\/g, "/")}@${width ?? "full"}`;
+  const format = preferredFormat(req.headers.get("accept"));
+  const cacheKey = `${rel.replace(/\\/g, "/")}@${width ?? "full"}@${format}`;
 
   if (width) {
     const cached = cacheGet(cacheKey);
@@ -138,14 +156,14 @@ export async function GET(
     const info = await stat(file);
     if (!info.isFile()) throw new Error("missing");
     const raw = await readFile(file);
-    const resized = await maybeResize(raw, type, width);
+    const resized = await maybeResize(raw, type, width, format);
     if (width) cacheSet(cacheKey, resized);
     return imageResponse(resized.bytes, resized.contentType, width);
   } catch {
     const hosted = await readHostedFile(rel.replace(/\\/g, "/"));
     if (!hosted) return new NextResponse("Not found", { status: 404 });
     await keepLocalCopy(file, hosted.bytes);
-    const resized = await maybeResize(hosted.bytes, hosted.contentType || type, width);
+    const resized = await maybeResize(hosted.bytes, hosted.contentType || type, width, format);
     if (width) cacheSet(cacheKey, resized);
     return imageResponse(resized.bytes, resized.contentType, width);
   }

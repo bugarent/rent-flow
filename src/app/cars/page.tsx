@@ -44,8 +44,13 @@ import { extraAvailableIn, locationCountryIso2 } from "@/lib/extras/country-scop
 import { getSearchDeliveryAirports } from "@/lib/server/delivery-locations";
 import { getCrossBorderReturnPlaces } from "@/lib/server/cross-border-returns";
 import { loadCrossBorderRouteIndex } from "@/lib/server/cross-border-route-index";
+import { JsonLd } from "@/components/seo/json-ld";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 import { getPageSeo } from "@/lib/seo/pages";
+import {
+  buildBreadcrumbJsonLd,
+  buildVehicleOffersItemListJsonLd,
+} from "@/lib/seo/json-ld";
 
 export const dynamic = "force-dynamic";
 
@@ -724,8 +729,40 @@ export default async function CarsPage({
     console.info("[cars search trace]", { pickup: pickupIata, startDate, endDate, excluded: trace });
   }
 
+  const listName = pickupIata
+    ? `Car rental near ${pickupIata}`
+    : categoryName
+      ? `Car rental — ${categoryName}`
+      : "Airport car rental";
+  const schemas = [
+    buildBreadcrumbJsonLd([
+      { name: "Home", path: "/" },
+      { name: "Cars", path: "/cars" },
+    ]),
+    ...(results.length
+      ? [
+          buildVehicleOffersItemListJsonLd(
+            listName,
+            results.slice(0, 12).map((car) => ({
+              id: car.id,
+              name: car.title || `${car.make} ${car.model}`,
+              description:
+                car.description?.trim() ||
+                `${car.make} ${car.model} ${car.year} for airport car rental.`,
+              image: car.photos[0] || null,
+              priceEur: car.dailyRateEur,
+              brand: car.make,
+              model: car.model,
+              path: `/cars/${encodeURIComponent(car.id)}`,
+            })),
+          ),
+        ]
+      : []),
+  ];
+
   return (
     <>
+      <JsonLd data={schemas} />
       {traceEnabled ? <SearchTracePanel rows={trace} /> : null}
       <CarsSearchResults
       cars={results}
