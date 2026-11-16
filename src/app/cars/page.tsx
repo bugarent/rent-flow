@@ -8,7 +8,8 @@ import { loadSearchCabinet, partnerIdsForPlace } from "@/lib/server/search-cabin
 import { partnerIdsForTrip, scopeSearchCars } from "@/lib/server/search-results-scope";
 import { loadPublicFileSearchCars } from "@/lib/server/public-file-cars";
 import { cachedSearchRead } from "@/lib/server/search-catalog";
-import { filterExtrasByCarOffers, parseCarDetails } from "@/lib/cars/car-details";
+import { descriptionForPublicPricing, filterExtrasByCarOffers, parseCarDetails } from "@/lib/cars/car-details";
+import { listingTariffIntervals, type TariffInterval } from "@/lib/partners/company-settings";
 import { listingDailyWithDeliveryEur, rentalDayCount } from "@/lib/cars/reserve-pricing";
 import { clampSiteDiscountPercent } from "@/lib/pricing/booking-discount";
 import {
@@ -511,12 +512,14 @@ export default async function CarsPage({
 
   const partnerDepositMethods = new Map<string, string[]>();
   const partnerRentPaymentMethods = new Map<string, string[]>();
+  const tariffsByPartner = new Map<string, TariffInterval[]>();
   try {
     const { resolveCompanySettings } = await import("@/lib/server/partner-company-settings-store");
     const fileSettings = await companyFilesPromise;
     for (const row of fileSettings) {
       partnerDepositMethods.set(row.partnerId, row.settings.depositMethods || []);
       partnerRentPaymentMethods.set(row.partnerId, row.settings.rentPaymentMethods || []);
+      if (row.settings.tariffs?.length) tariffsByPartner.set(row.partnerId, row.settings.tariffs);
     }
     const missing = new Map<string, (typeof cars)[number]>();
     for (const car of cars) {
@@ -544,7 +547,19 @@ export default async function CarsPage({
   }
 
   let results: SearchResultCar[] = cars.map((car) => {
-    const details = parseCarDetails(car.description);
+    const partnerId = car.partner?.id || car.partnerId || "";
+    const barePartnerId = partnerId.replace(/^file-partner-/, "");
+    const fromAccount = listingTariffIntervals(car.partner?.companySettings);
+    const tariffIntervals = fromAccount.length
+      ? fromAccount
+      : tariffsByPartner.get(partnerId) ||
+        tariffsByPartner.get(barePartnerId) ||
+        (barePartnerId ? tariffsByPartner.get(`file-partner-${barePartnerId}`) : undefined) ||
+        [];
+    const description = String(
+      descriptionForPublicPricing(car.description, tariffIntervals) || car.description || "",
+    );
+    const details = parseCarDetails(description);
     const depositRaw = details?.deposit != null ? Number(details.deposit) : null;
     const slug = resolveEffectiveCategorySlug(
       {
@@ -552,13 +567,12 @@ export default async function CarsPage({
         model: car.model,
         categorySlug: car.categorySlug,
         categoryLabel: car.categorySlug ? categoryLabels.get(car.categorySlug) || null : null,
-        description: car.description || "",
+        description,
       },
       filterCategories,
     );
     const baseDiscount = toNumber(car.discountPercent, 0);
     const periodDiscount = periodByCar.get(car.id) ?? 0;
-    const partnerId = car.partner?.id || car.partnerId || "";
     const fees = computeTripDeliveryFees({
       rows: car.deliveryPrices,
       pickup: pickupIata,
@@ -603,7 +617,7 @@ export default async function CarsPage({
       [...new Set([...fromCarExtras, ...offeredFromPrefs])].map((extraServiceId) => ({
         extraServiceId,
       })),
-      car.description,
+      description,
     ).map((row) => row.extraServiceId);
     return {
       id: car.id,
@@ -617,7 +631,7 @@ export default async function CarsPage({
       fuelType: String(car.fuelType || "PETROL"),
       dailyRateEur: toNumber(car.dailyRateEur, 0),
       discountPercent: mergeListingDiscountPercent(baseDiscount, periodDiscount),
-      description: car.description || "",
+      description,
       categorySlug: slug,
       categoryLabel: slug ? categoryLabels.get(slug) || null : null,
       photos: (car.photos || []).map((p) => p?.url).filter(Boolean) as string[],

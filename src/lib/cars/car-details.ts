@@ -208,6 +208,18 @@ export function descriptionWithTariffRanges(
   return description.replace(/<!--car-details:[\s\S]*?-->/, blob);
 }
 
+/**
+ * Public search and checkout price a trip with the same day columns the partner
+ * sees on the car form. Saved prices stay in their columns; only the day ranges move.
+ */
+export function descriptionForPublicPricing(
+  description: string | null | undefined,
+  intervals: Array<{ fromDays: number; toDays: number }>,
+): string | null | undefined {
+  if (!description || !intervals.length) return description;
+  return descriptionWithTariffRanges(description, intervals) ?? description;
+}
+
 export function readExtraOffers(details: CarDetailsBlob | null | undefined): CarExtraOffer[] {
   const raw = details && Array.isArray(details.extraOffers) ? details.extraOffers : [];
   return raw.filter(

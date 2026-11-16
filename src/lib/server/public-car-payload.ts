@@ -144,7 +144,7 @@ export async function enrichPublicCarPayload<T extends object>(
     input.partnerIdHint,
   );
   const carId = String(fields.id || input.carId).trim();
-  const [discountPercent, deliveryPrices, hydrated, payments, partnerClientLanguages, crossBorderRoutes] =
+  const [discountPercent, deliveryPrices, hydrated, payments, partnerClientLanguages, crossBorderRoutes, alignedDescription] =
     await Promise.all([
       periodDiscount(input.carId, fields.discountPercent, input),
       deliveryRows(partnerId, fields.deliveryPrices),
@@ -154,10 +154,22 @@ export async function enrichPublicCarPayload<T extends object>(
       companyPayments(partnerId),
       clientLanguages(partnerId),
       borderRoutes(partnerId),
+      import("@/lib/server/align-listing-tariffs").then((mod) =>
+        mod.alignPublicListingDescription(
+          typeof fields.description === "string" ? fields.description : null,
+          partnerId,
+          (fields.partner as { companySettings?: unknown } | null | undefined)?.companySettings,
+        ),
+      ),
     ]);
   const extras = hydrated;
+  const partnerRecord = fields.partner as { companySettings?: unknown } | null | undefined;
+  if (partnerRecord && "companySettings" in partnerRecord) {
+    delete partnerRecord.companySettings;
+  }
   return {
     ...payload,
+    ...(typeof alignedDescription === "string" ? { description: alignedDescription } : {}),
     ...(discountPercent !== undefined ? { discountPercent } : {}),
     ...(deliveryPrices !== undefined ? { deliveryPrices } : {}),
     ...(extras !== undefined ? { extras } : {}),
@@ -187,6 +199,7 @@ export const PUBLIC_CAR_INCLUDE = {
       logoUrl: true,
       status: true,
       userId: true,
+      companySettings: true,
       reviews: { where: { status: "APPROVED" as const }, select: { averageRating: true } },
     },
   },

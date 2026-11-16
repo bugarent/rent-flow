@@ -72,6 +72,22 @@ export function tariffPlusFromDays(tariffs: TariffInterval[]): number {
   return last ? last.toDays + 1 : 31;
 }
 
+/**
+ * Day ranges saved on the partner account.
+ * Empty when that account has no tariff list, so callers keep the listing's own ranges.
+ */
+export function listingTariffIntervals(raw: unknown): TariffInterval[] {
+  if (!raw || typeof raw !== "object") return [];
+  const tariffs = (raw as { tariffs?: unknown }).tariffs;
+  if (!Array.isArray(tariffs) || tariffs.length === 0) return [];
+  return normalizeTariffIntervals(
+    tariffs.map((row) => {
+      const item = row as TariffInterval;
+      return { fromDays: Number(item?.fromDays), toDays: Number(item?.toDays) };
+    }),
+  );
+}
+
 export type PartnerCompanySettings = {
   /** Public brand / trade name shown on car listings with the logo. */
   title: string;

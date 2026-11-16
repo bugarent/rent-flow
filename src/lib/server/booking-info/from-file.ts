@@ -5,6 +5,7 @@ import type { FileBookingRecord } from "@/lib/server/customer-bookings-store";
 import type { FileCarListing } from "@/lib/server/partner-cars-store";
 import { parsePartnerMessengers } from "@/lib/partner";
 import { parseCarDetails } from "@/lib/cars/car-details";
+import { alignPublicListingDescription } from "@/lib/server/align-listing-tariffs";
 import { splitStoredPhone } from "@/lib/catalog/dial-codes";
 import { resolveDailyRateEur, roundMoney } from "@/lib/cars/reserve-pricing";
 import type { DeliveryPriceRowLike } from "@/lib/delivery/trip-fees";
@@ -241,7 +242,7 @@ export async function fromFile(
       doors: fileCar?.doors ?? null,
       dailyRateEur: carDailyRateFromListing(
         Number(fileCar?.dailyRateEur) || 0,
-        fileCar?.description,
+        await alignPublicListingDescription(fileCar?.description, fileCar?.partnerId ?? dbPartner?.id),
         rentalDays,
         discountPercent,
       ),

@@ -511,7 +511,12 @@ export async function POST(req: Request) {
       1,
       Math.ceil((dropoffAt.getTime() - pickupAt.getTime()) / (1000 * 60 * 60 * 24)),
     );
-    const details = parseCarDetails(pricedFileCar.description);
+    const { alignPublicListingDescription } = await import("@/lib/server/align-listing-tariffs");
+    const pricedDescription = await alignPublicListingDescription(
+      pricedFileCar.description,
+      fileCar.partnerId,
+    );
+    const details = parseCarDetails(pricedDescription);
     const discountPercent = await resolveListingDiscountPercent({
       carId: id,
       basePercent: toNumber(
@@ -844,7 +849,12 @@ export async function POST(req: Request) {
         : DEFAULT_DEPOSIT_PERCENT;
 
     const days = Math.max(1, Math.ceil((dropoffAt.getTime() - pickupAt.getTime()) / (1000 * 60 * 60 * 24)));
-    const details = parseCarDetails(pricedCar.description);
+    const { alignPublicListingDescription } = await import("@/lib/server/align-listing-tariffs");
+    const pricedDescription = await alignPublicListingDescription(
+      pricedCar.description,
+      car.partner?.id,
+    );
+    const details = parseCarDetails(pricedDescription);
     const discountPercent = await resolveListingDiscountPercent({
       carId: id,
       basePercent: toNumber(pricedCar.discountPercent),

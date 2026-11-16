@@ -1,6 +1,8 @@
 import "server-only";
 
+import { descriptionForPublicPricing } from "@/lib/cars/car-details";
 import { formatBookingRef } from "@/lib/ids";
+import { listingTariffIntervals } from "@/lib/partners/company-settings";
 import { parsePartnerMessengers } from "@/lib/partner";
 import { prisma } from "@/lib/prisma";
 import { isDbOfflineError } from "@/lib/server/db-errors";
@@ -276,7 +278,10 @@ export async function loadBookingInfoDetail(
           doors: booking.car.doors ?? null,
           dailyRateEur: carDailyRateFromListing(
             Number(booking.car.dailyRateEur) || 0,
-            booking.car.description,
+            descriptionForPublicPricing(
+              booking.car.description,
+              listingTariffIntervals(booking.car.partner?.companySettings),
+            ),
             rentalDays,
             discountPercent,
           ),
