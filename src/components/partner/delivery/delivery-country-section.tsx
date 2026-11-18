@@ -7,6 +7,7 @@ import { worldCountryName } from "@/lib/catalog/world-countries";
 import { cn } from "@/lib/utils";
 import type { DeliveryCopy } from "./delivery-copy";
 import { DeliveryRowsTable } from "./delivery-rows-table";
+import { placeLabel } from "@/lib/i18n/place-label";
 import { optionMatchesRow, type DeliveryAddOption, type DeliveryRowState } from "./delivery-types";
 
 type TableHandlers = Omit<Parameters<typeof DeliveryRowsTable>[0], "rows" | "locale" | "t">;
@@ -79,7 +80,7 @@ export function DeliveryCountrySection({
                     checked={on}
                     onChange={() => togglePick(opt.id)}
                   />
-                  <span className="min-w-0 break-words font-semibold">{opt.label}</span>
+                  <span className="min-w-0 break-words font-semibold">{placeLabel(locale, opt.label)}</span>
                 </label>
               </li>
             );

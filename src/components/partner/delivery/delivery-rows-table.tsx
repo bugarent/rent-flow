@@ -5,7 +5,7 @@ import { PartnerDeliveryPriceCell } from "@/components/partner/partner-delivery-
 import { cn } from "@/lib/utils";
 import type { DeliveryCopy } from "./delivery-copy";
 import { DeliveryStatusSwitch } from "./delivery-status-switch";
-import { cityKey, placeLabel, type DeliveryRowState } from "./delivery-types";
+import { cityKey, placeLabel, translatedCity, type DeliveryRowState } from "./delivery-types";
 
 type Handlers = {
   togglingId: string | null;
@@ -117,13 +117,15 @@ export function DeliveryRowsTable({
         </tr>
       </thead>
       <tbody>
-        {grouped.map(([city, cityRows]) =>
+        {grouped.map(([, cityRows]) =>
           cityRows.map((row, idx) => (
             <tr
               key={row.location.id}
               className={cn(idx % 2 === 0 ? "bg-white" : "bg-[#f7fafc]", "border-t border-slate-100")}
             >
-              <td className="px-3 py-2.5 align-middle font-bold text-[#0b1f4b]">{idx === 0 ? city : ""}</td>
+              <td className="px-3 py-2.5 align-middle font-bold text-[#0b1f4b]">
+                {idx === 0 ? translatedCity(cityRows[0].location, locale) : ""}
+              </td>
               <td className="px-3 py-2.5 align-middle font-semibold text-[#0b1f4b]">
                 {placeLabel(row.location, locale)}
               </td>
@@ -143,10 +145,10 @@ export function DeliveryRowsTable({
 
   const mobile = (
     <>
-      {grouped.map(([city, cityRows]) =>
+      {grouped.map(([, cityRows]) =>
         cityRows.map((row) => (
           <MobileDataCard key={row.location.id}>
-            <MobileDataRow label={t.city}>{city}</MobileDataRow>
+            <MobileDataRow label={t.city}>{translatedCity(row.location, locale)}</MobileDataRow>
             <MobileDataRow label={t.place}>
               <span className="text-end text-[#0b1f4b]">{placeLabel(row.location, locale)}</span>
             </MobileDataRow>

@@ -1,4 +1,5 @@
 import { capFreeAfterDays, type DeliveryLocationView } from "@/lib/delivery/pricing";
+import { cityDisplayName, placeLabel as translatePlace } from "@/lib/i18n/place-label";
 
 export type DeliveryRowState = {
   location: DeliveryLocationView;
@@ -72,11 +73,19 @@ export function cityKey(loc: DeliveryLocationView) {
   return (loc.cityName || loc.country || loc.countryIso2 || "Other").trim();
 }
 
+/** City name in the language selected on the site. English is the stored name. */
+export function translatedCity(loc: DeliveryLocationView, locale: string) {
+  const english = String(loc.cityName || "")
+    .replace(/\s+\(city\)$/i, "")
+    .trim();
+  return english ? cityDisplayName(locale, english) : cityKey(loc);
+}
+
+/** Place name in the selected site language. Airports keep their name; cities use the city name. */
 export function placeLabel(loc: DeliveryLocationView, locale: string) {
-  if (loc.kind === "city") {
-    return locale === "ka" ? "ქალაქში მიწოდება" : locale === "ru" ? "Доставка по городу" : "City delivery";
-  }
-  return loc.label;
+  if (loc.kind === "city") return translatedCity(loc, locale);
+  const raw = String(loc.label || "").trim();
+  return raw ? translatePlace(locale, raw) : raw;
 }
 
 function norm(value: string | null | undefined) {

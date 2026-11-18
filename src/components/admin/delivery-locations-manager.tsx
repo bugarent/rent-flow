@@ -13,6 +13,7 @@ import {
   roundMoney,
 } from "@/lib/utils";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
+import { placeLabel } from "@/lib/i18n/place-label";
 import { uiText } from "@/lib/i18n/ui-text";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { DeliveryLimitBadge } from "@/components/admin/delivery-limit-badge";
@@ -116,6 +117,7 @@ export function DeliveryLocationsManager({
 }) {
   const rates = fxRates;
   const { locale } = useAdminLocale();
+  const locationName = (label: string) => placeLabel(locale, label);
   const phrase = (en: string, ka: string, ru: string) => uiText(locale, en, ka, ru);
   const [currency, setCurrency] = useState<PricingCurrency>("EUR");
   const [locations, setLocations] = useState(() => sortLocationsByCountry(initialLocations));
@@ -343,7 +345,7 @@ export function DeliveryLocationsManager({
           <CountryFlag iso2={item.countryIso2} className="h-4 w-6 rounded-sm shadow-sm" />
         </td>
         <td className="p-3">
-          <p className={cn("font-semibold", deliverable ? "text-[#0b1f4b]" : "text-slate-500")}>{item.label}</p>
+          <p className={cn("font-semibold", deliverable ? "text-[#0b1f4b]" : "text-slate-500")}>{locationName(item.label)}</p>
           <p className="text-xs text-slate-500">{item.iata}</p>
           {deliverable ? (
             <div className="mt-1">
@@ -456,7 +458,7 @@ export function DeliveryLocationsManager({
             <CountryFlag iso2={item.countryIso2} className="h-4 w-6 shrink-0 rounded-sm shadow-sm" />
             <div className="min-w-0">
               <p className={cn("break-words font-semibold", deliverable ? "text-[#0b1f4b]" : "text-slate-500")}>
-                {item.label}
+                {locationName(item.label)}
               </p>
               <p className="text-xs font-medium text-slate-500">{item.iata}</p>
               {deliverable ? (
