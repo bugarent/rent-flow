@@ -211,6 +211,8 @@ export function PartnerApplicationForm({
     confirm: confirmPassword.length < 6 || confirmPassword !== password,
   };
   const mark = (key: keyof typeof invalid) => showErrors && invalid[key];
+  // A country is chosen in the list but not added yet. Point at Add, not the whole field.
+  const countryWaitingAdd = mark("countries") && Boolean(addCountry);
 
   const addOperatingCountry = () => {
     const iso2 = addCountry.toUpperCase();
@@ -374,14 +376,14 @@ export function PartnerApplicationForm({
 
                 <div className="space-y-3">
                   <div data-invalid={mark("countries") ? "true" : undefined}>
-                    <p className={cn("mb-1.5 text-sm font-semibold", mark("countries") ? "text-red-700" : "text-[#3a4553]")}>
+                    <p className={cn("mb-1.5 text-sm font-semibold", mark("countries") && !countryWaitingAdd ? "text-red-700" : "text-[#3a4553]")}>
                       {t.countries} <span className="text-[#e11d48]">*</span>
                     </p>
                     <p className="mb-2 text-xs text-slate-500">{t.countriesHelp}</p>
                     <div
                       className={cn(
                         "rounded-md",
-                        mark("countries") && countryIso2s.length === 0 && "border border-red-500 bg-red-50 p-2",
+                        mark("countries") && !countryWaitingAdd && "border border-red-500 bg-red-50 p-2",
                       )}
                     >
                       <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -401,13 +403,16 @@ export function PartnerApplicationForm({
                           type="button"
                           disabled={!addCountry}
                           onClick={addOperatingCountry}
-                          className="min-h-11 rounded-md bg-[#28a745] px-3 text-sm font-bold text-white disabled:opacity-45"
+                          className={cn(
+                            "min-h-11 rounded-md px-3 text-sm font-bold text-white",
+                            countryWaitingAdd ? "bg-red-600 ring-2 ring-red-300" : "bg-[#28a745] disabled:opacity-45",
+                          )}
                         >
                           {t.add}
                         </button>
                       </div>
                       {countryIso2s.length === 0 ? (
-                        <p className={cn("text-sm", mark("countries") ? "font-semibold text-red-700" : "text-slate-400")}>
+                        <p className={cn("text-sm", mark("countries") && !countryWaitingAdd ? "font-semibold text-red-700" : "text-slate-400")}>
                           {t.noCountries}
                         </p>
                       ) : (
