@@ -2,7 +2,7 @@ import "server-only";
 
 import { after } from "next/server";
 
-/** Tag on public HTML that Netlify keeps at the edge for a minute (see next.config.ts). */
+/** Tag on public HTML that Netlify keeps at the edge (see next.config.ts). */
 export const PUBLIC_PAGES_CACHE_TAG = "public-pages";
 
 const PURGE_THROTTLE_MS = 10_000;
