@@ -7,6 +7,7 @@ import { carDetailCanonicalUrl, cleanSitePath } from "@/lib/seo/config";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 import { buildBreadcrumbJsonLd, buildProductVehicleJsonLd } from "@/lib/seo/json-ld";
 import { carDetailSeo } from "@/lib/seo/pages";
+import { loadCarDetailSeo } from "@/lib/seo/car-detail-seo";
 import { toNumber } from "@/lib/utils";
 import { isPubliclyVisibleListing } from "@/lib/cars/listing-visibility";
 
@@ -15,33 +16,7 @@ type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-const loadCarSeo = cache(async (id: string) => {
-  try {
-    const { prisma } = await import("@/lib/prisma");
-    const car = await prisma.car.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        make: true,
-        model: true,
-        year: true,
-        title: true,
-        description: true,
-        dailyRateEur: true,
-        status: true,
-        hiddenReason: true,
-        photos: {
-          orderBy: { sortOrder: "asc" },
-          take: 1,
-          select: { url: true },
-        },
-      },
-    });
-    return car;
-  } catch {
-    return null;
-  }
-});
+const loadCarSeo = cache(async (id: string) => loadCarDetailSeo(id));
 
 function firstParam(value: string | string[] | undefined) {
   return String(Array.isArray(value) ? value[0] : value || "").slice(0, 10);
@@ -66,7 +41,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const { locale } = await readPreferences();
   const path = carDetailPath(id);
-  const car = await loadCarSeo(id);
+  const { car, loadFailed } = await loadCarSeo(id);
+
+  // Transient storage failures must not noindex inventory URLs Google already knows.
+  if (loadFailed) {
+    return buildPageMetadata({
+      title: "Car rental | RentAirportCars",
+      description: "Book airport car rental — verified local partners, transparent pricing.",
+      path,
+      canonicalPath: path,
+      locale,
+      noIndex: false,
+    });
+  }
+
   if (!car || !isPubliclyVisibleListing(car)) {
     return buildPageMetadata({
       title: "Car rental | RentAirportCars",
@@ -95,6 +83,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     locale,
     image: car.photos[0]?.url || undefined,
     imageAlt: `${car.make} ${car.model} airport car rental`,
+    noIndex: false,
   });
 }
 
@@ -103,7 +92,7 @@ export default async function CarBookingPage({ params, searchParams }: Props) {
   const query = await searchParams;
   const startDate = firstParam(query.startDate);
   const endDate = firstParam(query.endDate) || startDate;
-  const [car, initialCar] = await Promise.all([
+  const [{ car }, initialCar] = await Promise.all([
     loadCarSeo(id),
     loadInitialCar(id, startDate, endDate),
   ]);
