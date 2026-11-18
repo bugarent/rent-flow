@@ -3,7 +3,10 @@ import { readFile, writeFile, mkdir } from "@/lib/server/durable-fs";
 import { join } from "node:path";
 import {
   defaultCompanySettings,
+  minRentalDaysFromSettings,
   parseCompanySettings,
+  parseMinRentalDays,
+  type MinRentalDays,
   type PartnerCompanySettings,
 } from "@/lib/partners/company-settings";
 import { parseIso2List, parsePartnerMessengers } from "@/lib/partner";
@@ -42,6 +45,29 @@ export async function listCompanySettingsFiles(): Promise<
     partnerId,
     settings: parseCompanySettings(raw),
   }));
+}
+
+/** Partner minimum rental length: file store first, then the partner row. Missing means 1 day. */
+export async function loadPartnerMinRentalDays(partnerId: string): Promise<MinRentalDays> {
+  const raw = partnerId.trim();
+  const bare = raw.replace(/^file-partner-/, "");
+  const ids = [...new Set([raw, bare, bare ? `file-partner-${bare}` : ""].filter(Boolean))];
+  for (const id of ids) {
+    const file = await readCompanySettingsFile(id);
+    if (file) return parseMinRentalDays(file.minRentalDays);
+  }
+  try {
+    const { prisma } = await import("@/lib/prisma");
+    const row = await prisma.partner.findFirst({
+      where: { id: { in: ids } },
+      select: { companySettings: true },
+    });
+    const fromDb = minRentalDaysFromSettings(row?.companySettings);
+    if (fromDb != null) return fromDb;
+  } catch {
+    /* database offline — one-day minimum */
+  }
+  return 1;
 }
 
 export async function writeCompanySettingsFile(partnerId: string, settings: PartnerCompanySettings) {

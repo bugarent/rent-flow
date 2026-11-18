@@ -18,6 +18,7 @@ import {
   type PartnerCompanySettings,
   type PartnerPricingCurrency,
   normalizeTariffIntervals,
+  parseMinRentalDays,
 } from "@/lib/partners/company-settings";
 import { PartnerTariffIntervalsEditor } from "@/components/partner/partner-tariff-intervals-editor";
 import { rebasePartnerAmount } from "@/lib/partners/pricing-currency";
@@ -215,7 +216,12 @@ export function PartnerPersonalInfoForm({
       partnerContractActive: Boolean(initial.partnerContractActive),
       useSiteContract: initial.useSiteContract === undefined ? true : Boolean(initial.useSiteContract),
     }),
-    tariffs: normalizeTariffIntervals(initial.tariffs, MAX_TARIFF_INTERVALS),
+    minRentalDays: parseMinRentalDays(initial.minRentalDays),
+    tariffs: normalizeTariffIntervals(
+      initial.tariffs,
+      MAX_TARIFF_INTERVALS,
+      parseMinRentalDays(initial.minRentalDays),
+    ),
   }));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -306,7 +312,7 @@ export function PartnerPersonalInfoForm({
         "requireCreditCard",
         "cashDepositRefundDays",
       ],
-      tariff: ["tariffs", "seasonalPricing", "yearFullySeasonal"],
+      tariff: ["tariffs", "seasonalPricing", "yearFullySeasonal", "minRentalDays"],
       contract: ["contractUrl", "partnerContractActive", "useSiteContract"],
     };
     return (keysBySection[sectionId] || []).some((k) => changedMap.has(k));
@@ -396,7 +402,12 @@ export function PartnerPersonalInfoForm({
               partnerContractActive: Boolean(next.partnerContractActive),
               useSiteContract: next.useSiteContract === undefined ? true : Boolean(next.useSiteContract),
             }),
-            tariffs: normalizeTariffIntervals(next.tariffs, MAX_TARIFF_INTERVALS),
+            minRentalDays: parseMinRentalDays(next.minRentalDays),
+            tariffs: normalizeTariffIntervals(
+              next.tariffs,
+              MAX_TARIFF_INTERVALS,
+              parseMinRentalDays(next.minRentalDays),
+            ),
           };
         });
       })
@@ -868,7 +879,12 @@ export function PartnerPersonalInfoForm({
       if (data.settings) {
         setSettings({
           ...data.settings,
-          tariffs: normalizeTariffIntervals(data.settings.tariffs ?? [], MAX_TARIFF_INTERVALS),
+          minRentalDays: parseMinRentalDays(data.settings.minRentalDays),
+          tariffs: normalizeTariffIntervals(
+            data.settings.tariffs ?? [],
+            MAX_TARIFF_INTERVALS,
+            parseMinRentalDays(data.settings.minRentalDays),
+          ),
         });
       }
       setPendingCountryAdds([]);
@@ -1721,12 +1737,55 @@ export function PartnerPersonalInfoForm({
           <p className="mb-4 text-sm text-slate-600">
             {pi.tariffHelp}
           </p>
-          {isChanged("tariffs") || isChanged("seasonalPricing") ? (
+          <div data-field="minRentalDays" className={cn("mb-5", wrapChanged("minRentalDays"))}>
+            <p
+              className={cn(
+                "mb-1 text-sm font-semibold",
+                isChanged("minRentalDays") ? "text-red-700" : "text-slate-700",
+              )}
+            >
+              {pi.minRentalPeriod}
+            </p>
+            <p className="mb-3 text-sm text-slate-600">{pi.minRentalHelp}</p>
+            <div className="flex flex-wrap gap-2">
+              {([1, 2] as const).map((days) => {
+                const selected = settings.minRentalDays === days;
+                return (
+                  <label
+                    key={days}
+                    className={cn(
+                      "inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold",
+                      selected
+                        ? "border-[#0b5c2e] bg-white text-[#0b5c2e]"
+                        : "border-slate-300 bg-white text-slate-700",
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="minRentalDays"
+                      className="h-4 w-4"
+                      checked={selected}
+                      onChange={() =>
+                        patch({
+                          minRentalDays: days,
+                          tariffs: normalizeTariffIntervals(settings.tariffs, MAX_TARIFF_INTERVALS, days),
+                        })
+                      }
+                    />
+                    {days === 1 ? pi.minRentalOne : pi.minRentalTwo}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+          {isChanged("tariffs") || isChanged("seasonalPricing") || isChanged("minRentalDays") ? (
             <p className="mb-3 text-xs font-semibold text-red-700">ტარიფები / სეზონური ფასები შეიცვალა</p>
           ) : null}
           <PartnerTariffIntervalsEditor
+            key={settings.minRentalDays}
             tariffs={settings.tariffs}
             maxIntervals={MAX_TARIFF_INTERVALS}
+            startFromDays={settings.minRentalDays === 2 ? 2 : 1}
             onChange={(tariffs) => patch({ tariffs })}
             inputClass={inputClass}
             accent={ACCENT}

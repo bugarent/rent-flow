@@ -67,14 +67,19 @@ async function hydratedExtras(
 
 async function companyPayments(partnerId: string) {
   try {
-    if (!partnerId) return { rentPaymentMethods: [] as string[], contractUrl: "" };
-    const [{ readCompanySettingsFile }, { LOCAL_PARTNER_ID }, { getPlatformSettings }, { resolveActiveContractUrl }] =
-      await Promise.all([
-        import("@/lib/server/partner-company-settings-store"),
-        import("@/lib/auth/local-partner-store"),
-        import("@/lib/server/platform-settings-store"),
-        import("@/lib/partners/company-settings"),
-      ]);
+    if (!partnerId) return { rentPaymentMethods: [] as string[], contractUrl: "", minRentalDays: 1 as const };
+    const [
+      { readCompanySettingsFile, loadPartnerMinRentalDays },
+      { LOCAL_PARTNER_ID },
+      { getPlatformSettings },
+      { resolveActiveContractUrl },
+    ] = await Promise.all([
+      import("@/lib/server/partner-company-settings-store"),
+      import("@/lib/auth/local-partner-store"),
+      import("@/lib/server/platform-settings-store"),
+      import("@/lib/partners/company-settings"),
+    ]);
+    const minRentalDays = await loadPartnerMinRentalDays(partnerId);
     const ids = [partnerId];
     if (partnerId.startsWith("file-partner-")) {
       const stripped = partnerId.replace(/^file-partner-/, "");
@@ -87,15 +92,18 @@ async function companyPayments(partnerId: string) {
     ]);
     const siteContractUrl = platform.siteContractUrl || "";
     const settings = settingsList.find(Boolean);
-    if (!settings) return { rentPaymentMethods: [] as string[], contractUrl: siteContractUrl };
+    if (!settings) {
+      return { rentPaymentMethods: [] as string[], contractUrl: siteContractUrl, minRentalDays };
+    }
     return {
       rentPaymentMethods: Array.isArray(settings.rentPaymentMethods)
         ? settings.rentPaymentMethods.map(String)
         : [],
       contractUrl: resolveActiveContractUrl(settings, siteContractUrl),
+      minRentalDays,
     };
   } catch {
-    return { rentPaymentMethods: [] as string[], contractUrl: "" };
+    return { rentPaymentMethods: [] as string[], contractUrl: "", minRentalDays: 1 as const };
   }
 }
 
@@ -130,7 +138,14 @@ async function clientLanguages(partnerId: string): Promise<string[]> {
 export async function enrichPublicCarPayload<T extends object>(
   payload: T,
   input: PublicCarRange & { carId: string; partnerIdHint?: string; keepStoredExtras?: boolean },
-): Promise<T & { rentPaymentMethods: string[]; contractUrl: string; partnerClientLanguages: string[] }> {
+): Promise<
+  T & {
+    rentPaymentMethods: string[];
+    contractUrl: string;
+    partnerClientLanguages: string[];
+    minRentalDays?: 1 | 2;
+  }
+> {
   const fields = payload as PartnerRef & {
     id?: string;
     discountPercent?: unknown;

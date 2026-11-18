@@ -394,6 +394,15 @@ export async function PATCH(req: Request) {
       }
     }
 
+    if (previous.minRentalDays !== nextSettings.minRentalDays) {
+      try {
+        const { revalidatePublishedContent } = await import("@/lib/server/revalidate-public-content");
+        revalidatePublishedContent();
+      } catch (revalidateError) {
+        console.warn("[partners/company-settings] revalidate min rental", revalidateError);
+      }
+    }
+
     if (JSON.stringify(previous.tariffs) !== JSON.stringify(nextSettings.tariffs)) {
       try {
         const { syncListingTariffRanges } = await import("@/lib/server/sync-listing-tariff-ranges");

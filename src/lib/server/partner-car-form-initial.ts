@@ -48,6 +48,7 @@ export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
   /** Cabinet state of each service in `initialExtrasCatalog`; present only when the partner's list loaded. */
   initialExtraPrefs?: CarFormExtraPref[];
   initialTariffs?: TariffInterval[];
+  initialMinRentalDays?: 1 | 2;
   initialCategories: PartnerCarCategoryOption[];
 }> {
   const categoriesPromise = listPartnerCarCategoryOptions();
@@ -95,6 +96,7 @@ export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
       initialExtrasCatalog,
       initialExtraPrefs,
       initialTariffs: company?.tariffs?.length ? company.tariffs : undefined,
+      initialMinRentalDays: company?.minRentalDays === 2 ? 2 : 1,
       initialCategories,
     };
   } catch {

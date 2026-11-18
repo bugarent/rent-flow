@@ -9,7 +9,13 @@ import { partnerIdsForTrip, scopeSearchCars } from "@/lib/server/search-results-
 import { loadPublicFileSearchCars } from "@/lib/server/public-file-cars";
 import { cachedSearchRead } from "@/lib/server/search-catalog";
 import { descriptionForPublicPricing, filterExtrasByCarOffers, parseCarDetails } from "@/lib/cars/car-details";
-import { listingTariffIntervals, type TariffInterval } from "@/lib/partners/company-settings";
+import {
+  listingTariffIntervals,
+  lookupPartnerMinRentalDays,
+  rememberPartnerMinRentalDays,
+  type MinRentalDays,
+  type TariffInterval,
+} from "@/lib/partners/company-settings";
 import { listingDailyWithDeliveryEur, rentalDayCount } from "@/lib/cars/reserve-pricing";
 import { clampSiteDiscountPercent } from "@/lib/pricing/booking-discount";
 import {
@@ -520,6 +526,7 @@ export default async function CarsPage({
   const partnerDepositMethods = new Map<string, string[]>();
   const partnerRentPaymentMethods = new Map<string, string[]>();
   const tariffsByPartner = new Map<string, TariffInterval[]>();
+  const minRentalByPartner = new Map<string, MinRentalDays>();
   try {
     const { resolveCompanySettings } = await import("@/lib/server/partner-company-settings-store");
     const fileSettings = await companyFilesPromise;
@@ -527,6 +534,7 @@ export default async function CarsPage({
       partnerDepositMethods.set(row.partnerId, row.settings.depositMethods || []);
       partnerRentPaymentMethods.set(row.partnerId, row.settings.rentPaymentMethods || []);
       if (row.settings.tariffs?.length) tariffsByPartner.set(row.partnerId, row.settings.tariffs);
+      rememberPartnerMinRentalDays(minRentalByPartner, row.partnerId, row.settings.minRentalDays);
     }
     const missing = new Map<string, (typeof cars)[number]>();
     for (const car of cars) {
@@ -551,6 +559,17 @@ export default async function CarsPage({
     );
   } catch {
     /* partner settings optional */
+  }
+
+  if (startDate && endDate && rentalDays < 2) {
+    cars = keepCars(cars, (car) => {
+      const minDays = lookupPartnerMinRentalDays(
+        String(car.partner?.id || car.partnerId || ""),
+        minRentalByPartner,
+        car.partner?.companySettings,
+      );
+      return rentalDays >= minDays || `minimum rental period is ${minDays} days`;
+    });
   }
 
   let results: SearchResultCar[] = cars.map((car) => {

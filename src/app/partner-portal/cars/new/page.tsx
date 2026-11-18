@@ -9,6 +9,7 @@ export default async function NewCarPage() {
     initialExtrasCatalog,
     initialExtraPrefs,
     initialTariffs,
+    initialMinRentalDays,
     initialCategories,
   } = await loadPartnerCarFormInitial(session.user);
 
@@ -18,6 +19,7 @@ export default async function NewCarPage() {
       initialExtrasCatalog={initialExtrasCatalog}
       initialExtraPrefs={initialExtraPrefs}
       initialTariffs={initialTariffs}
+      initialMinRentalDays={initialMinRentalDays}
       initialCategories={initialCategories}
     />
   );

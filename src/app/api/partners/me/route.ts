@@ -114,6 +114,7 @@ export async function GET() {
     }
 
     let tariffs = DEFAULT_PARTNER_TARIFFS.map((row) => ({ ...row }));
+    let minRentalDays: 1 | 2 = 1;
     let pricingCurrency: PartnerPricingCurrency = DEFAULT_PARTNER_PRICING_CURRENCY;
     let deliveryLocationIds: string[] = [];
     let deliveryCatalog: DeliveryLocationView[] = [];
@@ -129,6 +130,7 @@ export async function GET() {
             phone: "",
           }));
       if (company.tariffs?.length) tariffs = company.tariffs;
+      minRentalDays = company.minRentalDays === 2 ? 2 : 1;
       pricingCurrency = company.pricingCurrency;
       deliveryLocationIds = company.deliveryLocationIds || [];
       if (company.seasonalPricing?.seasons?.length) {
@@ -170,6 +172,7 @@ export async function GET() {
       deliveryLocationIds,
       seasonalPricing,
       tariffs,
+      minRentalDays,
       pricingCurrency,
       fxRates,
     });

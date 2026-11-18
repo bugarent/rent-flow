@@ -14,6 +14,7 @@ export default async function EditCarPage({
     initialExtrasCatalog,
     initialExtraPrefs,
     initialTariffs,
+    initialMinRentalDays,
     initialCategories,
   } = await loadPartnerCarFormInitial(session.user);
 
@@ -24,6 +25,7 @@ export default async function EditCarPage({
       initialExtrasCatalog={initialExtrasCatalog}
       initialExtraPrefs={initialExtraPrefs}
       initialTariffs={initialTariffs}
+      initialMinRentalDays={initialMinRentalDays}
       initialCategories={initialCategories}
     />
   );

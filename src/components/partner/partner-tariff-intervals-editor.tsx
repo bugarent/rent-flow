@@ -17,6 +17,7 @@ import {
 export function PartnerTariffIntervalsEditor({
   tariffs,
   maxIntervals,
+  startFromDays = 1,
   onChange,
   inputClass,
   accent,
@@ -24,6 +25,8 @@ export function PartnerTariffIntervalsEditor({
 }: {
   tariffs: TariffInterval[];
   maxIntervals: number;
+  /** First interval starts on this day (the partner's minimum rental). */
+  startFromDays?: 1 | 2;
   onChange: (next: TariffInterval[]) => void;
   inputClass: string;
   accent: string;
@@ -38,7 +41,8 @@ export function PartnerTariffIntervalsEditor({
 }) {
   const [drafts, setDrafts] = useState<Record<number, string>>({});
 
-  const commit = (rows: TariffInterval[]) => onChange(normalizeTariffIntervals(rows, maxIntervals));
+  const commit = (rows: TariffInterval[]) =>
+    onChange(normalizeTariffIntervals(rows, maxIntervals, startFromDays));
 
   const commitDraft = (index: number) => {
     const raw = drafts[index];

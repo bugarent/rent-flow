@@ -42,6 +42,55 @@ export type TariffInterval = {
   toDays: number;
 };
 
+/** Shortest rental a partner accepts. Only 1 or 2 days. */
+export type MinRentalDays = 1 | 2;
+
+export function parseMinRentalDays(value: unknown): MinRentalDays {
+  return Number(value) === 2 ? 2 : 1;
+}
+
+/** `null` when the stored object has no minimum yet (older records). */
+export function minRentalDaysFromSettings(raw: unknown): MinRentalDays | null {
+  if (!raw || typeof raw !== "object" || !("minRentalDays" in raw)) return null;
+  return parseMinRentalDays((raw as { minRentalDays?: unknown }).minRentalDays);
+}
+
+/** File-store id, bare id, and `file-partner-` id all point at the same minimum. */
+export function rememberPartnerMinRentalDays(
+  map: Map<string, MinRentalDays>,
+  partnerId: string,
+  days: MinRentalDays,
+) {
+  const raw = partnerId.trim();
+  const bare = raw.replace(/^file-partner-/, "");
+  if (raw) map.set(raw, days);
+  if (bare) {
+    map.set(bare, days);
+    map.set(`file-partner-${bare}`, days);
+  }
+}
+
+/**
+ * Explicit `minRentalDays` on the partner row wins. Otherwise the file-store map,
+ * then 1 day so existing partners keep accepting one-day trips.
+ */
+export function lookupPartnerMinRentalDays(
+  partnerId: string,
+  byPartner: ReadonlyMap<string, MinRentalDays>,
+  companySettings?: unknown,
+): MinRentalDays {
+  const explicit = minRentalDaysFromSettings(companySettings);
+  if (explicit != null) return explicit;
+  const raw = partnerId.trim();
+  const bare = raw.replace(/^file-partner-/, "");
+  return (
+    byPartner.get(raw) ??
+    byPartner.get(bare) ??
+    (bare ? byPartner.get(`file-partner-${bare}`) : undefined) ??
+    1
+  );
+}
+
 /** Day ranges a new partner sees until they edit or add their own. */
 export const DEFAULT_PARTNER_TARIFFS: TariffInterval[] = [
   { fromDays: 1, toDays: 3 },
@@ -49,14 +98,16 @@ export const DEFAULT_PARTNER_TARIFFS: TariffInterval[] = [
   { fromDays: 7, toDays: 30 },
 ];
 
-/** Next row always starts at previous “to” + 1. First row always starts at 1. */
+/** Next row always starts at the previous “to” + 1. The first row starts at `startFromDays` (1 or 2). */
 export function normalizeTariffIntervals(
   rows: TariffInterval[],
   maxIntervals = 8,
+  startFromDays: MinRentalDays = 1,
 ): TariffInterval[] {
+  const start = startFromDays === 2 ? 2 : 1;
   const tariffs: TariffInterval[] = [];
   for (let i = 0; i < Math.min(rows.length, maxIntervals); i++) {
-    const fromDays = i === 0 ? 1 : tariffs[i - 1].toDays + 1;
+    const fromDays = i === 0 ? start : tariffs[i - 1].toDays + 1;
     if (fromDays > 999) break;
     let toDays = Math.floor(Number(rows[i]?.toDays));
     if (!Number.isFinite(toDays) || toDays < fromDays) toDays = fromDays;
@@ -85,6 +136,8 @@ export function listingTariffIntervals(raw: unknown): TariffInterval[] {
       const item = row as TariffInterval;
       return { fromDays: Number(item?.fromDays), toDays: Number(item?.toDays) };
     }),
+    8,
+    parseMinRentalDays((raw as { minRentalDays?: unknown }).minRentalDays),
   );
 }
 
@@ -132,6 +185,8 @@ export type PartnerCompanySettings = {
   requireCreditCard: boolean;
   depositMethods: string[];
   cashDepositRefundDays: number;
+  /** Shortest trip this partner accepts. 2 hides their cars on 1-day searches. */
+  minRentalDays: MinRentalDays;
   tariffs: TariffInterval[];
   seasonalPricing: PartnerSeasonalPricing;
   yearFullySeasonal: boolean;
@@ -243,6 +298,7 @@ export function defaultCompanySettings(
     requireCreditCard: false,
     depositMethods: ["Cash"],
     cashDepositRefundDays: 0,
+    minRentalDays: 1,
     tariffs: DEFAULT_PARTNER_TARIFFS.map((row) => ({ ...row })),
     seasonalPricing: emptySeasonalPricing(),
     yearFullySeasonal: true,
@@ -280,6 +336,7 @@ export function parseCompanySettings(raw: unknown, seed?: Parameters<typeof defa
       }
     }
   }
+  const minRentalDays = parseMinRentalDays(o.minRentalDays);
   const tariffs = normalizeTariffIntervals(
     Array.isArray(o.tariffs)
       ? (o.tariffs as TariffInterval[])
@@ -289,6 +346,8 @@ export function parseCompanySettings(raw: unknown, seed?: Parameters<typeof defa
           }))
           .filter((t) => t.fromDays > 0 && t.toDays >= t.fromDays)
       : base.tariffs,
+    8,
+    minRentalDays,
   );
 
   const seasonal = parseSeasonalPricing(o.seasonalPricing);
@@ -368,7 +427,8 @@ export function parseCompanySettings(raw: unknown, seed?: Parameters<typeof defa
     requireCreditCard: Boolean(o.requireCreditCard),
     depositMethods: Array.isArray(o.depositMethods) ? o.depositMethods.map(String) : base.depositMethods,
     cashDepositRefundDays: Math.max(0, Number(o.cashDepositRefundDays) || 0),
-    tariffs: tariffs.length ? tariffs : base.tariffs,
+    minRentalDays,
+    tariffs: tariffs.length ? tariffs : normalizeTariffIntervals(base.tariffs, 8, minRentalDays),
     seasonalPricing: {
       enabled: Boolean(seasonal.enabled) || seasons.length > 0,
       seasons,

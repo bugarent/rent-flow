@@ -71,6 +71,10 @@ export type PartnerPersonalInfoCopy = {
   depositMethods: string;
   cashRefundDays: string;
   tariffHelp: string;
+  minRentalPeriod: string;
+  minRentalHelp: string;
+  minRentalOne: string;
+  minRentalTwo: string;
   fromDays: string;
   toDays: string;
   addInterval: string;
@@ -382,6 +386,11 @@ export const partnerUiEn: PartnerUiPack = {
     depositMethods: "Deposit retention methods",
     cashRefundDays: "Cash deposit refund delay (days)",
     tariffHelp: "Day ranges used on Create auto pricing. Add or edit intervals here.",
+    minRentalPeriod: "Minimum rental period",
+    minRentalHelp:
+      "Choose 1 or 2 days. At 2 days, these ranges start on day 2 and your cars stay out of 1-day searches.",
+    minRentalOne: "Minimum 1 day",
+    minRentalTwo: "Minimum 2 days",
     fromDays: "From days",
     toDays: "To days",
     addInterval: "Add interval",
@@ -687,6 +696,11 @@ export const partnerUiKa: PartnerUiPack = {
     depositMethods: "დეპოზიტის შენახვის მეთოდები",
     cashRefundDays: "ნაღდი დეპოზიტის დაბრუნების ვადა (დღე)",
     tariffHelp: "დღეების ინტერვალები მანქანის დამატების ფასებში. აქ დაამატეთ ან შეცვალეთ.",
+    minRentalPeriod: "მინიმალური გაქირავების პერიოდი",
+    minRentalHelp:
+      "აირჩიეთ 1 ან 2 დღე. 2 დღის შემთხვევაში ათვლა იწყება 2 დღიდან და 1 დღიან ძიებაში თქვენი მანქანები არ გამოჩნდება.",
+    minRentalOne: "მინიმუმ 1 დღე",
+    minRentalTwo: "მინიმუმ 2 დღე",
     fromDays: "დან (დღე)",
     toDays: "მდე (დღე)",
     addInterval: "ინტერვალის დამატება",
@@ -993,6 +1007,11 @@ export const partnerUiRu: PartnerUiPack = {
     depositMethods: "Способы удержания депозита",
     cashRefundDays: "Срок возврата наличного депозита (дни)",
     tariffHelp: "Диапазоны дней для цен при добавлении авто. Добавляйте или меняйте здесь.",
+    minRentalPeriod: "Минимальный срок аренды",
+    minRentalHelp:
+      "Выберите 1 или 2 дня. При 2 днях отсчёт начинается со 2-го дня, и авто не показывается в поиске на 1 день.",
+    minRentalOne: "Минимум 1 день",
+    minRentalTwo: "Минимум 2 дня",
     fromDays: "С (дней)",
     toDays: "По (дней)",
     addInterval: "Добавить интервал",

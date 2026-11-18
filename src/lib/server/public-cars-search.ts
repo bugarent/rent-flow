@@ -1,8 +1,13 @@
 import "server-only";
 
 import { carMatchesMappedModels } from "@/lib/cars/category-mapping";
+import { rentalDayCount } from "@/lib/cars/reserve-pricing";
 import { normalizeLocationCode } from "@/lib/catalog/search-places";
 import type { DeliveryPriceRowLike } from "@/lib/delivery/trip-fees";
+import {
+  lookupPartnerMinRentalDays,
+  rememberPartnerMinRentalDays,
+} from "@/lib/partners/company-settings";
 import { loadSearchCatalog, type CatalogCar } from "@/lib/server/search-catalog";
 import { scopeSearchCars } from "@/lib/server/search-results-scope";
 
@@ -131,6 +136,23 @@ export async function searchPublicCars(query: PublicCarsQuery, timer?: Timer): P
       /* availability optional */
     }
     timer?.mark("availability");
+  }
+
+  const startRaw = query.startDate?.trim();
+  const endRaw = query.endDate?.trim();
+  if (startRaw && endRaw && rentalDayCount(startRaw, endRaw) < 2) {
+    try {
+      const { cachedSearchRead } = await import("@/lib/server/search-catalog");
+      const { listCompanySettingsFiles } = await import("@/lib/server/partner-company-settings-store");
+      const files = await cachedSearchRead("company-files", listCompanySettingsFiles);
+      const mins = new Map<string, 1 | 2>();
+      for (const row of files) {
+        rememberPartnerMinRentalDays(mins, row.partnerId, row.settings.minRentalDays);
+      }
+      cars = cars.filter((car) => lookupPartnerMinRentalDays(car.partnerId, mins) <= 1);
+    } catch {
+      /* minimum rental is optional when partner settings cannot be read */
+    }
   }
 
   let periodMap = new Map<string, number[]>();

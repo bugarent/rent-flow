@@ -49,6 +49,7 @@ import {
   isPartnerPricingCurrency,
   type TariffInterval,
   normalizeTariffIntervals,
+  parseMinRentalDays,
   tariffPlusFromDays,
 } from "@/lib/partners/company-settings";
 import {
@@ -439,6 +440,7 @@ export function PartnerCreateCarForm({
   initialExtrasCatalog = NO_EXTRAS_CATALOG,
   initialExtraPrefs,
   initialTariffs,
+  initialMinRentalDays = 1,
   initialCategories,
   carId,
   adminReview = null,
@@ -451,6 +453,8 @@ export function PartnerCreateCarForm({
   initialCategories?: PartnerCarCategoryOption[];
   /** Partner day ranges from personal info, so the price columns are right on first paint. */
   initialTariffs?: TariffInterval[];
+  /** Partner minimum rental, so the first price column starts on day 1 or day 2. */
+  initialMinRentalDays?: 1 | 2;
   /** When set, form loads this listing and saves via PATCH (Update). */
   carId?: string;
   /** Admin remodeation: read-only partner form with red change highlights. */
@@ -507,8 +511,8 @@ export function PartnerCreateCarForm({
   const [deposit, setDeposit] = useState("0");
   const [tariffIntervals, setTariffIntervals] = useState<TariffInterval[]>(() =>
     initialTariffs?.length
-      ? normalizeTariffIntervals(initialTariffs)
-      : DEFAULT_PARTNER_TARIFFS.map((row) => ({ ...row })),
+      ? normalizeTariffIntervals(initialTariffs, 8, initialMinRentalDays)
+      : normalizeTariffIntervals(DEFAULT_PARTNER_TARIFFS, 8, initialMinRentalDays),
   );
   const [tariffPrices, setTariffPrices] = useState<string[]>(() =>
     Array.from({ length: (initialTariffs?.length || 3) + 1 }, () => ""),
@@ -958,7 +962,11 @@ export function PartnerCreateCarForm({
         }
         if (meRes?.ok) {
           if (Array.isArray(me.tariffs) && me.tariffs.length) {
-            const intervals = normalizeTariffIntervals(me.tariffs as TariffInterval[]);
+            const intervals = normalizeTariffIntervals(
+              me.tariffs as TariffInterval[],
+              8,
+              parseMinRentalDays(me.minRentalDays),
+            );
             setTariffIntervals(intervals);
             setTariffPrices((prev) =>
               Array.from({ length: intervals.length + 1 }, (_, i) => prev[i] ?? ""),

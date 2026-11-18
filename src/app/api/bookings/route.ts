@@ -24,6 +24,28 @@ import { ensureFileCarInPrisma } from "@/lib/server/ensure-file-car-in-prisma";
 import { createFileBooking } from "@/lib/server/customer-bookings-store";
 import { isPubliclyVisibleListing } from "@/lib/cars/listing-visibility";
 
+/** Block a trip shorter than the partner's minimum (1 or 2 days). */
+async function rejectBelowMinRental(partnerId: string, days: number) {
+  if (!partnerId) return null;
+  try {
+    const { loadPartnerMinRentalDays } = await import("@/lib/server/partner-company-settings-store");
+    const min = await loadPartnerMinRentalDays(partnerId);
+    if (days < min) {
+      return NextResponse.json(
+        {
+          error: `This car can be rented for at least ${min} days.`,
+          code: "MIN_RENTAL_DAYS",
+          minRentalDays: min,
+        },
+        { status: 400 },
+      );
+    }
+  } catch (error) {
+    console.warn("[bookings] min rental", error);
+  }
+  return null;
+}
+
 /** Price from the last approved version while a partner edit awaits re-moderation. */
 async function approvedListingVersion<
   T extends { status: string; title: string; description: string; dailyRateEur: unknown; discountPercent?: unknown },
@@ -511,6 +533,8 @@ export async function POST(req: Request) {
       1,
       Math.ceil((dropoffAt.getTime() - pickupAt.getTime()) / (1000 * 60 * 60 * 24)),
     );
+    const shortFileRental = await rejectBelowMinRental(fileCar.partnerId, days);
+    if (shortFileRental) return shortFileRental;
     const { alignPublicListingDescription } = await import("@/lib/server/align-listing-tariffs");
     const pricedDescription = await alignPublicListingDescription(
       pricedFileCar.description,
@@ -849,6 +873,8 @@ export async function POST(req: Request) {
         : DEFAULT_DEPOSIT_PERCENT;
 
     const days = Math.max(1, Math.ceil((dropoffAt.getTime() - pickupAt.getTime()) / (1000 * 60 * 60 * 24)));
+    const shortRental = await rejectBelowMinRental(String(car.partner?.id || ""), days);
+    if (shortRental) return shortRental;
     const { alignPublicListingDescription } = await import("@/lib/server/align-listing-tariffs");
     const pricedDescription = await alignPublicListingDescription(
       pricedCar.description,

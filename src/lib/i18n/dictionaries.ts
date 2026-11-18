@@ -259,6 +259,8 @@ export type Dictionary = {
     dropoffAddress: string;
     cityAddressRequired: string;
     createFailed: string;
+    /** `{n}` is the partner minimum (1 or 2). */
+    minRentalPeriod: string;
     driverRequired: string;
     phoneRequired: string;
     termsRequired: string;
@@ -627,6 +629,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       dropoffAddress: "Drop-off address",
       cityAddressRequired: "A street address is required for city delivery.",
       createFailed: "Booking could not be created.",
+      minRentalPeriod: "This car can be rented for at least {n} days.",
       driverRequired: "Please complete the main driver's information.",
       phoneRequired: "Phone number is required.",
       termsRequired: "Please confirm the rental terms.",
@@ -995,6 +998,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       dropoffAddress: "დაბრუნების მისამართი",
       cityAddressRequired: "ქალაქში მიწოდებისთვის მისამართი სავალდებულოა.",
       createFailed: "დაჯავშნის შექმნა ვერ მოხერხდა.",
+      minRentalPeriod: "ეს მანქანა მინიმუმ {n} დღით ქირავდება.",
       driverRequired: "გთხოვთ შეავსოთ მთავარი მძღოლის მონაცემები.",
       phoneRequired: "ტელეფონის ნომერი სავალდებულოა.",
       termsRequired: "გთხოვთ დაეთანხმოთ გაქირავების პირობებს.",
@@ -1365,6 +1369,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       dropoffAddress: "Адрес возврата",
       cityAddressRequired: "Для доставки по городу нужен адрес.",
       createFailed: "Не удалось создать бронирование.",
+      minRentalPeriod: "Этот автомобиль можно арендовать минимум на {n} дн.",
       driverRequired: "Заполните данные основного водителя.",
       phoneRequired: "Укажите номер телефона.",
       termsRequired: "Подтвердите условия аренды.",
@@ -1734,6 +1739,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       dropoffAddress: "Adresse de restitution",
       cityAddressRequired: "Une adresse est obligatoire pour une livraison en ville.",
       createFailed: "La réservation n'a pas pu être créée.",
+      minRentalPeriod: "Ce véhicule se loue pour au moins {n} jours.",
       driverRequired: "Veuillez compléter les informations du conducteur principal.",
       phoneRequired: "Le numéro de téléphone est obligatoire.",
       termsRequired: "Veuillez accepter les conditions de location.",
@@ -2103,6 +2109,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       dropoffAddress: "Rückgabeadresse",
       cityAddressRequired: "Für eine Stadtlieferung ist eine Adresse erforderlich.",
       createFailed: "Buchung konnte nicht erstellt werden.",
+      minRentalPeriod: "Dieses Fahrzeug kann mindestens {n} Tage gemietet werden.",
       driverRequired: "Bitte die Hauptdaten des Fahrers ausfüllen.",
       phoneRequired: "Telefonnummer ist erforderlich.",
       termsRequired: "Bitte die Mietbedingungen bestätigen.",
@@ -2472,6 +2479,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       dropoffAddress: "Adres zwrotu",
       cityAddressRequired: "Adres jest wymagany przy dostawie w mieście.",
       createFailed: "Nie udało się utworzyć rezerwacji.",
+      minRentalPeriod: "To auto można wynająć na co najmniej {n} dni.",
       driverRequired: "Uzupełnij dane głównego kierowcy.",
       phoneRequired: "Numer telefonu jest wymagany.",
       termsRequired: "Potwierdź warunki wynajmu.",
@@ -2839,6 +2847,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       dropoffAddress: "عنوان الإرجاع",
       cityAddressRequired: "العنوان مطلوب لتوصيل المدينة.",
       createFailed: "تعذّر إنشاء الحجز.",
+      minRentalPeriod: "يمكن استئجار هذه السيارة لمدة {n} أيام على الأقل.",
       driverRequired: "يرجى إكمال بيانات السائق الرئيسي.",
       phoneRequired: "رقم الهاتف مطلوب.",
       termsRequired: "يرجى الموافقة على شروط الإيجار.",

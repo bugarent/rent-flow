@@ -143,6 +143,8 @@ type CarPayload = {
   };
   rentPaymentMethods?: string[];
   contractUrl?: string;
+  /** Partner minimum rental length. 2 hides the car from 1-day searches. */
+  minRentalDays?: 1 | 2;
 };
 
 /** Must match the key built by `app/cars/[id]/page.tsx` (date part only; search links carry `T10:00`). */
@@ -430,6 +432,9 @@ export function ReserveCheckout({
   }, [session, email, firstName, lastName]);
 
   const days = useMemo(() => rentalDayCount(startDate, endDate), [startDate, endDate]);
+  const minStay = car?.minRentalDays === 2 ? 2 : 1;
+  const minStayMessage =
+    days < minStay ? dictionary.booking.minRentalPeriod.replace("{n}", String(minStay)) : "";
   const driverAgeYears = useMemo(
     () => ageFromDateOfBirth(dateOfBirth, startDate),
     [dateOfBirth, startDate],
@@ -848,6 +853,10 @@ export function ReserveCheckout({
     if (!dropoff.trim()) invalid.add("dropoff");
     if (!startDate) invalid.add("startDate");
     if (!endDate) invalid.add("endDate");
+    if (minStayMessage) {
+      invalid.add("endDate");
+      messages.push(minStayMessage);
+    }
     if (!firstName.trim()) invalid.add("firstName");
     if (!lastName.trim()) invalid.add("lastName");
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) invalid.add("email");
@@ -953,6 +962,10 @@ export function ReserveCheckout({
     }
     if (!endDate) {
       invalid.add("endDate");
+    }
+    if (minStayMessage) {
+      invalid.add("endDate");
+      messages.push(minStayMessage);
     }
     if (!firstName.trim()) invalid.add("firstName");
     if (!lastName.trim()) invalid.add("lastName");
