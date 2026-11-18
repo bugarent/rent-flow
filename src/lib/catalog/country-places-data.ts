@@ -925,6 +925,8 @@ export const COUNTRY_PLACES: Record<string, CountryPlaceSeed> = {
       ["limassol", "Limassol"],
       ["larnaca", "Larnaca"],
       ["paphos", "Paphos"],
+      ["ayia-napa", "Ayia Napa"],
+      ["protaras", "Protaras"],
     ],
   },
   MT: {
