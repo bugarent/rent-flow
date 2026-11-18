@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { SITE_URL } from "@/lib/seo/config";
+import { SITE_URL, carDetailCanonicalUrl } from "@/lib/seo/config";
 import { softTimeout } from "@/lib/server/soft-timeout";
 import {
   SEO_LANDING_LOCALES,
@@ -63,7 +63,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const cars = await softTimeout(loadApprovedCarIds(), [], 2500);
   const carEntries: MetadataRoute.Sitemap = cars.map((car) => ({
-    url: `${SITE_URL}/cars/${encodeURIComponent(car.id)}`,
+    url: carDetailCanonicalUrl(car.id),
     lastModified: car.updatedAt ? new Date(car.updatedAt) : now,
     changeFrequency: "weekly",
     priority: 0.8,

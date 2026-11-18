@@ -21,9 +21,25 @@ export const PRIMARY_KEYWORDS = [
   "airport car hire Georgia",
 ] as const;
 
+/** Path-only URL for canonicals / OG — strips ?query and #hash so filter/date variants collapse. */
+export function cleanSitePath(path = "/"): string {
+  const raw = String(path || "/").trim() || "/";
+  const withoutOrigin = raw.replace(/^https?:\/\/[^/]+/i, "");
+  const pathOnly = withoutOrigin.split(/[?#]/)[0] || "/";
+  if (!pathOnly || pathOnly === "/") return "/";
+  return pathOnly.startsWith("/") ? pathOnly : `/${pathOnly}`;
+}
+
 export function absoluteUrl(path = "/"): string {
-  if (!path || path === "/") return SITE_URL;
-  return `${SITE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  const cleaned = cleanSitePath(path);
+  if (cleaned === "/") return SITE_URL;
+  return `${SITE_URL}${cleaned}`;
+}
+
+/** Canonical href for a car detail page — never includes trip/filter query params. */
+export function carDetailCanonicalUrl(carId: string): string {
+  const id = String(carId || "").trim();
+  return absoluteUrl(`/cars/${encodeURIComponent(id)}`);
 }
 
 export function localeHtmlLang(locale: Locale): string {

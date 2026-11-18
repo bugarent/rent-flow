@@ -57,10 +57,12 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata(): Promise<Metadata> {
   const { locale } = await readPreferences();
   const page = getPageSeo("cars", locale);
+  // Always self-canonical to /cars — never include pickup/dates/filter query strings.
   return buildPageMetadata({
     title: page.title,
     description: page.description,
     path: "/cars",
+    canonicalPath: "/cars",
     locale,
     keywords: page.keywords,
   });

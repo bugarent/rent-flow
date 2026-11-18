@@ -3,7 +3,7 @@ import { cache } from "react";
 import { CarBookingClient } from "@/components/cars/car-booking-client";
 import { JsonLd } from "@/components/seo/json-ld";
 import { readPreferences } from "@/lib/server/preferences";
-import { absoluteUrl } from "@/lib/seo/config";
+import { carDetailCanonicalUrl, cleanSitePath } from "@/lib/seo/config";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 import { buildBreadcrumbJsonLd, buildProductVehicleJsonLd } from "@/lib/seo/json-ld";
 import { carDetailSeo } from "@/lib/seo/pages";
@@ -47,6 +47,11 @@ function firstParam(value: string | string[] | undefined) {
   return String(Array.isArray(value) ? value[0] : value || "").slice(0, 10);
 }
 
+/** Clean path for metadata / schema — never includes startDate, pickup, etc. */
+function carDetailPath(id: string) {
+  return cleanSitePath(`/cars/${encodeURIComponent(String(id || "").trim())}`);
+}
+
 async function loadInitialCar(id: string, startDate: string, endDate: string) {
   try {
     const { loadPublicCarPayload } = await import("@/lib/server/public-car-payload");
@@ -60,12 +65,14 @@ async function loadInitialCar(id: string, startDate: string, endDate: string) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const { locale } = await readPreferences();
+  const path = carDetailPath(id);
   const car = await loadCarSeo(id);
   if (!car || !isPubliclyVisibleListing(car)) {
     return buildPageMetadata({
       title: "Car rental | RentAirportCars",
       description: "Book airport car rental in Georgia — Kutaisi, Tbilisi and Batumi.",
-      path: `/cars/${encodeURIComponent(id)}`,
+      path,
+      canonicalPath: path,
       locale,
       noIndex: true,
     });
@@ -79,10 +86,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     locale,
   });
 
+  // Query params (dates / pickup / dropoff / tracking) must not appear in canonical or OG url.
   return buildPageMetadata({
     title: copy.title,
     description: copy.description,
-    path: `/cars/${encodeURIComponent(id)}`,
+    path,
+    canonicalPath: path,
     locale,
     image: car.photos[0]?.url || undefined,
     imageAlt: `${car.make} ${car.model} airport car rental`,
@@ -98,8 +107,8 @@ export default async function CarBookingPage({ params, searchParams }: Props) {
     loadCarSeo(id),
     loadInitialCar(id, startDate, endDate),
   ]);
-  const path = `/cars/${encodeURIComponent(id)}`;
-  const url = absoluteUrl(path);
+  const path = carDetailPath(id);
+  const url = carDetailCanonicalUrl(id);
 
   const schemas =
     car && isPubliclyVisibleListing(car)
