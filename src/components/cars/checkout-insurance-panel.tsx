@@ -453,17 +453,17 @@ function InsuranceToggleRow({
         locked || free || selected ? onGreen : offYellow,
       )}
     >
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 sm:flex-nowrap sm:gap-3">
-        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-1">
+      <div className="flex flex-col gap-1.5 lg:flex-row lg:flex-nowrap lg:items-center lg:gap-3">
+        <div className="flex min-w-0 items-start gap-2 lg:flex-1 lg:items-center">
           <ShieldCheck
             className={cn(
-              "h-4 w-4 shrink-0",
+              "mt-0.5 h-4 w-4 shrink-0 lg:mt-0",
               locked || selected ? "text-[#0a7a52]" : inactive ? "text-amber-600" : "text-slate-400",
             )}
           />
           <h3
             className={cn(
-              "shrink truncate text-sm font-extrabold leading-none",
+              "min-w-0 flex-1 break-words text-sm font-extrabold leading-snug lg:truncate lg:leading-none",
               locked || selected ? "text-[#0b1f4b]" : inactive ? "text-amber-950" : "text-[#0b1f4b]",
             )}
           >
@@ -473,7 +473,7 @@ function InsuranceToggleRow({
             type="button"
             onClick={onOpenDetails}
             className={cn(
-              "inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-sm font-extrabold underline-offset-2 hover:underline sm:text-[15px]",
+              "inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg px-2.5 py-1 text-sm font-extrabold underline-offset-2 hover:underline sm:text-[15px] lg:self-auto",
               inactive
                 ? "bg-amber-50 text-amber-800 ring-1 ring-amber-200"
                 : "bg-white text-[#0f766e] ring-1 ring-[#0f766e]/25 shadow-sm",
@@ -484,7 +484,8 @@ function InsuranceToggleRow({
           </button>
         </div>
 
-        <div className="ms-auto flex min-w-0 flex-wrap items-center justify-end gap-x-1.5 text-end sm:ms-0 sm:shrink-0 sm:flex-nowrap sm:gap-x-2 sm:whitespace-nowrap">
+        <div className="flex items-center justify-between gap-2 ps-6 lg:contents">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-end lg:shrink-0 lg:flex-nowrap lg:gap-x-2 lg:whitespace-nowrap">
           {free ? (
             <span
               className={cn(
@@ -557,6 +558,7 @@ function InsuranceToggleRow({
             )}
           />
         </button>
+        </div>
       </div>
     </article>
   );

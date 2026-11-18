@@ -1339,22 +1339,23 @@ export function ReserveCheckout({
                           <li
                             key={extra.id}
                             className={cn(
-                              "flex flex-nowrap items-center gap-2 rounded-lg border px-2 py-1.5 sm:gap-2.5",
+                              "flex flex-col gap-1.5 rounded-lg border px-2 py-1.5 lg:flex-row lg:flex-nowrap lg:items-center lg:gap-2.5",
                               locked || selected
                                 ? "border-emerald-200 bg-emerald-50/70 ring-1 ring-emerald-100"
                                 : "border-amber-200 bg-amber-50/60 ring-1 ring-amber-100",
                             )}
                           >
+                            <div className="flex min-w-0 items-start gap-2 lg:flex-1 lg:items-center">
                             <ExtraServiceIcon
                               name={extra.name}
                               slug={extra.slug}
                               description={extra.description}
                               compact
                             />
-                            <div className="flex min-w-0 flex-1 items-center gap-1">
+                            <div className="flex min-w-0 flex-1 items-start gap-1 lg:items-center">
                               <span
                                 className={cn(
-                                  "min-w-0 truncate text-sm font-extrabold leading-none",
+                                  "min-w-0 flex-1 break-words text-sm font-extrabold leading-snug lg:truncate lg:leading-none",
                                   locked || selected ? "text-[#0b1f4b]" : "text-amber-950",
                                 )}
                               >
@@ -1372,7 +1373,9 @@ export function ReserveCheckout({
                                 />
                               ) : null}
                             </div>
+                            </div>
 
+                            <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 ps-9 lg:contents">
                             {selected && !locked && !isFree ? (
                               <div className="inline-flex h-6 shrink-0 items-center gap-0.5 rounded-md border border-[#60d1a6]/80 bg-white/80">
                                 <button
@@ -1396,7 +1399,7 @@ export function ReserveCheckout({
                               </div>
                             ) : null}
 
-                            <div className="flex shrink-0 flex-nowrap items-center gap-x-1.5 whitespace-nowrap text-end sm:gap-x-2">
+                            <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 text-end lg:shrink-0 lg:flex-nowrap lg:gap-x-2 lg:whitespace-nowrap">
                               {isFree ? (
                                 <span className="inline-flex items-center gap-1 text-sm font-extrabold text-[#0a7a52]">
                                   {dictionary.common.free}
@@ -1462,6 +1465,7 @@ export function ReserveCheckout({
                                 )}
                               />
                             </button>
+                            </div>
                           </li>
                         );
                       })}
@@ -1480,8 +1484,8 @@ export function ReserveCheckout({
                               variant="forbidden"
                               compact
                             />
-                            <div className="flex min-w-0 flex-1 items-center gap-1 truncate">
-                              <span className="truncate text-sm font-semibold text-slate-900">
+                            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-0.5">
+                              <span className="min-w-0 break-words text-sm font-semibold leading-snug text-slate-900">
                                 {extraName(extra)}
                               </span>
                               {extra.description?.trim() ? (
