@@ -257,7 +257,8 @@ export function PartnerImageEditor({
     setZoom(1);
     setOffset({ x: 0, y: 0 });
     setTilt(0);
-    setInsets({ left: 0.05, right: 0.05, top: 0.05, bottom: 0.05 });
+    // Start with the full photo selected — no pre-crop so the whole frame is visible.
+    setInsets({ left: 0, right: 0, top: 0, bottom: 0 });
     setNatural({ w: 0, h: 0 });
     setAspectId("free");
     setActiveHandle(null);
@@ -300,15 +301,29 @@ export function PartnerImageEditor({
   if (!open || !mounted) return null;
 
   const viewportAspect =
-    viewportSize.w && viewportSize.h ? viewportSize.w / viewportSize.h : asDocument ? 3 / 4 : 4 / 3;
+    viewportSize.w && viewportSize.h
+      ? viewportSize.w / viewportSize.h
+      : natural.w && natural.h
+        ? natural.w / natural.h
+        : asDocument
+          ? 3 / 4
+          : 4 / 3;
   const lockedAspect = ASPECT_VALUES[aspectId];
 
-  const coverScale =
-    natural.w && viewportSize.w
-      ? Math.max(viewportSize.w / natural.w, viewportSize.h / natural.h)
+  // Fit the whole photo inside the viewport (contain). Cover was cropping edges
+  // before the user started editing, which looked like a forced zoom.
+  const fitScale =
+    natural.w && natural.h && viewportSize.w && viewportSize.h
+      ? Math.min(viewportSize.w / natural.w, viewportSize.h / natural.h)
       : 1;
-  const drawW = natural.w * coverScale * zoom;
-  const drawH = natural.h * coverScale * zoom;
+  const drawW = natural.w * fitScale * zoom;
+  const drawH = natural.h * fitScale * zoom;
+  const viewportAspectStyle =
+    natural.w && natural.h
+      ? `${natural.w} / ${natural.h}`
+      : asDocument
+        ? "3 / 4"
+        : "4 / 3";
 
   const startHandle = (handle: Handle, e: ReactPointerEvent) => {
     e.stopPropagation();
@@ -424,7 +439,7 @@ export function PartnerImageEditor({
       setOffset({ x: 0, y: 0 });
       setZoom(1);
       setTilt(0);
-      setInsets({ left: 0.05, right: 0.05, top: 0.05, bottom: 0.05 });
+      setInsets({ left: 0, right: 0, top: 0, bottom: 0 });
       setNatural({ w: 0, h: 0 });
     } catch {
       setError(copy.loadFailed);
@@ -529,7 +544,8 @@ export function PartnerImageEditor({
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3 sm:px-4">
           <div
             ref={viewportRef}
-            className="relative mx-auto aspect-[4/3] w-full max-w-md overflow-hidden rounded-xl bg-slate-900 touch-none"
+            className="relative mx-auto w-full max-w-md max-h-[min(52vh,420px)] overflow-hidden rounded-xl bg-slate-900 touch-none"
+            style={{ aspectRatio: viewportAspectStyle }}
           >
             {workSrc ? (
               // eslint-disable-next-line @next/next/no-img-element
