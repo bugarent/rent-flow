@@ -85,8 +85,8 @@ export function LocationDriveNotes({
           <ul className="mt-3 space-y-3">
             {routes.map((route) => (
               <li key={route.title} className="min-w-0">
-                <h3 className="text-sm font-semibold text-slate-900 sm:text-base">{route.title}</h3>
-                <p className="text-sm leading-6 text-slate-600">
+                <h3 className="break-words text-sm font-semibold text-slate-900 sm:text-base">{route.title}</h3>
+                <p className="break-words text-sm leading-6 text-slate-600">
                   {route.distance} <strong className="font-semibold text-slate-800">{route.tip}</strong>
                   {route.also ? ` ${route.also}` : ""}
                 </p>

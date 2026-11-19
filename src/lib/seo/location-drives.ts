@@ -1,6 +1,8 @@
 import type { Locale } from "@/lib/i18n/config";
 import { cityDisplayName } from "@/lib/i18n/place-label";
 import { EXTRA_AIRPORTS, EXTRA_CITIES } from "@/lib/seo/location-drives-extra";
+import { drivePlaceName } from "@/lib/seo/location-drive-names";
+import { worldDriveSpots } from "@/lib/seo/location-drives-world";
 
 export type DriveLine = {
   title: string;
@@ -11,7 +13,14 @@ export type DriveLine = {
 
 type Tip = "sedan" | "standard" | "crossover" | "highway" | "mountain" | "either";
 type Name = { en: string } & Partial<Record<Locale, string>>;
-type Spot = { name: string | Name; km: string; time: string; tip: Tip; also?: { name: string | Name; km: string; time: string } };
+type Spot = {
+  name: string | Name;
+  km: string;
+  time: string;
+  tip: Tip;
+  approx?: boolean;
+  also?: { name: string | Name; km: string; time: string };
+};
 
 const TIPS: Record<Locale, Record<Tip, readonly [string, string]>> = {
   en: {
@@ -127,6 +136,30 @@ const TIPS: Record<Locale, Record<Tip, readonly [string, string]>> = {
     either: ["บนทางหลวงใช้ได้ทั้งซีดาน ไฮบริด และ SUV", "เลือกตามความสบาย ตัวถนนไม่ได้ยาก"],
   },
 };
+
+const TIME_UNIT: Record<Locale, { h: string; min: string }> = {
+  en: { h: "h", min: "min" },
+  ka: { h: "სთ", min: "წთ" },
+  ru: { h: "ч", min: "мин" },
+  de: { h: "Std.", min: "Min." },
+  es: { h: "h", min: "min" },
+  fr: { h: "h", min: "min" },
+  it: { h: "h", min: "min" },
+  nl: { h: "u", min: "min" },
+  pl: { h: "godz.", min: "min" },
+  tr: { h: "sa", min: "dk" },
+  ar: { h: "س", min: "د" },
+  zh: { h: "小时", min: "分钟" },
+  ko: { h: "시간", min: "분" },
+  th: { h: "ชม.", min: "นาที" },
+};
+
+function localTime(locale: Locale, time: string): string {
+  const unit = TIME_UNIT[locale];
+  return time
+    .replace(/(\d+(?:[.,]\d+)?(?:\s*[–-]\s*\d+(?:[.,]\d+)?)?)\s*h\b/g, (_, n: string) => `${n} ${unit.h}`)
+    .replace(/(\d+(?:[.,]\d+)?(?:\s*[–-]\s*\d+(?:[.,]\d+)?)?)\s*min\b/g, (_, n: string) => `${n} ${unit.min}`);
+}
 
 const DISTANCE: Record<Locale, (km: string, time: string) => string> = {
   en: (km, time) => `About ${km} km, about ${time}.`,
@@ -477,10 +510,27 @@ function lang(locale: string): Locale {
   return locale in TIPS ? (locale as Locale) : "en";
 }
 
+const APPROX: Record<Locale, string> = {
+  en: "The time is approximate and changes with traffic.",
+  ka: "დრო სავარაუდოა და საცობზე იცვლება.",
+  ru: "Время ориентировочное и зависит от пробок.",
+  de: "Die Zeit ist ungefähr und hängt vom Verkehr ab.",
+  es: "El tiempo es aproximado y cambia con el tráfico.",
+  fr: "La durée est approximative et varie avec la circulation.",
+  it: "Il tempo è indicativo e cambia col traffico.",
+  nl: "De tijd is een schatting en hangt van het verkeer af.",
+  pl: "Czas jest orientacyjny i zależy od korków.",
+  tr: "Süre yaklaşıktır ve trafiğe göre değişir.",
+  ar: "الوقت تقريبي ويتغير مع الازدحام.",
+  zh: "时间为大约值，会随路况变化。",
+  ko: "시간은 대략적이며 교통에 따라 달라집니다.",
+  th: "เวลาเป็นค่าประมาณและเปลี่ยนตามการจราจร",
+};
+
 function titleOf(locale: string, name: string | Name): string {
   const code = lang(locale);
-  if (typeof name === "string") return cityDisplayName(code, name) || name;
-  return name[code] || cityDisplayName(code, name.en) || name.en;
+  if (typeof name === "string") return drivePlaceName(code, name) || cityDisplayName(code, name) || name;
+  return name[code] || drivePlaceName(code, name.en) || cityDisplayName(code, name.en) || name.en;
 }
 
 function lines(spots: Spot[], locale: string): DriveLine[] {
@@ -489,11 +539,14 @@ function lines(spots: Spot[], locale: string): DriveLine[] {
     .filter((spot) => spot.km !== "0")
     .map((spot, index) => ({
       title: titleOf(locale, spot.name),
-      distance: DISTANCE[code](spot.km, spot.time),
+      distance: DISTANCE[code](spot.km, localTime(code, spot.time)),
       tip: TIPS[code][spot.tip][index % 2],
-      also: spot.also
-        ? ALSO[code](titleOf(locale, spot.also.name), spot.also.km, spot.also.time)
-        : undefined,
+      also: [
+        spot.also ? ALSO[code](titleOf(locale, spot.also.name), spot.also.km, localTime(code, spot.also.time)) : "",
+        spot.approx ? APPROX[code] : "",
+      ]
+        .filter(Boolean)
+        .join(" ") || undefined,
     }));
 }
 
@@ -510,5 +563,6 @@ export function locationRouteLines(code: string, locale: string, cityName?: stri
   const city = (cityName || "").trim();
   const citySpots = city ? combined(CITY_DRIVES[city], EXTRA_CITIES[city]) : undefined;
   if (citySpots) return lines(citySpots, locale);
-  return [];
+  const world = worldDriveSpots(direct, city);
+  return world.length ? lines(world, locale) : [];
 }
