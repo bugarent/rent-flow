@@ -25,12 +25,10 @@ import {
 } from "lucide-react";
 import { BirthDateSelect } from "@/components/cars/birth-date-select";
 import {
-  CheckoutBogCard,
   CheckoutPaypalCard,
   GuestBookingNoticeModal,
   LegalDocumentModal,
   RentalTermsModal,
-  loadCheckoutBogCard,
   loadCheckoutPaypalCard,
   loadGuestBookingNoticeModal,
   loadLegalDocumentModal,
@@ -205,7 +203,6 @@ export function ReserveCheckout({
 }) {
   const intentPrefetch = useIntentPrefetch();
   usePreloadWhenIdle(
-    loadCheckoutBogCard,
     loadCheckoutPaypalCard,
     loadGuestBookingNoticeModal,
     loadRentalTermsModal,
