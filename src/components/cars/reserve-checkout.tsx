@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -25,11 +24,11 @@ import {
 } from "lucide-react";
 import { BirthDateSelect } from "@/components/cars/birth-date-select";
 import {
-  CheckoutPaypalSandbox,
+  CheckoutBogCard,
   GuestBookingNoticeModal,
   LegalDocumentModal,
   RentalTermsModal,
-  loadCheckoutPaypalSandbox,
+  loadCheckoutBogCard,
   loadGuestBookingNoticeModal,
   loadLegalDocumentModal,
   loadRentalTermsModal,
@@ -200,10 +199,9 @@ export function ReserveCheckout({
   initialCar?: Record<string, unknown> | null;
   initialRange?: string;
 }) {
-  const router = useRouter();
   const intentPrefetch = useIntentPrefetch();
   usePreloadWhenIdle(
-    loadCheckoutPaypalSandbox,
+    loadCheckoutBogCard,
     loadGuestBookingNoticeModal,
     loadRentalTermsModal,
     loadLegalDocumentModal,
@@ -1060,8 +1058,7 @@ export function ReserveCheckout({
                 readBusinessPartnerReferralCookieClient()
               ).toUpperCase(),
           declinePartnerReferral: noPromoCode,
-          paymentProvider: "paypal",
-          paymentMode: "sandbox",
+          paymentProvider: "bog",
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1101,18 +1098,32 @@ export function ReserveCheckout({
         setCheckoutStep("details");
         throw new Error(apiError);
       }
-      const ref =
-        data.sequentialNumber != null
-          ? formatBookingRef(data.sequentialNumber) || ""
-          : data.id
-            ? String(data.id).slice(0, 8)
-            : "";
+
+      const bookingId = String(data.id || "").trim();
+      if (!bookingId) {
+        throw new Error(dictionary.booking.createFailed);
+      }
+
       clearBusinessPartnerReferralCookieClient();
-      const q = new URLSearchParams();
-      q.set("booked", "1");
-      if (ref) q.set("ref", ref);
-      if (email.trim()) q.set("email", email.trim());
-      router.push(`/?${q.toString()}`);
+
+      const payRes = await fetch("/api/payments/bog/create-order", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId, locale }),
+      });
+      const payData = await payRes.json().catch(() => ({}));
+      if (!payRes.ok) {
+        throw new Error(
+          String(payData.error || "Could not start card payment. Please try again."),
+        );
+      }
+      const redirectUrl = String(payData.redirect_url || "").trim();
+      if (!redirectUrl) {
+        throw new Error("Payment redirect URL missing. Please try again.");
+      }
+      window.location.assign(redirectUrl);
+      return;
     } catch (err) {
       setError(err instanceof Error ? err.message : dictionary.booking.createFailed);
       requestAnimationFrame(() => {
@@ -1162,10 +1173,9 @@ export function ReserveCheckout({
                 {tripLocationLabel(pickup, pickupAddress, { locale })}
               </p>
             </div>
-            <CheckoutPaypalSandbox
+            <CheckoutBogCard
               amountLabel={payAmountLabel || formatPrice(totals.payNow)}
               locale={locale}
-              guestEmail={email}
               loading={loading}
               onBack={() => setCheckoutStep("details")}
               onConfirm={async () => {

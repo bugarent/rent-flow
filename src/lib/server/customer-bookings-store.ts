@@ -40,6 +40,12 @@ export type FileBookingRecord = {
   platformChargeCurrency?: string;
   platformChargeAmount?: number;
   balanceDueEur: number;
+  /** Online checkout provider (e.g. bog). */
+  paymentProvider?: string;
+  /** UNPAID | PENDING | PAID | FAILED */
+  paymentStatus?: string;
+  /** Bank of Georgia ecommerce order id */
+  bogOrderId?: string;
   guestFirstName: string;
   guestLastName: string;
   guestPhone: string;
@@ -223,6 +229,9 @@ export async function updateFileBooking(
       | "platformChargeAmount"
       | "balanceDueEur"
       | "depositPercent"
+      | "paymentProvider"
+      | "paymentStatus"
+      | "bogOrderId"
       | "status"
       | "cancellationReason"
       | "cancelledAt"

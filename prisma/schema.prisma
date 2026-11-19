@@ -456,6 +456,12 @@ model Booking {
   guestDateOfBirth   String        @default("")
   /// Customer promo / discount code, optional
   promoCode          String        @default("")
+  /// Online checkout provider (e.g. bog, paypal)
+  paymentProvider    String        @default("")
+  /// UNPAID | PENDING | PAID | FAILED
+  paymentStatus      String        @default("UNPAID")
+  /// Bank of Georgia ecommerce order id
+  bogOrderId         String?
   cancelledAt        DateTime?
   completedAt        DateTime?
   /// External booking id returned by partner channel after lock
@@ -473,6 +479,8 @@ model Booking {
   @@index([carId, status, pickupAt, bufferEndsAt])
   @@index([status, pickupAt, bufferEndsAt])
   @@index([customerId])
+  @@index([bogOrderId])
+  @@index([paymentStatus])
 }
 
 model BookingExtra {

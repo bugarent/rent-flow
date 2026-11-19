@@ -304,6 +304,13 @@ export async function POST(req: Request) {
 
     const guestDateOfBirth =
       typeof dateOfBirth === "string" ? dateOfBirth.trim().slice(0, 32) : "";
+    const paymentProvider = String(
+      (body as { paymentProvider?: unknown }).paymentProvider || "",
+    )
+      .trim()
+      .toLowerCase()
+      .slice(0, 32);
+    const deferNotifyUntilPaid = paymentProvider === "bog";
     const countryOfResidence = String(
       (body as { countryOfResidence?: unknown }).countryOfResidence || "",
     )
@@ -763,14 +770,22 @@ export async function POST(req: Request) {
           ...(bookingPromoCode || bpCode
             ? { promoCode: bpCode || bookingPromoCode }
             : {}),
+          ...(paymentProvider
+            ? {
+                paymentProvider,
+                paymentStatus: "UNPAID" as const,
+              }
+            : {}),
         });
         await freezeBookingTermsAtCheckout(booking.id);
 
-        try {
-          const { notifyFileBookingEvent } = await import("@/lib/notifications");
-          await notifyFileBookingEvent(booking);
-        } catch (notifyError) {
-          console.warn("[bookings] notifyFileBookingEvent failed", notifyError);
+        if (!deferNotifyUntilPaid) {
+          try {
+            const { notifyFileBookingEvent } = await import("@/lib/notifications");
+            await notifyFileBookingEvent(booking);
+          } catch (notifyError) {
+            console.warn("[bookings] notifyFileBookingEvent failed", notifyError);
+          }
         }
         try {
           const { markBookingUnread } = await import("@/lib/server/admin-booking-unread-store");
@@ -1291,10 +1306,26 @@ export async function POST(req: Request) {
     }
     await freezeBookingTermsAtCheckout(booking.id);
 
-    try {
-      await notifyBookingEvent(booking.id, "BOOKING_NEW");
-    } catch (notifyError) {
-      console.warn("[bookings] notifyBookingEvent failed", notifyError);
+    if (paymentProvider) {
+      try {
+        await prisma.booking.update({
+          where: { id: booking.id },
+          data: {
+            paymentProvider,
+            paymentStatus: "UNPAID",
+          },
+        });
+      } catch {
+        /* optional columns may be missing until migrate */
+      }
+    }
+
+    if (!deferNotifyUntilPaid) {
+      try {
+        await notifyBookingEvent(booking.id, "BOOKING_NEW");
+      } catch (notifyError) {
+        console.warn("[bookings] notifyBookingEvent failed", notifyError);
+      }
     }
     void import("@/lib/server/channel-publish")
       .then((mod) => mod.noteReservationPublished(booking.carId))
