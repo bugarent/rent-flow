@@ -17,19 +17,22 @@ export const PLATE_TAKEN_MESSAGE =
   "A car with this registration number is already registered. You cannot submit or save a listing with the same plate.";
 
 const BLOCKING = [...PLATE_BLOCKING_STATUSES];
+/** A clone may not reuse a plate that is still on any listing except a rejected one. */
+const CLONE_BLOCKING = ["APPROVED", "PENDING", "PENDING_REMODERATION", "DRAFT", "HIDDEN"] as const;
 
 export async function findRegistrationConflict(
   plate: string,
-  opts?: { excludeId?: string },
+  opts?: { excludeId?: string; clone?: boolean },
 ): Promise<{ id: string; source: "db" | "file" } | null> {
   const normalized = normalizeRegistrationNumber(plate);
   if (!normalized) return null;
+  const statuses = opts?.clone ? CLONE_BLOCKING : BLOCKING;
 
   try {
     const existing = await prisma.car.findFirst({
       where: {
         registrationNumber: normalized,
-        status: { in: BLOCKING as ("APPROVED" | "PENDING" | "PENDING_REMODERATION")[] },
+        status: { in: [...statuses] },
         ...(opts?.excludeId ? { id: { not: opts.excludeId } } : {}),
       },
       select: { id: true },
@@ -40,7 +43,8 @@ export async function findRegistrationConflict(
   }
 
   const fileClash = await findFileCarByRegistration(normalized, {
-    blockingOnly: true,
+    blockingOnly: !opts?.clone,
+    excludeRejected: Boolean(opts?.clone),
     excludeId: opts?.excludeId,
   });
   if (fileClash) return { id: fileClash.id, source: "file" };
@@ -49,7 +53,7 @@ export async function findRegistrationConflict(
 
 export async function assertRegistrationAvailable(
   plate: string,
-  opts?: { excludeId?: string },
+  opts?: { excludeId?: string; clone?: boolean },
 ): Promise<{ ok: true } | { ok: false; conflict: NonNullable<Awaited<ReturnType<typeof findRegistrationConflict>>> }> {
   const conflict = await findRegistrationConflict(plate, opts);
   if (conflict) return { ok: false, conflict };

@@ -243,6 +243,7 @@ export async function POST(req: Request) {
       status: statusRaw,
       registrationNumber: registrationNumberRaw,
       plate: plateRaw,
+      clone: cloneRaw,
       categorySlug: categorySlugRaw,
     } = body;
 
@@ -253,6 +254,13 @@ export async function POST(req: Request) {
         ? "DRAFT"
         : "PENDING";
     const forSale = listingStatus !== "DRAFT";
+    const isClone = cloneRaw === true;
+    if (isClone && !forSale) {
+      return NextResponse.json(
+        { error: "A cloned listing cannot be saved as a draft", code: "CLONE_NO_DRAFT" },
+        { status: 400 },
+      );
+    }
 
     const registrationNumber = normalizeRegistrationNumber(
       String(registrationNumberRaw ?? plateRaw ?? ""),
@@ -270,7 +278,7 @@ export async function POST(req: Request) {
       const { assertRegistrationAvailable, plateTakenResponse } = await import(
         "@/lib/server/assert-registration-available"
       );
-      const check = await assertRegistrationAvailable(registrationNumber);
+      const check = await assertRegistrationAvailable(registrationNumber, { clone: isClone });
       if (!check.ok) {
         return NextResponse.json(plateTakenResponse(), { status: 409 });
       }

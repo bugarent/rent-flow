@@ -443,6 +443,7 @@ export function PartnerCreateCarForm({
   initialMinRentalDays = 1,
   initialCategories,
   carId,
+  cloneFromId,
   adminReview = null,
 }: {
   initialDeliveryCatalog?: DeliveryLocationView[];
@@ -457,6 +458,8 @@ export function PartnerCreateCarForm({
   initialMinRentalDays?: 1 | 2;
   /** When set, form loads this listing and saves via PATCH (Update). */
   carId?: string;
+  /** Prefill a new listing from this car. Draft save is hidden; the plate must be new. */
+  cloneFromId?: string;
   /** Admin remodeation: read-only partner form with red change highlights. */
   adminReview?: AdminListingReviewConfig | null;
 }) {
@@ -467,13 +470,16 @@ export function PartnerCreateCarForm({
   const common = dictionary.common;
   const isAdminReview = Boolean(adminReview);
   const isEdit = Boolean(carId);
+  const isClone = Boolean(cloneFromId) && !isEdit;
+  const sourceId = carId || (isClone ? cloneFromId : undefined);
+  const sourcePlateRef = useRef("");
   const sectionLabel = (id: CreateCarSectionId) => cc.sections[SECTION_COPY_KEY[id]];
   const [activeSection, setActiveSection] = useState<string>("main-info");
   const [error, setError] = useState("");
   const [saveNotice, setSaveNotice] = useState("");
   const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
-  const [booting, setBooting] = useState(isEdit);
+  const [booting, setBooting] = useState(Boolean(sourceId));
   const [serverCaps, setServerCaps] = useState<DeliveryAdjustment[] | null>(null);
   const [listingStatus, setListingStatus] = useState("");
   const [moderationReason, setModerationReason] = useState("");
@@ -906,8 +912,8 @@ export function PartnerCreateCarForm({
           return;
         }
 
-        const carPromise = carId
-          ? fetch(`/api/cars/${encodeURIComponent(carId)}`, {
+        const carPromise = sourceId
+          ? fetch(`/api/cars/${encodeURIComponent(sourceId)}`, {
               cache: "no-store",
               signal: AbortSignal.timeout(20_000),
             }).catch(() => null)
@@ -974,10 +980,10 @@ export function PartnerCreateCarForm({
           }
         }
 
-        if (carId) {
+        if (sourceId) {
           let carRes = await carPromise;
           if (!carRes?.ok) {
-            carRes = await fetch(`/api/cars/${encodeURIComponent(carId)}`, {
+            carRes = await fetch(`/api/cars/${encodeURIComponent(sourceId)}`, {
               cache: "no-store",
               signal: AbortSignal.timeout(20_000),
             }).catch(() => null);
@@ -1029,11 +1035,11 @@ export function PartnerCreateCarForm({
           setMake(String(car.make || ""));
           setModel(String(car.model || ""));
           setYear(String(car.year || new Date().getFullYear()));
-          setPlate(
-            sanitizeRegistrationInput(
-              String(details?.plate || car.registrationNumber || ""),
-            ),
+          const loadedPlate = sanitizeRegistrationInput(
+            String(details?.plate || car.registrationNumber || ""),
           );
+          if (isClone) sourcePlateRef.current = loadedPlate;
+          setPlate(loadedPlate);
           setColor(String(details?.color || ""));
           const savedSlug = String(car.categorySlug || "").trim();
           const savedBody = String(details?.bodyType || "").trim();
@@ -1098,7 +1104,7 @@ export function PartnerCreateCarForm({
           // Phone and desktop both paint the cabinet. A failed prefs request keeps the
           // car payload, and a saved offer cannot add or flip a service.
           if (!cancelled && prefItems.length && catalogSource.length) {
-            const listing = selectionsForCar(catalogSource, prefItems, carId);
+            const listing = selectionsForCar(catalogSource, prefItems, sourceId);
             setExtrasCatalog(listing.catalog);
             setExtrasReady(true);
             setExtraSelections(displayExtraPrices(listing.selections, nextCurrency, nextRates));
@@ -1187,7 +1193,7 @@ export function PartnerCreateCarForm({
           setPickupPlaces(placeRows);
         }
       } catch (err) {
-        if (!cancelled && carId) {
+        if (!cancelled && sourceId) {
           setError(err instanceof Error ? err.message : errUpdateFailedRef.current);
         }
       } finally {
@@ -1202,7 +1208,7 @@ export function PartnerCreateCarForm({
     return () => {
       cancelled = true;
     };
-  }, [carId, isAdminReview]);
+  }, [sourceId, isAdminReview, isClone]);
 
   useEffect(() => {
     const nodes = SECTION_IDS.map((id) => document.getElementById(id)).filter(Boolean) as HTMLElement[];
@@ -1307,6 +1313,7 @@ export function PartnerCreateCarForm({
     mode: "sales" | "internal" | "update",
     opts?: { publish?: boolean },
   ): Promise<boolean> => {
+    if (isClone && mode === "internal") return false;
     setError("");
     setSaveNotice("");
     setInvalidFields(new Set());
@@ -1369,6 +1376,16 @@ export function PartnerCreateCarForm({
         message = cc.errCertificate;
       }
       showError(message, firstSection, fields);
+      return false;
+    }
+
+    if (
+      isClone &&
+      plateNormalized &&
+      sourcePlateRef.current &&
+      plateNormalized === sourcePlateRef.current
+    ) {
+      showError(cc.errPlateTaken, "main-info", ["plate"]);
       return false;
     }
 
@@ -1522,7 +1539,7 @@ export function PartnerCreateCarForm({
           ...(isAdminReview ? { adminEdit: true, ...(opts?.publish ? { publish: true } : {}) } : {}),
           ...(isEdit
             ? {}
-            : { status: mode === "internal" ? "DRAFT" : "PENDING" }),
+            : { status: mode === "internal" ? "DRAFT" : "PENDING", ...(isClone ? { clone: true } : {}) }),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1767,6 +1784,16 @@ export function PartnerCreateCarForm({
               </span>
             ) : null}
           </div>
+        ) : null}
+        {isClone ? (
+          <p className="px-3 py-2 text-xs font-semibold leading-snug sm:px-5">
+            {uiText(
+              locale,
+              "This is a copy. Change the registration number, then add it as a new listing. A draft cannot be saved.",
+              "ეს ასლია. შეცვალეთ სახელმწიფო ნომერი და დაამატეთ ახალ განცხადებად. დრაფტად შენახვა შეუძლებელია.",
+              "Это копия. Измените госномер и добавьте как новое объявление. Черновик сохранить нельзя.",
+            )}
+          </p>
         ) : null}
         <nav
           className={cn(
@@ -2875,6 +2902,7 @@ export function PartnerCreateCarForm({
                   <Check className="h-3.5 w-3.5" />
                   {loading ? common.saving : cc.saveSales}
                 </button>
+                {isClone ? null : (
                 <button
                   type="button"
                   disabled={loading || uploading}
@@ -2885,6 +2913,7 @@ export function PartnerCreateCarForm({
                   <EyeOff className="h-3.5 w-3.5" />
                   {loading ? common.saving : cc.saveInternal}
                 </button>
+                )}
               </>
             )}
           </div>

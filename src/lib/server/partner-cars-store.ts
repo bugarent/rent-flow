@@ -142,7 +142,7 @@ export async function listFilePendingCars(): Promise<FileCarListing[]> {
 
 export async function findFileCarByRegistration(
   plate: string,
-  opts?: { approvedOnly?: boolean; blockingOnly?: boolean; excludeId?: string },
+  opts?: { approvedOnly?: boolean; blockingOnly?: boolean; excludeRejected?: boolean; excludeId?: string },
 ): Promise<FileCarListing | null> {
   const normalized = normalizeRegistrationNumber(plate);
   if (!normalized) return null;
@@ -153,6 +153,7 @@ export async function findFileCarByRegistration(
     cars.find((c) => {
       if (opts?.excludeId && c.id === opts.excludeId) return false;
       if (opts?.approvedOnly && c.status !== "APPROVED") return false;
+      if (opts?.excludeRejected && String(c.status) === "REJECTED") return false;
       if (
         opts?.blockingOnly &&
         !(PLATE_BLOCKING_STATUSES as readonly string[]).includes(String(c.status))

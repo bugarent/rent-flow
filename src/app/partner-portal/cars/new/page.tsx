@@ -2,8 +2,14 @@ import { PartnerCreateCarForm } from "@/components/partner/partner-create-car-fo
 import { requirePartner } from "@/lib/auth/guards";
 import { loadPartnerCarFormInitial } from "@/lib/server/partner-car-form-initial";
 
-export default async function NewCarPage() {
+export default async function NewCarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ clone?: string }>;
+}) {
   const session = await requirePartner();
+  const { clone } = await searchParams;
+  const cloneFromId = String(clone || "").trim();
   const {
     initialDeliveryCatalog,
     initialExtrasCatalog,
@@ -21,6 +27,7 @@ export default async function NewCarPage() {
       initialTariffs={initialTariffs}
       initialMinRentalDays={initialMinRentalDays}
       initialCategories={initialCategories}
+      cloneFromId={cloneFromId || undefined}
     />
   );
 }

@@ -168,7 +168,7 @@ function isToday(d: Date) {
 
 function dayCellClass(d: Date) {
   return cn(
-    "box-border h-full w-7 flex-none border-e border-b border-slate-200 [touch-action:pan-x_pan-y] md:w-auto md:min-w-0 md:flex-1",
+    "box-border h-8 min-h-full w-7 flex-none border-e border-slate-400 [touch-action:pan-x_pan-y] md:h-full md:w-auto md:min-w-0 md:flex-1",
     isWeekBoundaryDay(d) ? "bg-slate-100" : "bg-white",
   );
 }
@@ -222,6 +222,8 @@ export function PartnerFleetCalendar() {
   const [monthMenuOpen, setMonthMenuOpen] = useState(false);
   const [carsColumnNarrow, setCarsColumnNarrow] = useState(false);
   const [clientReady, setClientReady] = useState(false);
+  const nameMeasureRef = useRef<HTMLDivElement>(null);
+  const [fittedColumnPx, setFittedColumnPx] = useState<number | null>(null);
 
   useLayoutEffect(() => {
     setClientReady(true);
@@ -240,6 +242,7 @@ export function PartnerFleetCalendar() {
     Array<{ id: string; label: string; priceEurPerDay: number }>
   >([]);
   const [blockCarId, setBlockCarId] = useState<string | null>(null);
+  const [plusCar, setPlusCar] = useState<CarRow | null>(null);
   const [blockFromDate, setBlockFromDate] = useState("");
   const [blockToDate, setBlockToDate] = useState("");
   const [blockFromTime, setBlockFromTime] = useState("10:00");
@@ -708,6 +711,25 @@ export function PartnerFleetCalendar() {
     })();
   };
 
+  const plusCopy =
+    locale === "ka"
+      ? {
+          title: "აირჩიეთ მოქმედება",
+          clone: "განცხადების კლონირება",
+          cloneHint: "იგივე მონაცემებით ახალი განცხადება. ნომერი უნდა იყოს სხვა.",
+        }
+      : locale === "ru"
+        ? {
+            title: "Выберите действие",
+            clone: "Клонировать объявление",
+            cloneHint: "Новое объявление с теми же данными. Номер должен быть другим.",
+          }
+        : {
+            title: "Choose an action",
+            clone: "Clone this listing",
+            cloneHint: "A new listing with the same details. The plate must be different.",
+          };
+
   const blockCopy =
     locale === "ka"
       ? {
@@ -833,8 +855,42 @@ export function PartnerFleetCalendar() {
     };
   }, []);
 
-  // Phone column is wide enough for the name and plate at a smaller size. Desktop stays 281px.
-  const carColumnWidth = carsColumnNarrow ? "w-[4.5rem] md:w-[84px]" : "w-[12rem] md:w-[281px]";
+  useLayoutEffect(() => {
+    const root = nameMeasureRef.current;
+    if (!root || carsColumnNarrow) {
+      setFittedColumnPx(null);
+      return;
+    }
+    const measure = () => {
+      const mobile = window.matchMedia("(max-width: 767px)").matches;
+      let label = 0;
+      let text = 0;
+      root.querySelectorAll<HTMLElement>("[data-fit]").forEach((el) => {
+        const width = el.scrollWidth;
+        if (el.dataset.fit === "label") label = Math.max(label, width);
+        else text = Math.max(text, width);
+      });
+      const badge = mobile ? 20 : 24;
+      const plus = mobile ? 20 : 36;
+      const rowNeed = text + 12 + badge + 6 + (mobile ? 4 : 6) + plus + 2;
+      const headerNeed = label + 6 + 24 + 4 + (mobile ? 20 : 24) + 2;
+      const raw = Math.ceil(Math.max(rowNeed, headerNeed, mobile ? 96 : 140)) + 4;
+      const cap = mobile ? Math.min(220, Math.floor(window.innerWidth * 0.62)) : 281;
+      setFittedColumnPx(Math.min(cap, raw));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [cars, carsColumnNarrow, clientReady, locale, t.allCars]);
+
+  // Expanded width follows the longest name and plate. Narrow mode stays a fixed strip.
+  const carColumnWidth = carsColumnNarrow
+    ? "w-[4.5rem] md:w-[84px]"
+    : fittedColumnPx
+      ? "shrink-0"
+      : "w-[12rem] md:w-[281px]";
+  const carColumnStyle =
+    !carsColumnNarrow && fittedColumnPx ? { width: fittedColumnPx } : undefined;
   const carColumnToggleLabel = carsColumnNarrow
     ? locale === "ka"
       ? "სვეტის გაშლა"
@@ -854,6 +910,30 @@ export function PartnerFleetCalendar() {
           <p className="m-4 shrink-0 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>
         ) : null}
 
+        <div ref={nameMeasureRef} aria-hidden className="pointer-events-none fixed start-0 top-0 -z-10 opacity-0">
+          <p data-fit="label" className="w-max whitespace-nowrap text-[10px] font-bold md:text-[11px]">
+            {t.allCars} ({cars.length})
+          </p>
+          {cars.map((car) => {
+            const plate = [
+              car.registrationNumber ? formatRegistrationNumberDisplay(car.registrationNumber) : null,
+              car.year,
+            ]
+              .filter(Boolean)
+              .join(" · ");
+            return (
+              <div key={car.id}>
+                <p data-fit="name" className="w-max whitespace-nowrap text-[11px] font-bold md:text-[12px]">
+                  {car.make} {car.model}
+                </p>
+                <p data-fit="meta" className="w-max whitespace-nowrap text-[10px]">
+                  {plate}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
         <div
           ref={gridRef}
           className="min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-contain pb-[max(3.5rem,env(safe-area-inset-bottom))] [touch-action:pan-x_pan-y] md:pb-0"
@@ -864,7 +944,10 @@ export function PartnerFleetCalendar() {
               "sticky top-0 z-20 flex h-16 w-max border-b-2 border-slate-300 bg-white md:h-14 md:w-full",
             )}
           >
-            <div className={cn("sticky start-0 z-30 flex h-full shrink-0 flex-col border-e-2 border-slate-300 bg-white", carColumnWidth)}>
+            <div
+              className={cn("sticky start-0 z-30 flex h-full shrink-0 flex-col border-e-2 border-slate-300 bg-white", carColumnWidth)}
+              style={carColumnStyle}
+            >
               <div
                 className={cn(
                   "relative z-50 flex h-10 items-center gap-0.5 border-b border-[#cfd8e3] bg-[#d9e2e8] px-0.5 md:h-8 md:px-1",
@@ -961,7 +1044,7 @@ export function PartnerFleetCalendar() {
                     key={`d-${d.toISOString()}`}
                     data-day-col=""
                     className={cn(
-                      "box-border flex h-full w-7 flex-none flex-col items-center justify-center overflow-hidden border-e border-b border-slate-200 [touch-action:pan-x_pan-y] md:w-auto md:min-w-0 md:flex-1",
+                      "box-border flex h-full w-7 flex-none flex-col items-center justify-center overflow-hidden border-e border-b border-slate-400 [touch-action:pan-x_pan-y] md:w-auto md:min-w-0 md:flex-1",
                       isToday(d)
                         ? "bg-sky-100 ring-2 ring-inset ring-sky-500"
                         : isWeekBoundaryDay(d)
@@ -1010,6 +1093,7 @@ export function PartnerFleetCalendar() {
                     carColumnWidth,
                     tone ? tone.carCell : "border-slate-300 bg-white",
                   )}
+                  style={carColumnStyle}
                 >
                   <button
                     type="button"
@@ -1049,10 +1133,11 @@ export function PartnerFleetCalendar() {
                   </button>
                   <button
                     type="button"
-                    title={blockCopy.title}
-                    onClick={() => openBlockModal(car.id)}
+                    title={plusCopy.title}
+                    aria-haspopup="dialog"
+                    onClick={() => setPlusCar(car)}
                     className={cn(
-                      "inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded border border-sky-300 bg-sky-50 px-0 text-[11px] font-bold text-sky-800 hover:bg-sky-100 md:h-9 md:min-w-9 md:px-1.5 md:text-sm",
+                      "inline-flex h-10 min-w-10 shrink-0 items-center justify-center rounded border border-sky-300 bg-sky-50 px-0 text-sm font-bold text-sky-800 hover:bg-sky-100",
                     )}
                   >
                     +
@@ -1061,7 +1146,7 @@ export function PartnerFleetCalendar() {
 
                 <div
                   className={cn(
-                    "relative h-full w-[calc(var(--days)*1.75rem)] flex-none select-none md:w-auto md:min-w-0 md:flex-1",
+                    "relative min-h-8 w-[calc(var(--days)*1.75rem)] flex-none self-stretch select-none md:min-h-0 md:w-auto md:min-w-0 md:flex-1",
                     tone?.track,
                     monthSwipeArmed && "cursor-grabbing",
                   )}
@@ -1074,7 +1159,7 @@ export function PartnerFleetCalendar() {
                   onPointerUp={onMonthSwipePointerEnd}
                   onPointerCancel={onMonthSwipePointerEnd}
                 >
-                  <div className="absolute inset-0 flex">
+                  <div className="flex h-full min-h-8">
                     {days.map((d) => (
                       <button
                         key={d.toISOString()}
@@ -1093,7 +1178,7 @@ export function PartnerFleetCalendar() {
                         className={cn(
                           tone
                             ? cn(
-                                "box-border h-full w-7 flex-none border-e border-b [touch-action:pan-x_pan-y] md:w-auto md:min-w-0 md:flex-1",
+                                "box-border h-8 min-h-full w-7 flex-none border-e border-slate-400 [touch-action:pan-x_pan-y] md:h-full md:w-auto md:min-w-0 md:flex-1",
                                 tone.day,
                                 isWeekBoundaryDay(d) ? tone.dayWeekBoundary : tone.dayPlain,
                               )
@@ -1323,6 +1408,65 @@ export function PartnerFleetCalendar() {
           hidePartnerSection
           onClose={() => setViewingInfo(null)}
         />
+      ) : null}
+
+      {plusCar ? (
+        <div
+          className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+          onClick={() => setPlusCar(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fleet-plus-title"
+            className="w-full max-w-sm rounded-t-2xl bg-white p-4 shadow-2xl pb-[max(1rem,env(safe-area-inset-bottom))] sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p id="fleet-plus-title" className="text-base font-extrabold text-[#0b1f4b]">
+                  {plusCopy.title}
+                </p>
+                <p className="mt-0.5 break-words text-sm text-slate-600">
+                  {plusCar.make} {plusCar.model}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPlusCar(null)}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100"
+                aria-label={blockCopy.cancel}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mt-4 flex flex-col gap-2">
+              <button
+                type="button"
+                className="min-h-11 rounded-md bg-sky-700 px-4 text-sm font-bold text-white"
+                onClick={() => {
+                  const id = plusCar.id;
+                  setPlusCar(null);
+                  router.push(`${PARTNER_BASE}/cars/new?clone=${encodeURIComponent(id)}`);
+                }}
+              >
+                {plusCopy.clone}
+              </button>
+              <p className="text-xs leading-snug text-slate-500">{plusCopy.cloneHint}</p>
+              <button
+                type="button"
+                className="min-h-11 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800"
+                onClick={() => {
+                  const id = plusCar.id;
+                  setPlusCar(null);
+                  openBlockModal(id);
+                }}
+              >
+                {blockCopy.title}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {blockCarId ? (
