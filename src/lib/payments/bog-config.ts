@@ -28,15 +28,24 @@ export function getBogCurrency(): "GEL" | "EUR" | "USD" | "GBP" {
 
 /**
  * Public site origin for redirect_urls + callback_url.
- * Prefers SITE_URL, then NEXT_PUBLIC_SITE_URL / NEXTAUTH_URL.
+ * Prefers SITE_URL, then public/site URL envs, Netlify URL, then production domain.
  */
 export function getBogSiteUrl(): string {
-  const raw =
-    process.env.SITE_URL ||
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    process.env.NEXTAUTH_URL ||
-    "";
-  return String(raw).trim().replace(/\/$/, "");
+  const candidates = [
+    process.env.SITE_URL,
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.NEXTAUTH_URL,
+    process.env.URL, // Netlify
+    process.env.DEPLOY_PRIME_URL, // Netlify deploy preview
+  ];
+  for (const raw of candidates) {
+    const value = String(raw || "")
+      .trim()
+      .replace(/\/$/, "");
+    if (/^https:\/\//i.test(value)) return value;
+  }
+  // Production fallback so payment redirects work even if SITE_URL was never set in Netlify.
+  return "https://rentairportcars.com";
 }
 
 export const BOG_OAUTH_TOKEN_URL =

@@ -58,6 +58,7 @@ export function CheckoutPaypalCard({
   amountLabel,
   locale,
   loading,
+  disabled,
   onConfirm,
   onBack,
   backLabel,
@@ -65,11 +66,13 @@ export function CheckoutPaypalCard({
   amountLabel: string;
   locale: string;
   loading?: boolean;
+  disabled?: boolean;
   onConfirm: () => void | Promise<void>;
   onBack: () => void;
   backLabel?: string;
 }) {
   const copy = COPY[locale] || COPY.en;
+  const blocked = Boolean(loading || disabled);
 
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -97,7 +100,7 @@ export function CheckoutPaypalCard({
         <div className="flex flex-col gap-2 sm:flex-row-reverse">
           <button
             type="button"
-            disabled={loading}
+            disabled={blocked}
             onClick={() => void onConfirm()}
             className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#0070ba] px-4 text-sm font-extrabold text-white transition hover:bg-[#005ea6] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-1"
           >

@@ -42,6 +42,7 @@ export function CheckoutBogCard({
   amountLabel,
   locale,
   loading,
+  disabled,
   onConfirm,
   onBack,
   backLabel,
@@ -49,11 +50,13 @@ export function CheckoutBogCard({
   amountLabel: string;
   locale: string;
   loading?: boolean;
+  disabled?: boolean;
   onConfirm: () => void | Promise<void>;
   onBack: () => void;
   backLabel?: string;
 }) {
   const copy = COPY[locale] || COPY.en;
+  const blocked = Boolean(loading || disabled);
 
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -83,7 +86,7 @@ export function CheckoutBogCard({
         <div className="flex flex-col gap-2 sm:flex-row-reverse">
           <button
             type="button"
-            disabled={loading}
+            disabled={blocked}
             onClick={() => void onConfirm()}
             className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-sm font-extrabold text-white transition hover:bg-[#e55800] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-1"
           >

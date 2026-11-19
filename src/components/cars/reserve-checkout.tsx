@@ -244,6 +244,11 @@ export function ReserveCheckout({
   const [checkoutStep, setCheckoutStep] = useState<"details" | "payment">("details");
   const [paymentMethod, setPaymentMethod] = useState<"bog" | "paypal">("bog");
   const [payAmountLabel, setPayAmountLabel] = useState("");
+  const [paymentReady, setPaymentReady] = useState<{
+    bog: boolean;
+    paypal: boolean;
+    checked: boolean;
+  }>({ bog: false, paypal: false, checked: false });
   const [guestNoticeOpen, setGuestNoticeOpen] = useState(false);
   const [previewBookingRef, setPreviewBookingRef] = useState("");
   const previewRefRequest = useRef<Promise<string> | null>(null);
@@ -943,6 +948,30 @@ export function ReserveCheckout({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  useEffect(() => {
+    if (checkoutStep !== "payment") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/payments/status", { cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        setPaymentReady({
+          bog: Boolean(data?.bog?.ready),
+          paypal: Boolean(data?.paypal?.ready),
+          checked: true,
+        });
+      } catch {
+        if (!cancelled) {
+          setPaymentReady({ bog: false, paypal: false, checked: true });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [checkoutStep]);
+
   const handleBooking = async (provider: "bog" | "paypal" = paymentMethod) => {
     const invalid = new Set<string>();
     const messages: string[] = [];
@@ -1017,6 +1046,23 @@ export function ReserveCheckout({
     setError("");
     setLoading(true);
     try {
+      const readyRes = await fetch(
+        provider === "paypal" ? "/api/payments/paypal/ready" : "/api/payments/bog/ready",
+        { cache: "no-store" },
+      );
+      const readyData = await readyRes.json().catch(() => ({}));
+      if (!readyRes.ok || readyData?.ready === false) {
+        throw new Error(
+          locale === "ka"
+            ? provider === "bog"
+              ? "ბარათით გადახდა ჯერ არ არის ჩართული. Netlify-ზე დაამატეთ BOG_CLIENT_ID და BOG_SECRET_KEY, შემდეგ სცადეთ თავიდან. ბარათის მონაცემები ივსება საქართველოს ბანკის გვერდზე (გადამისამართების შემდეგ)."
+              : "PayPal ჯერ არ არის ჩართული. Netlify-ზე დაამატეთ PAYPAL_CLIENT_ID და PAYPAL_CLIENT_SECRET."
+            : provider === "bog"
+              ? "Card payment is not configured. Add BOG_CLIENT_ID and BOG_SECRET_KEY in Netlify. Card details are entered on Bank of Georgia’s page after redirect."
+              : "PayPal is not configured. Add PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET in Netlify.",
+        );
+      }
+
       const selectedExtras = [...paidExtras, ...insuranceExtras]
         .map((extra) => ({
           id: extra.id,
@@ -1252,11 +1298,60 @@ export function ReserveCheckout({
               </div>
             </fieldset>
 
+            {paymentReady.checked && paymentMethod === "bog" && !paymentReady.bog ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm leading-relaxed text-amber-950">
+                {locale === "ka" ? (
+                  <>
+                    <p className="font-bold">ბარათით გადახდა ჯერ არ არის ჩართული</p>
+                    <p className="mt-1">
+                      ბარათის ნომერი/CVV ჩვენს საიტზე არ ივსება — საქართველოს ბანკი ხსნის საკუთარ
+                      უსაფრთხო გვერდს გადამისამართების შემდეგ. ამისთვის Netlify Environment-ში დაამატეთ{" "}
+                      <strong>BOG_CLIENT_ID</strong> და <strong>BOG_SECRET_KEY</strong>, შემდეგ
+                      Redeploy.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-bold">Card payment is not enabled yet</p>
+                    <p className="mt-1">
+                      Card number/CVV are entered on Bank of Georgia’s secure page after redirect — not
+                      on this site. Add <strong>BOG_CLIENT_ID</strong> and{" "}
+                      <strong>BOG_SECRET_KEY</strong> in Netlify, then redeploy.
+                    </p>
+                  </>
+                )}
+              </div>
+            ) : null}
+
+            {paymentReady.checked && paymentMethod === "paypal" && !paymentReady.paypal ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm leading-relaxed text-amber-950">
+                {locale === "ka" ? (
+                  <>
+                    <p className="font-bold">PayPal ჯერ არ არის ჩართული</p>
+                    <p className="mt-1">
+                      Netlify-ზე დაამატეთ <strong>PAYPAL_CLIENT_ID</strong> და{" "}
+                      <strong>PAYPAL_CLIENT_SECRET</strong>, შემდეგ Redeploy. გადახდა დასრულდება
+                      PayPal-ის გვერდზე.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-bold">PayPal is not enabled yet</p>
+                    <p className="mt-1">
+                      Add <strong>PAYPAL_CLIENT_ID</strong> and <strong>PAYPAL_CLIENT_SECRET</strong>{" "}
+                      in Netlify, then redeploy. Payment completes on PayPal’s page.
+                    </p>
+                  </>
+                )}
+              </div>
+            ) : null}
+
             {paymentMethod === "bog" ? (
               <CheckoutBogCard
                 amountLabel={payAmountLabel || formatPrice(totals.payNow)}
                 locale={locale}
                 loading={loading}
+                disabled={paymentReady.checked && !paymentReady.bog}
                 onBack={() => setCheckoutStep("details")}
                 onConfirm={async () => {
                   const label = await loadPayAmountLabel(totals.payNow);
@@ -1272,6 +1367,7 @@ export function ReserveCheckout({
                 amountLabel={payAmountLabel || formatPrice(totals.payNow)}
                 locale={locale}
                 loading={loading}
+                disabled={paymentReady.checked && !paymentReady.paypal}
                 onBack={() => setCheckoutStep("details")}
                 onConfirm={async () => {
                   const label = await loadPayAmountLabel(totals.payNow);
