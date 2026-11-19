@@ -50,6 +50,8 @@ const nextConfig: NextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
+    // The last width becomes the <img src>. 3840 made every card refetch a huge file.
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
     localPatterns: [{ pathname: "/uploads/**" }, { pathname: "/images/**" }],
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },

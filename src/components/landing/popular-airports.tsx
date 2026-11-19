@@ -7,7 +7,7 @@ import type { PopularAirportCard } from "@/lib/catalog/popular-airports";
 import type { PopularAirportsLayout } from "@/lib/catalog/popular-airports-layout";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { airportCarsLabel } from "@/lib/i18n/airport-cars-label";
-import { SiteImage } from "@/components/ui/site-image";
+import { CardImage } from "@/components/ui/site-image";
 import { useIntentPrefetch } from "@/lib/client/prefetch-route";
 import { useHomeCountry } from "@/lib/catalog/home-country-store";
 
@@ -40,16 +40,7 @@ function AirportCard({
       aria-hidden={loopCopy || undefined}
     >
       <div className="relative aspect-[16/10] w-full bg-slate-200">
-        <SiteImage
-          src={airport.image}
-          alt={imageAlt}
-          fill
-          sizes="(max-width: 639px) 90vw, (max-width: 1023px) 45vw, 360px"
-          className="object-cover"
-          loading="lazy"
-          fetchPriority="low"
-          decoding="async"
-        />
+        <CardImage src={airport.image} alt={imageAlt} />
       </div>
       <div className="flex flex-1 flex-col p-4 sm:p-5">
         <h3 className="mb-4 min-w-0 break-words text-lg font-bold text-[#0b1f4b]">

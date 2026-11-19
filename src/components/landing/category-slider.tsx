@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Car, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { knownText } from "@/lib/i18n/known-record-text";
-import { SiteImage } from "@/components/ui/site-image";
+import { CardImage } from "@/components/ui/site-image";
 import { requestHomeCategorySearch } from "@/lib/catalog/home-country-store";
 
 const AUTO_MS = 4000;
@@ -32,12 +32,10 @@ function CategoryCard({
 }) {
   const { locale } = usePreferences();
   const name = knownText(locale, category.name);
-  const [imgFailed, setImgFailed] = useState(false);
   const openSearch = () => {
     requestHomeCategorySearch(category.slug, name);
     scrollToHomeSearch();
   };
-  const hasImage = Boolean(category.imageUrl?.trim()) && !imgFailed;
 
   return (
     <article
@@ -45,22 +43,7 @@ function CategoryCard({
       aria-hidden={loopCopy || undefined}
     >
       <div className="relative aspect-[16/10] w-full bg-slate-100">
-        {hasImage ? (
-          <SiteImage
-            src={category.imageUrl}
-            alt={name}
-            fill
-            sizes="(max-width: 639px) 100vw, (max-width: 1023px) 45vw, 360px"
-            className="object-cover"
-            loading="lazy"
-            fetchPriority="low"
-            onError={() => setImgFailed(true)}
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-slate-300">
-            <Car className="h-10 w-10" aria-hidden />
-          </div>
-        )}
+        <CardImage src={category.imageUrl} alt={name} />
       </div>
       <div className="flex flex-1 flex-col p-4 sm:p-5">
         <h3 className="mb-4 text-lg font-bold text-[#0b1f4b]">{name}</h3>

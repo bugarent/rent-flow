@@ -17,7 +17,7 @@ const TYPES: Record<string, string> = {
   ".pdf": "application/pdf",
 };
 
-const OPTIMIZER_WIDTHS = [16, 32, 48, 64, 96, 128, 256, 384, 640, 750, 828, 1080, 1200, 1920];
+const OPTIMIZER_WIDTHS = [16, 32, 48, 64, 96, 128, 256, 384, 640, 750, 828, 1080, 1200];
 
 /** In-process cache so search grids do not re-fetch multi-MB HostedFile blobs + re-encode. */
 const THUMB_CACHE_MAX = 200;
@@ -31,8 +31,8 @@ globalForThumbs.__uploadThumbCache = thumbCache;
 function clampWidth(raw: string | null): number | null {
   const n = Number(raw);
   if (!Number.isFinite(n) || n < 16) return null;
-  const want = Math.min(Math.floor(n), 1920);
-  return OPTIMIZER_WIDTHS.find((w) => w >= want) ?? 1920;
+  const want = Math.min(Math.floor(n), 1200);
+  return OPTIMIZER_WIDTHS.find((w) => w >= want) ?? 1200;
 }
 
 function cacheGet(key: string) {
