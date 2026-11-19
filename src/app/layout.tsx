@@ -95,18 +95,15 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   // Admin and partner pages do not show this contact. A cold database must not
   // hold their first byte. Public pages wait only briefly; the shell fills the
   // rest from the last visit and /api/footer-contact.
-  const { listSeoDestinationLinks } = await import("@/lib/seo/destination-links");
-  const [fxRates, footerContact, destinations, googleReviews] = portal
+  const [fxRates, footerContact, googleReviews] = portal
     ? [
         defaultFxRates(),
         emptyFooterContact(),
-        [] as Array<{ href: string; label: string }>,
         null as { placeRating: number | null; userRatingsTotal: number | null } | null,
       ]
     : await Promise.all([
         softTimeout(cachedFxRates(), defaultFxRates(), 250),
         softTimeout(cachedFooterContact(), cachedFooterContact.peek() ?? emptyFooterContact(), 400),
-        softTimeout(listSeoDestinationLinks(locale, 24), [], 500),
         softTimeout(
           import("@/lib/server/homepage-google-reviews-store").then(async (m) => {
             const cfg = await m.getHomepageGoogleReviewsConfig();
@@ -165,7 +162,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           ]}
         />
         <AppProviders locale={locale} currency={currency} fxRates={fxRates}>
-          <PublicShell footerContact={footerContact} destinations={destinations}>
+          <PublicShell footerContact={footerContact}>
             {children}
           </PublicShell>
         </AppProviders>

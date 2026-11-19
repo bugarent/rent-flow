@@ -103,12 +103,10 @@ function ContactItem({
 
 export function Footer({
   contact,
-  destinations = [],
 }: {
   contact?: FooterContactConfig | null;
-  destinations?: Array<{ href: string; label: string }>;
 }) {
-  const { dictionary, locale } = usePreferences();
+  const { dictionary } = usePreferences();
   const copyrightYear = copyrightYearLabel();
   const showContact = contact ? hasFooterContact(contact) : false;
   const phone = contact?.phone?.trim() || "";
@@ -116,12 +114,6 @@ export function Footer({
   const address = formatFooterAddress(contact?.address?.trim() || "");
   const telHref = phone ? `tel:${phone.replace(/[^\d+]/g, "")}` : undefined;
   const mailHref = email ? `mailto:${email}` : undefined;
-  const destinationsTitle =
-    locale === "ka"
-      ? "პოპულარული მიმართულებები"
-      : locale === "ru"
-        ? "Популярные направления"
-        : "Popular destinations";
 
   const footerLinkClass =
     "inline-flex min-h-11 items-center py-2 hover:text-white";
@@ -239,31 +231,6 @@ export function Footer({
               ) : null}
             </div>
           </div>
-        ) : null}
-
-        {destinations.length ? (
-          <section className="border-t border-white/10" aria-labelledby="footer-destinations-heading">
-            <div className="mx-auto max-w-6xl px-4 py-8">
-              <h3
-                id="footer-destinations-heading"
-                className="mb-3 text-sm font-bold uppercase tracking-wide text-white"
-              >
-                {destinationsTitle}
-              </h3>
-              <ul className="grid grid-cols-1 gap-x-4 gap-y-0.5 sm:grid-cols-2 lg:grid-cols-3">
-                {destinations.map((row) => (
-                  <li key={row.href} className="min-w-0">
-                    <Link
-                      href={row.href}
-                      className="inline-flex min-h-11 max-w-full items-center py-2 text-sm font-medium text-white/95 hover:text-white hover:underline"
-                    >
-                      <span className="truncate">{row.label}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </section>
         ) : null}
 
         <div className="border-t border-white/10">
