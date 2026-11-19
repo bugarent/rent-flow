@@ -138,12 +138,13 @@ export async function listSeoLocations(): Promise<SeoLocation[]> {
 }
 
 async function loadSeoLocationList(): Promise<SeoLocation[]> {
+  const { softTimeout } = await import("@/lib/server/soft-timeout");
   const codes: Array<{ code: string; kind?: "airport" | "city"; label?: string }> = [];
   const [live, homepage] = await Promise.all([
     (async () => {
       try {
         const { getSearchDeliveryAirports } = await import("@/lib/server/delivery-locations");
-        return await getSearchDeliveryAirports();
+        return await softTimeout(getSearchDeliveryAirports(), [], 2000);
       } catch {
         return [];
       }
@@ -151,7 +152,7 @@ async function loadSeoLocationList(): Promise<SeoLocation[]> {
     (async () => {
       try {
         const { listHomepageAirports } = await import("@/lib/server/homepage-airports-store");
-        return await listHomepageAirports();
+        return await softTimeout(listHomepageAirports(), [], 2000);
       } catch {
         return [];
       }
@@ -164,13 +165,11 @@ async function loadSeoLocationList(): Promise<SeoLocation[]> {
     if (!row.iata?.trim()) continue;
     codes.push({ code: row.iata, label: row.title });
   }
-  // Catalog hubs only when both live sources are empty, so a slow database cannot
-  // replace active city pages with a shorter airport-only list.
-  if (!codes.length) {
-    for (const place of allSearchPlaces()) {
-      if (place.kind === "airport" && CATALOG_AIRPORTS.some((a) => a.iata === place.iata)) {
-        codes.push({ code: place.code, kind: place.kind, label: place.label });
-      }
+  // Always union catalog hubs. Live/homepage may be partial when Neon is slow;
+  // cities from live still win via buildSeoLocations slug merge.
+  for (const place of allSearchPlaces()) {
+    if (place.kind === "airport" && CATALOG_AIRPORTS.some((a) => a.iata === place.iata)) {
+      codes.push({ code: place.code, kind: place.kind, label: place.label });
     }
   }
   return buildSeoLocations(codes);

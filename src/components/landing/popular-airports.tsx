@@ -29,6 +29,11 @@ function AirportCard({
   const href = `/airport/${encodeURIComponent(airport.iata)}`;
   const intentPrefetch = useIntentPrefetch();
   const heading = airport.headings?.[locale] || airport.headings?.en || "";
+  const imageAlt =
+    heading ||
+    airport.name ||
+    (airport.iata ? `${airport.city} Airport (${airport.iata})` : airport.city) ||
+    "Airport";
   return (
     <article
       className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
@@ -37,12 +42,13 @@ function AirportCard({
       <div className="relative aspect-[16/10] w-full bg-slate-200">
         <SiteImage
           src={airport.image}
-          alt={heading}
+          alt={imageAlt}
           fill
           sizes="(max-width: 639px) 90vw, (max-width: 1023px) 45vw, 360px"
           className="object-cover"
           loading="lazy"
           fetchPriority="low"
+          decoding="async"
         />
       </div>
       <div className="flex flex-1 flex-col p-4 sm:p-5">
