@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -9,6 +10,7 @@ import { useIntentPrefetch } from "@/lib/client/prefetch-route";
 import {
   Check,
   Clock,
+  CreditCard,
   Fuel,
   Gauge,
   Headset,
@@ -25,10 +27,12 @@ import {
 import { BirthDateSelect } from "@/components/cars/birth-date-select";
 import {
   CheckoutBogCard,
+  CheckoutPaypalSandbox,
   GuestBookingNoticeModal,
   LegalDocumentModal,
   RentalTermsModal,
   loadCheckoutBogCard,
+  loadCheckoutPaypalSandbox,
   loadGuestBookingNoticeModal,
   loadLegalDocumentModal,
   loadRentalTermsModal,
@@ -199,9 +203,11 @@ export function ReserveCheckout({
   initialCar?: Record<string, unknown> | null;
   initialRange?: string;
 }) {
+  const router = useRouter();
   const intentPrefetch = useIntentPrefetch();
   usePreloadWhenIdle(
     loadCheckoutBogCard,
+    loadCheckoutPaypalSandbox,
     loadGuestBookingNoticeModal,
     loadRentalTermsModal,
     loadLegalDocumentModal,
@@ -239,6 +245,7 @@ export function ReserveCheckout({
     () => !(initialCar && initialRange === carRangeKey(initialStart, initialEnd)),
   );
   const [checkoutStep, setCheckoutStep] = useState<"details" | "payment">("details");
+  const [paymentMethod, setPaymentMethod] = useState<"bog" | "paypal">("bog");
   const [payAmountLabel, setPayAmountLabel] = useState("");
   const [guestNoticeOpen, setGuestNoticeOpen] = useState(false);
   const [previewBookingRef, setPreviewBookingRef] = useState("");
@@ -939,9 +946,7 @@ export function ReserveCheckout({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleBooking = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    e?.stopPropagation();
+  const handleBooking = async (provider: "bog" | "paypal" = paymentMethod) => {
     const invalid = new Set<string>();
     const messages: string[] = [];
 
@@ -1058,7 +1063,8 @@ export function ReserveCheckout({
                 readBusinessPartnerReferralCookieClient()
               ).toUpperCase(),
           declinePartnerReferral: noPromoCode,
-          paymentProvider: "bog",
+          paymentProvider: provider,
+          ...(provider === "paypal" ? { paymentMode: "sandbox" } : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1105,6 +1111,19 @@ export function ReserveCheckout({
       }
 
       clearBusinessPartnerReferralCookieClient();
+
+      if (provider === "paypal") {
+        const ref =
+          data.sequentialNumber != null
+            ? formatBookingRef(data.sequentialNumber) || ""
+            : bookingId.slice(0, 8);
+        const q = new URLSearchParams();
+        q.set("booked", "1");
+        if (ref) q.set("ref", ref);
+        if (email.trim()) q.set("email", email.trim());
+        router.push(`/?${q.toString()}`);
+        return;
+      }
 
       const payRes = await fetch("/api/payments/bog/create-order", {
         method: "POST",
@@ -1173,20 +1192,93 @@ export function ReserveCheckout({
                 {tripLocationLabel(pickup, pickupAddress, { locale })}
               </p>
             </div>
-            <CheckoutBogCard
-              amountLabel={payAmountLabel || formatPrice(totals.payNow)}
-              locale={locale}
-              loading={loading}
-              onBack={() => setCheckoutStep("details")}
-              onConfirm={async () => {
-                const label = await loadPayAmountLabel(totals.payNow);
-                if (label && label !== payAmountLabel) {
-                  setPayAmountLabel(label);
-                  return;
-                }
-                await handleBooking();
-              }}
-            />
+
+            <fieldset className="space-y-2">
+              <legend className="px-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+                {locale === "ka"
+                  ? "გადახდის მეთოდი"
+                  : locale === "ru"
+                    ? "Способ оплаты"
+                    : "Payment method"}
+              </legend>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setPaymentMethod("bog")}
+                  className={`flex min-h-12 items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition ${
+                    paymentMethod === "bog"
+                      ? "border-[#ff6200] bg-[#fff5ef] ring-2 ring-[#ff6200]/30"
+                      : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                >
+                  <CreditCard
+                    className={`h-5 w-5 shrink-0 ${paymentMethod === "bog" ? "text-[#ff6200]" : "text-slate-400"}`}
+                    aria-hidden
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-extrabold text-[#0b1f4b]">
+                      {locale === "ka" ? "ბარათი" : locale === "ru" ? "Карта" : "Card"}
+                    </span>
+                    <span className="block truncate text-[11px] text-slate-500">Bank of Georgia</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setPaymentMethod("paypal")}
+                  className={`flex min-h-12 items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition ${
+                    paymentMethod === "paypal"
+                      ? "border-[#0070ba] bg-[#f0f7fc] ring-2 ring-[#0070ba]/25"
+                      : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                >
+                  <Lock
+                    className={`h-5 w-5 shrink-0 ${paymentMethod === "paypal" ? "text-[#0070ba]" : "text-slate-400"}`}
+                    aria-hidden
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-extrabold text-[#0b1f4b]">PayPal</span>
+                    <span className="block truncate text-[11px] text-slate-500">
+                      {locale === "ka" ? "PayPal ანგარიში" : locale === "ru" ? "Аккаунт PayPal" : "PayPal account"}
+                    </span>
+                  </span>
+                </button>
+              </div>
+            </fieldset>
+
+            {paymentMethod === "bog" ? (
+              <CheckoutBogCard
+                amountLabel={payAmountLabel || formatPrice(totals.payNow)}
+                locale={locale}
+                loading={loading}
+                onBack={() => setCheckoutStep("details")}
+                onConfirm={async () => {
+                  const label = await loadPayAmountLabel(totals.payNow);
+                  if (label && label !== payAmountLabel) {
+                    setPayAmountLabel(label);
+                    return;
+                  }
+                  await handleBooking("bog");
+                }}
+              />
+            ) : (
+              <CheckoutPaypalSandbox
+                amountLabel={payAmountLabel || formatPrice(totals.payNow)}
+                locale={locale}
+                guestEmail={email}
+                loading={loading}
+                onBack={() => setCheckoutStep("details")}
+                onConfirm={async () => {
+                  const label = await loadPayAmountLabel(totals.payNow);
+                  if (label && label !== payAmountLabel) {
+                    setPayAmountLabel(label);
+                    return;
+                  }
+                  await handleBooking("paypal");
+                }}
+              />
+            )}
           </div>
         ) : (
           <form
