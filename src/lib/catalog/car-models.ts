@@ -221,7 +221,7 @@ export const CAR_MAKES_MODELS: CarMakeModels[] = [
   },
   {
     make: "Daihatsu",
-    models: ["Cuore", "Sirion", "Terios", "Rocky", "Materia", "Charade", "Move", "Taft"],
+    models: ["Cuore", "Sirion", "Terios", "Rocky", "Materia", "Charade", "Move", "Mira", "Taft"],
   },
   {
     make: "Dodge",
@@ -650,6 +650,7 @@ export const CAR_MAKES_MODELS: CarMakeModels[] = [
       "Primera",
       "Tiida",
       "Teana",
+      "Serena",
       "Ariya",
       "Townstar",
       "NV200",
@@ -886,6 +887,8 @@ export const CAR_MAKES_MODELS: CarMakeModels[] = [
       "Proace Verso",
       "Hiace",
       "Sienna",
+      "Sienta",
+      "Passo",
       "Alphard",
       "Vellfire",
       "Venza",
