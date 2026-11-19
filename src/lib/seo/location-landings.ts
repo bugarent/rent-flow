@@ -7,6 +7,7 @@ import {
   type SearchPlace,
 } from "@/lib/catalog/search-places";
 import { CATALOG_AIRPORTS } from "@/lib/catalog/airports";
+import { cleanLocationAnchor } from "@/lib/seo/location-link-label";
 export {
   SEO_LANDING_LOCALES,
   SEO_LANDING_PREFIX,
@@ -218,10 +219,7 @@ export function locationLandingCopy(location: SeoLocation, locale: Locale): Loca
         `${city} აეროპორტი მანქანა`,
         `ავტომობილის დაქირავება ${city}`,
       ],
-      anchor:
-        location.kind === "airport"
-          ? `მანქანის დაქირავება ${city} აეროპორტში`
-          : `მანქანის დაქირავება ${city}ში`,
+      anchor: cleanLocationAnchor(location, locale),
     };
   }
 
@@ -247,10 +245,7 @@ export function locationLandingCopy(location: SeoLocation, locale: Locale): Loca
         `${city} аэропорт аренда авто`,
         `аренда машины ${city}`,
       ],
-      anchor:
-        location.kind === "airport"
-          ? `Аренда авто в аэропорту ${city}`
-          : `Аренда авто в ${city}`,
+      anchor: cleanLocationAnchor(location, locale),
     };
   }
 
@@ -279,10 +274,7 @@ export function locationLandingCopy(location: SeoLocation, locale: Locale): Loca
       `${city} airport car rental`,
       `car hire ${city}`,
     ],
-    anchor:
-      location.kind === "airport"
-        ? `Car rental at ${city} Airport`
-        : `Car rental in ${city}`,
+    anchor: cleanLocationAnchor(location, locale),
   };
 }
 

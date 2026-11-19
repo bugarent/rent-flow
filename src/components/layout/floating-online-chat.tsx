@@ -34,7 +34,7 @@ export function FloatingOnlineChat({
 
   return (
     <aside
-      className="pointer-events-none fixed bottom-[5.25rem] end-3 z-[60] flex flex-col items-end gap-3 md:bottom-6 md:end-4"
+      className="pointer-events-none fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] end-3 z-[60] flex flex-col items-end gap-3 md:bottom-6 md:end-4"
       aria-label={label}
     >
       {mounted && open ? (
@@ -49,9 +49,9 @@ export function FloatingOnlineChat({
         aria-expanded={open}
         {...preloadProps(loadLiveChatPanel)}
         onClick={toggle}
-        className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#1d6fe8] text-white shadow-xl transition hover:bg-[#1558c0] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-3"
+        className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#1d6fe8] text-white shadow-lg transition hover:bg-[#1558c0] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-3"
       >
-        {open ? <X className="h-6 w-6" aria-hidden /> : <MessageCircle className="h-6 w-6" aria-hidden />}
+        {open ? <X className="h-5 w-5" aria-hidden /> : <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden />}
         <span className="hidden max-w-[9rem] text-[11px] font-bold uppercase leading-tight sm:block">
           {label}
         </span>

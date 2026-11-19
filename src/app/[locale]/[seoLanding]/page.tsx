@@ -2,11 +2,20 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { JsonLd } from "@/components/seo/json-ld";
+import {
+  faqsForSchema,
+  LocationBenefits,
+  LocationCarPreview,
+  LocationDriveNotes,
+  LocationFaqSection,
+  locationPageBottomClass,
+} from "@/components/seo/location-landing-sections";
 import { SiteImage } from "@/components/ui/site-image";
 import { SEO_SITE_NAME } from "@/lib/brand";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 import {
   buildBreadcrumbJsonLd,
+  buildFaqPageJsonLd,
   buildLocationAutoRentalJsonLd,
   buildVehicleOffersItemListJsonLd,
 } from "@/lib/seo/json-ld";
@@ -22,6 +31,8 @@ import {
   type SeoLocation,
 } from "@/lib/seo/location-landings";
 import { loadLocationLandingExtras } from "@/lib/seo/location-landing-data";
+import { uniqueOtherLocations } from "@/lib/seo/location-link-label";
+import { cityDisplayName } from "@/lib/i18n/place-label";
 import { softTimeout } from "@/lib/server/soft-timeout";
 import { emptyFooterContact } from "@/lib/catalog/footer-contact";
 import { getFooterContactConfig } from "@/lib/server/footer-contact-store";
@@ -97,13 +108,10 @@ export default async function SeoLocationLandingPage({
     softTimeout(getFooterContactConfig(), emptyFooterContact(), 1500),
   ]);
 
-  const related = locations
-    .filter((row) => row.code !== location.code && row.countryIso2 === location.countryIso2)
-    .slice(0, 12);
-  const popular = (related.length ? related : locations.filter((r) => r.code !== location.code)).slice(
-    0,
-    16,
-  );
+  const popular = uniqueOtherLocations(locations, location, 12);
+  const cityLabel = cityDisplayName(parsed.locale, location.cityName) || location.cityName;
+  const leadAt = cityLabel ? copy.lead.indexOf(cityLabel) : -1;
+  const faqs = faqsForSchema(parsed.locale, location.kind);
 
   const breadcrumb = [
     { name: copy.breadcrumbHome, path: "/" },
@@ -154,10 +162,11 @@ export default async function SeoLocationLandingPage({
           ),
         ]
       : []),
+    buildFaqPageJsonLd(faqs),
   ];
 
   return (
-    <article className="mx-auto w-full max-w-3xl px-4 py-10 sm:py-14">
+    <article className={`mx-auto w-full max-w-3xl px-4 pt-10 sm:pt-14 ${locationPageBottomClass()}`}>
       <JsonLd data={jsonLd} />
       <nav aria-label="Breadcrumb" className="mb-4 text-xs text-slate-500">
         <ol className="flex flex-wrap items-center gap-1.5">
@@ -200,7 +209,17 @@ export default async function SeoLocationLandingPage({
         <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
           {copy.h1}
         </h1>
-        <p className="text-base leading-relaxed text-slate-600 sm:text-lg">{copy.lead}</p>
+        <p className="text-base leading-relaxed text-slate-600 sm:text-lg">
+          {leadAt >= 0 ? (
+            <>
+              {copy.lead.slice(0, leadAt)}
+              <strong className="font-semibold text-slate-800">{cityLabel}</strong>
+              {copy.lead.slice(leadAt + cityLabel.length)}
+            </>
+          ) : (
+            copy.lead
+          )}
+        </p>
         <div className="flex flex-wrap gap-2 pt-1">
           <Link
             href={searchHref}
@@ -220,6 +239,15 @@ export default async function SeoLocationLandingPage({
           </Link>
         </div>
       </header>
+
+      <LocationBenefits locale={parsed.locale} />
+      <LocationDriveNotes
+        locale={parsed.locale}
+        kind={location.kind}
+        routeCode={location.iata || location.code}
+        cityName={location.cityName}
+      />
+      <LocationCarPreview locale={parsed.locale} cars={extras.samples} />
 
       {popular.length ? (
         <section className="mt-12 border-t border-slate-200 pt-8">
@@ -241,6 +269,8 @@ export default async function SeoLocationLandingPage({
           </ul>
         </section>
       ) : null}
+
+      <LocationFaqSection locale={parsed.locale} kind={location.kind} />
 
       {/* Hidden hreflang helpers for crawlers that prefer in-body links */}
       <nav className="sr-only" aria-label="Language versions">
