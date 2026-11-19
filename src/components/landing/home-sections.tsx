@@ -165,7 +165,7 @@ export async function HomeBelowFold() {
       />
       <WhyChooseUsPanel content={infoContent} />
       {googleReviews ? <GoogleReviewsCarousel {...googleReviews} /> : null}
-      <PopularDestinations locale={locale} limit={18} variant="home" />
+      <PopularDestinations locale={locale} variant="home" />
     </>
   );
 }

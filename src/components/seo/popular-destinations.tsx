@@ -1,13 +1,16 @@
 import Link from "next/link";
 import {
-  listSeoLocations,
+  buildSeoLocations,
   locationLandingCopy,
   seoLandingPath,
   type SeoLandingLocale,
   isSeoLandingLocale,
 } from "@/lib/seo/location-landings";
+import { normalizeLocationCode } from "@/lib/catalog/search-places";
+import { getSearchDeliveryAirports } from "@/lib/server/delivery-locations";
 import { softTimeout } from "@/lib/server/soft-timeout";
 import type { Locale } from "@/lib/i18n/config";
+import { DestinationSlideshow } from "@/components/seo/destination-slideshow";
 
 function heading(locale: Locale): string {
   if (locale === "ka") return "პოპულარული მიმართულებები";
@@ -27,11 +30,19 @@ export async function PopularDestinations({
   limit?: number;
   variant?: "footer" | "home";
 }) {
-  const locations = await softTimeout(listSeoLocations(), [], 3500);
+  const active = await softTimeout(getSearchDeliveryAirports(), [], 3500);
+  const ranked = [...active].sort((a, b) => (b.carCount ?? 0) - (a.carCount ?? 0));
+  const order = new Map(ranked.map((row, index) => [normalizeLocationCode(row.iata), index]));
+  const locations = buildSeoLocations(
+    ranked.map((row) => ({ code: row.iata, kind: row.kind, label: row.label })),
+  ).sort(
+    (a, b) =>
+      (order.get(normalizeLocationCode(a.code)) ?? 999) - (order.get(normalizeLocationCode(b.code)) ?? 999),
+  );
   if (!locations.length) return null;
 
   const seoLocale: SeoLandingLocale = isSeoLandingLocale(locale) ? locale : "en";
-  const rows = locations.slice(0, limit);
+  const rows = variant === "home" ? locations : locations.slice(0, limit);
   const title = heading(locale);
 
   if (variant === "footer") {
@@ -65,25 +76,12 @@ export async function PopularDestinations({
   }
 
   return (
-    <section className="mx-auto w-full max-w-6xl px-4 py-10 sm:py-12" aria-labelledby="seo-home-destinations">
-      <h2 id="seo-home-destinations" className="text-xl font-extrabold text-slate-900 sm:text-2xl">
-        {title}
-      </h2>
-      <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {rows.map((row) => {
-          const copy = locationLandingCopy(row, seoLocale);
-          return (
-            <li key={row.code}>
-              <Link
-                href={seoLandingPath(seoLocale, row.slug)}
-                className="inline-flex min-h-11 w-full items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-sky-900 hover:bg-sky-50"
-              >
-                {copy.anchor}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+    <DestinationSlideshow
+      title={title}
+      items={rows.map((row) => ({
+        href: seoLandingPath(seoLocale, row.slug),
+        label: locationLandingCopy(row, seoLocale).anchor,
+      }))}
+    />
   );
 }
