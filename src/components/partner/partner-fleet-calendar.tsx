@@ -224,7 +224,6 @@ export function PartnerFleetCalendar() {
   const [clientReady, setClientReady] = useState(false);
 
   useLayoutEffect(() => {
-    if (window.matchMedia("(max-width: 767px)").matches) setCarsColumnNarrow(true);
     setClientReady(true);
   }, []);
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -834,8 +833,8 @@ export function PartnerFleetCalendar() {
     };
   }, []);
 
-  // Desktop car list is 3 cm (~113px) wider than the old 168px so names and plates fit.
-  const carColumnWidth = carsColumnNarrow ? "w-[4.5rem] md:w-[84px]" : "w-36 md:w-[281px]";
+  // Phone column is wide enough for the name and plate at a smaller size. Desktop stays 281px.
+  const carColumnWidth = carsColumnNarrow ? "w-[4.5rem] md:w-[84px]" : "w-[12rem] md:w-[281px]";
   const carColumnToggleLabel = carsColumnNarrow
     ? locale === "ka"
       ? "სვეტის გაშლა"
@@ -916,7 +915,7 @@ export function PartnerFleetCalendar() {
                 </select>
               </div>
               <div className="relative flex min-h-0 flex-1 items-center justify-between gap-1 px-1.5 pe-6">
-                <p className={cn("truncate text-xs font-bold text-slate-800 md:text-[11px]", carsColumnNarrow && "sr-only")}>
+                <p className={cn("min-w-0 break-words text-[10px] font-bold leading-tight text-slate-800 md:truncate md:text-[11px]", carsColumnNarrow && "sr-only")}>
                   {t.allCars} ({cars.length})
                 </p>
                 <Link
@@ -1001,7 +1000,7 @@ export function PartnerFleetCalendar() {
               <div
                 key={car.id}
                 className={cn(
-                  "flex h-7 w-max border-b-2 md:h-[52px] md:w-full",
+                  "flex min-h-8 w-max items-stretch border-b-2 md:h-[52px] md:w-full",
                   tone ? tone.row : "border-slate-200",
                 )}
               >
@@ -1033,10 +1032,10 @@ export function PartnerFleetCalendar() {
                       {(car.make || "A").slice(0, 1).toUpperCase()}
                     </span>
                     <div className={cn("min-w-0 flex-1", carsColumnNarrow && "hidden")}>
-                      <p className="truncate text-[12px] font-bold leading-tight text-slate-900">
+                      <p className="break-words text-[11px] font-bold leading-tight text-slate-900 md:truncate md:text-[12px]">
                         {car.make} {car.model}
                       </p>
-                      <p className="truncate text-[10px] text-slate-500">
+                      <p className="break-words text-[10px] leading-tight text-slate-500 md:truncate">
                         {[
                           car.registrationNumber
                             ? formatRegistrationNumberDisplay(car.registrationNumber)
