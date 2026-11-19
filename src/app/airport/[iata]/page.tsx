@@ -23,12 +23,14 @@ import {
   LocationCarPreview,
   LocationDriveNotes,
   LocationFaqSection,
+  LocationIntro,
   locationPageBottomClass,
 } from "@/components/seo/location-landing-sections";
 import { readPreferences } from "@/lib/server/preferences";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 import { buildBreadcrumbJsonLd, buildFaqPageJsonLd, buildLocationAutoRentalJsonLd } from "@/lib/seo/json-ld";
 import { airportCardLinkLabel } from "@/lib/seo/location-link-label";
+import { locationIntro } from "@/lib/seo/location-intro";
 import { loadLocationLandingExtras } from "@/lib/seo/location-landing-data";
 import { countryDisplayName, type SeoLocation } from "@/lib/seo/location-landings";
 import { absoluteUrl } from "@/lib/seo/config";
@@ -101,6 +103,7 @@ export default async function AirportInfoPage({
   const text = localizedAirportInfo(airport, locale);
   const seo = localizedAirportSeo(card, locale, { airportName });
   const copy = airportPageCopy(locale);
+  const intro = locationIntro(code, locale);
   const paragraphs = text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
   const country = airportCountryIso2(code);
   const kind = /^CITY-/i.test(code) ? "city" : "airport";
@@ -204,17 +207,21 @@ export default async function AirportInfoPage({
         </div>
       ) : null}
       <h1 className="text-2xl font-extrabold text-[#0b1f4b] sm:text-3xl">{title}</h1>
-      <div className="mt-5 space-y-4 text-base leading-7 text-slate-700">
-        {paragraphs.length ? (
-          paragraphs.map((p, i) => (
-            <p key={i} className="whitespace-pre-wrap break-words">
-              {p}
-            </p>
-          ))
-        ) : (
-          <p>{copy.empty}</p>
-        )}
-      </div>
+      {intro ? (
+        <LocationIntro intro={intro} />
+      ) : (
+        <div className="mt-5 space-y-4 text-base leading-7 text-slate-700">
+          {paragraphs.length ? (
+            paragraphs.map((p, i) => (
+              <p key={i} className="whitespace-pre-wrap break-words">
+                {p}
+              </p>
+            ))
+          ) : (
+            <p>{copy.empty}</p>
+          )}
+        </div>
+      )}
       <Link
         href={`/cars?pickup=${encodeURIComponent(code)}`}
         className="mt-8 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-sky-600 px-6 py-3 text-center text-base font-bold text-white hover:bg-sky-700 sm:w-auto"

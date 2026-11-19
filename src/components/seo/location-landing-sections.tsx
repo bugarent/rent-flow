@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SiteImage } from "@/components/ui/site-image";
+import type { LocationIntroCopy } from "@/lib/seo/location-intro";
 import type { LocationFaq } from "@/lib/seo/location-page-sections";
 import { locationRouteLines, locationSectionCopy } from "@/lib/seo/location-page-sections";
 
@@ -18,6 +19,33 @@ export function LocationBenefits({ locale }: { locale: string }) {
         {copy.benefits.map((item) => (
           <li key={item.strong} className="break-words">
             <strong className="font-semibold text-slate-900">{item.strong}</strong> {item.text}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+export function LocationIntro({ intro }: { intro: LocationIntroCopy }) {
+  const at = intro.strong ? intro.lead.indexOf(intro.strong) : -1;
+  return (
+    <section className="mt-5">
+      <h2 className="text-lg font-bold text-[#0b1f4b]">{intro.title}</h2>
+      <p className="mt-3 text-base leading-7 text-slate-700">
+        {at >= 0 && intro.strong ? (
+          <>
+            {intro.lead.slice(0, at)}
+            <strong className="font-semibold text-slate-900">{intro.strong}</strong>
+            {intro.lead.slice(at + intro.strong.length)}
+          </>
+        ) : (
+          intro.lead
+        )}
+      </p>
+      <ul className="mt-3 list-disc space-y-2 ps-5 text-sm leading-6 text-slate-700 sm:text-base sm:leading-7">
+        {intro.points.map((point) => (
+          <li key={point} className="break-words">
+            {point}
           </li>
         ))}
       </ul>
@@ -56,7 +84,10 @@ export function LocationDriveNotes({
             {routes.map((route) => (
               <li key={route.title} className="min-w-0">
                 <h3 className="text-sm font-semibold text-slate-900 sm:text-base">{route.title}</h3>
-                <p className="text-sm leading-6 text-slate-600">{route.detail}</p>
+                <p className="text-sm leading-6 text-slate-600">
+                  {route.distance} <strong className="font-semibold text-slate-800">{route.tip}</strong>
+                  {route.also ? ` ${route.also}` : ""}
+                </p>
               </li>
             ))}
           </ul>

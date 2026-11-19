@@ -1,5 +1,6 @@
 import type { Locale } from "@/lib/i18n/config";
-import { cityDisplayName } from "@/lib/i18n/place-label";
+
+export { locationRouteLines } from "@/lib/seo/location-drives";
 
 export type LocationFaq = { question: string; answer: string };
 type Benefit = { strong: string; text: string };
@@ -669,46 +670,3 @@ export function locationFaqs(locale: string, kind: "airport" | "city"): Location
   return kind === "airport" ? copy.airportFaqs : copy.cityFaqs;
 }
 
-type RouteSeed = { placeEn: string; km: string; time: string; tip: "sedan" | "either" };
-
-/** Approximate drives from a hub. Add a code and every location page of that place can show it. */
-const ROUTES: Record<string, RouteSeed[]> = {
-  KUT: [
-    { placeEn: "Kutaisi", km: "18", time: "25 min", tip: "sedan" },
-    { placeEn: "Tbilisi", km: "230", time: "3.5 h", tip: "either" },
-    { placeEn: "Batumi", km: "150", time: "2.5 h", tip: "either" },
-  ],
-  TBS: [
-    { placeEn: "Tbilisi", km: "18", time: "30 min", tip: "sedan" },
-    { placeEn: "Mtskheta", km: "25", time: "30 min", tip: "sedan" },
-    { placeEn: "Kazbegi", km: "150", time: "2.5 h", tip: "either" },
-  ],
-  BUS: [
-    { placeEn: "Batumi", km: "5", time: "15 min", tip: "sedan" },
-    { placeEn: "Kutaisi", km: "150", time: "2.5 h", tip: "either" },
-    { placeEn: "Tbilisi", km: "370", time: "6 h", tip: "either" },
-  ],
-};
-
-const CITY_HUB: Record<string, string> = {
-  Kutaisi: "KUT",
-  Tbilisi: "TBS",
-  Batumi: "BUS",
-};
-
-export function locationRouteLines(
-  code: string,
-  locale: string,
-  cityName?: string,
-): Array<{ title: string; detail: string }> {
-  const direct = code.trim().toUpperCase();
-  const hub = ROUTES[direct] ? direct : CITY_HUB[cityName || ""] || "";
-  const rows = ROUTES[hub];
-  if (!rows?.length) return [];
-  const copy = pack(locale);
-  const lang = (locale in COPY ? locale : "en") as Locale;
-  return rows.map((row) => ({
-    title: cityDisplayName(lang, row.placeEn) || row.placeEn,
-    detail: `${copy.routeLine(row.km, row.time)} ${row.tip === "sedan" ? copy.sedan : copy.either}`,
-  }));
-}
