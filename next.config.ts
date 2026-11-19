@@ -43,6 +43,7 @@ const nextConfig: NextConfig = {
     ];
   },
   serverExternalPackages: ["@prisma/client", "prisma", "sharp", "nodemailer", "cloudinary"],
+  transpilePackages: ["@bankofgeorgia/bog-payments-web-sdk"],
   experimental: {
     // Hover-prefetched pages (prices, availability) are reused for at most 60 s.
     // Dynamic pages stay uncached so partners and admins always see their saves.

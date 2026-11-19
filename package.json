@@ -19,6 +19,7 @@
     "resync:listing-extras": "node --require ./scripts/register-server-only.cjs --import tsx --env-file=.env scripts/resync-listing-extras.ts"
   },
   "dependencies": {
+    "@bankofgeorgia/bog-payments-web-sdk": "^2.0.1-beta.0",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "bcryptjs": "^3.0.3",

@@ -3,7 +3,11 @@ import {
   bogCredentialsConfigured,
   getBogSiteUrl,
 } from "@/lib/payments/bog-config";
-import { paypalCredentialsConfigured } from "@/lib/payments/paypal-config";
+import {
+  getPaypalClientId,
+  getPaypalMode,
+  paypalCredentialsConfigured,
+} from "@/lib/payments/paypal-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +23,12 @@ export async function GET() {
       siteUrl,
       siteOk,
       bog: { ready: bogConfigured && siteOk, configured: bogConfigured },
-      paypal: { ready: paypalConfigured && siteOk, configured: paypalConfigured },
+      paypal: {
+        ready: paypalConfigured && siteOk,
+        configured: paypalConfigured,
+        clientId: paypalConfigured ? getPaypalClientId() : "",
+        mode: getPaypalMode(),
+      },
     },
     { headers: { "Cache-Control": "no-store" } },
   );

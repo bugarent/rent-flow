@@ -25,17 +25,15 @@ import {
 } from "lucide-react";
 import { BirthDateSelect } from "@/components/cars/birth-date-select";
 import {
-  CheckoutBogCard,
-  CheckoutPaypalCard,
   GuestBookingNoticeModal,
   LegalDocumentModal,
   RentalTermsModal,
-  loadCheckoutBogCard,
-  loadCheckoutPaypalCard,
   loadGuestBookingNoticeModal,
   loadLegalDocumentModal,
   loadRentalTermsModal,
 } from "@/components/cars/lazy-checkout";
+import { CheckoutBogFrame } from "@/components/cars/checkout-bog-frame";
+import { CheckoutPaypalButtons } from "@/components/cars/checkout-paypal-buttons";
 import { usePreloadWhenIdle } from "@/lib/client/preload";
 import { ResidenceCountrySelect } from "@/components/cars/residence-country-select";
 import { CheckoutCarGallery } from "@/components/cars/checkout-car-gallery";
@@ -203,8 +201,6 @@ export function ReserveCheckout({
 }) {
   const intentPrefetch = useIntentPrefetch();
   usePreloadWhenIdle(
-    loadCheckoutBogCard,
-    loadCheckoutPaypalCard,
     loadGuestBookingNoticeModal,
     loadRentalTermsModal,
     loadLegalDocumentModal,
@@ -247,8 +243,23 @@ export function ReserveCheckout({
   const [paymentReady, setPaymentReady] = useState<{
     bog: boolean;
     paypal: boolean;
+    paypalClientId: string;
     checked: boolean;
-  }>({ bog: false, paypal: false, checked: false });
+  }>({ bog: false, paypal: false, paypalClientId: "", checked: false });
+  const [embeddedPay, setEmbeddedPay] = useState<{
+    method: "bog" | "paypal";
+    bookingId: string;
+    orderId: string;
+  } | null>(null);
+  const bookingIdRef = useRef("");
+  const ordersRef = useRef<{ bookingId: string; bog?: string; paypal?: string }>({
+    bookingId: "",
+  });
+  const payInflight = useRef<{
+    method: "bog" | "paypal";
+    task: Promise<{ bookingId: string; orderId: string } | void>;
+  } | null>(null);
+  const [payAttempt, setPayAttempt] = useState(0);
   const [guestNoticeOpen, setGuestNoticeOpen] = useState(false);
   const [previewBookingRef, setPreviewBookingRef] = useState("");
   const previewRefRequest = useRef<Promise<string> | null>(null);
@@ -959,11 +970,12 @@ export function ReserveCheckout({
         setPaymentReady({
           bog: Boolean(data?.bog?.ready),
           paypal: Boolean(data?.paypal?.ready),
+          paypalClientId: typeof data?.paypal?.clientId === "string" ? data.paypal.clientId : "",
           checked: true,
         });
       } catch {
         if (!cancelled) {
-          setPaymentReady({ bog: false, paypal: false, checked: true });
+          setPaymentReady({ bog: false, paypal: false, paypalClientId: "", checked: true });
         }
       }
     })();
@@ -972,7 +984,10 @@ export function ReserveCheckout({
     };
   }, [checkoutStep]);
 
-  const handleBooking = async (provider: "bog" | "paypal" = paymentMethod) => {
+  const handleBooking = async (
+    provider: "bog" | "paypal" = paymentMethod,
+    opts?: { embed?: boolean },
+  ): Promise<{ bookingId: string; orderId: string } | void> => {
     const invalid = new Set<string>();
     const messages: string[] = [];
 
@@ -1044,6 +1059,13 @@ export function ReserveCheckout({
 
     setInvalidFields(new Set());
     setError("");
+    const cachedOrderId =
+      opts?.embed && bookingIdRef.current && ordersRef.current.bookingId === bookingIdRef.current
+        ? ordersRef.current[provider]
+        : "";
+    if (cachedOrderId) {
+      return { bookingId: bookingIdRef.current, orderId: cachedOrderId };
+    }
     setLoading(true);
     try {
       const readyRes = await fetch(
@@ -1070,6 +1092,8 @@ export function ReserveCheckout({
         }))
         .filter((row) => row.qty > 0);
       const phone = formatInternationalPhone(phoneIso2, phoneNational);
+      let bookingId = bookingIdRef.current;
+      if (!bookingId) {
       const res = await fetch("/api/bookings", {
         method: "POST",
         credentials: "same-origin",
@@ -1147,12 +1171,15 @@ export function ReserveCheckout({
         throw new Error(apiError);
       }
 
-      const bookingId = String(data.id || "").trim();
+      bookingId = String(data.id || "").trim();
       if (!bookingId) {
         throw new Error(dictionary.booking.createFailed);
       }
+      bookingIdRef.current = bookingId;
+      ordersRef.current = { bookingId };
 
       clearBusinessPartnerReferralCookieClient();
+      }
 
       const payPath =
         provider === "paypal"
@@ -1184,7 +1211,19 @@ export function ReserveCheckout({
             : payErr || "Could not start PayPal payment. The booking was not confirmed.",
         );
       }
+      const orderId = String(payData.order_id || "").trim();
       const redirectUrl = String(payData.redirect_url || "").trim();
+      if (opts?.embed) {
+        if (!orderId) {
+          throw new Error(
+            locale === "ka"
+              ? "გადახდის ფორმა ვერ მოვიდა. სცადეთ თავიდან."
+              : "The payment form could not be opened. Please try again.",
+          );
+        }
+        ordersRef.current = { ...ordersRef.current, bookingId, [provider]: orderId };
+        return { bookingId, orderId };
+      }
       if (!redirectUrl) {
         throw new Error(
           locale === "ka"
@@ -1204,6 +1243,80 @@ export function ReserveCheckout({
       setLoading(false);
     }
   };
+
+  const handleBookingRef = useRef(handleBooking);
+  handleBookingRef.current = handleBooking;
+
+  useEffect(() => {
+    if (checkoutStep !== "payment") {
+      bookingIdRef.current = "";
+      ordersRef.current = { bookingId: "" };
+      payInflight.current = null;
+      setEmbeddedPay(null);
+      return;
+    }
+    if (!paymentReady.checked) return;
+    const ready = paymentMethod === "bog" ? paymentReady.bog : paymentReady.paypal;
+    if (!ready) return;
+    const cached =
+      bookingIdRef.current && ordersRef.current.bookingId === bookingIdRef.current
+        ? ordersRef.current[paymentMethod]
+        : "";
+    if (cached) {
+      setEmbeddedPay({
+        method: paymentMethod,
+        bookingId: bookingIdRef.current,
+        orderId: cached,
+      });
+      return;
+    }
+    let cancelled = false;
+    const task =
+      payInflight.current?.method === paymentMethod
+        ? payInflight.current.task
+        : handleBookingRef.current(paymentMethod, { embed: true });
+    payInflight.current = { method: paymentMethod, task };
+    void task.then((result) => {
+      if (payInflight.current?.task === task) payInflight.current = null;
+      if (cancelled || !result) return;
+      setEmbeddedPay({
+        method: paymentMethod,
+        bookingId: result.bookingId,
+        orderId: result.orderId,
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    checkoutStep,
+    payAttempt,
+    paymentMethod,
+    paymentReady.bog,
+    paymentReady.checked,
+    paymentReady.paypal,
+  ]);
+
+  const onBogPaid = useCallback(() => {
+    const id = bookingIdRef.current;
+    window.location.assign(`/booking/payment/success?bookingId=${encodeURIComponent(id)}`);
+  }, []);
+
+  const onPaypalPaid = useCallback((orderId: string) => {
+    const q = new URLSearchParams({
+      token: orderId,
+      bookingId: bookingIdRef.current,
+    });
+    window.location.assign(`/booking/payment/paypal/return?${q.toString()}`);
+  }, []);
+
+  const onPayFailed = useCallback((message: string) => {
+    setError(message);
+    if (paymentMethod === "bog") ordersRef.current.bog = undefined;
+    else ordersRef.current.paypal = undefined;
+    setEmbeddedPay(null);
+    setPayAttempt((n) => n + 1);
+  }, [paymentMethod]);
 
   return (
     <div className="min-h-screen bg-[#eef2f6]">
@@ -1304,8 +1417,7 @@ export function ReserveCheckout({
                   <>
                     <p className="font-bold">ბარათით გადახდა ჯერ არ არის ჩართული</p>
                     <p className="mt-1">
-                      ბარათის ნომერი/CVV ჩვენს საიტზე არ ივსება — საქართველოს ბანკი ხსნის საკუთარ
-                      უსაფრთხო გვერდს გადამისამართების შემდეგ. ამისთვის Netlify Environment-ში დაამატეთ{" "}
+                      ბარათის ფორმა ამ გვერდზე იხსნება, როცა Netlify Environment-ში დაემატება{" "}
                       <strong>BOG_CLIENT_ID</strong> და <strong>BOG_SECRET_KEY</strong>, შემდეგ
                       Redeploy.
                     </p>
@@ -1314,8 +1426,7 @@ export function ReserveCheckout({
                   <>
                     <p className="font-bold">Card payment is not enabled yet</p>
                     <p className="mt-1">
-                      Card number/CVV are entered on Bank of Georgia’s secure page after redirect — not
-                      on this site. Add <strong>BOG_CLIENT_ID</strong> and{" "}
+                      The card form opens on this page after you add <strong>BOG_CLIENT_ID</strong> and{" "}
                       <strong>BOG_SECRET_KEY</strong> in Netlify, then redeploy.
                     </p>
                   </>
@@ -1331,7 +1442,7 @@ export function ReserveCheckout({
                     <p className="mt-1">
                       Netlify-ზე დაამატეთ <strong>PAYPAL_CLIENT_ID</strong> და{" "}
                       <strong>PAYPAL_CLIENT_SECRET</strong>, შემდეგ Redeploy. გადახდა დასრულდება
-                      PayPal-ის გვერდზე.
+                      PayPal-ის ღილაკები ამ გვერდზე გამოჩნდება.
                     </p>
                   </>
                 ) : (
@@ -1339,46 +1450,54 @@ export function ReserveCheckout({
                     <p className="font-bold">PayPal is not enabled yet</p>
                     <p className="mt-1">
                       Add <strong>PAYPAL_CLIENT_ID</strong> and <strong>PAYPAL_CLIENT_SECRET</strong>{" "}
-                      in Netlify, then redeploy. Payment completes on PayPal’s page.
+                      in Netlify, then redeploy. PayPal’s buttons then open on this page.
                     </p>
                   </>
                 )}
               </div>
             ) : null}
 
-            {paymentMethod === "bog" ? (
-              <CheckoutBogCard
-                amountLabel={payAmountLabel || formatPrice(totals.payNow)}
+            {loading && !embeddedPay ? (
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-10 text-center text-sm font-semibold text-slate-500">
+                {locale === "ka"
+                  ? "გადახდის ფორმა იხსნება…"
+                  : locale === "ru"
+                    ? "Открываем форму оплаты…"
+                    : "Opening the payment form…"}
+              </div>
+            ) : null}
+
+            {embeddedPay?.method === "bog" && paymentMethod === "bog" ? (
+              <CheckoutBogFrame
+                orderId={embeddedPay.orderId}
                 locale={locale}
-                loading={loading}
-                disabled={paymentReady.checked && !paymentReady.bog}
-                onBack={() => setCheckoutStep("details")}
-                onConfirm={async () => {
-                  const label = await loadPayAmountLabel(totals.payNow);
-                  if (label && label !== payAmountLabel) {
-                    setPayAmountLabel(label);
-                    return;
-                  }
-                  await handleBooking("bog");
-                }}
+                onPaid={onBogPaid}
+                onFailed={onPayFailed}
               />
-            ) : (
-              <CheckoutPaypalCard
-                amountLabel={payAmountLabel || formatPrice(totals.payNow)}
+            ) : null}
+
+            {embeddedPay?.method === "paypal" && paymentMethod === "paypal" && paymentReady.paypalClientId ? (
+              <CheckoutPaypalButtons
+                clientId={paymentReady.paypalClientId}
+                orderId={embeddedPay.orderId}
                 locale={locale}
-                loading={loading}
-                disabled={paymentReady.checked && !paymentReady.paypal}
-                onBack={() => setCheckoutStep("details")}
-                onConfirm={async () => {
-                  const label = await loadPayAmountLabel(totals.payNow);
-                  if (label && label !== payAmountLabel) {
-                    setPayAmountLabel(label);
-                    return;
-                  }
-                  await handleBooking("paypal");
-                }}
+                onPaid={onPaypalPaid}
+                onFailed={onPayFailed}
               />
-            )}
+            ) : null}
+
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => setCheckoutStep("details")}
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              {locale === "ka"
+                ? "დაბრუნება მძღოლის დეტალებზე"
+                : locale === "ru"
+                  ? "Назад к данным водителя"
+                  : "Back to driver details"}
+            </button>
           </div>
         ) : (
           <form
