@@ -25,9 +25,13 @@ import {
 } from "lucide-react";
 import { BirthDateSelect } from "@/components/cars/birth-date-select";
 import {
+  CheckoutBogCard,
+  CheckoutPaypalCard,
   GuestBookingNoticeModal,
   LegalDocumentModal,
   RentalTermsModal,
+  loadCheckoutBogCard,
+  loadCheckoutPaypalCard,
   loadGuestBookingNoticeModal,
   loadLegalDocumentModal,
   loadRentalTermsModal,
@@ -201,6 +205,8 @@ export function ReserveCheckout({
 }) {
   const intentPrefetch = useIntentPrefetch();
   usePreloadWhenIdle(
+    loadCheckoutBogCard,
+    loadCheckoutPaypalCard,
     loadGuestBookingNoticeModal,
     loadRentalTermsModal,
     loadLegalDocumentModal,
@@ -250,16 +256,18 @@ export function ReserveCheckout({
     method: "bog" | "paypal";
     bookingId: string;
     orderId: string;
+    redirectUrl?: string;
   } | null>(null);
   const bookingIdRef = useRef("");
-  const ordersRef = useRef<{ bookingId: string; bog?: string; paypal?: string }>({
+  const ordersRef = useRef<{
+    bookingId: string;
+    bog?: string;
+    paypal?: string;
+    bogRedirect?: string;
+    paypalRedirect?: string;
+  }>({
     bookingId: "",
   });
-  const payInflight = useRef<{
-    method: "bog" | "paypal";
-    task: Promise<{ bookingId: string; orderId: string } | void>;
-  } | null>(null);
-  const [payAttempt, setPayAttempt] = useState(0);
   const [guestNoticeOpen, setGuestNoticeOpen] = useState(false);
   const [previewBookingRef, setPreviewBookingRef] = useState("");
   const previewRefRequest = useRef<Promise<string> | null>(null);
@@ -987,7 +995,7 @@ export function ReserveCheckout({
   const handleBooking = async (
     provider: "bog" | "paypal" = paymentMethod,
     opts?: { embed?: boolean },
-  ): Promise<{ bookingId: string; orderId: string } | void> => {
+  ): Promise<{ bookingId: string; orderId: string; redirectUrl?: string } | void> => {
     const invalid = new Set<string>();
     const messages: string[] = [];
 
@@ -1185,14 +1193,31 @@ export function ReserveCheckout({
         provider === "paypal"
           ? "/api/payments/paypal/create-order"
           : "/api/payments/bog/create-order";
-      const payRes = await fetch(payPath, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          provider === "bog" ? { bookingId, locale } : { bookingId },
-        ),
-      });
+      const payController = new AbortController();
+      const payTimer = window.setTimeout(() => payController.abort(), 25000);
+      let payRes: Response;
+      try {
+        payRes = await fetch(payPath, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            provider === "bog" ? { bookingId, locale } : { bookingId },
+          ),
+          signal: payController.signal,
+        });
+      } catch (fetchErr) {
+        if (fetchErr instanceof DOMException && fetchErr.name === "AbortError") {
+          throw new Error(
+            locale === "ka"
+              ? "გადახდის სერვერმა დიდხანს არ უპასუხა. სცადეთ თავიდან."
+              : "The payment server took too long. Please try again.",
+          );
+        }
+        throw fetchErr;
+      } finally {
+        window.clearTimeout(payTimer);
+      }
       const payData = await payRes.json().catch(() => ({}));
       if (!payRes.ok) {
         const payErr = String(payData.error || "");
@@ -1213,16 +1238,30 @@ export function ReserveCheckout({
       }
       const orderId = String(payData.order_id || "").trim();
       const redirectUrl = String(payData.redirect_url || "").trim();
+      if (!orderId) {
+        throw new Error(
+          locale === "ka"
+            ? "გადახდის ფორმა ვერ მოვიდა. სცადეთ თავიდან."
+            : "The payment form could not be opened. Please try again.",
+        );
+      }
+      bookingIdRef.current = bookingId;
+      ordersRef.current = {
+        ...ordersRef.current,
+        bookingId,
+        [provider]: orderId,
+        ...(provider === "bog"
+          ? { bogRedirect: redirectUrl || undefined }
+          : { paypalRedirect: redirectUrl || undefined }),
+      };
       if (opts?.embed) {
-        if (!orderId) {
-          throw new Error(
-            locale === "ka"
-              ? "გადახდის ფორმა ვერ მოვიდა. სცადეთ თავიდან."
-              : "The payment form could not be opened. Please try again.",
-          );
-        }
-        ordersRef.current = { ...ordersRef.current, bookingId, [provider]: orderId };
-        return { bookingId, orderId };
+        setEmbeddedPay({
+          method: provider,
+          bookingId,
+          orderId,
+          redirectUrl: redirectUrl || undefined,
+        });
+        return { bookingId, orderId, redirectUrl: redirectUrl || undefined };
       }
       if (!redirectUrl) {
         throw new Error(
@@ -1235,6 +1274,7 @@ export function ReserveCheckout({
       return;
     } catch (err) {
       setError(err instanceof Error ? err.message : dictionary.booking.createFailed);
+      setEmbeddedPay(null);
       requestAnimationFrame(() => {
         const el = document.querySelector("[data-invalid-field='true']");
         el?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1244,58 +1284,16 @@ export function ReserveCheckout({
     }
   };
 
-  const handleBookingRef = useRef(handleBooking);
-  handleBookingRef.current = handleBooking;
-
   useEffect(() => {
     if (checkoutStep !== "payment") {
-      bookingIdRef.current = "";
-      ordersRef.current = { bookingId: "" };
-      payInflight.current = null;
       setEmbeddedPay(null);
-      return;
     }
-    if (!paymentReady.checked) return;
-    const ready = paymentMethod === "bog" ? paymentReady.bog : paymentReady.paypal;
-    if (!ready) return;
-    const cached =
-      bookingIdRef.current && ordersRef.current.bookingId === bookingIdRef.current
-        ? ordersRef.current[paymentMethod]
-        : "";
-    if (cached) {
-      setEmbeddedPay({
-        method: paymentMethod,
-        bookingId: bookingIdRef.current,
-        orderId: cached,
-      });
-      return;
-    }
-    let cancelled = false;
-    const task =
-      payInflight.current?.method === paymentMethod
-        ? payInflight.current.task
-        : handleBookingRef.current(paymentMethod, { embed: true });
-    payInflight.current = { method: paymentMethod, task };
-    void task.then((result) => {
-      if (payInflight.current?.task === task) payInflight.current = null;
-      if (cancelled || !result) return;
-      setEmbeddedPay({
-        method: paymentMethod,
-        bookingId: result.bookingId,
-        orderId: result.orderId,
-      });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    checkoutStep,
-    payAttempt,
-    paymentMethod,
-    paymentReady.bog,
-    paymentReady.checked,
-    paymentReady.paypal,
-  ]);
+  }, [checkoutStep]);
+
+  useEffect(() => {
+    setEmbeddedPay(null);
+    setError("");
+  }, [paymentMethod]);
 
   const onBogPaid = useCallback(() => {
     const id = bookingIdRef.current;
@@ -1312,11 +1310,7 @@ export function ReserveCheckout({
 
   const onPayFailed = useCallback((message: string) => {
     setError(message);
-    if (paymentMethod === "bog") ordersRef.current.bog = undefined;
-    else ordersRef.current.paypal = undefined;
-    setEmbeddedPay(null);
-    setPayAttempt((n) => n + 1);
-  }, [paymentMethod]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#eef2f6]">
@@ -1457,26 +1451,67 @@ export function ReserveCheckout({
               </div>
             ) : null}
 
-            {loading && !embeddedPay ? (
-              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-10 text-center text-sm font-semibold text-slate-500">
-                {locale === "ka"
-                  ? "გადახდის ფორმა იხსნება…"
-                  : locale === "ru"
-                    ? "Открываем форму оплаты…"
-                    : "Opening the payment form…"}
-              </div>
+            {paymentMethod === "bog" && paymentReady.bog && !embeddedPay ? (
+              <CheckoutBogCard
+                amountLabel={payAmountLabel || formatPrice(totals.payNow)}
+                locale={locale}
+                loading={loading}
+                disabled={paymentReady.checked && !paymentReady.bog}
+                onBack={() => setCheckoutStep("details")}
+                onConfirm={async () => {
+                  const label = await loadPayAmountLabel(totals.payNow);
+                  if (label && label !== payAmountLabel) {
+                    setPayAmountLabel(label);
+                    return;
+                  }
+                  await handleBooking("bog", { embed: true });
+                }}
+              />
+            ) : null}
+
+            {paymentMethod === "paypal" && paymentReady.paypal && !embeddedPay ? (
+              paymentReady.paypalClientId ? (
+                <CheckoutPaypalCard
+                  amountLabel={payAmountLabel || formatPrice(totals.payNow)}
+                  locale={locale}
+                  loading={loading}
+                  disabled={paymentReady.checked && !paymentReady.paypal}
+                  onBack={() => setCheckoutStep("details")}
+                  onConfirm={async () => {
+                    const label = await loadPayAmountLabel(totals.payNow);
+                    if (label && label !== payAmountLabel) {
+                      setPayAmountLabel(label);
+                      return;
+                    }
+                    await handleBooking("paypal", { embed: true });
+                  }}
+                />
+              ) : (
+                <CheckoutPaypalCard
+                  amountLabel={payAmountLabel || formatPrice(totals.payNow)}
+                  locale={locale}
+                  loading={loading}
+                  onBack={() => setCheckoutStep("details")}
+                  onConfirm={async () => {
+                    await handleBooking("paypal");
+                  }}
+                />
+              )
             ) : null}
 
             {embeddedPay?.method === "bog" && paymentMethod === "bog" ? (
               <CheckoutBogFrame
                 orderId={embeddedPay.orderId}
                 locale={locale}
+                redirectUrl={embeddedPay.redirectUrl || ordersRef.current.bogRedirect}
                 onPaid={onBogPaid}
                 onFailed={onPayFailed}
               />
             ) : null}
 
-            {embeddedPay?.method === "paypal" && paymentMethod === "paypal" && paymentReady.paypalClientId ? (
+            {embeddedPay?.method === "paypal" &&
+            paymentMethod === "paypal" &&
+            paymentReady.paypalClientId ? (
               <CheckoutPaypalButtons
                 clientId={paymentReady.paypalClientId}
                 orderId={embeddedPay.orderId}
@@ -1486,18 +1521,38 @@ export function ReserveCheckout({
               />
             ) : null}
 
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => setCheckoutStep("details")}
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-            >
-              {locale === "ka"
-                ? "დაბრუნება მძღოლის დეტალებზე"
-                : locale === "ru"
-                  ? "Назад к данным водителя"
-                  : "Back to driver details"}
-            </button>
+            {embeddedPay ? (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => {
+                  setEmbeddedPay(null);
+                  setError("");
+                }}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >
+                {locale === "ka"
+                  ? "სხვა გადახდის მეთოდი / თავიდან"
+                  : "Choose another method / retry"}
+              </button>
+            ) : null}
+
+            {!embeddedPay &&
+            !(paymentMethod === "bog" && paymentReady.bog) &&
+            !(paymentMethod === "paypal" && paymentReady.paypal) ? (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => setCheckoutStep("details")}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >
+                {locale === "ka"
+                  ? "დაბრუნება მძღოლის დეტალებზე"
+                  : locale === "ru"
+                    ? "Назад к данным водителя"
+                    : "Back to driver details"}
+              </button>
+            ) : null}
           </div>
         ) : (
           <form
