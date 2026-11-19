@@ -8,12 +8,14 @@ import {
 } from "@/lib/payments/bog-client";
 import {
   bogCredentialsConfigured,
+  getBogCurrency,
   getBogSiteUrl,
 } from "@/lib/payments/bog-config";
 import {
   attachBogOrderToBooking,
   getBookingForPayment,
 } from "@/lib/server/booking-payment";
+import { convertFromEur, roundMoney } from "@/lib/utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,10 +68,32 @@ export async function POST(req: Request) {
     );
   }
 
-  const amount = Math.round(Math.max(0, booking.depositPaidEur) * 100) / 100;
-  if (!(amount > 0)) {
+  const amountEur = roundMoney(Math.max(0, booking.depositPaidEur));
+  if (!(amountEur > 0)) {
     return NextResponse.json(
       { error: "Nothing to charge for this booking." },
+      { status: 400 },
+    );
+  }
+
+  const currency = getBogCurrency();
+  let chargeAmount = amountEur;
+  if (currency === "GEL" || currency === "USD" || currency === "GBP") {
+    try {
+      const { ensureDailyFxRates } = await import("@/lib/server/fx-rates-sync");
+      const rates = await ensureDailyFxRates();
+      chargeAmount = roundMoney(convertFromEur(amountEur, currency, rates));
+    } catch (err) {
+      console.warn("[bog/create-order] FX convert failed", err);
+      if (currency === "GEL") {
+        // Last-resort approx if FX store is down — better than failing checkout.
+        chargeAmount = roundMoney(amountEur * 2.9);
+      }
+    }
+  }
+  if (!(chargeAmount > 0)) {
+    return NextResponse.json(
+      { error: "Could not compute payment amount." },
       { status: 400 },
     );
   }
@@ -88,14 +112,14 @@ export async function POST(req: Request) {
   try {
     const order = await createBogEcommerceOrder({
       externalOrderId: booking.id,
-      totalAmount: amount,
-      currency: "EUR",
+      totalAmount: chargeAmount,
+      currency,
       basket: [
         {
           product_id: booking.id,
           description: `Car rental deposit ${ref}`.slice(0, 120),
           quantity: 1,
-          unit_price: amount,
+          unit_price: chargeAmount,
         },
       ],
       callbackUrl: `${siteUrl}/api/payments/bog/callback`,

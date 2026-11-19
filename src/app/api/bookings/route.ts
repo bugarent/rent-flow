@@ -310,16 +310,10 @@ export async function POST(req: Request) {
       .trim()
       .toLowerCase()
       .slice(0, 32);
-    const paymentMode = String(
-      (body as { paymentMode?: unknown }).paymentMode || "",
-    )
-      .trim()
-      .toLowerCase()
-      .slice(0, 32);
-    /** PayPal sandbox confirm treats the deposit as paid immediately. */
-    const paypalSandboxPaid = paymentProvider === "paypal" && paymentMode === "sandbox";
-    const initialPaymentStatus = paypalSandboxPaid ? "PAID" : "UNPAID";
-    const deferNotifyUntilPaid = paymentProvider === "bog";
+    /** Online gateways (BOG / PayPal) stay unpaid until callback/capture confirms. */
+    const deferNotifyUntilPaid =
+      paymentProvider === "bog" || paymentProvider === "paypal";
+    const initialPaymentStatus = "UNPAID";
     const countryOfResidence = String(
       (body as { countryOfResidence?: unknown }).countryOfResidence || "",
     )
@@ -783,7 +777,6 @@ export async function POST(req: Request) {
             ? {
                 paymentProvider,
                 paymentStatus: initialPaymentStatus,
-                ...(paypalSandboxPaid ? { status: "CONFIRMED" as const } : {}),
               }
             : {}),
         });
@@ -1323,7 +1316,6 @@ export async function POST(req: Request) {
           data: {
             paymentProvider,
             paymentStatus: initialPaymentStatus,
-            ...(paypalSandboxPaid ? { status: "CONFIRMED" } : {}),
           },
         });
       } catch {

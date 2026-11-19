@@ -46,6 +46,8 @@ export type FileBookingRecord = {
   paymentStatus?: string;
   /** Bank of Georgia ecommerce order id */
   bogOrderId?: string;
+  /** PayPal checkout order id */
+  paypalOrderId?: string;
   guestFirstName: string;
   guestLastName: string;
   guestPhone: string;
@@ -232,6 +234,7 @@ export async function updateFileBooking(
       | "paymentProvider"
       | "paymentStatus"
       | "bogOrderId"
+      | "paypalOrderId"
       | "status"
       | "cancellationReason"
       | "cancelledAt"

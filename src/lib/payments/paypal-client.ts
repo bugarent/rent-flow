@@ -143,8 +143,33 @@ export async function createPaypalCheckoutOrder(input: {
   amount: string;
   currency: string;
   description: string;
+  /** Our booking id — returned on capture as custom_id */
+  customId?: string;
+  returnUrl?: string;
+  cancelUrl?: string;
 }): Promise<PaypalOrder> {
   const create = async (token: string) => {
+    const body: Record<string, unknown> = {
+      intent: input.intent,
+      purchase_units: [
+        {
+          description: input.description.slice(0, 127),
+          ...(input.customId ? { custom_id: input.customId.slice(0, 127) } : {}),
+          amount: {
+            currency_code: input.currency,
+            value: input.amount,
+          },
+        },
+      ],
+    };
+    if (input.returnUrl && input.cancelUrl) {
+      body.application_context = {
+        user_action: "PAY_NOW",
+        shipping_preference: "NO_SHIPPING",
+        return_url: input.returnUrl,
+        cancel_url: input.cancelUrl,
+      };
+    }
     const res = await paypalRequest(`${getPaypalApiBase()}/v2/checkout/orders`, {
       method: "POST",
       headers: {
@@ -153,18 +178,7 @@ export async function createPaypalCheckoutOrder(input: {
         Accept: "application/json",
         Prefer: "return=representation",
       },
-      body: JSON.stringify({
-        intent: input.intent,
-        purchase_units: [
-          {
-            description: input.description.slice(0, 127),
-            amount: {
-              currency_code: input.currency,
-              value: input.amount,
-            },
-          },
-        ],
-      }),
+      body: JSON.stringify(body),
     });
     const data = res.data as {
       id?: unknown;
@@ -196,5 +210,53 @@ export async function createPaypalCheckoutOrder(input: {
     id: orderId,
     status: typeof data?.status === "string" ? data.status : "CREATED",
     approveUrl: typeof approve?.href === "string" ? approve.href : null,
+  };
+}
+
+export async function capturePaypalCheckoutOrder(orderId: string): Promise<{
+  status: string;
+  customId: string | null;
+}> {
+  const id = orderId.trim();
+  if (!id) throw new PaypalConfigError("PayPal order id is required");
+
+  const run = async (token: string) =>
+    paypalRequest(`${getPaypalApiBase()}/v2/checkout/orders/${encodeURIComponent(id)}/capture`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Prefer: "return=representation",
+      },
+      body: "{}",
+    });
+
+  let token = await getPaypalAccessToken();
+  let res = await run(token);
+  if (res.status === 401) {
+    clearPaypalAccessTokenCache();
+    token = await getPaypalAccessToken();
+    res = await run(token);
+  }
+
+  const data = res.data as {
+    status?: unknown;
+    purchase_units?: Array<{ custom_id?: unknown; payments?: { captures?: Array<{ status?: unknown }> } }>;
+  } | null;
+
+  if (res.status < 200 || res.status >= 300) {
+    const failure = paypalFailure(data, "PayPal capture failed");
+    throw new PaypalApiError(failure.message, res.status, failure.debugId);
+  }
+
+  const customId = String(data?.purchase_units?.[0]?.custom_id || "").trim() || null;
+  const captureStatus = String(
+    data?.purchase_units?.[0]?.payments?.captures?.[0]?.status || data?.status || "",
+  ).toUpperCase();
+
+  return {
+    status: captureStatus || String(data?.status || "UNKNOWN"),
+    customId,
   };
 }

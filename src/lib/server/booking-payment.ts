@@ -20,6 +20,7 @@ export type BookingPaymentSnapshot = {
   paymentProvider: string;
   paymentStatus: BookingPaymentStatus;
   bogOrderId: string | null;
+  paypalOrderId: string | null;
   source: "prisma" | "file";
 };
 
@@ -46,6 +47,7 @@ function fromFile(row: FileBookingRecord): BookingPaymentSnapshot {
     paymentProvider: String(row.paymentProvider || ""),
     paymentStatus: asPaymentStatus(row.paymentStatus),
     bogOrderId: row.bogOrderId || null,
+    paypalOrderId: row.paypalOrderId || null,
     source: "file",
   };
 }
@@ -84,6 +86,7 @@ export async function getBookingForPayment(
         paymentProvider: String(row.paymentProvider || ""),
         paymentStatus: asPaymentStatus(row.paymentStatus),
         bogOrderId: row.bogOrderId || null,
+        paypalOrderId: null,
         source: "prisma",
       };
     }
@@ -129,6 +132,7 @@ export async function findBookingByBogOrderId(
         paymentProvider: String(row.paymentProvider || ""),
         paymentStatus: asPaymentStatus(row.paymentStatus),
         bogOrderId: row.bogOrderId || null,
+        paypalOrderId: null,
         source: "prisma",
       };
     }
@@ -151,58 +155,71 @@ export async function attachBogOrderToBooking(
   bookingId: string,
   bogOrderId: string,
 ): Promise<void> {
-  const id = bookingId.trim();
-  const oid = bogOrderId.trim();
+  await attachPaymentOrderToBooking({
+    bookingId,
+    provider: "bog",
+    orderId: bogOrderId,
+  });
+}
+
+export async function attachPaymentOrderToBooking(params: {
+  bookingId: string;
+  provider: "bog" | "paypal";
+  orderId: string;
+}): Promise<void> {
+  const id = params.bookingId.trim();
+  const oid = params.orderId.trim();
   if (!id || !oid) return;
 
   try {
     await prisma.booking.update({
       where: { id },
       data: {
-        bogOrderId: oid,
-        paymentProvider: "bog",
+        paymentProvider: params.provider,
         paymentStatus: "PENDING",
+        ...(params.provider === "bog" ? { bogOrderId: oid } : {}),
       },
     });
   } catch (err) {
-    console.warn("[booking-payment] prisma attachBogOrder failed", err);
+    console.warn("[booking-payment] prisma attachPaymentOrder failed", err);
   }
 
   try {
     await updateFileBooking(id, {
-      bogOrderId: oid,
-      paymentProvider: "bog",
+      paymentProvider: params.provider,
       paymentStatus: "PENDING",
+      ...(params.provider === "bog" ? { bogOrderId: oid } : { paypalOrderId: oid }),
     });
   } catch {
     /* file booking may not exist */
   }
 }
 
-/**
- * Mark booking paid after BOG `completed`. Idempotent: no-op if already PAID.
- * Returns whether this call applied a new paid update.
- */
-export async function markBookingPaidFromBog(params: {
+/** Mark booking paid after a successful gateway capture/callback. Idempotent. */
+export async function markBookingPaid(params: {
   bookingId: string;
-  bogOrderId: string;
+  provider: "bog" | "paypal";
+  orderId?: string;
 }): Promise<{ updated: boolean; alreadyPaid: boolean }> {
   const existing = await getBookingForPayment(params.bookingId);
-  if (!existing) {
-    return { updated: false, alreadyPaid: false };
-  }
-  if (existing.paymentStatus === "PAID") {
-    return { updated: false, alreadyPaid: true };
-  }
+  if (!existing) return { updated: false, alreadyPaid: false };
+  if (existing.paymentStatus === "PAID") return { updated: false, alreadyPaid: true };
 
-  const bogOrderId = params.bogOrderId.trim() || existing.bogOrderId || null;
+  const bogOrderId =
+    params.provider === "bog"
+      ? params.orderId?.trim() || existing.bogOrderId || null
+      : existing.bogOrderId;
+  const paypalOrderId =
+    params.provider === "paypal"
+      ? params.orderId?.trim() || existing.paypalOrderId || null
+      : existing.paypalOrderId;
 
   try {
     await prisma.booking.update({
       where: { id: existing.id },
       data: {
         paymentStatus: "PAID",
-        paymentProvider: "bog",
+        paymentProvider: params.provider,
         ...(bogOrderId ? { bogOrderId } : {}),
         status: "CONFIRMED",
       },
@@ -214,8 +231,9 @@ export async function markBookingPaidFromBog(params: {
   try {
     await updateFileBooking(existing.id, {
       paymentStatus: "PAID",
-      paymentProvider: "bog",
+      paymentProvider: params.provider,
       ...(bogOrderId ? { bogOrderId } : {}),
+      ...(paypalOrderId ? { paypalOrderId } : {}),
       status: "CONFIRMED",
     });
   } catch {
@@ -223,6 +241,18 @@ export async function markBookingPaidFromBog(params: {
   }
 
   return { updated: true, alreadyPaid: false };
+}
+
+/** Mark booking paid after BOG `completed`. Idempotent. */
+export async function markBookingPaidFromBog(params: {
+  bookingId: string;
+  bogOrderId: string;
+}): Promise<{ updated: boolean; alreadyPaid: boolean }> {
+  return markBookingPaid({
+    bookingId: params.bookingId,
+    provider: "bog",
+    orderId: params.bogOrderId,
+  });
 }
 
 export async function markBookingPaymentFailed(params: {

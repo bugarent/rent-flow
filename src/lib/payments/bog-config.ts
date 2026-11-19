@@ -17,6 +17,15 @@ export function bogCredentialsConfigured(): boolean {
   return Boolean(getBogClientId() && getBogSecretKey());
 }
 
+/** Merchant settlement currency. Georgian POS usually expects GEL. */
+export function getBogCurrency(): "GEL" | "EUR" | "USD" | "GBP" {
+  const raw = String(process.env.BOG_CURRENCY || "GEL")
+    .trim()
+    .toUpperCase();
+  if (raw === "EUR" || raw === "USD" || raw === "GBP" || raw === "GEL") return raw;
+  return "GEL";
+}
+
 /**
  * Public site origin for redirect_urls + callback_url.
  * Prefers SITE_URL, then NEXT_PUBLIC_SITE_URL / NEXTAUTH_URL.

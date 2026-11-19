@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -27,12 +26,12 @@ import {
 import { BirthDateSelect } from "@/components/cars/birth-date-select";
 import {
   CheckoutBogCard,
-  CheckoutPaypalSandbox,
+  CheckoutPaypalCard,
   GuestBookingNoticeModal,
   LegalDocumentModal,
   RentalTermsModal,
   loadCheckoutBogCard,
-  loadCheckoutPaypalSandbox,
+  loadCheckoutPaypalCard,
   loadGuestBookingNoticeModal,
   loadLegalDocumentModal,
   loadRentalTermsModal,
@@ -66,7 +65,6 @@ import { formatInternationalPhone } from "@/lib/catalog/dial-codes";
 import { extraPeriodCharge } from "@/lib/extras/pricing";
 import type { PartnerSocialPlatform } from "@/lib/partner";
 import { cn, toNumber } from "@/lib/utils";
-import { formatBookingRef } from "@/lib/ids";
 import {
   clearBusinessPartnerReferralCookieClient,
   getBusinessPartnerReferralRemainingMsClient,
@@ -203,11 +201,10 @@ export function ReserveCheckout({
   initialCar?: Record<string, unknown> | null;
   initialRange?: string;
 }) {
-  const router = useRouter();
   const intentPrefetch = useIntentPrefetch();
   usePreloadWhenIdle(
     loadCheckoutBogCard,
-    loadCheckoutPaypalSandbox,
+    loadCheckoutPaypalCard,
     loadGuestBookingNoticeModal,
     loadRentalTermsModal,
     loadLegalDocumentModal,
@@ -1064,7 +1061,6 @@ export function ReserveCheckout({
               ).toUpperCase(),
           declinePartnerReferral: noPromoCode,
           paymentProvider: provider,
-          ...(provider === "paypal" ? { paymentMode: "sandbox" } : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1112,34 +1108,43 @@ export function ReserveCheckout({
 
       clearBusinessPartnerReferralCookieClient();
 
-      if (provider === "paypal") {
-        const ref =
-          data.sequentialNumber != null
-            ? formatBookingRef(data.sequentialNumber) || ""
-            : bookingId.slice(0, 8);
-        const q = new URLSearchParams();
-        q.set("booked", "1");
-        if (ref) q.set("ref", ref);
-        if (email.trim()) q.set("email", email.trim());
-        router.push(`/?${q.toString()}`);
-        return;
-      }
-
-      const payRes = await fetch("/api/payments/bog/create-order", {
+      const payPath =
+        provider === "paypal"
+          ? "/api/payments/paypal/create-order"
+          : "/api/payments/bog/create-order";
+      const payRes = await fetch(payPath, {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId, locale }),
+        body: JSON.stringify(
+          provider === "bog" ? { bookingId, locale } : { bookingId },
+        ),
       });
       const payData = await payRes.json().catch(() => ({}));
       if (!payRes.ok) {
+        const payErr = String(payData.error || "");
+        if (provider === "bog") {
+          throw new Error(
+            locale === "ka"
+              ? payErr.includes("not configured")
+                ? "ბარათით გადახდა ჯერ არ არის ჩართული (BOG გასაღებები). სცადეთ PayPal ან დაგვიკავშირდით."
+                : payErr || "ბარათით გადახდის დაწყება ვერ მოხერხდა. ჯავშანი გადახდის გარეშე არ დადასტურდა."
+              : payErr || "Could not start card payment. The booking was not confirmed.",
+          );
+        }
         throw new Error(
-          String(payData.error || "Could not start card payment. Please try again."),
+          locale === "ka"
+            ? payErr || "PayPal გადახდის დაწყება ვერ მოხერხდა. ჯავშანი გადახდის გარეშე არ დადასტურდა."
+            : payErr || "Could not start PayPal payment. The booking was not confirmed.",
         );
       }
       const redirectUrl = String(payData.redirect_url || "").trim();
       if (!redirectUrl) {
-        throw new Error("Payment redirect URL missing. Please try again.");
+        throw new Error(
+          locale === "ka"
+            ? "გადახდის ბმული ვერ მოვიდა. სცადეთ თავიდან — ჯავშანი გადახდის გარეშე არ დადასტურდა."
+            : "Payment redirect URL missing. Please try again — the booking was not confirmed.",
+        );
       }
       window.location.assign(redirectUrl);
       return;
@@ -1263,10 +1268,9 @@ export function ReserveCheckout({
                 }}
               />
             ) : (
-              <CheckoutPaypalSandbox
+              <CheckoutPaypalCard
                 amountLabel={payAmountLabel || formatPrice(totals.payNow)}
                 locale={locale}
-                guestEmail={email}
                 loading={loading}
                 onBack={() => setCheckoutStep("details")}
                 onConfirm={async () => {
