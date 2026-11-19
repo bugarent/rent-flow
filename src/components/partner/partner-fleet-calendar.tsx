@@ -168,7 +168,7 @@ function isToday(d: Date) {
 
 function dayCellClass(d: Date) {
   return cn(
-    "box-border h-8 min-h-full w-7 flex-none border-e border-slate-400 [touch-action:pan-x_pan-y] md:h-full md:w-auto md:min-w-0 md:flex-1",
+    "box-border h-10 min-h-full w-7 flex-none border-e border-slate-400 [touch-action:pan-x_pan-y] md:h-full md:w-auto md:min-w-0 md:flex-1",
     isWeekBoundaryDay(d) ? "bg-slate-100" : "bg-white",
   );
 }
@@ -871,7 +871,7 @@ export function PartnerFleetCalendar() {
         else text = Math.max(text, width);
       });
       const badge = mobile ? 20 : 24;
-      const plus = mobile ? 20 : 36;
+      const plus = 40;
       const rowNeed = text + 12 + badge + 6 + (mobile ? 4 : 6) + plus + 2;
       const headerNeed = label + 6 + 24 + 4 + (mobile ? 20 : 24) + 2;
       const raw = Math.ceil(Math.max(rowNeed, headerNeed, mobile ? 96 : 140)) + 4;
@@ -1159,7 +1159,7 @@ export function PartnerFleetCalendar() {
                   onPointerUp={onMonthSwipePointerEnd}
                   onPointerCancel={onMonthSwipePointerEnd}
                 >
-                  <div className="flex h-full min-h-8">
+                  <div className="flex h-full min-h-10">
                     {days.map((d) => (
                       <button
                         key={d.toISOString()}
@@ -1178,7 +1178,7 @@ export function PartnerFleetCalendar() {
                         className={cn(
                           tone
                             ? cn(
-                                "box-border h-8 min-h-full w-7 flex-none border-e border-slate-400 [touch-action:pan-x_pan-y] md:h-full md:w-auto md:min-w-0 md:flex-1",
+                                "box-border h-10 min-h-full w-7 flex-none border-e border-slate-400 [touch-action:pan-x_pan-y] md:h-full md:w-auto md:min-w-0 md:flex-1",
                                 tone.day,
                                 isWeekBoundaryDay(d) ? tone.dayWeekBoundary : tone.dayPlain,
                               )
