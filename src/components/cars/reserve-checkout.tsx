@@ -943,7 +943,7 @@ export function ReserveCheckout({
     setGuestNoticeOpen(true);
   };
 
-  const loadPayAmountLabel = async (amountEur: number) => {
+  const loadPayAmountLabel = useCallback(async (amountEur: number) => {
     try {
       const res = await fetch(
         `/api/fx/quote?amountEur=${encodeURIComponent(amountEur.toFixed(2))}`,
@@ -954,20 +954,15 @@ export function ReserveCheckout({
     } catch {
       return "";
     }
-  };
+  }, []);
 
-  const proceedToPaymentAfterNotice = async () => {
-    setGuestNoticeOpen(false);
-    const label = await loadPayAmountLabel(totals.payNow);
-    if (label) setPayAmountLabel(label);
-    setCheckoutStep("payment");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  const paymentReadyRef = useRef(paymentReady);
+  paymentReadyRef.current = paymentReady;
 
+  // Prefetch gateways + amount label on the details step so payment opens instantly.
   useEffect(() => {
-    if (checkoutStep !== "payment") return;
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const res = await fetch("/api/payments/status", { cache: "no-store" });
         const data = await res.json().catch(() => ({}));
@@ -980,14 +975,37 @@ export function ReserveCheckout({
         });
       } catch {
         if (!cancelled) {
-          setPaymentReady({ bog: false, paypal: false, paypalClientId: "", checked: true });
+          setPaymentReady((prev) => ({ ...prev, checked: true }));
         }
       }
+    })();
+    void import("@bankofgeorgia/bog-payments-web-sdk").catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const label = await loadPayAmountLabel(totals.payNow);
+      if (!cancelled && label) setPayAmountLabel(label);
     })();
     return () => {
       cancelled = true;
     };
-  }, [checkoutStep]);
+  }, [loadPayAmountLabel, totals.payNow]);
+
+  const proceedToPaymentAfterNotice = () => {
+    setGuestNoticeOpen(false);
+    setCheckoutStep("payment");
+    window.scrollTo({ top: 0, behavior: "auto" });
+    if (!payAmountLabel) {
+      void loadPayAmountLabel(totals.payNow).then((label) => {
+        if (label) setPayAmountLabel(label);
+      });
+    }
+  };
 
   const handleBooking = async (
     provider: "bog" | "paypal" = paymentMethod,
@@ -1073,21 +1091,26 @@ export function ReserveCheckout({
     }
     setLoading(true);
     try {
-      const readyRes = await fetch(
-        provider === "paypal" ? "/api/payments/paypal/ready" : "/api/payments/bog/ready",
-        { cache: "no-store" },
-      );
-      const readyData = await readyRes.json().catch(() => ({}));
-      if (!readyRes.ok || readyData?.ready === false) {
-        throw new Error(
-          locale === "ka"
-            ? provider === "bog"
-              ? "ბარათით გადახდა ჯერ არ არის ჩართული. Netlify-ზე დაამატეთ BOG_CLIENT_ID და BOG_SECRET_KEY, შემდეგ სცადეთ თავიდან. ბარათის მონაცემები ივსება საქართველოს ბანკის გვერდზე (გადამისამართების შემდეგ)."
-              : "PayPal ჯერ არ არის ჩართული. Netlify-ზე დაამატეთ PAYPAL_CLIENT_ID და PAYPAL_CLIENT_SECRET."
-            : provider === "bog"
-              ? "Card payment is not configured. Add BOG_CLIENT_ID and BOG_SECRET_KEY in Netlify. Card details are entered on Bank of Georgia’s page after redirect."
-              : "PayPal is not configured. Add PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET in Netlify.",
+      const cachedReady = paymentReadyRef.current;
+      const alreadyReady =
+        cachedReady.checked && (provider === "bog" ? cachedReady.bog : cachedReady.paypal);
+      if (!alreadyReady) {
+        const readyRes = await fetch(
+          provider === "paypal" ? "/api/payments/paypal/ready" : "/api/payments/bog/ready",
+          { cache: "no-store" },
         );
+        const readyData = await readyRes.json().catch(() => ({}));
+        if (!readyRes.ok || readyData?.ready === false) {
+          throw new Error(
+            locale === "ka"
+              ? provider === "bog"
+                ? "ბარათით გადახდა ჯერ არ არის ჩართული. Netlify-ზე დაამატეთ BOG_CLIENT_ID და BOG_SECRET_KEY, შემდეგ სცადეთ თავიდან. ბარათის მონაცემები ივსება საქართველოს ბანკის გვერდზე (გადამისამართების შემდეგ)."
+                : "PayPal ჯერ არ არის ჩართული. Netlify-ზე დაამატეთ PAYPAL_CLIENT_ID და PAYPAL_CLIENT_SECRET."
+              : provider === "bog"
+                ? "Card payment is not configured. Add BOG_CLIENT_ID and BOG_SECRET_KEY in Netlify. Card details are entered on Bank of Georgia’s page after redirect."
+                : "PayPal is not configured. Add PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET in Netlify.",
+          );
+        }
       }
 
       const selectedExtras = [...paidExtras, ...insuranceExtras]
@@ -1321,8 +1344,10 @@ export function ReserveCheckout({
     }
 
     void (async () => {
-      const label = await loadPayAmountLabel(totals.payNow);
-      if (label && label !== payAmountLabel) setPayAmountLabel(label);
+      if (!payAmountLabel) {
+        const label = await loadPayAmountLabel(totals.payNow);
+        if (label) setPayAmountLabel(label);
+      }
       const result = await handleBookingRef.current("bog", { embed: true });
       if (!result) {
         // Allow a later retry when the user re-selects Card.
@@ -1506,7 +1531,7 @@ export function ReserveCheckout({
               </div>
             ) : null}
 
-            {paymentMethod === "bog" && paymentReady.bog ? (
+            {paymentMethod === "bog" && (!paymentReady.checked || paymentReady.bog) ? (
               <div className="rounded-xl bg-slate-50 px-3 py-3 text-center">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                   {locale === "ka"
@@ -1521,7 +1546,9 @@ export function ReserveCheckout({
               </div>
             ) : null}
 
-            {paymentMethod === "bog" && paymentReady.bog && !embeddedPay ? (
+            {paymentMethod === "bog" &&
+            (!paymentReady.checked || paymentReady.bog) &&
+            !embeddedPay ? (
               <div className="rounded-2xl border border-slate-200 bg-white px-4 py-10 text-center text-sm font-semibold text-slate-500">
                 {locale === "ka"
                   ? "ბარათის ფორმა იხსნება…"
@@ -1531,19 +1558,20 @@ export function ReserveCheckout({
               </div>
             ) : null}
 
-            {paymentMethod === "paypal" && paymentReady.paypal && !embeddedPay ? (
-              paymentReady.paypalClientId ? (
+            {paymentMethod === "paypal" &&
+            (!paymentReady.checked || paymentReady.paypal) &&
+            !embeddedPay ? (
+              paymentReady.paypalClientId || !paymentReady.checked ? (
                 <CheckoutPaypalCard
                   amountLabel={payAmountLabel || formatPrice(totals.payNow)}
                   locale={locale}
-                  loading={loading}
-                  disabled={paymentReady.checked && !paymentReady.paypal}
+                  loading={loading || !paymentReady.checked}
+                  disabled={!paymentReady.checked || !paymentReady.paypal}
                   onBack={() => setCheckoutStep("details")}
                   onConfirm={async () => {
-                    const label = await loadPayAmountLabel(totals.payNow);
-                    if (label && label !== payAmountLabel) {
-                      setPayAmountLabel(label);
-                      return;
+                    if (!payAmountLabel) {
+                      const label = await loadPayAmountLabel(totals.payNow);
+                      if (label) setPayAmountLabel(label);
                     }
                     await handleBooking("paypal", { embed: true });
                   }}
