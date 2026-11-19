@@ -1,4 +1,4 @@
-import type { Locale } from "@/lib/i18n/config";
+import { LOCALES, type Locale } from "@/lib/i18n/config";
 import { cityDisplayName } from "@/lib/i18n/place-label";
 import { findSearchPlace, normalizeLocationCode } from "@/lib/catalog/search-places";
 
@@ -72,6 +72,13 @@ export function uniqueOtherLocations<T extends { code: string; slug: string; cou
     if (out.length >= limit) break;
   }
   return out;
+}
+
+/** Short carousel heading in every UI language. Ignores stored SEO titles and slogans. */
+export function popularCardHeadings(iata: string): Record<Locale, string> {
+  const headings = {} as Record<Locale, string>;
+  for (const locale of LOCALES) headings[locale] = airportCardLinkLabel(iata, locale);
+  return headings;
 }
 
 /** Anchor for an /airport/[code] card. Ignores the stored SEO title. */

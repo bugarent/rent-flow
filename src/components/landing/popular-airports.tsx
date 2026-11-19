@@ -7,7 +7,6 @@ import type { PopularAirportCard } from "@/lib/catalog/popular-airports";
 import type { PopularAirportsLayout } from "@/lib/catalog/popular-airports-layout";
 import { usePreferences } from "@/components/providers/preferences-context";
 import { airportCarsLabel } from "@/lib/i18n/airport-cars-label";
-import { localizedAirportTitle } from "@/lib/catalog/homepage-airport-i18n";
 import { SiteImage } from "@/components/ui/site-image";
 import { useIntentPrefetch } from "@/lib/client/prefetch-route";
 import { useHomeCountry } from "@/lib/catalog/home-country-store";
@@ -29,6 +28,7 @@ function AirportCard({
 }) {
   const href = `/airport/${encodeURIComponent(airport.iata)}`;
   const intentPrefetch = useIntentPrefetch();
+  const heading = airport.headings?.[locale] || airport.headings?.en || "";
   return (
     <article
       className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
@@ -37,10 +37,7 @@ function AirportCard({
       <div className="relative aspect-[16/10] w-full bg-slate-200">
         <SiteImage
           src={airport.image}
-          alt={localizedAirportTitle(
-            { iata: airport.iata, title: airport.name, translations: airport.translations },
-            locale,
-          )}
+          alt={heading}
           fill
           sizes="(max-width: 639px) 90vw, (max-width: 1023px) 45vw, 360px"
           className="object-cover"
@@ -49,11 +46,8 @@ function AirportCard({
         />
       </div>
       <div className="flex flex-1 flex-col p-4 sm:p-5">
-        <h3 className="mb-4 text-lg font-bold text-[#0b1f4b]">
-          {localizedAirportTitle(
-            { iata: airport.iata, title: airport.name, translations: airport.translations },
-            locale,
-          )}
+        <h3 className="mb-4 min-w-0 break-words text-lg font-bold text-[#0b1f4b]">
+          {heading}
         </h3>
         <Link
           href={href}

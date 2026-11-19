@@ -23,15 +23,12 @@ import { softTimeout } from "@/lib/server/soft-timeout";
 import type { CachedPublicRead } from "@/lib/server/public-data-cache";
 import { staticHomepageAirports, staticHomepageCategories } from "@/lib/server/homepage";
 import { bookingCountsByPickupIata } from "@/lib/server/airport-popularity";
-import type { AirportCardTranslations } from "@/lib/catalog/homepage-airport-i18n";
-import { localizedAirportTitle } from "@/lib/catalog/homepage-airport-i18n";
 import { airportCountryIso2, findSearchPlace, normalizeLocationCode } from "@/lib/catalog/search-places";
-import { withAutoTitleTranslations } from "@/lib/catalog/airport-card-auto-titles";
+import { airportCardLinkLabel, popularCardHeadings } from "@/lib/seo/location-link-label";
 import { readPreferences } from "@/lib/server/preferences";
 import { getCrossBorderReturnPlaces } from "@/lib/server/cross-border-returns";
 import { popularPlacesListName } from "@/lib/seo/home-seo";
 import { buildPlacesItemListJsonLd } from "@/lib/seo/json-ld";
-import { plainHeading } from "@/lib/catalog/airport-seo";
 import { PopularDestinations } from "@/components/seo/popular-destinations";
 
 const DATA_WAIT_MS = 700;
@@ -50,19 +47,6 @@ function readOr<T>(read: CachedPublicRead<T>, fallback: T, ms: number): Promise<
 async function savedOrStatic<T>(read: CachedPublicRead<T[]>, fallback: () => T[], ms: number): Promise<T[]> {
   const rows = await readOr(read, [], ms);
   return rows.length ? rows : (read.peek() ?? fallback());
-}
-
-/**
- * Cards only show the title. The full page text and SEO lines in every language made the
- * homepage HTML ~0.5 MB larger, so only titles go to the browser (all languages, for switching).
- */
-function titleOnly(translations: AirportCardTranslations | undefined): AirportCardTranslations {
-  const out: AirportCardTranslations = {};
-  for (const [lang, row] of Object.entries(translations ?? {})) {
-    const title = row?.title?.trim();
-    if (title) out[lang as keyof AirportCardTranslations] = { title };
-  }
-  return out;
 }
 
 /** Hero shown in the first bytes, before any data: the photo is the LCP and must not wait. */
@@ -149,16 +133,7 @@ export async function HomeBelowFold() {
   const placesJsonLd = buildPlacesItemListJsonLd(
     popularPlacesListName(locale),
     popularAirports.map((a) => ({
-      name: plainHeading(
-        localizedAirportTitle(
-          withAutoTitleTranslations({
-            iata: a.iata,
-            title: a.title,
-            translations: "translations" in a ? (a.translations as AirportCardTranslations) : undefined,
-          }),
-          locale,
-        ),
-      ),
+      name: airportCardLinkLabel(a.iata, locale),
       path: `/airport/${encodeURIComponent(normalizeLocationCode(a.iata))}`,
     })),
   );
@@ -180,17 +155,11 @@ export async function HomeBelowFold() {
         layout={airportsLayout}
         airports={rankedAirports.map((a, index) => ({
           iata: a.iata,
-          name: a.title,
+          name: airportCardLinkLabel(a.iata, "en"),
           city: findSearchPlace(a.iata)?.cityName || a.iata,
           image: a.imageUrl,
           rank: index + 1,
-          translations: titleOnly(
-            withAutoTitleTranslations({
-              iata: a.iata,
-              title: a.title,
-              translations: "translations" in a ? (a.translations as AirportCardTranslations) : undefined,
-            }).translations,
-          ),
+          headings: popularCardHeadings(a.iata),
           countryIso2: airportCountryIso2(a.iata),
         }))}
       />
