@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   asCardLocale,
-  localizedAirportInfo,
   localizedAirportSeo,
   localizedAirportTitle,
 } from "@/lib/catalog/homepage-airport-i18n";
@@ -28,11 +27,21 @@ import {
 } from "@/components/seo/location-landing-sections";
 import { readPreferences } from "@/lib/server/preferences";
 import { buildPageMetadata } from "@/lib/seo/metadata";
-import { buildBreadcrumbJsonLd, buildFaqPageJsonLd, buildLocationAutoRentalJsonLd } from "@/lib/seo/json-ld";
+import { buildBreadcrumbJsonLd, buildFaqPageJsonLd, buildLocationAutoRentalJsonLd, buildWebPageJsonLd } from "@/lib/seo/json-ld";
 import { airportCardLinkLabel } from "@/lib/seo/location-link-label";
-import { locationIntro } from "@/lib/seo/location-intro";
+import { genericLocationIntro, locationIntro } from "@/lib/seo/location-intro";
+import { locationRouteLines } from "@/lib/seo/location-drives";
+import { cityDisplayName } from "@/lib/i18n/place-label";
 import { loadLocationLandingExtras } from "@/lib/seo/location-landing-data";
-import { countryDisplayName, type SeoLocation } from "@/lib/seo/location-landings";
+import {
+  countryDisplayName,
+  findSeoLocationByCode,
+  listSeoLocations,
+  locationLandingCopy,
+  seoLandingLanguageAlternates,
+  seoLandingPath,
+  type SeoLocation,
+} from "@/lib/seo/location-landings";
 import { absoluteUrl } from "@/lib/seo/config";
 import { CATALOG_AIRPORTS } from "@/lib/catalog/airports";
 import { emptyFooterContact } from "@/lib/catalog/footer-contact";
@@ -69,14 +78,21 @@ export async function generateMetadata({
   const airportName = airportNameOf(found);
   const code = normalizeLocationCode(found.iata);
   const seo = localizedAirportSeo(card, locale, { airportName });
+  const selfPath = pagePath(code);
+  const locations = await softTimeout(listSeoLocations(), [], 1500);
+  const landing = findSeoLocationByCode(locations, code);
+  const canonicalPath = landing ? seoLandingPath("en", landing.slug) : selfPath;
+  const landingCopy = landing ? locationLandingCopy(landing, "en") : null;
   return buildPageMetadata({
-    title: seo.title,
-    description: seo.description,
-    path: pagePath(code),
-    locale: asCardLocale(locale),
+    title: landingCopy?.title || seo.title,
+    description: landingCopy?.description || seo.description,
+    path: selfPath,
+    canonicalPath,
+    locale: landing ? "en" : asCardLocale(locale),
+    languages: landing ? seoLandingLanguageAlternates(landing.slug) : { "x-default": selfPath },
     image: found.imageUrl || undefined,
     imageAlt: localizedAirportTitle(card, locale),
-    keywords: [
+    keywords: landingCopy?.keywords || [
       `car rental ${airportName}`,
       `rent a car ${airportName}`,
       `${code} car rental`,
@@ -99,14 +115,17 @@ export default async function AirportInfoPage({
   const card = withAutoTitleTranslations(airport);
   const code = normalizeLocationCode(airport.iata);
   const airportName = airportNameOf(airport);
-  const title = localizedAirportTitle(card, locale);
-  const text = localizedAirportInfo(airport, locale);
   const seo = localizedAirportSeo(card, locale, { airportName });
   const copy = airportPageCopy(locale);
-  const intro = locationIntro(code, locale);
-  const paragraphs = text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-  const country = airportCountryIso2(code);
   const kind = /^CITY-/i.test(code) ? "city" : "airport";
+  const place = findSearchPlace(code);
+  const placeLabel =
+    cityDisplayName(locale, place?.cityName || airportName) || place?.cityName || airportName;
+  const heading = airportCardLinkLabel(code, locale);
+  const hasDrives = locationRouteLines(code, locale, place?.cityName).length > 0;
+  const intro =
+    locationIntro(code, locale) ?? genericLocationIntro(locale, kind, placeLabel, hasDrives);
+  const country = airportCountryIso2(code);
   const seen = new Set<string>();
   const ranked = [
     ...rows.filter((row) => country && airportCountryIso2(row.iata) === country),
@@ -120,7 +139,6 @@ export default async function AirportInfoPage({
     related.push(row);
     if (related.length >= 12) break;
   }
-  const place = findSearchPlace(code);
   const seoLocation: SeoLocation = {
     code,
     kind,
@@ -131,7 +149,12 @@ export default async function AirportInfoPage({
     iata: kind === "airport" ? code : undefined,
   };
 
-  const url = absoluteUrl(pagePath(code));
+  const locationsForCanonical = await softTimeout(listSeoLocations(), [], 1500);
+  const landingMatch = findSeoLocationByCode(locationsForCanonical, code);
+  const canonicalPath = landingMatch ? seoLandingPath("en", landingMatch.slug) : pagePath(code);
+  const url = absoluteUrl(canonicalPath);
+  const breadcrumbId = `${url}#breadcrumb`;
+  const faqId = `${url}#faq`;
   const [footerContact, extras] = await Promise.all([
     softTimeout(getFooterContactConfig(), emptyFooterContact(), 1500),
     softTimeout(
@@ -147,12 +170,21 @@ export default async function AirportInfoPage({
   const breadcrumb = [
     { name: copy.home, path: "/" },
     ...(countryLabel ? [{ name: countryLabel, path: "/locations" as const }] : []),
-    { name: title, path: pagePath(code) },
+    { name: heading, path: canonicalPath },
   ];
+  const faqLd = buildFaqPageJsonLd(faqsForSchema(locale, kind), faqId);
   const jsonLd = [
-    buildBreadcrumbJsonLd(breadcrumb),
+    buildWebPageJsonLd({
+      name: heading,
+      description: seo.description,
+      url,
+      locale,
+      breadcrumbId,
+      ...(faqLd ? { faqId } : {}),
+    }),
+    buildBreadcrumbJsonLd(breadcrumb, breadcrumbId),
     buildLocationAutoRentalJsonLd({
-      name: title,
+      name: heading,
       description: seo.description,
       url,
       image: airport.imageUrl || undefined,
@@ -166,7 +198,7 @@ export default async function AirportInfoPage({
         ? { "@type": "City", name: airportName }
         : { "@type": "Airport", name: airportName, iataCode: code },
     }),
-    buildFaqPageJsonLd(faqsForSchema(locale, kind)),
+    ...(faqLd ? [faqLd] : []),
   ];
 
   return (
@@ -190,14 +222,14 @@ export default async function AirportInfoPage({
             </>
           ) : null}
           <li aria-hidden>›</li>
-          <li className="text-slate-700">{title}</li>
+          <li className="min-w-0 break-words text-slate-700">{heading}</li>
         </ol>
       </nav>
       {airport.imageUrl ? (
         <div className="relative mb-6 aspect-[16/9] w-full overflow-hidden rounded-2xl bg-slate-200 sm:aspect-[2/1]">
           <SiteImage
             src={airport.imageUrl}
-            alt={title}
+            alt={heading}
             fill
             sizes="(max-width: 800px) 100vw, 768px"
             className="object-cover"
@@ -206,22 +238,8 @@ export default async function AirportInfoPage({
           />
         </div>
       ) : null}
-      <h1 className="text-2xl font-extrabold text-[#0b1f4b] sm:text-3xl">{title}</h1>
-      {intro ? (
-        <LocationIntro intro={intro} />
-      ) : (
-        <div className="mt-5 space-y-4 text-base leading-7 text-slate-700">
-          {paragraphs.length ? (
-            paragraphs.map((p, i) => (
-              <p key={i} className="whitespace-pre-wrap break-words">
-                {p}
-              </p>
-            ))
-          ) : (
-            <p>{copy.empty}</p>
-          )}
-        </div>
-      )}
+      <h1 className="break-words text-2xl font-extrabold text-[#0b1f4b] sm:text-3xl">{heading}</h1>
+      <LocationIntro intro={intro} />
       <Link
         href={`/cars?pickup=${encodeURIComponent(code)}`}
         className="mt-8 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-sky-600 px-6 py-3 text-center text-base font-bold text-white hover:bg-sky-700 sm:w-auto"

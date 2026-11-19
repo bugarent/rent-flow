@@ -120,7 +120,15 @@ export function LocationCarPreview({
             >
               {car.image ? (
                 <span className="relative h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-100">
-                  <SiteImage src={car.image} alt="" fill sizes="80px" className="object-cover" />
+                  <SiteImage
+                    src={car.image}
+                    alt={car.name}
+                    fill
+                    sizes="80px"
+                    className="object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </span>
               ) : null}
               <span className="min-w-0">
@@ -147,7 +155,8 @@ export function LocationFaqSection({
   kind: "airport" | "city";
 }) {
   const copy = locationSectionCopy(locale);
-  const faqs = kind === "airport" ? copy.airportFaqs : copy.cityFaqs;
+  const faqs = faqsForSchema(locale, kind);
+  if (!faqs.length) return null;
   return (
     <section className="mt-10 border-t border-slate-200 pt-6">
       <h2 className="text-lg font-bold text-[#0b1f4b]">{copy.faqTitle}</h2>
@@ -167,5 +176,13 @@ export function LocationFaqSection({
 
 export function faqsForSchema(locale: string, kind: "airport" | "city"): LocationFaq[] {
   const copy = locationSectionCopy(locale);
-  return kind === "airport" ? copy.airportFaqs : copy.cityFaqs;
+  const rows = kind === "airport" ? copy.airportFaqs : copy.cityFaqs;
+  const seen = new Set<string>();
+  return rows.filter((faq) => {
+    const question = faq.question.trim();
+    const answer = faq.answer.trim();
+    if (!question || !answer || seen.has(question)) return false;
+    seen.add(question);
+    return true;
+  });
 }

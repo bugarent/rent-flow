@@ -1,5 +1,6 @@
 import type { Locale } from "@/lib/i18n/config";
 import { cityDisplayName } from "@/lib/i18n/place-label";
+import { EXTRA_AIRPORTS, EXTRA_CITIES } from "@/lib/seo/location-drives-extra";
 
 export type DriveLine = {
   title: string;
@@ -496,11 +497,18 @@ function lines(spots: Spot[], locale: string): DriveLine[] {
     }));
 }
 
+function combined(base: Spot[] | undefined, extra: Spot[] | undefined): Spot[] | undefined {
+  if (!base?.length && !extra?.length) return undefined;
+  return [...(base ?? []), ...(extra ?? [])];
+}
+
 /** Drives for an airport code, or for a city when the page is not that airport. */
 export function locationRouteLines(code: string, locale: string, cityName?: string): DriveLine[] {
   const direct = code.trim().toUpperCase();
-  if (AIRPORTS[direct]) return lines(AIRPORTS[direct], locale);
+  const airportSpots = combined(AIRPORTS[direct], EXTRA_AIRPORTS[direct]);
+  if (airportSpots) return lines(airportSpots, locale);
   const city = (cityName || "").trim();
-  if (city && CITY_DRIVES[city]) return lines(CITY_DRIVES[city], locale);
+  const citySpots = city ? combined(CITY_DRIVES[city], EXTRA_CITIES[city]) : undefined;
+  if (citySpots) return lines(citySpots, locale);
   return [];
 }
