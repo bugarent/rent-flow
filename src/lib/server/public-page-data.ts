@@ -45,7 +45,7 @@ export const cachedCustomBookingChannels = cachedPublicRead(
   getPublicCustomBookingChannels,
 );
 export const cachedCountryCovers = cachedPublicRead("country-covers", getPublicCountryCovers);
-export const cachedFooterContact = cachedPublicRead("footer-contact", getPublicFooterContact, {
+export const cachedFooterContact = cachedPublicRead("footer-contact:v2", getPublicFooterContact, {
   // A timed-out or failed read is an empty contact. Caching that hides the
   // phone, email, and address until the cache expires.
   keep: hasFooterContact,

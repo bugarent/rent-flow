@@ -5,6 +5,7 @@ import { mkdir, readFile, writeFile } from "@/lib/server/durable-fs";
 import { join } from "node:path";
 import {
   emptyFooterContact,
+  formatFooterAddress,
   type FooterContactConfig,
 } from "@/lib/catalog/footer-contact";
 import { createTtlCache } from "@/lib/server/ttl-cache";
@@ -21,7 +22,7 @@ function normalize(parsed: Partial<FooterContactConfig>): FooterContactConfig {
     phone: String(parsed.phone || "").trim(),
     email: String(parsed.email || "").trim(),
     inboxEmail: String(parsed.inboxEmail || "").trim(),
-    address: String(parsed.address || "").trim(),
+    address: formatFooterAddress(String(parsed.address || "").trim()),
     updatedAt: String(parsed.updatedAt || new Date().toISOString()),
   };
 }
@@ -56,7 +57,7 @@ export async function saveFooterContactConfig(input: {
     phone: String(input.phone || "").trim().slice(0, 80),
     email: String(input.email || "").trim().slice(0, 160),
     inboxEmail: String(input.inboxEmail || "").trim().slice(0, 160),
-    address: String(input.address || "").trim().slice(0, 200),
+    address: formatFooterAddress(String(input.address || "").trim()).slice(0, 200),
     updatedAt: new Date().toISOString(),
   };
   await writeConfig(next);

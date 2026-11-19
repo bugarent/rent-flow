@@ -11,6 +11,7 @@ import { PublicShell } from "@/components/layout/public-shell";
 import { JsonLd } from "@/components/seo/json-ld";
 import { GoogleAnalytics } from "@/components/analytics/google-analytics";
 import { SEO_SITE_NAME } from "@/lib/brand";
+import { formatFooterAddress } from "@/lib/catalog/footer-contact";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { readPreferences } from "@/lib/server/preferences";
 import { cachedFooterContact, cachedFxRates } from "@/lib/server/public-page-data";
@@ -156,7 +157,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               {
                 phone: footerContact.phone,
                 email: footerContact.email,
-                address: footerContact.address,
+                address: formatFooterAddress(footerContact.address),
               },
               aggregateRating,
             ),

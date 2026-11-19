@@ -139,5 +139,6 @@ const KUT: Record<Locale, LocationIntroCopy> = {
 
 export function locationIntro(code: string, locale: string): LocationIntroCopy | null {
   if (code.trim().toUpperCase() !== "KUT") return null;
-  return KUT[locale as Locale] ?? KUT.en;
+  const row = KUT[locale as Locale] ?? KUT.en;
+  return { title: row.title, lead: row.lead, strong: row.strong, points: [] };
 }

@@ -21,6 +21,14 @@ export function emptyFooterContact(): FooterContactConfig {
   };
 }
 
+/** Capitalize an all-lowercase place word. Leaves "Georgia" and scripts without case as they are. */
+export function formatFooterAddress(address: string): string {
+  return address.replace(/\p{L}+(?:['’\-]\p{L}+)*/gu, (word) => {
+    if (word !== word.toLocaleLowerCase()) return word;
+    return word.charAt(0).toLocaleUpperCase() + word.slice(1);
+  });
+}
+
 export function hasFooterContact(config: FooterContactConfig): boolean {
   return Boolean(config.phone.trim() || config.email.trim() || config.address.trim());
 }

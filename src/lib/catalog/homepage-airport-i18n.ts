@@ -1,4 +1,5 @@
 import { CATALOG_AIRPORTS } from "@/lib/catalog/airports";
+import { formatFooterAddress } from "@/lib/catalog/footer-contact";
 import { LOCALES, type Locale } from "@/lib/i18n/config";
 import { placeLabel } from "@/lib/i18n/place-label";
 import { autoSeoDescription, autoSeoTitle } from "@/lib/catalog/airport-seo";
@@ -163,7 +164,7 @@ export function localizedAirportSeo(
       code: card.iata.trim().toUpperCase(),
       infoText: localizedAirportInfo(card, lang),
     });
-  return { title, description };
+  return { title: formatFooterAddress(title), description };
 }
 
 /** Keep only non-empty, known-locale translation entries. */

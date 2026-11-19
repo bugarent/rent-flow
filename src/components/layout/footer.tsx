@@ -4,7 +4,7 @@ import Link from "next/link";
 import { type ReactNode } from "react";
 import { Mail, MapPin, Phone } from "lucide-react";
 import { SITE_NAME } from "@/lib/brand";
-import { hasFooterContact, type FooterContactConfig } from "@/lib/catalog/footer-contact";
+import { formatFooterAddress, hasFooterContact, type FooterContactConfig } from "@/lib/catalog/footer-contact";
 import { BecomePartnerCta } from "@/components/partner/become-partner-cta";
 import { ContactCta } from "@/components/contact/contact-cta";
 import { usePreferences } from "@/components/providers/preferences-context";
@@ -113,7 +113,7 @@ export function Footer({
   const showContact = contact ? hasFooterContact(contact) : false;
   const phone = contact?.phone?.trim() || "";
   const email = contact?.email?.trim() || "";
-  const address = contact?.address?.trim() || "";
+  const address = formatFooterAddress(contact?.address?.trim() || "");
   const telHref = phone ? `tel:${phone.replace(/[^\d+]/g, "")}` : undefined;
   const mailHref = email ? `mailto:${email}` : undefined;
   const destinationsTitle =

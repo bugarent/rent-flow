@@ -45,12 +45,12 @@ const COPY: Record<Locale, LocationSectionCopy> = {
     notesTitle: "Pickup and driving",
     airportNotes: [
       "The car is handed over at the airport when you land. The partner confirms the meeting point after booking.",
-      "A sedan is enough for city roads and the airport transfer. Choose an SUV for mountain and unpaved roads.",
+      "Follow the local speed limits and the conditions in the rental agreement.",
       "Bring your driving licence and passport. The payment card and the deposit are confirmed on the booking page.",
     ],
     cityNotes: [
       "You collect the car in the city, or at the airport when that partner offers delivery.",
-      "A sedan suits city driving. An SUV is the better choice for mountain roads and rough surfaces.",
+      "The rental agreement sets the roads and countries you may drive.",
       "Bring your driving licence and passport. Insurance and the deposit are shown before you confirm.",
     ],
     routesTitle: "Nearby drives",
@@ -115,12 +115,12 @@ const COPY: Record<Locale, LocationSectionCopy> = {
     notesTitle: "აღება და გზა",
     airportNotes: [
       "მანქანას აეროპორტში გიბარებენ ჩამოსვლისას. შეხვედრის წერტილს პარტნიორი ჯავშნის შემდეგ ადასტურებს.",
-      "სედანი საკმარისია ქალაქისა და აეროპორტის გზისთვის. მთასა და გრუნტის გზაზე აირჩიეთ ჯიპი.",
+      "დაიცავით ადგილობრივი სიჩქარის ლიმიტი და ქირავნობის ხელშეკრულების პირობები.",
       "თან იქონიეთ მართვის მოწმობა და პასპორტი. ბარათი და დეპოზიტი ჯავშნის გვერდზე ჩანს.",
     ],
     cityNotes: [
       "მანქანას იღებთ ქალაქში, ან აეროპორტში, თუ პარტნიორი იქ მიწოდებას სთავაზობს.",
-      "სედანი ქალაქში მოსახერხებელია. მთის და გრუნტის გზისთვის უკეთესია ჯიპი.",
+      "ხელშეკრულებაში წერია, რომელ გზასა და ქვეყანაში შეგიძლიათ მგზავრობა.",
       "თან იქონიეთ მართვის მოწმობა და პასპორტი. დაზღვევა და დეპოზიტი დადასტურებამდე ჩანს.",
     ],
     routesTitle: "ახლომდებარე გზები",
@@ -182,12 +182,12 @@ const COPY: Record<Locale, LocationSectionCopy> = {
     notesTitle: "Получение и дорога",
     airportNotes: [
       "Автомобиль выдают в аэропорту после прилёта. Точку встречи партнёр подтверждает после брони.",
-      "Седана достаточно для города и трансфера. Для гор и грунтовых дорог лучше внедорожник.",
+      "Соблюдайте местные ограничения скорости и условия договора аренды.",
       "Возьмите права и паспорт. Карта и залог указаны на странице брони.",
     ],
     cityNotes: [
       "Автомобиль забираете в городе или в аэропорту, если партнёр туда подаёт.",
-      "Седан удобен в городе. Для горных и грунтовых дорог лучше внедорожник.",
+      "В договоре указаны дороги и страны, куда можно ехать.",
       "Возьмите права и паспорт. Страховка и залог видны до подтверждения.",
     ],
     routesTitle: "Поездки рядом",
@@ -249,12 +249,12 @@ const COPY: Record<Locale, LocationSectionCopy> = {
     notesTitle: "Übergabe und Fahrt",
     airportNotes: [
       "Das Auto wird am Flughafen nach der Landung übergeben. Der Treffpunkt steht nach der Buchung fest.",
-      "Eine Limousine reicht für die Stadt und den Transfer. Für Berge und Schotter ist ein SUV besser.",
+      "Halten Sie die örtlichen Tempolimits und die Bedingungen im Mietvertrag ein.",
       "Führerschein und Reisepass mitbringen. Karte und Kaution stehen auf der Buchungsseite.",
     ],
     cityNotes: [
       "Sie holen das Auto in der Stadt ab, oder am Flughafen, wenn der Partner dorthin liefert.",
-      "Eine Limousine passt zur Stadt. Für Berge und schlechte Wege ist ein SUV besser.",
+      "Der Mietvertrag nennt die Straßen und Länder, die Sie befahren dürfen.",
       "Führerschein und Reisepass mitbringen. Versicherung und Kaution sehen Sie vor der Bestätigung.",
     ],
     routesTitle: "Fahrten in der Nähe",
@@ -287,12 +287,12 @@ const COPY: Record<Locale, LocationSectionCopy> = {
     notesTitle: "Recogida y ruta",
     airportNotes: [
       "El coche se entrega en el aeropuerto al aterrizar. El punto de encuentro se confirma tras la reserva.",
-      "Un sedán basta para la ciudad y el traslado. Para montaña y caminos de tierra conviene un SUV.",
+      "Respete los límites de velocidad locales y las condiciones del contrato.",
       "Lleve el permiso de conducir y el pasaporte. La tarjeta y la fianza figuran en la reserva.",
     ],
     cityNotes: [
       "Recoge el coche en la ciudad, o en el aeropuerto si ese socio ofrece la entrega.",
-      "Un sedán va bien en ciudad. Un SUV es mejor en montaña y en firme irregular.",
+      "El contrato indica las carreteras y los países por los que puede circular.",
       "Lleve el permiso y el pasaporte. El seguro y la fianza se ven antes de confirmar.",
     ],
     routesTitle: "Rutas cercanas",
@@ -325,12 +325,12 @@ const COPY: Record<Locale, LocationSectionCopy> = {
     notesTitle: "Prise en charge et route",
     airportNotes: [
       "La voiture est remise à l’aéroport à l’arrivée. Le point de rendez-vous est confirmé après la réservation.",
-      "Une berline suffit en ville et pour le transfert. En montagne et sur piste, un SUV est préférable.",
+      "Respectez les limitations locales et les conditions du contrat de location.",
       "Apportez le permis et le passeport. La carte et la caution figurent sur la réservation.",
     ],
     cityNotes: [
       "Vous prenez la voiture en ville, ou à l’aéroport si le partenaire livre là.",
-      "Une berline convient en ville. Un SUV est préférable en montagne et sur route difficile.",
+      "Le contrat indique les routes et les pays où vous pouvez rouler.",
       "Apportez le permis et le passeport. Assurance et caution sont visibles avant confirmation.",
     ],
     routesTitle: "Trajets à proximité",
@@ -363,12 +363,12 @@ const COPY: Record<Locale, LocationSectionCopy> = {
     notesTitle: "Ritiro e strada",
     airportNotes: [
       "L’auto si ritira in aeroporto all’arrivo. Il punto d’incontro è confermato dopo la prenotazione.",
-      "Una berlina basta in città e per il transfer. In montagna e sullo sterrato conviene un SUV.",
+      "Rispetta i limiti di velocità locali e le condizioni del contratto.",
       "Porta patente e passaporto. Carta e deposito sono indicati nella prenotazione.",
     ],
     cityNotes: [
       "Ritiri l’auto in città, oppure in aeroporto se il partner consegna lì.",
-      "Una berlina va bene in città. Un SUV è meglio in montagna e su fondi irregolari.",
+      "Il contratto indica le strade e i paesi in cui puoi guidare.",
       "Porta patente e passaporto. Assicurazione e deposito si vedono prima della conferma.",
     ],
     routesTitle: "Percorsi vicini",
@@ -401,12 +401,12 @@ const COPY: Record<Locale, LocationSectionCopy> = {
     notesTitle: "Ophalen en rijden",
     airportNotes: [
       "De auto wordt op de luchthaven afgegeven na aankomst. Het trefpunt staat vast na de boeking.",
-      "Een sedan volstaat in de stad en voor de transfer. Kies een SUV voor bergen en onverharde wegen.",
+      "Houd u aan de lokale snelheidslimieten en de voorwaarden in het huurcontract.",
       "Neem rijbewijs en paspoort mee. Kaart en borg staan op de boekingspagina.",
     ],
     cityNotes: [
       "U haalt de auto in de stad op, of op de luchthaven als die partner daar levert.",
-      "Een sedan past in de stad. Een SUV is beter in de bergen en op slecht wegdek.",
+      "Het huurcontract noemt de wegen en landen waar u mag rijden.",
       "Neem rijbewijs en paspoort mee. Verzekering en borg ziet u vóór bevestiging.",
     ],
     routesTitle: "Ritten in de buurt",
@@ -439,12 +439,12 @@ const COPY: Record<Locale, LocationSectionCopy> = {
     notesTitle: "Odbiór i trasa",
     airportNotes: [
       "Auto odbierasz na lotnisku po przylocie. Miejsce spotkania partner potwierdza po rezerwacji.",
-      "Sedan wystarczy w mieście i na transfer. W góry i na szuter lepszy jest SUV.",
+      "Przestrzegaj lokalnych limitów prędkości i warunków umowy najmu.",
       "Weź prawo jazdy i paszport. Karta i kaucja są na stronie rezerwacji.",
     ],
     cityNotes: [
       "Auto odbierasz w mieście albo na lotnisku, jeśli partner tam dowozi.",
-      "Sedan pasuje do miasta. W góry i na gorszą nawierzchnię wybierz SUV.",
+      "Umowa wskazuje drogi i kraje, po których możesz jeździć.",
       "Weź prawo jazdy i paszport. Ubezpieczenie i kaucja są widoczne przed potwierdzeniem.",
     ],
     routesTitle: "Trasy w pobliżu",
@@ -477,12 +477,12 @@ const COPY: Record<Locale, LocationSectionCopy> = {
     notesTitle: "Teslim ve yol",
     airportNotes: [
       "Araç inişten sonra havalimanında teslim edilir. Buluşma noktası rezervasyondan sonra netleşir.",
-      "Şehir ve transfer için sedan yeterlidir. Dağ ve toprak yolda SUV daha uygundur.",
+      "Yerel hız sınırlarına ve kira sözleşmesinin koşullarına uyun.",
       "Ehliyet ve pasaport getirin. Kart ve depozito rezervasyon sayfasında yazar.",
     ],
     cityNotes: [
       "Aracı şehirde alırsınız ya da iş ortağı teslim ediyorsa havalimanında.",
-      "Sedan şehir için uygundur. Dağ ve bozuk yolda SUV daha iyidir.",
+      "Hangi yol ve ülkede sürebileceğiniz kira sözleşmesinde yazar.",
       "Ehliyet ve pasaport getirin. Sigorta ve depozito onaydan önce görünür.",
     ],
     routesTitle: "Yakın rotalar",
@@ -515,12 +515,12 @@ const COPY: Record<Locale, LocationSectionCopy> = {
     notesTitle: "الاستلام والطريق",
     airportNotes: [
       "تُسلَّم السيارة في المطار بعد الوصول. يؤكد الشريك نقطة اللقاء بعد الحجز.",
-      "السيدان تكفي للمدينة وللنقل من المطار. للجبل والطرق الترابية اختر SUV.",
+      "التزم بحدود السرعة المحلية وبشروط عقد الإيجار.",
       "أحضِر رخصة القيادة وجواز السفر. البطاقة والعربون ظاهران في صفحة الحجز.",
     ],
     cityNotes: [
       "تستلم السيارة في المدينة، أو في المطار إذا كان الشريك يوصل إليها.",
-      "السيدان مناسبة للمدينة. الـ SUV أفضل للجبل والطرق الوعرة.",
+      "يوضح العقد الطرق والبلدان التي يجوز القيادة فيها.",
       "أحضِر الرخصة وجواز السفر. التأمين والعربون ظاهران قبل التأكيد.",
     ],
     routesTitle: "طرق قريبة",
@@ -553,12 +553,12 @@ const COPY: Record<Locale, LocationSectionCopy> = {
     notesTitle: "取车与驾驶",
     airportNotes: [
       "降落后在机场交接车辆。会面地点在预订后由合作方确认。",
-      "市区和机场接送用轿车即可。山路和非铺装路请选择 SUV。",
+      "请遵守当地限速和租赁合同中的规定。",
       "请携带驾照和护照。付款卡和押金在预订页上确认。",
     ],
     cityNotes: [
       "在市区取车；若合作方提供送车，也可在机场取。",
-      "轿车适合市区。山路和较差路面更适合 SUV。",
+      "可以行驶的道路和国家写在租赁合同里。",
       "请携带驾照和护照。保险和押金在确认前显示。",
     ],
     routesTitle: "附近路程",
@@ -591,12 +591,12 @@ const COPY: Record<Locale, LocationSectionCopy> = {
     notesTitle: "인수와 운전",
     airportNotes: [
       "착륙 후 공항에서 차를 받습니다. 만나는 장소는 예약 후 파트너가 확인합니다.",
-      "시내와 공항 이동은 세단으로 충분합니다. 산길과 비포장도로는 SUV가 낫습니다.",
+      "현지 제한 속도와 임대 계약의 조건을 지키세요.",
       "면허증과 여권을 지참하세요. 카드와 보증금은 예약 페이지에 나옵니다.",
     ],
     cityNotes: [
       "시내에서 차를 받거나, 파트너가 배달하면 공항에서 받습니다.",
-      "세단은 시내에 알맞습니다. 산길과 거친 노면은 SUV가 낫습니다.",
+      "어느 도로와 나라로 갈 수 있는지는 임대 계약에 나옵니다.",
       "면허증과 여권을 지참하세요. 보험과 보증금은 확인 전에 보입니다.",
     ],
     routesTitle: "가까운 경로",
@@ -629,12 +629,12 @@ const COPY: Record<Locale, LocationSectionCopy> = {
     notesTitle: "การรับรถและการขับ",
     airportNotes: [
       "รับรถที่สนามบินหลังเครื่องลง จุดนัดพบจะยืนยันหลังจอง",
-      "ซีดานพอสำหรับในเมืองและรับส่งสนามบิน ทางเขาและทางลูกรังควรเลือก SUV",
+      "ปฏิบัติตามจำกัดความเร็วท้องถิ่นและเงื่อนไขในสัญญาเช่า",
       "นำใบขับขี่และพาสปอร์ตมา บัตรและมัดจำแสดงในหน้าจอง",
     ],
     cityNotes: [
       "รับรถในเมือง หรือที่สนามบินถ้าพาร์ทเนอร์ส่งรถที่นั่น",
-      "ซีดานเหมาะกับในเมือง ทางเขาและถนนขรุขระควรใช้ SUV",
+      "สัญญาเช่าระบุถนนและประเทศที่ขับได้",
       "นำใบขับขี่และพาสปอร์ตมา ประกันและมัดจำแสดงก่อนยืนยัน",
     ],
     routesTitle: "เส้นทางใกล้เคียง",

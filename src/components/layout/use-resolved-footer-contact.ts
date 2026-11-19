@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useState } from "react";
-import { hasFooterContact, type FooterContactConfig } from "@/lib/catalog/footer-contact";
+import { formatFooterAddress, hasFooterContact, type FooterContactConfig } from "@/lib/catalog/footer-contact";
 
 const STORAGE_KEY = "rac-footer-contact";
 
@@ -11,7 +11,7 @@ function readable(value: Partial<FooterContactConfig> | null | undefined): Foote
     phone: String(value.phone || "").trim(),
     email: String(value.email || "").trim(),
     inboxEmail: "",
-    address: String(value.address || "").trim(),
+    address: formatFooterAddress(String(value.address || "").trim()),
     updatedAt: String(value.updatedAt || ""),
   };
   return hasFooterContact(next) ? next : null;

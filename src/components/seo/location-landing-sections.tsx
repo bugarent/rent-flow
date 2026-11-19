@@ -42,13 +42,15 @@ export function LocationIntro({ intro }: { intro: LocationIntroCopy }) {
           intro.lead
         )}
       </p>
-      <ul className="mt-3 list-disc space-y-2 ps-5 text-sm leading-6 text-slate-700 sm:text-base sm:leading-7">
-        {intro.points.map((point) => (
-          <li key={point} className="break-words">
-            {point}
-          </li>
-        ))}
-      </ul>
+      {intro.points.length ? (
+        <ul className="mt-3 list-disc space-y-2 ps-5 text-sm leading-6 text-slate-700 sm:text-base sm:leading-7">
+          {intro.points.map((point) => (
+            <li key={point} className="break-words">
+              {point}
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </section>
   );
 }
