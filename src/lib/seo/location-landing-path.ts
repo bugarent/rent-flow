@@ -13,6 +13,10 @@ export const SEO_LANDING_LOCALES = [
   "it",
   "nl",
   "tr",
+  "ar",
+  "zh",
+  "ko",
+  "th",
 ] as const satisfies readonly Locale[];
 
 export type SeoLandingLocale = (typeof SEO_LANDING_LOCALES)[number];
@@ -28,6 +32,10 @@ export const SEO_LANDING_PREFIX: Record<SeoLandingLocale, string> = {
   it: "noleggio-auto",
   nl: "autoverhuur",
   tr: "arac-kiralama",
+  ar: "taajir-sayyarat",
+  zh: "zuche",
+  ko: "renteka",
+  th: "che-rot",
 };
 
 export function isSeoLandingLocale(value: string | undefined | null): value is SeoLandingLocale {

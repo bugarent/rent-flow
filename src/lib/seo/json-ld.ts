@@ -227,16 +227,45 @@ export function buildPlacesItemListJsonLd(name: string, items: Array<{ name: str
   };
 }
 
-export function buildBreadcrumbJsonLd(items: Array<{ name: string; path: string }>) {
+export function buildBreadcrumbJsonLd(items: Array<{ name: string; path: string }>, id?: string) {
+  const list = items
+    .map((item) => ({ name: item.name.trim(), path: item.path }))
+    .filter((item) => item.name && item.path);
   return {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    itemListElement: items.map((item, index) => ({
+    ...(id ? { "@id": id } : {}),
+    itemListElement: list.map((item, index) => ({
       "@type": "ListItem",
       position: index + 1,
       name: item.name,
       item: absoluteUrl(item.path),
     })),
+  };
+}
+
+/** WebPage node that points at the breadcrumb and FAQ on the same URL. Not a second FAQPage. */
+export function buildWebPageJsonLd(input: {
+  name: string;
+  description: string;
+  url: string;
+  locale?: string;
+  breadcrumbId?: string;
+  faqId?: string;
+}) {
+  const name = input.name.trim();
+  const description = input.description.trim();
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "@id": `${input.url}#webpage`,
+    url: input.url,
+    ...(name ? { name } : {}),
+    ...(description ? { description } : {}),
+    inLanguage: input.locale || "en",
+    isPartOf: { "@id": `${SITE_URL}/#website` },
+    ...(input.breadcrumbId ? { breadcrumb: { "@id": input.breadcrumbId } } : {}),
+    ...(input.faqId ? { mainEntity: { "@id": input.faqId } } : {}),
   };
 }
 
@@ -326,17 +355,28 @@ export function buildVehicleOffersItemListJsonLd(
   };
 }
 
-export function buildFaqPageJsonLd(faqs: Array<{ question: string; answer: string }>) {
+export function buildFaqPageJsonLd(
+  faqs: Array<{ question: string; answer: string }>,
+  id?: string,
+) {
+  const seen = new Set<string>();
+  const mainEntity = [];
+  for (const faq of faqs) {
+    const question = faq.question.trim();
+    const answer = faq.answer.trim();
+    if (!question || !answer || seen.has(question)) continue;
+    seen.add(question);
+    mainEntity.push({
+      "@type": "Question",
+      name: question,
+      acceptedAnswer: { "@type": "Answer", text: answer },
+    });
+  }
+  if (!mainEntity.length) return null;
   return {
     "@context": "https://schema.org",
     "@type": "FAQPage",
-    mainEntity: faqs.map((f) => ({
-      "@type": "Question",
-      name: f.question,
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: f.answer,
-      },
-    })),
+    ...(id ? { "@id": id } : {}),
+    mainEntity,
   };
 }

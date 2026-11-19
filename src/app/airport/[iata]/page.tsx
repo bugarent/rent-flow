@@ -79,7 +79,7 @@ export async function generateMetadata({
   const code = normalizeLocationCode(found.iata);
   const seo = localizedAirportSeo(card, locale, { airportName });
   const selfPath = pagePath(code);
-  const locations = await softTimeout(listSeoLocations(), [], 1500);
+  const locations = await listSeoLocations();
   const landing = findSeoLocationByCode(locations, code);
   const canonicalPath = landing ? seoLandingPath("en", landing.slug) : selfPath;
   const landingCopy = landing ? locationLandingCopy(landing, "en") : null;
@@ -149,7 +149,7 @@ export default async function AirportInfoPage({
     iata: kind === "airport" ? code : undefined,
   };
 
-  const locationsForCanonical = await softTimeout(listSeoLocations(), [], 1500);
+  const locationsForCanonical = await listSeoLocations();
   const landingMatch = findSeoLocationByCode(locationsForCanonical, code);
   const canonicalPath = landingMatch ? seoLandingPath("en", landingMatch.slug) : pagePath(code);
   const url = absoluteUrl(canonicalPath);
@@ -229,12 +229,17 @@ export default async function AirportInfoPage({
         <div className="relative mb-6 aspect-[16/9] w-full overflow-hidden rounded-2xl bg-slate-200 sm:aspect-[2/1]">
           <SiteImage
             src={airport.imageUrl}
-            alt={heading}
+            alt={
+              kind === "airport" && code
+                ? `${airportName}${airportName.includes(code) ? "" : ` (${code})`}`
+                : heading
+            }
             fill
             sizes="(max-width: 800px) 100vw, 768px"
             className="object-cover"
             loading="eager"
             fetchPriority="high"
+            decoding="async"
           />
         </div>
       ) : null}

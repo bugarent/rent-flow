@@ -195,5 +195,9 @@ export const config = {
     "/it/:path*",
     "/nl/:path*",
     "/tr/:path*",
+    "/ar/:path*",
+    "/zh/:path*",
+    "/ko/:path*",
+    "/th/:path*",
   ],
 };

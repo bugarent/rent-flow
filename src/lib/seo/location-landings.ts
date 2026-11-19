@@ -25,6 +25,7 @@ import {
   isSeoLandingLocale,
   type SeoLandingLocale,
 } from "@/lib/seo/location-landing-path";
+import { createTtlCache } from "@/lib/server/ttl-cache";
 
 export type SeoLocation = {
   /** Stable id = normalized place code (IATA or CITY-…). */
@@ -115,27 +116,56 @@ export function buildSeoLocations(
   return [...bySlug.values()].sort((a, b) => a.slug.localeCompare(b.slug));
 }
 
+const seoLocationCache = createTtlCache<SeoLocation[]>(30_000);
+let seoLocationInflight: Promise<SeoLocation[]> | null = null;
+
 export async function listSeoLocations(): Promise<SeoLocation[]> {
+  const cached = seoLocationCache.get();
+  if (cached) return cached;
+  if (!seoLocationInflight) {
+    seoLocationInflight = loadSeoLocationList()
+      .then((rows) => {
+        const previous = seoLocationCache.peek();
+        const value = rows.length ? rows : previous ?? rows;
+        seoLocationCache.set(value);
+        return value;
+      })
+      .finally(() => {
+        seoLocationInflight = null;
+      });
+  }
+  return seoLocationInflight;
+}
+
+async function loadSeoLocationList(): Promise<SeoLocation[]> {
   const codes: Array<{ code: string; kind?: "airport" | "city"; label?: string }> = [];
-  try {
-    const { getSearchDeliveryAirports } = await import("@/lib/server/delivery-locations");
-    const live = await getSearchDeliveryAirports();
-    for (const row of live) {
-      codes.push({ code: row.iata, kind: row.kind, label: row.label });
-    }
-  } catch {
-    /* ignore */
+  const [live, homepage] = await Promise.all([
+    (async () => {
+      try {
+        const { getSearchDeliveryAirports } = await import("@/lib/server/delivery-locations");
+        return await getSearchDeliveryAirports();
+      } catch {
+        return [];
+      }
+    })(),
+    (async () => {
+      try {
+        const { listHomepageAirports } = await import("@/lib/server/homepage-airports-store");
+        return await listHomepageAirports();
+      } catch {
+        return [];
+      }
+    })(),
+  ]);
+  for (const row of live) {
+    codes.push({ code: row.iata, kind: row.kind, label: row.label });
   }
-  try {
-    const { listHomepageAirports } = await import("@/lib/server/homepage-airports-store");
-    for (const row of await listHomepageAirports()) {
-      if (!row.iata?.trim()) continue;
-      codes.push({ code: row.iata, label: row.title });
-    }
-  } catch {
-    /* ignore */
+  for (const row of homepage) {
+    if (!row.iata?.trim()) continue;
+    codes.push({ code: row.iata, label: row.title });
   }
-  // Fallback: catalog hub airports only (not the full world place dump).
+  // Catalog hubs only when both live sources are empty, so a slow database cannot
+  // replace active city pages with a shorter airport-only list.
   if (!codes.length) {
     for (const place of allSearchPlaces()) {
       if (place.kind === "airport" && CATALOG_AIRPORTS.some((a) => a.iata === place.iata)) {

@@ -1,9 +1,9 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL, carDetailCanonicalUrl } from "@/lib/seo/config";
 import { softTimeout } from "@/lib/server/soft-timeout";
+import { normalizeLocationCode } from "@/lib/catalog/search-places";
 import {
   SEO_LANDING_LOCALES,
-  SEO_LANDING_PREFIX,
   listSeoLocations,
   seoLandingPath,
 } from "@/lib/seo/location-landings";
@@ -69,15 +69,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  const airports = await softTimeout(loadAirportCards(), [], 2500);
-  const airportEntries: MetadataRoute.Sitemap = airports.map((row) => ({
-    url: `${SITE_URL}/airport/${encodeURIComponent(row.iata.toUpperCase())}`,
-    lastModified: row.updatedAt ? new Date(row.updatedAt) : now,
-    changeFrequency: "weekly",
-    priority: 0.9,
-  }));
-
-  const seoLocations = await softTimeout(listSeoLocations(), [], 4000);
+  const seoLocations = await softTimeout(listSeoLocations(), [], 12000);
   const locationEntries: MetadataRoute.Sitemap = [];
   for (const locale of SEO_LANDING_LOCALES) {
     for (const loc of seoLocations) {
@@ -90,10 +82,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   }
 
-  // Ensure prefix roots are discoverable even if empty (helps Search Console).
-  for (const locale of SEO_LANDING_LOCALES) {
-    void SEO_LANDING_PREFIX[locale];
+  // /airport/KUT is the same place as the English landing. Keep only places with no landing.
+  const coveredCodes = new Set(seoLocations.map((loc) => normalizeLocationCode(loc.code)));
+  const airports = await softTimeout(loadAirportCards(), [], 2500);
+  const airportEntries: MetadataRoute.Sitemap = [];
+  const seenAirport = new Set<string>();
+  for (const row of airports) {
+    const code = normalizeLocationCode(row.iata);
+    if (!code || coveredCodes.has(code) || seenAirport.has(code)) continue;
+    seenAirport.add(code);
+    airportEntries.push({
+      url: `${SITE_URL}/airport/${encodeURIComponent(code)}`,
+      lastModified: row.updatedAt ? new Date(row.updatedAt) : now,
+      changeFrequency: "weekly",
+      priority: 0.9,
+    });
   }
 
-  return [...staticEntries, ...locationEntries, ...airportEntries, ...carEntries];
+  const seen = new Set<string>();
+  return [...staticEntries, ...locationEntries, ...airportEntries, ...carEntries].filter((entry) => {
+    if (seen.has(entry.url)) return false;
+    seen.add(entry.url);
+    return true;
+  });
 }

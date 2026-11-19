@@ -18,6 +18,7 @@ import {
   buildFaqPageJsonLd,
   buildLocationAutoRentalJsonLd,
   buildVehicleOffersItemListJsonLd,
+  buildWebPageJsonLd,
 } from "@/lib/seo/json-ld";
 import { absoluteUrl } from "@/lib/seo/config";
 import {
@@ -81,7 +82,7 @@ export async function generateMetadata({
     keywords: copy.keywords,
     languages: seoLandingLanguageAlternates(location.slug),
     image: extras.imageUrl,
-    imageAlt: copy.h1,
+    imageAlt: copy.imageAlt,
   });
 }
 
@@ -97,6 +98,9 @@ export default async function SeoLocationLandingPage({
   const { parsed, location, locations } = loaded;
   const copy = locationLandingCopy(location, parsed.locale);
   const path = seoLandingPath(parsed.locale, location.slug);
+  const pageUrl = absoluteUrl(path);
+  const breadcrumbId = `${pageUrl}#breadcrumb`;
+  const faqId = `${pageUrl}#faq`;
   const pickup = encodeURIComponent(location.code);
   const searchHref = `/cars?pickup=${pickup}`;
   const [extras, footerContact] = await Promise.all([
@@ -121,12 +125,21 @@ export default async function SeoLocationLandingPage({
     { name: copy.h1, path },
   ];
 
+  const faqLd = buildFaqPageJsonLd(faqs, faqId);
   const jsonLd = [
-    buildBreadcrumbJsonLd(breadcrumb),
+    buildWebPageJsonLd({
+      name: copy.h1,
+      description: copy.description,
+      url: pageUrl,
+      locale: parsed.locale,
+      breadcrumbId,
+      ...(faqLd ? { faqId } : {}),
+    }),
+    buildBreadcrumbJsonLd(breadcrumb, breadcrumbId),
     buildLocationAutoRentalJsonLd({
       name: copy.h1,
       description: copy.description,
-      url: absoluteUrl(path),
+      url: pageUrl,
       image: extras.imageUrl,
       telephone: footerContact.phone,
       email: footerContact.email,
@@ -162,7 +175,7 @@ export default async function SeoLocationLandingPage({
           ),
         ]
       : []),
-    buildFaqPageJsonLd(faqs),
+    ...(faqLd ? [faqLd] : []),
   ];
 
   return (
@@ -194,7 +207,7 @@ export default async function SeoLocationLandingPage({
         <div className="relative mb-6 aspect-[16/9] w-full overflow-hidden rounded-2xl bg-slate-200">
           <SiteImage
             src={extras.imageUrl}
-            alt={copy.h1}
+            alt={copy.imageAlt}
             fill
             sizes="(max-width: 800px) 100vw, 768px"
             className="object-cover"

@@ -10,6 +10,24 @@ import {
 } from "@/lib/seo/config";
 import { SEO_SITE_NAME } from "@/lib/brand";
 
+/** Open Graph locale tags for every public language. Unknown locales fall back to English. */
+const OG_LOCALE: Record<string, string> = {
+  en: "en_US",
+  ka: "ka_GE",
+  ru: "ru_RU",
+  de: "de_DE",
+  es: "es_ES",
+  fr: "fr_FR",
+  it: "it_IT",
+  nl: "nl_NL",
+  pl: "pl_PL",
+  tr: "tr_TR",
+  ar: "ar_SA",
+  zh: "zh_CN",
+  ko: "ko_KR",
+  th: "th_TH",
+};
+
 export type PageSeoInput = {
   title: string;
   description: string;
@@ -44,6 +62,8 @@ export function buildPageMetadata({
 }: PageSeoInput): Metadata {
   const pagePath = cleanSitePath(path);
   const url = absoluteUrl(canonicalPath ? cleanSitePath(canonicalPath) : pagePath);
+  const safeTitle = title.trim() || SEO_SITE_NAME;
+  const safeDescription = description.trim() || safeTitle;
   const ogImage = image.startsWith("http") ? image : absoluteUrl(image);
   const languageMap = languages
     ? Object.fromEntries(
@@ -57,8 +77,8 @@ export function buildPageMetadata({
       };
 
   return {
-    title,
-    description,
+    title: safeTitle,
+    description: safeDescription,
     // Next Metadata accepts string | string[]; pass the array from getPageSeo as-is.
     keywords: keywords.length ? keywords : undefined,
     alternates: {
@@ -68,9 +88,9 @@ export function buildPageMetadata({
     openGraph: {
       type,
       siteName: SEO_SITE_NAME,
-      locale: locale === "ka" ? "ka_GE" : locale === "ru" ? "ru_RU" : "en_US",
-      title,
-      description,
+      locale: OG_LOCALE[locale] || "en_US",
+      title: safeTitle,
+      description: safeDescription,
       url,
       images: [
         {
@@ -83,8 +103,8 @@ export function buildPageMetadata({
     },
     twitter: {
       card: "summary_large_image",
-      title,
-      description,
+      title: safeTitle,
+      description: safeDescription,
       images: [{ url: ogImage, alt: imageAlt }],
     },
     robots: noIndex
