@@ -138,13 +138,12 @@ export async function listSeoLocations(): Promise<SeoLocation[]> {
 }
 
 async function loadSeoLocationList(): Promise<SeoLocation[]> {
-  const { softTimeout } = await import("@/lib/server/soft-timeout");
   const codes: Array<{ code: string; kind?: "airport" | "city"; label?: string }> = [];
   const [live, homepage] = await Promise.all([
     (async () => {
       try {
         const { getSearchDeliveryAirports } = await import("@/lib/server/delivery-locations");
-        return await softTimeout(getSearchDeliveryAirports(), [], 2000);
+        return await getSearchDeliveryAirports();
       } catch {
         return [];
       }
@@ -152,7 +151,7 @@ async function loadSeoLocationList(): Promise<SeoLocation[]> {
     (async () => {
       try {
         const { listHomepageAirports } = await import("@/lib/server/homepage-airports-store");
-        return await softTimeout(listHomepageAirports(), [], 2000);
+        return await listHomepageAirports();
       } catch {
         return [];
       }
