@@ -1284,14 +1284,72 @@ export function ReserveCheckout({
     }
   };
 
-  useEffect(() => {
-    if (checkoutStep !== "payment") {
-      setEmbeddedPay(null);
-    }
-  }, [checkoutStep]);
+  const handleBookingRef = useRef(handleBooking);
+  handleBookingRef.current = handleBooking;
+  const bogAutoStartRef = useRef(false);
 
   useEffect(() => {
-    setEmbeddedPay(null);
+    if (checkoutStep !== "payment") {
+      bogAutoStartRef.current = false;
+      setEmbeddedPay(null);
+      return;
+    }
+    // Card (BOG): open the bank form as soon as this method is selected — no extra button.
+    if (paymentMethod !== "bog") {
+      bogAutoStartRef.current = false;
+      return;
+    }
+    if (!paymentReady.checked || !paymentReady.bog) return;
+    if (embeddedPay?.method === "bog") {
+      bogAutoStartRef.current = true;
+      return;
+    }
+    if (bogAutoStartRef.current) return;
+    bogAutoStartRef.current = true;
+
+    const cachedOrder =
+      bookingIdRef.current &&
+      ordersRef.current.bookingId === bookingIdRef.current &&
+      ordersRef.current.bog
+        ? ordersRef.current.bog
+        : "";
+    if (cachedOrder) {
+      setEmbeddedPay({
+        method: "bog",
+        bookingId: bookingIdRef.current,
+        orderId: cachedOrder,
+        redirectUrl: ordersRef.current.bogRedirect,
+      });
+      return;
+    }
+
+    void (async () => {
+      const label = await loadPayAmountLabel(totals.payNow);
+      if (label && label !== payAmountLabel) setPayAmountLabel(label);
+      const result = await handleBookingRef.current("bog", { embed: true });
+      if (!result) {
+        // Allow a later retry when the user re-selects Card.
+        bogAutoStartRef.current = false;
+      }
+    })();
+  }, [
+    checkoutStep,
+    paymentMethod,
+    paymentReady.bog,
+    paymentReady.checked,
+    embeddedPay?.method,
+    loadPayAmountLabel,
+    payAmountLabel,
+    totals.payNow,
+  ]);
+
+  useEffect(() => {
+    if (paymentMethod !== "bog") {
+      setEmbeddedPay((prev) => (prev?.method === "bog" ? null : prev));
+    }
+    if (paymentMethod !== "paypal") {
+      setEmbeddedPay((prev) => (prev?.method === "paypal" ? null : prev));
+    }
     setError("");
   }, [paymentMethod]);
 
@@ -1451,22 +1509,29 @@ export function ReserveCheckout({
               </div>
             ) : null}
 
+            {paymentMethod === "bog" && paymentReady.bog ? (
+              <div className="rounded-xl bg-slate-50 px-3 py-3 text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  {locale === "ka"
+                    ? "გადასახდელი თანხა ახლა"
+                    : locale === "ru"
+                      ? "К оплате сейчас"
+                      : "Amount due now"}
+                </p>
+                <p className="mt-1 text-xl font-extrabold text-[#0b1f4b] sm:text-2xl">
+                  {payAmountLabel || formatPrice(totals.payNow)}
+                </p>
+              </div>
+            ) : null}
+
             {paymentMethod === "bog" && paymentReady.bog && !embeddedPay ? (
-              <CheckoutBogCard
-                amountLabel={payAmountLabel || formatPrice(totals.payNow)}
-                locale={locale}
-                loading={loading}
-                disabled={paymentReady.checked && !paymentReady.bog}
-                onBack={() => setCheckoutStep("details")}
-                onConfirm={async () => {
-                  const label = await loadPayAmountLabel(totals.payNow);
-                  if (label && label !== payAmountLabel) {
-                    setPayAmountLabel(label);
-                    return;
-                  }
-                  await handleBooking("bog", { embed: true });
-                }}
-              />
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-10 text-center text-sm font-semibold text-slate-500">
+                {locale === "ka"
+                  ? "ბარათის ფორმა იხსნება…"
+                  : locale === "ru"
+                    ? "Открываем форму карты…"
+                    : "Opening card form…"}
+              </div>
             ) : null}
 
             {paymentMethod === "paypal" && paymentReady.paypal && !embeddedPay ? (
@@ -1521,38 +1586,18 @@ export function ReserveCheckout({
               />
             ) : null}
 
-            {embeddedPay ? (
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => {
-                  setEmbeddedPay(null);
-                  setError("");
-                }}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-              >
-                {locale === "ka"
-                  ? "სხვა გადახდის მეთოდი / თავიდან"
-                  : "Choose another method / retry"}
-              </button>
-            ) : null}
-
-            {!embeddedPay &&
-            !(paymentMethod === "bog" && paymentReady.bog) &&
-            !(paymentMethod === "paypal" && paymentReady.paypal) ? (
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => setCheckoutStep("details")}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-              >
-                {locale === "ka"
-                  ? "დაბრუნება მძღოლის დეტალებზე"
-                  : locale === "ru"
-                    ? "Назад к данным водителя"
-                    : "Back to driver details"}
-              </button>
-            ) : null}
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => setCheckoutStep("details")}
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              {locale === "ka"
+                ? "დაბრუნება მძღოლის დეტალებზე"
+                : locale === "ru"
+                  ? "Назад к данным водителя"
+                  : "Back to driver details"}
+            </button>
           </div>
         ) : (
           <form
