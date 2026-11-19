@@ -231,13 +231,13 @@ export function BookingInvoiceDocumentView({
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <section className="rounded-lg border border-slate-200 p-3">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{t.from}</p>
-          <p className="mt-1 text-sm font-extrabold">{doc.billTo.name}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{t.billTo}</p>
+          <p className="mt-1 text-sm font-extrabold">{doc.billTo.name || "—"}</p>
           {doc.billTo.email ? <p className="text-xs text-slate-600">{doc.billTo.email}</p> : null}
           {doc.billTo.phone ? <p className="text-xs text-slate-600">{doc.billTo.phone}</p> : null}
         </section>
         <section className="rounded-lg border border-slate-200 p-3">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{t.billTo}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{t.from}</p>
           <p className="mt-1 text-sm font-extrabold">{doc.recipientName || issuer.legalName}</p>
           {doc.recipientCode ? (
             <p className="font-mono text-sm font-bold text-[#0b1f4b]">{doc.recipientCode}</p>

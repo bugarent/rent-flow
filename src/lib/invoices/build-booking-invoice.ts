@@ -5,7 +5,7 @@ import {
   DEFAULT_DEPOSIT_PERCENT,
   roundMoney,
 } from "@/lib/cars/reserve-pricing";
-import { settleBookingMoney } from "@/lib/bookings/booking-money";
+import { displayBookingCharges, settleBookingMoney } from "@/lib/bookings/booking-money";
 import { reconstructBpPreDiscountRental } from "@/lib/business-partner/referral-pricing";
 import { resolveBookingDiscount } from "@/lib/pricing/booking-discount";
 import {
@@ -57,6 +57,7 @@ export type InvoiceBookingInput = {
   pickupAddress?: string;
   dropoffAddress?: string;
   partner?: {
+    companyName?: string | null;
     partnerCode?: string | null;
     sequentialNumber?: number | null;
   };
@@ -124,7 +125,8 @@ function storedInvoiceMoney(input: {
   const totalStored = roundMoney(Math.max(0, Number(b.totalPriceEur) || 0));
   const depositStored = roundMoney(Math.max(0, Number(b.depositPaidEur) || 0));
 
-  if (totalStored <= 0.02 || depositStored <= 0.02) {
+  // No locked total yet: price the trip from the listing rate.
+  if (totalStored <= 0.02) {
     const daily = roundMoney(Number(b.car.dailyRateEur) || 0);
     const rentalEur = roundMoney(daily * input.days);
     const settled = settleBookingMoney({
@@ -136,14 +138,16 @@ function storedInvoiceMoney(input: {
     return { rentalEur, dailyEur: daily, promoDiscountEur: 0, discountPercent: 0, siteDiscount: false, settled };
   }
 
-  const siteFee = roundMoney(depositStored / (1 + CARD_PICKUP_SURCHARGE_PERCENT / 100));
-  const card = roundMoney(Math.max(0, depositStored - siteFee));
-  const trip = roundMoney(Math.max(0, totalStored - card));
-  const storedBalance = Number(b.balanceDueEur);
-  const onSite =
-    Number.isFinite(storedBalance) && Math.abs(storedBalance + siteFee - trip) <= 0.05
-      ? roundMoney(Math.max(0, storedBalance))
-      : roundMoney(Math.max(0, trip - siteFee));
+  // Same split as the bookings list, including trips that are paid entirely on site.
+  const facing = displayBookingCharges({
+    totalPriceEur: totalStored,
+    depositPaidEur: depositStored,
+    balanceDueEur: b.balanceDueEur,
+  });
+  const siteFee = facing.siteFeeEur;
+  const card = facing.cardSurchargeEur;
+  const trip = facing.tripEur;
+  const onSite = facing.dueAtPickupEur;
 
   const discount = resolveBookingDiscount({
     promoCode: b.promoCode,
@@ -171,7 +175,7 @@ function storedInvoiceMoney(input: {
     siteDiscount: Boolean(discount?.cardOnDiscountedFee),
     settled: {
       tripEur: trip,
-      chargedEur: totalStored,
+      chargedEur: facing.totalEur,
       depositPercent: input.depositPercent,
       siteFeeEur: siteFee,
       cardSurchargeEur: card,
@@ -381,6 +385,8 @@ export function buildBookingInvoiceDocument(input: {
   const bookingRef =
     b.reference || formatBookingRef(b.sequentialNumber) || b.id.slice(0, 8).toUpperCase();
   const invoiceNumber = `INV-${bookingRef.replace(/^(?:11R-?|RE-?)/i, "")}`;
+  const guestName = [b.guestFirstName, b.guestLastName].filter(Boolean).join(" ").trim();
+  const partnerName = String(b.partner?.companyName || "").trim();
 
   return {
     documentType: "invoice",
@@ -391,13 +397,13 @@ export function buildBookingInvoiceDocument(input: {
     bookingRef,
     status: b.status,
     issuer: input.issuer,
-    recipientName: "rentairportcars",
+    recipientName: partnerName,
     recipientCode:
       String(b.partner?.partnerCode || "").trim() ||
       formatPartnerCode(b.partner?.sequentialNumber) ||
       "",
     billTo: {
-      name: "rentairportcars",
+      name: guestName,
       email: String(b.guestEmail || "").trim(),
       phone: String(b.guestPhone || "").trim(),
     },
