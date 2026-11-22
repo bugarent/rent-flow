@@ -21,7 +21,7 @@ import { after } from "next/server";
 import { ensureCountryCovers } from "@/lib/server/country-cover-auto";
 import { softTimeout } from "@/lib/server/soft-timeout";
 import type { CachedPublicRead } from "@/lib/server/public-data-cache";
-import { staticHomepageAirports, staticHomepageCategories } from "@/lib/server/homepage";
+import { staticHomepageAirports } from "@/lib/server/homepage";
 import { bookingCountsByPickupIata } from "@/lib/server/airport-popularity";
 import { airportCountryIso2, findSearchPlace, normalizeLocationCode } from "@/lib/catalog/search-places";
 import { airportCardLinkLabel, popularCardHeadings } from "@/lib/seo/location-link-label";
@@ -33,10 +33,13 @@ import { PopularDestinations } from "@/components/seo/popular-destinations";
 
 const DATA_WAIT_MS = 700;
 /**
- * Below-fold sections stream after the hero. The wait stays short so a cold
- * database cannot hold the document; the last saved cards are the fallback.
+ * Below-fold sections stream after the hero, so a longer wait here does not
+ * block the first paint. Giving up at ~1s was swapping in the built-in
+ * Unsplash category/airport cards ("old version") on a cold Neon.
  */
 const SECTION_WAIT_MS = 900;
+/** Admin-saved homepage cards only — wait for Neon; never show the built-in set. */
+const SAVED_CARDS_WAIT_MS = 6000;
 
 /** Fresh value, else this instance's last good one, else `fallback`. */
 function readOr<T>(read: CachedPublicRead<T>, fallback: T, ms: number): Promise<T> {
@@ -47,6 +50,14 @@ function readOr<T>(read: CachedPublicRead<T>, fallback: T, ms: number): Promise<
 async function savedOrStatic<T>(read: CachedPublicRead<T[]>, fallback: () => T[], ms: number): Promise<T[]> {
   const rows = await readOr(read, [], ms);
   return rows.length ? rows : (read.peek() ?? fallback());
+}
+
+/** Like savedOrStatic, but never substitutes the stock Unsplash cards. */
+async function savedCardsOnly<T>(read: CachedPublicRead<T[]>, ms: number): Promise<T[]> {
+  const rows = await readOr(read, [], ms);
+  if (rows.length) return rows;
+  const peek = read.peek();
+  return peek?.length ? peek : [];
 }
 
 /** Hero shown in the first bytes, before any data: the photo is the LCP and must not wait. */
@@ -106,8 +117,8 @@ export async function HomeBelowFold() {
     { locale },
   ] = await Promise.all([
     readOr(cachedSearchDeliveryAirports, [], SECTION_WAIT_MS),
-    savedOrStatic(cachedHomepageAirports, staticHomepageAirports, SECTION_WAIT_MS),
-    savedOrStatic(cachedHomepageCategories, staticHomepageCategories, SECTION_WAIT_MS),
+    savedCardsOnly(cachedHomepageAirports, SAVED_CARDS_WAIT_MS),
+    savedCardsOnly(cachedHomepageCategories, SAVED_CARDS_WAIT_MS),
     readOr(cachedPopularAirportsLayout, "grid" as const, SECTION_WAIT_MS),
     readOr(cachedHomepageInfoContent, defaultHomepageInfoContent(), SECTION_WAIT_MS),
     readOr(cachedHomepageGoogleReviews, null, SECTION_WAIT_MS),
