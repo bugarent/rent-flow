@@ -1,11 +1,30 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+const BOG_ORIGIN = "https://payment.bog.ge";
+const BOG_IFRAME_PATH = "/iframe-v2";
+
+function bogIframeSrc(orderId: string, locale: string) {
+  const options = {
+    width: "100%",
+    height: "560",
+    lang: locale === "ka" ? "ka" : "en",
+    theme: "light",
+    submitButton: { display: true },
+  };
+  const q = new URLSearchParams({
+    order_id: orderId,
+    theme: "light",
+    lang: options.lang,
+    options: JSON.stringify(options),
+  });
+  return `${BOG_ORIGIN}${BOG_IFRAME_PATH}?${q.toString()}`;
+}
 
 /**
- * Bank of Georgia card form on this page (card number / pay).
- * Always offers the hosted BOG page as soon as we have a redirect URL so the
- * payment step never sits as an empty white box if the iframe is slow/blocked.
+ * Bank of Georgia card form (card number / pay) embedded under the Card method.
+ * Uses the official iframe-v2 URL directly so the form paints without waiting on the SDK chunk.
  */
 export function CheckoutBogFrame({
   orderId,
@@ -20,172 +39,145 @@ export function CheckoutBogFrame({
   onPaid: () => void;
   onFailed: (message: string) => void;
 }) {
-  const host = useRef<HTMLDivElement>(null);
   const paidRef = useRef(onPaid);
   const failedRef = useRef(onFailed);
   paidRef.current = onPaid;
   failedRef.current = onFailed;
-  const [height, setHeight] = useState(520);
-  const [showFallback, setShowFallback] = useState(Boolean(redirectUrl));
+
+  const id = String(orderId || "").trim();
+  const src = useMemo(() => (id ? bogIframeSrc(id, locale) : ""), [id, locale]);
+  const [height, setHeight] = useState(560);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [frameFailed, setFrameFailed] = useState(false);
 
   useEffect(() => {
-    const node = host.current;
-    const id = String(orderId || "").trim();
-    if (!node || !id) {
+    if (!id || !src) {
       setStatus("error");
-      setShowFallback(Boolean(redirectUrl));
+      setFrameFailed(true);
       return;
     }
-
-    let cancelled = false;
-    let session: { disconnect: () => void; resize: (w?: string, h?: string) => void } | null =
-      null;
     setStatus("loading");
-    // Keep the bank-page CTA visible while loading so the slot is never blank.
-    setShowFallback(Boolean(redirectUrl));
+    setFrameFailed(false);
 
-    const markMissing = () => {
-      if (cancelled) return;
-      const hasFrame = Boolean(node.querySelector("iframe"));
-      if (hasFrame) return;
-      setShowFallback(true);
-      setStatus("error");
-      failedRef.current(
-        locale === "ka"
-          ? "ბარათის ფორმა ვერ ჩაიტვირთა. გახსენით საქართველოს ბანკის გვერდი ქვემოთ ან სცადეთ თავიდან."
-          : "The card form did not load. Open the Bank of Georgia page below or try again.",
-      );
-    };
-
-    const watchdog = window.setTimeout(markMissing, 2500);
-
-    (async () => {
-      try {
-        const mod = await import("@bankofgeorgia/bog-payments-web-sdk");
-        const BogPaymentSession =
-          mod.BogPaymentSession ||
-          (mod as { default?: { BogPaymentSession?: unknown } }).default?.BogPaymentSession ||
-          (typeof window !== "undefined"
-            ? (window as { BogPaymentSession?: unknown }).BogPaymentSession
-            : undefined);
-        if (cancelled || !host.current) return;
-        if (typeof BogPaymentSession !== "function") {
-          throw new Error("BOG_SDK_MISSING");
-        }
-
-        host.current.replaceChildren();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SDK constructor typing
-        const next = new (BogPaymentSession as any)(id, {
-          width: "100%",
-          height: "520",
-          lang: locale === "ka" ? "ka" : "en",
-          theme: "light",
-          submitButton: { display: true },
-        });
-        next.on("form_layout_changed", (data: { preferredMinHeight?: number }) => {
-          const nextHeight = Math.max(420, Math.min(920, Number(data?.preferredMinHeight) || 520));
-          setHeight(nextHeight);
-          setStatus("ready");
-          try {
-            next.resize("100%", String(nextHeight));
-          } catch {
-            /* frame already removed */
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== BOG_ORIGIN) return;
+      const data = event.data as
+        | {
+            type?: string;
+            payload?: {
+              preferredMinHeight?: number;
+              error?: { message?: string };
+            };
           }
-        });
-        next.on("payment_complete", (data: { error?: { message?: string } }) => {
-          if (data?.error) {
-            failedRef.current(
-              locale === "ka"
-                ? "გადახდა ვერ დასრულდა. სცადეთ თავიდან ან აირჩიეთ PayPal."
-                : locale === "ru"
-                  ? "Оплата не прошла. Попробуйте снова или выберите PayPal."
-                  : "Payment did not go through. Try again or choose PayPal.",
-            );
-            return;
-          }
-          paidRef.current();
-        });
-        next.render(host.current);
-        session = next;
+        | null;
+      if (!data || typeof data !== "object") return;
 
-        window.setTimeout(() => {
-          if (cancelled) return;
-          if (host.current?.querySelector("iframe")) {
-            setStatus("ready");
-          } else {
-            markMissing();
-          }
-        }, 1200);
-      } catch {
-        if (!cancelled) {
-          setStatus("error");
-          setShowFallback(true);
+      if (data.type === "form_layout_changed") {
+        const nextHeight = Math.max(
+          420,
+          Math.min(920, Number(data.payload?.preferredMinHeight) || 560),
+        );
+        setHeight(nextHeight);
+        setStatus("ready");
+        setFrameFailed(false);
+        return;
+      }
+      if (data.type === "payment_complete") {
+        if (data.payload?.error) {
           failedRef.current(
             locale === "ka"
-              ? "საქართველოს ბანკის ფორმა ვერ გაიხსნა. გახსენით ბანკის გვერდი ქვემოთ."
-              : "The Bank of Georgia form could not be opened. Use the bank page link below.",
+              ? "გადახდა ვერ დასრულდა. სცადეთ თავიდან ან აირჩიეთ PayPal."
+              : "Payment did not go through. Try again or choose PayPal.",
           );
+          return;
         }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(watchdog);
-      try {
-        session?.disconnect();
-      } catch {
-        node.replaceChildren();
+        paidRef.current();
       }
     };
-  }, [locale, orderId, redirectUrl]);
+
+    window.addEventListener("message", onMessage);
+    const readyTimer = window.setTimeout(() => {
+      setStatus((prev) => (prev === "loading" ? "ready" : prev));
+    }, 1600);
+    const failTimer = window.setTimeout(() => {
+      setStatus((prev) => {
+        if (prev === "ready") return prev;
+        setFrameFailed(true);
+        failedRef.current(
+          locale === "ka"
+            ? "ბარათის ფორმა ვერ ჩაიტვირთა. სცადეთ თავიდან."
+            : "The card form did not load. Please try again.",
+        );
+        return "error";
+      });
+    }, 12000);
+
+    return () => {
+      window.removeEventListener("message", onMessage);
+      window.clearTimeout(readyTimer);
+      window.clearTimeout(failTimer);
+    };
+  }, [id, locale, src]);
+
+  if (!id) {
+    return (
+      <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+        {locale === "ka" ? "გადახდის შეკვეთა ვერ მოიძებნა." : "Payment order is missing."}
+      </p>
+    );
+  }
+
+  // Last resort only — primary path is the in-page card form under Card.
+  if (frameFailed && redirectUrl) {
+    return (
+      <div className="space-y-2 rounded-2xl border border-[#ff6200]/40 bg-[#fff5ef] px-4 py-4">
+        <p className="text-center text-sm font-semibold text-[#0b1f4b]">
+          {locale === "ka"
+            ? "ბარათის ფორმა ამ გვერდზე ვერ ჩაიტვირთა"
+            : "The card form could not open on this page"}
+        </p>
+        <a
+          href={redirectUrl}
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-sm font-extrabold text-white hover:bg-[#e55800]"
+        >
+          {locale === "ka"
+            ? "გადახდა საქართველოს ბანკის გვერდზე"
+            : "Pay on Bank of Georgia page"}
+        </a>
+      </div>
+    );
+  }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      {status === "loading" ? (
-        <p className="border-b border-slate-100 px-4 py-3 text-center text-sm font-semibold text-slate-500">
-          {locale === "ka"
-            ? "ბარათის ფორმა იტვირთება…"
-            : locale === "ru"
-              ? "Загрузка формы карты…"
-              : "Loading card form…"}
+    <div className="overflow-hidden rounded-2xl border border-[#ff6200]/35 bg-white shadow-sm">
+      <div className="border-b border-slate-100 px-4 py-2.5">
+        <p className="text-sm font-extrabold text-[#0b1f4b]">
+          {locale === "ka" ? "ბარათის მონაცემები" : "Card details"}
         </p>
-      ) : null}
-      <div
-        ref={host}
-        data-bog-host="1"
-        className="w-full bg-white [&_iframe]:block [&_iframe]:w-full [&_iframe]:max-w-full [&_iframe]:border-0"
-        style={{ minHeight: status === "error" && showFallback ? 0 : height }}
+        <p className="text-[11px] text-slate-500">
+          {status === "loading"
+            ? locale === "ka"
+              ? "ფორმა იტვირთება…"
+              : "Loading form…"
+            : locale === "ka"
+              ? "შეიყვანეთ ბარათის ნომერი და დააჭირეთ გადახდას"
+              : "Enter your card number and pay"}
+        </p>
+      </div>
+      <iframe
+        title={locale === "ka" ? "საქართველოს ბანკის ბარათის ფორმა" : "Bank of Georgia card form"}
+        src={src}
+        width="100%"
+        height={height}
+        className="block w-full max-w-full border-0 bg-white"
+        style={{ minHeight: height }}
+        sandbox="allow-forms allow-scripts allow-popups allow-same-origin"
+        referrerPolicy="origin"
+        onLoad={() => {
+          setStatus("ready");
+          setFrameFailed(false);
+        }}
       />
-      {showFallback && redirectUrl ? (
-        <div className="space-y-2 border-t border-slate-100 px-4 py-4">
-          <a
-            href={redirectUrl}
-            className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-sm font-extrabold text-white hover:bg-[#e55800]"
-          >
-            {locale === "ka"
-              ? status === "ready"
-                ? "გადახდა საქართველოს ბანკის გვერდზე"
-                : "ბარათის მონაცემების შეყვანა — საქართველოს ბანკი"
-              : status === "ready"
-                ? "Pay on Bank of Georgia page"
-                : "Enter card details on Bank of Georgia"}
-          </a>
-          <p className="text-center text-xs text-slate-500">
-            {locale === "ka"
-              ? "ბარათის ნომერი და CVV ივსება ბანკის უსაფრთხო გვერდზე."
-              : "Card number and CVV are entered on the bank’s secure page."}
-          </p>
-        </div>
-      ) : null}
-      {status === "error" && !redirectUrl ? (
-        <p className="px-4 py-4 text-center text-sm font-medium text-red-600">
-          {locale === "ka"
-            ? "ბარათის ფორმა ვერ ჩაიტვირთა. სცადეთ თავიდან."
-            : "The card form could not load. Please try again."}
-        </p>
-      ) : null}
     </div>
   );
 }

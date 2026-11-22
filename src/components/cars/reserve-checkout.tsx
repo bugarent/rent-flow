@@ -1594,179 +1594,143 @@ export function ReserveCheckout({
                     ? "Способ оплаты"
                     : "Payment method"}
               </legend>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+
+              {/* Card = one block: method + amount + BOG card form underneath */}
+              <div
+                className={`overflow-hidden rounded-2xl border-2 transition ${
+                  paymentMethod === "bog"
+                    ? "border-[#ff6200] bg-white shadow-sm ring-2 ring-[#ff6200]/25"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
                 <button
                   type="button"
                   disabled={loading}
                   onClick={() => setPaymentMethod("bog")}
-                  className={`flex min-h-12 items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition ${
-                    paymentMethod === "bog"
-                      ? "border-[#ff6200] bg-[#fff5ef] ring-2 ring-[#ff6200]/30"
-                      : "border-slate-200 bg-white hover:border-slate-300"
+                  className={`flex w-full min-h-12 items-center gap-2.5 px-3.5 py-3 text-left transition ${
+                    paymentMethod === "bog" ? "bg-[#fff5ef]" : "bg-white hover:bg-slate-50"
                   }`}
                 >
                   <CreditCard
                     className={`h-5 w-5 shrink-0 ${paymentMethod === "bog" ? "text-[#ff6200]" : "text-slate-400"}`}
                     aria-hidden
                   />
-                  <span className="min-w-0">
+                  <span className="min-w-0 flex-1">
                     <span className="block text-sm font-extrabold text-[#0b1f4b]">
                       {locale === "ka" ? "ბარათი" : locale === "ru" ? "Карта" : "Card"}
                     </span>
                     <span className="block truncate text-[11px] text-slate-500">Bank of Georgia</span>
                   </span>
-                </button>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => setPaymentMethod("paypal")}
-                  className={`flex min-h-12 items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition ${
-                    paymentMethod === "paypal"
-                      ? "border-[#0070ba] bg-[#f0f7fc] ring-2 ring-[#0070ba]/25"
-                      : "border-slate-200 bg-white hover:border-slate-300"
-                  }`}
-                >
-                  <Lock
-                    className={`h-5 w-5 shrink-0 ${paymentMethod === "paypal" ? "text-[#0070ba]" : "text-slate-400"}`}
-                    aria-hidden
-                  />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-extrabold text-[#0b1f4b]">PayPal</span>
-                    <span className="block truncate text-[11px] text-slate-500">
-                      {locale === "ka" ? "PayPal ანგარიში" : locale === "ru" ? "Аккаунт PayPal" : "PayPal account"}
+                  {paymentMethod === "bog" && (!paymentReady.checked || paymentReady.bog) ? (
+                    <span className="shrink-0 text-right">
+                      <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        {locale === "ka" ? "ახლა" : "Now"}
+                      </span>
+                      <span className="block text-base font-black text-[#0b1f4b]">
+                        {payAmountLabel || formatPrice(totals.payNow)}
+                      </span>
                     </span>
-                  </span>
+                  ) : null}
                 </button>
-              </div>
-            </fieldset>
 
-            {paymentReady.checked && paymentMethod === "bog" && !paymentReady.bog ? (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm leading-relaxed text-amber-950">
-                {locale === "ka" ? (
-                  <>
-                    <p className="font-bold">ბარათით გადახდა ჯერ არ არის ჩართული</p>
-                    <p className="mt-1">
-                      ბარათის ფორმა ამ გვერდზე იხსნება, როცა Netlify Environment-ში დაემატება{" "}
-                      <strong>BOG_CLIENT_ID</strong> და <strong>BOG_SECRET_KEY</strong>, შემდეგ
-                      Redeploy.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="font-bold">Card payment is not enabled yet</p>
-                    <p className="mt-1">
-                      The card form opens on this page after you add <strong>BOG_CLIENT_ID</strong> and{" "}
-                      <strong>BOG_SECRET_KEY</strong> in Netlify, then redeploy.
-                    </p>
-                  </>
-                )}
-              </div>
-            ) : null}
-
-            {paymentReady.checked && paymentMethod === "paypal" && !paymentReady.paypal ? (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm leading-relaxed text-amber-950">
-                {locale === "ka" ? (
-                  <>
-                    <p className="font-bold">PayPal ჯერ არ არის ჩართული</p>
-                    <p className="mt-1">
-                      Netlify-ზე დაამატეთ <strong>PAYPAL_CLIENT_ID</strong> და{" "}
-                      <strong>PAYPAL_CLIENT_SECRET</strong>, შემდეგ Redeploy. გადახდა დასრულდება
-                      PayPal-ის ღილაკები ამ გვერდზე გამოჩნდება.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="font-bold">PayPal is not enabled yet</p>
-                    <p className="mt-1">
-                      Add <strong>PAYPAL_CLIENT_ID</strong> and <strong>PAYPAL_CLIENT_SECRET</strong>{" "}
-                      in Netlify, then redeploy. PayPal’s buttons then open on this page.
-                    </p>
-                  </>
-                )}
-              </div>
-            ) : null}
-
-            {paymentMethod === "bog" && (!paymentReady.checked || paymentReady.bog) ? (
-              <div className="rounded-xl bg-slate-50 px-3 py-3 text-center">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  {locale === "ka"
-                    ? "გადასახდელი თანხა ახლა"
-                    : locale === "ru"
-                      ? "К оплате сейчас"
-                      : "Amount due now"}
-                </p>
-                <p className="mt-1 text-xl font-extrabold text-[#0b1f4b] sm:text-2xl">
-                  {payAmountLabel || formatPrice(totals.payNow)}
-                </p>
-              </div>
-            ) : null}
-
-            {paymentMethod === "bog" &&
-            (!paymentReady.checked || paymentReady.bog) &&
-            !embeddedPay &&
-            !error ? (
-              <div className="space-y-4 rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center shadow-sm">
-                {loading ? (
-                  <div className="flex flex-col items-center gap-3">
-                    <RacButtonLoader
-                      label={
-                        locale === "ka"
-                          ? "ბარათის ფორმა იხსნება…"
-                          : "Opening card form…"
-                      }
-                    />
-                    <p className="text-sm font-semibold text-slate-500">
-                      {roundMoney(Math.max(0, totals.payNow)) <= 0.009
-                        ? locale === "ka"
-                          ? "ჯავშანი დასტურდება…"
-                          : "Confirming booking…"
-                        : locale === "ka"
-                          ? "ბარათის ფორმა იხსნება…"
-                          : "Opening card form…"}
-                    </p>
+                {paymentMethod === "bog" ? (
+                  <div className="border-t border-[#ff6200]/20">
+                    {paymentReady.checked && !paymentReady.bog ? (
+                      <div className="px-3 py-3 text-sm leading-relaxed text-amber-950">
+                        <p className="font-bold">
+                          {locale === "ka"
+                            ? "ბარათით გადახდა ჯერ არ არის ჩართული"
+                            : "Card payment is not enabled yet"}
+                        </p>
+                      </div>
+                    ) : embeddedPay?.method === "bog" ? (
+                      <CheckoutBogFrame
+                        key={embeddedPay.orderId}
+                        orderId={embeddedPay.orderId}
+                        locale={locale}
+                        redirectUrl={embeddedPay.redirectUrl || ordersRef.current.bogRedirect}
+                        onPaid={onBogPaid}
+                        onFailed={onPayFailed}
+                      />
+                    ) : error ? (
+                      <div className="space-y-3 px-4 py-4 text-center">
+                        <button
+                          type="button"
+                          disabled={loading}
+                          onClick={() => {
+                            bogAutoStartRef.current = false;
+                            setError("");
+                            void handleBooking("bog", { embed: true });
+                          }}
+                          className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-sm font-extrabold text-white hover:bg-[#e55800] disabled:opacity-60"
+                        >
+                          {locale === "ka" ? "თავიდან ცდა" : "Try again"}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+                        <RacButtonLoader
+                          label={
+                            locale === "ka" ? "ბარათის ფორმა იხსნება…" : "Opening card form…"
+                          }
+                        />
+                        <p className="text-sm font-semibold text-slate-500">
+                          {loading || bogAutoStartRef.current
+                            ? locale === "ka"
+                              ? "ბარათის ფორმა იხსნება…"
+                              : "Opening card form…"
+                            : locale === "ka"
+                              ? "ემზადება…"
+                              : "Preparing…"}
+                        </p>
+                        {!loading ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              bogAutoStartRef.current = false;
+                              setError("");
+                              void handleBooking("bog", { embed: true });
+                            }}
+                            className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-sm font-extrabold text-white hover:bg-[#e55800]"
+                          >
+                            {locale === "ka" ? "ბარათის ფორმის გახსნა" : "Open card form"}
+                          </button>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <>
-                    <p className="text-sm font-semibold text-slate-600">
-                      {locale === "ka"
-                        ? "ბარათის მონაცემების შესაყვანად გახსენით გადახდის ფორმა"
-                        : "Open the payment form to enter your card details"}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        bogAutoStartRef.current = false;
-                        setError("");
-                        void handleBooking("bog", { embed: true });
-                      }}
-                      className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-sm font-extrabold text-white hover:bg-[#e55800]"
-                    >
-                      {roundMoney(Math.max(0, totals.payNow)) <= 0.009
-                        ? locale === "ka"
-                          ? "ჯავშნის დადასტურება"
-                          : "Confirm booking"
-                        : locale === "ka"
-                          ? "ბარათის ფორმის გახსნა"
-                          : "Open card form"}
-                    </button>
-                  </>
-                )}
+                ) : null}
               </div>
-            ) : null}
 
-            {paymentMethod === "bog" && error && !embeddedPay ? (
               <button
                 type="button"
                 disabled={loading}
-                onClick={() => {
-                  bogAutoStartRef.current = false;
-                  setError("");
-                  void handleBooking("bog", { embed: true });
-                }}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-sm font-extrabold text-white hover:bg-[#e55800] disabled:opacity-60"
+                onClick={() => setPaymentMethod("paypal")}
+                className={`flex w-full min-h-12 items-center gap-2.5 rounded-2xl border-2 px-3.5 py-3 text-left transition ${
+                  paymentMethod === "paypal"
+                    ? "border-[#0070ba] bg-[#f0f7fc] ring-2 ring-[#0070ba]/25"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
               >
-                {locale === "ka" ? "თავიდან ცდა" : "Try again"}
+                <Lock
+                  className={`h-5 w-5 shrink-0 ${paymentMethod === "paypal" ? "text-[#0070ba]" : "text-slate-400"}`}
+                  aria-hidden
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-extrabold text-[#0b1f4b]">PayPal</span>
+                  <span className="block truncate text-[11px] text-slate-500">
+                    {locale === "ka" ? "PayPal ანგარიში" : locale === "ru" ? "Аккаунт PayPal" : "PayPal account"}
+                  </span>
+                </span>
               </button>
+            </fieldset>
+
+            {paymentReady.checked && paymentMethod === "paypal" && !paymentReady.paypal ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm leading-relaxed text-amber-950">
+                <p className="font-bold">
+                  {locale === "ka" ? "PayPal ჯერ არ არის ჩართული" : "PayPal is not enabled yet"}
+                </p>
+              </div>
             ) : null}
 
             {paymentMethod === "paypal" &&
@@ -1798,17 +1762,6 @@ export function ReserveCheckout({
                   }}
                 />
               )
-            ) : null}
-
-            {embeddedPay?.method === "bog" && paymentMethod === "bog" ? (
-              <CheckoutBogFrame
-                key={embeddedPay.orderId}
-                orderId={embeddedPay.orderId}
-                locale={locale}
-                redirectUrl={embeddedPay.redirectUrl || ordersRef.current.bogRedirect}
-                onPaid={onBogPaid}
-                onFailed={onPayFailed}
-              />
             ) : null}
 
             {embeddedPay?.method === "paypal" &&
