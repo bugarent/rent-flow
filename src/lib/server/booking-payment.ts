@@ -11,6 +11,7 @@ export type BookingPaymentStatus = "UNPAID" | "PENDING" | "PAID" | "FAILED";
 
 export type BookingPaymentSnapshot = {
   id: string;
+  carId: string;
   sequentialNumber: number | null;
   status: string;
   depositPaidEur: number;
@@ -38,6 +39,7 @@ function num(v: unknown): number {
 function fromFile(row: FileBookingRecord): BookingPaymentSnapshot {
   return {
     id: row.id,
+    carId: row.carId,
     sequentialNumber: row.sequentialNumber,
     status: row.status,
     depositPaidEur: num(row.depositPaidEur),
@@ -63,6 +65,7 @@ export async function getBookingForPayment(
       where: { id },
       select: {
         id: true,
+        carId: true,
         sequentialNumber: true,
         status: true,
         depositPaidEur: true,
@@ -77,6 +80,7 @@ export async function getBookingForPayment(
     if (row) {
       return {
         id: row.id,
+        carId: row.carId,
         sequentialNumber: row.sequentialNumber,
         status: row.status,
         depositPaidEur: num(row.depositPaidEur),
@@ -109,6 +113,7 @@ export async function findBookingByBogOrderId(
       where: { bogOrderId: oid },
       select: {
         id: true,
+        carId: true,
         sequentialNumber: true,
         status: true,
         depositPaidEur: true,
@@ -123,6 +128,7 @@ export async function findBookingByBogOrderId(
     if (row) {
       return {
         id: row.id,
+        carId: row.carId,
         sequentialNumber: row.sequentialNumber,
         status: row.status,
         depositPaidEur: num(row.depositPaidEur),

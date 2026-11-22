@@ -801,34 +801,36 @@ export async function POST(req: Request) {
             } catch (notifyError) {
               console.warn("[bookings] notifyFileBookingEvent failed", notifyError);
             }
-          }
-          try {
-            const { markBookingUnread } = await import("@/lib/server/admin-booking-unread-store");
-            await markBookingUnread(booking.id);
-          } catch {
-            /* best-effort */
+            try {
+              const { markBookingUnread } = await import("@/lib/server/admin-booking-unread-store");
+              await markBookingUnread(booking.id);
+            } catch {
+              /* best-effort */
+            }
+            if (bpCode && bpSplit) {
+              await creditBusinessPartnerFromBooking({
+                promoCode: bpCode,
+                sequentialNumber: booking.sequentialNumber,
+                bookingId: booking.id,
+                airport: booking.pickupAirportIata,
+                customerName: `${guestFirst} ${guestLast}`.trim(),
+                customerEmail: guestMail,
+                customerFirstName: guestFirst,
+                customerLastName: guestLast,
+                partnerEarnedEur: bpSplit.partnerEarnedEur,
+                siteEarnedEur: bpSplit.siteEarnedEur,
+              });
+            }
           }
           await rememberMessengers(booking.id);
           await rememberResidence(booking.id);
           await rememberSiteDiscount(booking.id, appliedSiteDiscount);
-          if (bpCode && bpSplit) {
-            await creditBusinessPartnerFromBooking({
-              promoCode: bpCode,
-              sequentialNumber: booking.sequentialNumber,
-              bookingId: booking.id,
-              airport: booking.pickupAirportIata,
-              customerName: `${guestFirst} ${guestLast}`.trim(),
-              customerEmail: guestMail,
-              customerFirstName: guestFirst,
-              customerLastName: guestLast,
-              partnerEarnedEur: bpSplit.partnerEarnedEur,
-              siteEarnedEur: bpSplit.siteEarnedEur,
-            });
-          }
           await attachPlatformCharge(booking);
-          void import("@/lib/server/channel-publish")
-            .then((mod) => mod.noteReservationPublished(booking.carId))
-            .catch(() => undefined);
+          if (!deferNotifyUntilPaid) {
+            void import("@/lib/server/channel-publish")
+              .then((mod) => mod.noteReservationPublished(booking.carId))
+              .catch(() => undefined);
+          }
         });
         return NextResponse.json(
           {
@@ -1161,38 +1163,47 @@ export async function POST(req: Request) {
         ...(guestDateOfBirth ? { dateOfBirth: guestDateOfBirth } : {}),
         ...(guestCountry ? { countryOfResidence: guestCountry } : {}),
         ...(bookingPromoCode || bpCode ? { promoCode: bpCode || bookingPromoCode } : {}),
+        ...(paymentProvider
+          ? {
+              paymentProvider,
+              paymentStatus: initialPaymentStatus,
+            }
+          : {}),
       });
       runAfterResponse(async () => {
         await freezeBookingTermsAtCheckout(booking.id);
-        try {
-          const { notifyFileBookingEvent } = await import("@/lib/notifications");
-          await notifyFileBookingEvent(booking);
-        } catch (notifyError) {
-          console.warn("[bookings] notifyFileBookingEvent failed", notifyError);
-        }
-        try {
-          const { markBookingUnread } = await import("@/lib/server/admin-booking-unread-store");
-          await markBookingUnread(booking.id);
-        } catch {
-          /* best-effort */
+        // Unpaid online checkout: confirm only after gateway success (BOG/PayPal callback).
+        if (!deferNotifyUntilPaid) {
+          try {
+            const { notifyFileBookingEvent } = await import("@/lib/notifications");
+            await notifyFileBookingEvent(booking);
+          } catch (notifyError) {
+            console.warn("[bookings] notifyFileBookingEvent failed", notifyError);
+          }
+          try {
+            const { markBookingUnread } = await import("@/lib/server/admin-booking-unread-store");
+            await markBookingUnread(booking.id);
+          } catch {
+            /* best-effort */
+          }
+          if (bpCode && bpSplit) {
+            await creditBusinessPartnerFromBooking({
+              promoCode: bpCode,
+              sequentialNumber: booking.sequentialNumber,
+              bookingId: booking.id,
+              airport: booking.pickupAirportIata,
+              customerName: `${guestFirst} ${guestLast}`.trim(),
+              customerEmail: guestMail,
+              customerFirstName: guestFirst,
+              customerLastName: guestLast,
+              partnerEarnedEur: bpSplit.partnerEarnedEur,
+              siteEarnedEur: bpSplit.siteEarnedEur,
+            });
+          }
         }
         await rememberMessengers(booking.id);
         await rememberResidence(booking.id);
         await rememberSiteDiscount(booking.id, appliedSiteDiscount);
-        if (bpCode && bpSplit) {
-          await creditBusinessPartnerFromBooking({
-            promoCode: bpCode,
-            sequentialNumber: booking.sequentialNumber,
-            bookingId: booking.id,
-            airport: booking.pickupAirportIata,
-            customerName: `${guestFirst} ${guestLast}`.trim(),
-            customerEmail: guestMail,
-            customerFirstName: guestFirst,
-            customerLastName: guestLast,
-            partnerEarnedEur: bpSplit.partnerEarnedEur,
-            siteEarnedEur: bpSplit.siteEarnedEur,
-          });
-        }
         await attachPlatformCharge(booking);
       });
       return NextResponse.json(
@@ -1346,97 +1357,99 @@ export async function POST(req: Request) {
         } catch (notifyError) {
           console.warn("[bookings] notifyBookingEvent failed", notifyError);
         }
-      }
-      try {
-        const { markBookingUnread } = await import("@/lib/server/admin-booking-unread-store");
-        await markBookingUnread(booking.id);
-      } catch {
-        /* best-effort */
+        try {
+          const { markBookingUnread } = await import("@/lib/server/admin-booking-unread-store");
+          await markBookingUnread(booking.id);
+        } catch {
+          /* best-effort */
+        }
+        if (bpCode && bpSplit) {
+          await creditBusinessPartnerFromBooking({
+            promoCode: bpCode,
+            sequentialNumber: booking.sequentialNumber,
+            bookingId: booking.id,
+            airport: pickupIata,
+            customerName: `${resolvedFirst} ${resolvedLast}`.trim(),
+            customerEmail: resolvedMail,
+            customerFirstName: resolvedFirst,
+            customerLastName: resolvedLast,
+            partnerEarnedEur: bpSplit.partnerEarnedEur,
+            siteEarnedEur: bpSplit.siteEarnedEur,
+          });
+        }
+        void import("@/lib/server/channel-publish")
+          .then((mod) => mod.noteReservationPublished(booking.carId))
+          .catch(() => undefined);
       }
       await rememberMessengers(booking.id);
       await rememberResidence(booking.id);
       await rememberSiteDiscount(booking.id, appliedSiteDiscount);
-      if (bpCode && bpSplit) {
-        await creditBusinessPartnerFromBooking({
-          promoCode: bpCode,
-          sequentialNumber: booking.sequentialNumber,
-          bookingId: booking.id,
-          airport: pickupIata,
-          customerName: `${resolvedFirst} ${resolvedLast}`.trim(),
-          customerEmail: resolvedMail,
-          customerFirstName: resolvedFirst,
-          customerLastName: resolvedLast,
-          partnerEarnedEur: bpSplit.partnerEarnedEur,
-          siteEarnedEur: bpSplit.siteEarnedEur,
-        });
-      }
       await attachPlatformCharge(booking);
-      void import("@/lib/server/channel-publish")
-        .then((mod) => mod.noteReservationPublished(booking.carId))
-        .catch(() => undefined);
 
-      // Partner channel lock after the guest already has confirmation.
-      try {
-        const { listIntegrations } = await import("@/lib/integrations/repository");
-        const { listMappings } = await import("@/lib/integrations/repository");
-        const { findMappingByInternal } = await import("@/lib/integrations/mapping");
-        const { pushBookingLock } = await import("@/lib/integrations/sync-engine");
-        const { formatBookingRef } = await import("@/lib/ids");
+      // Partner channel lock only after paid confirmation (or free checkout).
+      if (!deferNotifyUntilPaid) {
+        try {
+          const { listIntegrations } = await import("@/lib/integrations/repository");
+          const { listMappings } = await import("@/lib/integrations/repository");
+          const { findMappingByInternal } = await import("@/lib/integrations/mapping");
+          const { pushBookingLock } = await import("@/lib/integrations/sync-engine");
+          const { formatBookingRef } = await import("@/lib/ids");
 
-        const { items } = await listIntegrations();
-        const integrations = items.filter(
-          (i) =>
-            i.partnerId === car.partnerId &&
-            ["LIVE", "TESTING"].includes(i.status) &&
-            !i.manualOverride,
-        );
-        for (const integration of integrations) {
-          const mappings = await listMappings(integration.id);
-          const vehicleMap = findMappingByInternal(mappings, "VEHICLE", car.id);
-          if (!vehicleMap) {
+          const { items } = await listIntegrations();
+          const integrations = items.filter(
+            (i) =>
+              i.partnerId === car.partnerId &&
+              ["LIVE", "TESTING"].includes(i.status) &&
+              !i.manualOverride,
+          );
+          for (const integration of integrations) {
+            const mappings = await listMappings(integration.id);
+            const vehicleMap = findMappingByInternal(mappings, "VEHICLE", car.id);
+            if (!vehicleMap) {
+              try {
+                await prisma.booking.update({
+                  where: { id: booking.id },
+                  data: { integrationLockStatus: "SKIPPED" },
+                });
+              } catch {
+                /* schema may be unmigrated offline */
+              }
+              continue;
+            }
             try {
               await prisma.booking.update({
                 where: { id: booking.id },
-                data: { integrationLockStatus: "SKIPPED" },
+                data: { integrationLockStatus: "PENDING" },
               });
             } catch {
-              /* schema may be unmigrated offline */
+              /* ignore */
             }
-            continue;
-          }
-          try {
-            await prisma.booking.update({
-              where: { id: booking.id },
-              data: { integrationLockStatus: "PENDING" },
-            });
-          } catch {
-            /* ignore */
-          }
-          const lock = await pushBookingLock({
-            integrationId: integration.id,
-            lock: {
-              externalId: vehicleMap.externalId,
-              lockId: booking.id,
-              pickupAt: pickupAt.toISOString(),
-              dropoffAt: dropoffAt.toISOString(),
-              bookingRef: formatBookingRef(booking.sequentialNumber) || booking.id,
-            },
-          });
-          try {
-            await prisma.booking.update({
-              where: { id: booking.id },
-              data: {
-                integrationLockStatus: lock.ok ? "LOCKED" : "FAILED",
-                externalRef: lock.externalBookingId || undefined,
+            const lock = await pushBookingLock({
+              integrationId: integration.id,
+              lock: {
+                externalId: vehicleMap.externalId,
+                lockId: booking.id,
+                pickupAt: pickupAt.toISOString(),
+                dropoffAt: dropoffAt.toISOString(),
+                bookingRef: formatBookingRef(booking.sequentialNumber) || booking.id,
               },
             });
-          } catch {
-            /* ignore */
+            try {
+              await prisma.booking.update({
+                where: { id: booking.id },
+                data: {
+                  integrationLockStatus: lock.ok ? "LOCKED" : "FAILED",
+                  externalRef: lock.externalBookingId || undefined,
+                },
+              });
+            } catch {
+              /* ignore */
+            }
+            break;
           }
-          break;
+        } catch (error) {
+          console.warn("[bookings] integration lock failed", error);
         }
-      } catch (error) {
-        console.warn("[bookings] integration lock failed", error);
       }
     });
 

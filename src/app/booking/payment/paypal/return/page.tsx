@@ -88,6 +88,21 @@ export default async function PaypalPaymentReturnPage({ searchParams }: Props) {
       } catch (notifyErr) {
         console.warn("[paypal/return] notify failed", notifyErr);
       }
+      try {
+        const { markBookingUnread } = await import("@/lib/server/admin-booking-unread-store");
+        await markBookingUnread(paid.id);
+      } catch {
+        /* best-effort */
+      }
+      try {
+        const carId = paid.carId;
+        if (carId) {
+          const { noteReservationPublished } = await import("@/lib/server/channel-publish");
+          await noteReservationPublished(carId);
+        }
+      } catch {
+        /* best-effort */
+      }
     });
   }
 

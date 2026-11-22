@@ -1429,64 +1429,16 @@ export function ReserveCheckout({
     if (checkoutStep !== "payment") {
       bogAutoStartRef.current = false;
       setEmbeddedPay(null);
-      return;
-    }
-    // Card tab: prepare BOG order in the background — stay here so PayPal↔Card can switch.
-    if (paymentMethod !== "bog") {
-      bogAutoStartRef.current = false;
-      return;
-    }
-    if (roundMoney(Math.max(0, totals.payNow)) <= 0.009) {
-      if (bogAutoStartRef.current) return;
-      bogAutoStartRef.current = true;
-      void handleBookingRef.current("bog").then((result) => {
-        if (!result) bogAutoStartRef.current = false;
-      });
-      return;
-    }
-    if (!paymentReady.checked || !paymentReady.bog) return;
-    if (bogCheckout?.redirectUrl) return;
-    if (bogAutoStartRef.current) return;
-    bogAutoStartRef.current = true;
-
-    const cachedRedirect =
-      bookingIdRef.current &&
-      ordersRef.current.bookingId === bookingIdRef.current &&
-      ordersRef.current.bog &&
-      ordersRef.current.bogRedirect
-        ? { orderId: ordersRef.current.bog, redirectUrl: ordersRef.current.bogRedirect }
-        : null;
-    if (cachedRedirect) {
-      setBogCheckout(cachedRedirect);
-      bogAutoStartRef.current = false;
-      return;
-    }
-
-    let cancelled = false;
-    void (async () => {
-      if (!payAmountLabel) {
-        void loadPayAmountLabel(totals.payNow).then((label) => {
-          if (label) setPayAmountLabel(label);
-        });
+      // Leaving payment without paying must not keep a staged booking id around.
+      if (!leaveCheckoutRef.current) {
+        setBogCheckout(null);
+        bookingIdRef.current = "";
+        ordersRef.current = { bookingId: "" };
       }
-      const result = await handleBookingRef.current("bog", { prepareOnly: true });
-      if (cancelled) return;
-      bogAutoStartRef.current = false;
-      if (!result) return;
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- prepare when card tab is active
-  }, [
-    checkoutStep,
-    paymentMethod,
-    paymentReady.bog,
-    paymentReady.checked,
-    totals.payNow,
-    bogCheckout?.redirectUrl,
-  ]);
+      return;
+    }
+    // Never auto-create a booking here — only when the guest clicks pay (or free 0€ confirm).
+  }, [checkoutStep]);
 
   useEffect(() => {
     if (paymentMethod !== "bog") {
@@ -1543,7 +1495,20 @@ export function ReserveCheckout({
           <Step
             label={t.step2}
             active={checkoutStep === "details"}
-            onClick={checkoutStep === "payment" ? () => setCheckoutStep("details") : undefined}
+            onClick={
+              checkoutStep === "payment"
+                ? () => {
+                    leaveCheckoutRef.current = false;
+                    setBogCheckout(null);
+                    bookingIdRef.current = "";
+                    ordersRef.current = { bookingId: "" };
+                    bogAutoStartRef.current = false;
+                    setEmbeddedPay(null);
+                    setError("");
+                    setCheckoutStep("details");
+                  }
+                : undefined
+            }
           />
           <Step label={t.step3} active={checkoutStep === "payment"} />
         </div>
@@ -1655,7 +1620,16 @@ export function ReserveCheckout({
                       backLabel={
                         locale === "ka" ? "დაბრუნება მძღოლის დეტალებზე" : "Back to driver details"
                       }
-                      onBack={() => setCheckoutStep("details")}
+                      onBack={() => {
+                        leaveCheckoutRef.current = false;
+                        setBogCheckout(null);
+                        bookingIdRef.current = "";
+                        ordersRef.current = { bookingId: "" };
+                        bogAutoStartRef.current = false;
+                        setEmbeddedPay(null);
+                        setError("");
+                        setCheckoutStep("details");
+                      }}
                       onConfirm={async () => {
                         if (!payAmountLabel) {
                           const label = await loadPayAmountLabel(totals.payNow);
@@ -1681,47 +1655,51 @@ export function ReserveCheckout({
                       onClick={() => {
                         bogAutoStartRef.current = false;
                         setBogCheckout(null);
+                        bookingIdRef.current = "";
+                        ordersRef.current = { bookingId: "" };
                         setError("");
-                        void handleBooking("bog", { prepareOnly: true });
+                        void handleBooking("bog");
                       }}
                       className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-sm font-extrabold text-white hover:bg-[#e55800] disabled:opacity-60"
                     >
                       {locale === "ka" ? "თავიდან ცდა" : "Try again"}
                     </button>
-                  ) : bogCheckout?.redirectUrl ? (
+                  ) : (
                     <>
                       <p className="text-sm font-semibold text-slate-600">
                         {locale === "ka"
-                          ? "ბარათის ნომერი ივსება საქართველოს ბანკის უსაფრთხო გვერდზე"
-                          : "Card number is entered on Bank of Georgia’s secure page"}
+                          ? "ბარათის ნომერი ივსება საქართველოს ბანკის უსაფრთხო გვერდზე. ჯავშანი მხოლოდ წარმატებული გადახდის შემდეგ დადასტურდება."
+                          : "Card number is entered on Bank of Georgia’s secure page. The booking is confirmed only after successful payment."}
                       </p>
                       <button
                         type="button"
-                        disabled={loading}
+                        disabled={loading || !paymentReady.checked || !paymentReady.bog}
                         onClick={() => {
-                          leaveCheckoutRef.current = true;
-                          window.location.assign(bogCheckout.redirectUrl);
+                          bogAutoStartRef.current = false;
+                          setError("");
+                          if (bogCheckout?.redirectUrl) {
+                            leaveCheckoutRef.current = true;
+                            window.location.assign(bogCheckout.redirectUrl);
+                            return;
+                          }
+                          // Create booking + BOG order only when the guest commits to pay.
+                          void handleBooking("bog");
                         }}
                         className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-base font-extrabold text-white hover:bg-[#e55800] disabled:opacity-60"
                       >
-                        {locale === "ka"
-                          ? `გადახდა ბარათით (${payAmountLabel || formatPrice(totals.payNow)})`
-                          : `Pay by card (${payAmountLabel || formatPrice(totals.payNow)})`}
+                        {loading ? (
+                          <RacButtonLoader
+                            label={
+                              locale === "ka" ? "გადახდა იწყება…" : "Starting payment…"
+                            }
+                          />
+                        ) : locale === "ka" ? (
+                          `გადახდა ბარათით (${payAmountLabel || formatPrice(totals.payNow)})`
+                        ) : (
+                          `Pay by card (${payAmountLabel || formatPrice(totals.payNow)})`
+                        )}
                       </button>
                     </>
-                  ) : (
-                    <div className="flex flex-col items-center gap-3 py-2">
-                      <RacButtonLoader
-                        label={
-                          locale === "ka" ? "მზადდება…" : "Preparing…"
-                        }
-                      />
-                      <p className="text-sm font-semibold text-slate-500">
-                        {locale === "ka"
-                          ? "ბარათით გადახდა მზადდება…"
-                          : "Preparing card payment…"}
-                      </p>
-                    </div>
                   )}
                 </div>
               )}
@@ -1730,7 +1708,16 @@ export function ReserveCheckout({
             <button
               type="button"
               disabled={loading}
-              onClick={() => setCheckoutStep("details")}
+              onClick={() => {
+                leaveCheckoutRef.current = false;
+                setBogCheckout(null);
+                bookingIdRef.current = "";
+                ordersRef.current = { bookingId: "" };
+                bogAutoStartRef.current = false;
+                setEmbeddedPay(null);
+                setError("");
+                setCheckoutStep("details");
+              }}
               className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
             >
               {locale === "ka"
