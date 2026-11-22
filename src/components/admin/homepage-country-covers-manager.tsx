@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { ImageUp, RotateCcw, Search } from "lucide-react";
+import { ChevronDown, ImageUp, RotateCcw, Search } from "lucide-react";
 import { useAdminLocale } from "@/components/providers/admin-locale-context";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { uiText } from "@/lib/i18n/ui-text";
@@ -121,20 +121,30 @@ export function HomepageCountryCoversManager({
     }
   };
 
+  const title = tx(
+    "Homepage cover per country",
+    "მთავარი გვერდის ყდა ქვეყნების მიხედვით",
+    "Обложка главной по странам",
+  );
+
   return (
-    <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-      <div>
-        <h2 className="text-base font-extrabold text-[#0b1f4b]">
-          {tx("Homepage cover per country", "მთავარი გვერდის ყდა ქვეყნების მიხედვით", "Обложка главной по странам")}
-        </h2>
-        <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-          {tx(
-            "When a visitor picks a country, its landmark photo appears behind the search. Upload any photo — it is converted to AVIF/WebP, sized for desktop and phones, and remembered for that country.",
-            "ვიზიტორის მიერ ქვეყნის არჩევისას ძებნის უკან გამოჩნდება მისი ღირსშესანიშნაობის ფოტო. ატვირთეთ ნებისმიერი ფოტო — ავტომატურად გადაკეთდება AVIF/WebP-ად, კომპიუტერისა და ტელეფონის ზომებით, და ამ ქვეყნისთვის დაიმახსოვრება.",
-            "Когда посетитель выбирает страну, за поиском появляется фото её достопримечательности. Загрузите любое фото — оно будет сжато в AVIF/WebP для компьютера и телефона и закреплено за страной.",
-          )}
-        </p>
-      </div>
+    <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      <details className="group">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-3 sm:px-4 [&::-webkit-details-marker]:hidden">
+          <h2 className="min-w-0 flex-1 text-base font-extrabold text-[#0b1f4b]">{title}</h2>
+          <span className="shrink-0 rounded-md bg-[#0b1f4b] px-1.5 py-0.5 text-xs font-extrabold tabular-nums text-white">
+            {countries.length}
+          </span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-180" aria-hidden />
+        </summary>
+        <div className="space-y-3 border-t border-slate-100 px-3 pb-3 pt-3 sm:px-4 sm:pb-4">
+      <p className="text-xs leading-relaxed text-slate-500">
+        {tx(
+          "When a visitor picks a country, its landmark photo appears behind the search. Upload any photo — it is converted to AVIF/WebP, sized for desktop and phones, and remembered for that country.",
+          "ვიზიტორის მიერ ქვეყნის არჩევისას ძებნის უკან გამოჩნდება მისი ღირსშესანიშნაობის ფოტო. ატვირთეთ ნებისმიერი ფოტო — ავტომატურად გადაკეთდება AVIF/WebP-ად, კომპიუტერისა და ტელეფონის ზომებით, და ამ ქვეყნისთვის დაიმახსოვრება.",
+          "Когда посетитель выбирает страну, за поиском появляется фото её достопримечательности. Загрузите любое фото — оно будет сжато в AVIF/WebP для компьютера и телефона и закреплено за страной.",
+        )}
+      </p>
 
       <input
         ref={fileRef}
@@ -253,6 +263,8 @@ export function HomepageCountryCoversManager({
           );
         })}
       </ul>
+        </div>
+      </details>
     </section>
   );
 }
