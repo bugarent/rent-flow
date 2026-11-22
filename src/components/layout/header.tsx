@@ -162,7 +162,7 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
         <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-2 px-3 py-2 sm:h-[76px] sm:flex-nowrap sm:gap-4 sm:px-4 sm:py-0 lg:h-[84px] lg:gap-5 lg:px-6">
           <Link
             href="/"
-            className={`${headerChipClass} h-12 min-h-12 min-w-0 max-w-full flex-1 basis-full justify-start gap-2 px-2.5 sm:h-14 sm:min-h-14 sm:flex-none sm:basis-auto sm:gap-3.5 sm:px-6 lg:h-[60px] lg:min-h-[60px] lg:px-7`}
+            className={`${headerChipClass} h-12 min-h-12 w-full min-w-0 max-w-full shrink-0 basis-full justify-start gap-2 px-2.5 sm:h-14 sm:min-h-14 sm:w-auto sm:flex-none sm:basis-auto sm:gap-3.5 sm:px-6 lg:h-[60px] lg:min-h-[60px] lg:px-7`}
             onClick={(e) => {
               setOpen(false);
               e.preventDefault();
@@ -175,7 +175,7 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
               }
               window.location.assign("/");
             }}
-            aria-label="Rentairportcars.com — home"
+            aria-label="Rent Airport Cars — home"
           >
             <BrandLogo size="xl" />
           </Link>

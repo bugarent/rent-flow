@@ -46,7 +46,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // Transient storage failures must not noindex inventory URLs Google already knows.
   if (loadFailed) {
     return buildPageMetadata({
-      title: "Car rental | RentAirportCars",
+      title: "Car rental | Rent Airport Cars",
       description: "Book airport car rental — verified local partners, transparent pricing.",
       path,
       canonicalPath: path,
@@ -57,7 +57,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!car || !isPubliclyVisibleListing(car)) {
     return buildPageMetadata({
-      title: "Car rental | RentAirportCars",
+      title: "Car rental | Rent Airport Cars",
       description: "Book airport car rental in Georgia — Kutaisi, Tbilisi and Batumi.",
       path,
       canonicalPath: path,

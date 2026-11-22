@@ -11,7 +11,7 @@ type DeepPartial<T> = T extends string
 
 const es: DeepPartial<Dictionary> = {
   meta: {
-    title: "Alquiler de coches en el aeropuerto de Kutaisi (KUT) | RentAirportCars",
+    title: "Alquiler de coches en el aeropuerto de Kutaisi (KUT) | Rent Airport Cars",
     description:
       "Alquila un coche en Kutaisi (KUT), Tiflis y Batumi. Socios verificados, precios claros y entrega en el aeropuerto.",
   },
@@ -191,7 +191,7 @@ const es: DeepPartial<Dictionary> = {
 
 const it: DeepPartial<Dictionary> = {
   meta: {
-    title: "Noleggio auto aeroporto di Kutaisi (KUT) | RentAirportCars",
+    title: "Noleggio auto aeroporto di Kutaisi (KUT) | Rent Airport Cars",
     description:
       "Noleggia un'auto a Kutaisi (KUT), Tbilisi e Batumi. Partner verificati, prezzi chiari e consegna in aeroporto.",
   },
@@ -345,7 +345,7 @@ const it: DeepPartial<Dictionary> = {
 
 const nl: DeepPartial<Dictionary> = {
   meta: {
-    title: "Autohuur luchthaven Kutaisi (KUT) | RentAirportCars",
+    title: "Autohuur luchthaven Kutaisi (KUT) | Rent Airport Cars",
     description: "Huur een auto in Kutaisi (KUT), Tbilisi en Batumi. Geverifieerde partners en luchthavenlevering.",
   },
   nav: {
@@ -498,7 +498,7 @@ const nl: DeepPartial<Dictionary> = {
 
 const tr: DeepPartial<Dictionary> = {
   meta: {
-    title: "Kutaisi Havalimanı araç kiralama (KUT) | RentAirportCars",
+    title: "Kutaisi Havalimanı araç kiralama (KUT) | Rent Airport Cars",
     description: "Kutaisi (KUT), Tiflis ve Batum'da araç kiralayın. Doğrulanmış ortaklar ve havalimanı teslimi.",
   },
   nav: {
@@ -677,7 +677,7 @@ const tr: DeepPartial<Dictionary> = {
 
 const zh: DeepPartial<Dictionary> = {
   meta: {
-    title: "库塔伊西机场租车 (KUT) | RentAirportCars",
+    title: "库塔伊西机场租车 (KUT) | Rent Airport Cars",
     description: "在库塔伊西 (KUT)、第比利斯和巴统租车。已核验合作伙伴，机场交付。",
   },
   nav: {
@@ -861,7 +861,7 @@ const zh: DeepPartial<Dictionary> = {
 
 const ko: DeepPartial<Dictionary> = {
   meta: {
-    title: "쿠타이시 공항 렌터카 (KUT) | RentAirportCars",
+    title: "쿠타이시 공항 렌터카 (KUT) | Rent Airport Cars",
     description: "쿠타이시(KUT), 트빌리시, 바투미에서 차량을 예약하세요. 검증된 파트너와 공항 인도.",
   },
   nav: {
@@ -1014,7 +1014,7 @@ const ko: DeepPartial<Dictionary> = {
 
 const th: DeepPartial<Dictionary> = {
   meta: {
-    title: "เช่ารถสนามบินคูไตซี (KUT) | RentAirportCars",
+    title: "เช่ารถสนามบินคูไตซี (KUT) | Rent Airport Cars",
     description: "เช่ารถที่คูไตซี (KUT) ทบิลิซี และบาตูมี พาร์ทเนอร์ที่ตรวจสอบแล้ว และส่งรถที่สนามบิน",
   },
   nav: {

@@ -5,7 +5,7 @@ import { SEO_SITE_NAME } from "@/lib/brand";
 export const SEO_TITLE_RANGE = { min: 30, max: 60 } as const;
 export const SEO_DESCRIPTION_RANGE = { min: 120, max: 160 } as const;
 const BRAND = SEO_SITE_NAME;
-/** "RENT AIRPORT CARS", "RentAirportCars", "rentairportcars.com" … */
+/** "Rent Airport Cars", "RentAirportCars", "rentairportcars.com" … */
 const BRAND_PATTERN = "rent\\s*airport\\s*cars(?:\\.com)?";
 
 const DESCRIPTION_TEMPLATE: Record<Locale, string> = {
@@ -45,7 +45,7 @@ export function plainHeading(title: string): string {
 /** Google cuts long titles at the end, so the trailing brand may run a little past the range. */
 const BRANDED_TITLE_MAX = 70;
 
-/** "<heading> | RENT AIRPORT CARS", dropping the brand when the heading alone is too long. */
+/** "<heading> | Rent Airport Cars", dropping the brand when the heading alone is too long. */
 export function autoSeoTitle(heading: string): string {
   const plain = plainHeading(heading);
   const branded = `${plain} | ${BRAND}`;

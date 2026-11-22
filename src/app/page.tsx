@@ -26,7 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description: seo.description,
     path: "/",
     locale,
-    keywords: [...(getPageSeo("home", locale).keywords ?? []), "RENT AIRPORT CARS", "rent airport cars"],
+    keywords: [...(getPageSeo("home", locale).keywords ?? []), "Rent Airport Cars", "rent airport cars"],
   });
 }
 

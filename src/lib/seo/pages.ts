@@ -17,7 +17,7 @@ type PageCopy = { title: string; description: string; keywords?: string[] };
 
 const EN: Record<PageKey, PageCopy> = {
   home: {
-    title: "Kutaisi Airport Car Rental (KUT) | Georgia Airport Hire | RentAirportCars",
+    title: "Kutaisi Airport Car Rental (KUT) | Georgia Airport Hire | Rent Airport Cars",
     description:
       "Rent a car at Kutaisi International Airport (KUT), Tbilisi (TBS) and Batumi (BUS). Compare verified local partners, transparent rates with TPL included, and airport delivery timed to your flight.",
     keywords: [
@@ -29,19 +29,19 @@ const EN: Record<PageKey, PageCopy> = {
     ],
   },
   cars: {
-    title: "Search Airport Cars in Georgia | Kutaisi, Tbilisi, Batumi | RentAirportCars",
+    title: "Search Airport Cars in Georgia | Kutaisi, Tbilisi, Batumi | Rent Airport Cars",
     description:
       "Browse available cars near Kutaisi International Airport and other Georgian airports. Filter by category, dates and price — book online with a small deposit.",
   },
   about: {
-    title: "About RentAirportCars | Airport Car Rental in Georgia",
+    title: "About Rent Airport Cars | Airport Car Rental in Georgia",
     description:
       "Learn how RentAirportCars connects travellers with verified partners for airport car rental in Kutaisi, Tbilisi, Batumi and expanding destinations worldwide.",
   },
   contact: {
-    title: "Contact RentAirportCars | Airport Car Rental Support",
+    title: "Contact Rent Airport Cars | Airport Car Rental Support",
     description:
-      "Contact RentAirportCars for booking help, partner questions or support with your airport car rental in Georgia and beyond.",
+      "Contact Rent Airport Cars for booking help, partner questions or support with your airport car rental in Georgia and beyond.",
   },
   locations: {
     title: "Car Rental Locations | Kutaisi, Tbilisi, Batumi Airports",
@@ -59,19 +59,19 @@ const EN: Record<PageKey, PageCopy> = {
       "Join RentAirportCars as a verified fleet partner. List your cars for Kutaisi, Tbilisi and Batumi airport pickups after admin approval.",
   },
   terms: {
-    title: "Terms of Service | RentAirportCars",
+    title: "Terms of Service | Rent Airport Cars",
     description: "Read the terms of service for booking airport car rental on RentAirportCars.com.",
   },
   privacy: {
-    title: "Privacy Policy | RentAirportCars",
+    title: "Privacy Policy | Rent Airport Cars",
     description: "How RentAirportCars collects, uses and protects your personal data.",
   },
   register: {
-    title: "Create Account | RentAirportCars",
+    title: "Create Account | Rent Airport Cars",
     description: "Create a RentAirportCars account to manage airport car rental bookings.",
   },
   help: {
-    title: "Help Center | Airport Car Rental FAQ | RentAirportCars",
+    title: "Help Center | Airport Car Rental FAQ | Rent Airport Cars",
     description:
       "Answers about booking, payments, airport delivery and cancellations for car rental at Kutaisi and other airports.",
   },
@@ -79,7 +79,7 @@ const EN: Record<PageKey, PageCopy> = {
 
 const KA: Record<PageKey, PageCopy> = {
   home: {
-    title: "ქუთაისის აეროპორტის მანქანის გაქირავება (KUT) | RentAirportCars",
+    title: "ქუთაისის აეროპორტის მანქანის გაქირავება (KUT) | Rent Airport Cars",
     description:
       "იქირავეთ მანქანა ქუთაისის საერთაშორისო აეროპორტში (KUT), თბილისსა და ბათუმში. გადაამოწმებული პარტნიორები, გამჭვირვალე ფასები და მიწოდება აეროპორტში.",
   },
@@ -89,12 +89,12 @@ const KA: Record<PageKey, PageCopy> = {
       "იპოვეთ ხელმისაწვდომი მანქანები ქუთაისის აეროპორტთან და სხვა ქართულ აეროპორტებთან. გაფილტრეთ კატეგორიით, თარიღებითა და ფასით.",
   },
   about: {
-    title: "ჩვენს შესახებ | RentAirportCars",
+    title: "ჩვენს შესახებ | Rent Airport Cars",
     description:
       "გაიგეთ, როგორ აკავშირებს RentAirportCars მოგზაურებს გადაამოწმებულ პარტნიორებთან ქუთაისში, თბილისსა და ბათუმში.",
   },
   contact: {
-    title: "კონტაქტი | RentAirportCars",
+    title: "კონტაქტი | Rent Airport Cars",
     description: "დაგვიკავშირდით ჯავშნის, პარტნიორობის ან მხარდაჭერის საკითხებზე.",
   },
   locations: {
@@ -102,7 +102,7 @@ const KA: Record<PageKey, PageCopy> = {
     description: "იპოვეთ გააქტიურებული ლოკაციები ქუთაისის, თბილისისა და ბათუმის აეროპორტებში.",
   },
   partnership: {
-    title: "ბიზნეს პარტნიორობა | RentAirportCars",
+    title: "ბიზნეს პარტნიორობა | Rent Airport Cars",
     description: "ითანამშრომლეთ RentAirportCars-თან სასტუმროებისა და სააგენტოებისთვის საქართველოს აეროპორტებში.",
   },
   becomePartner: {
@@ -110,26 +110,26 @@ const KA: Record<PageKey, PageCopy> = {
     description: "განათავსეთ ავტოპარკი ქუთაისის, თბილისისა და ბათუმის აეროპორტებზე.",
   },
   terms: {
-    title: "მომსახურების პირობები | RentAirportCars",
+    title: "მომსახურების პირობები | Rent Airport Cars",
     description: "წაიკითხეთ RentAirportCars-ის მომსახურების პირობები.",
   },
   privacy: {
-    title: "კონფიდენციალურობის პოლიტიკა | RentAirportCars",
+    title: "კონფიდენციალურობის პოლიტიკა | Rent Airport Cars",
     description: "როგორ ვამუშავებთ და ვიცავთ თქვენს პერსონალურ მონაცემებს.",
   },
   register: {
-    title: "რეგისტრაცია | RentAirportCars",
+    title: "რეგისტრაცია | Rent Airport Cars",
     description: "შექმენით ანგარიში ჯავშნების სამართავად.",
   },
   help: {
-    title: "დახმარების ცენტრი | RentAirportCars",
+    title: "დახმარების ცენტრი | Rent Airport Cars",
     description: "პასუხები ჯავშნაზე, გადახდაზე და აეროპორტის მიწოდებაზე.",
   },
 };
 
 const RU: Record<PageKey, PageCopy> = {
   home: {
-    title: "Аренда авто в аэропорту Кутаиси (KUT) | Грузия | RentAirportCars",
+    title: "Аренда авто в аэропорту Кутаиси (KUT) | Грузия | Rent Airport Cars",
     description:
       "Арендуйте авто в аэропорту Кутаиси (KUT), Тбилиси и Батуми. Проверенные партнёры, прозрачные цены и подача в аэропорту.",
   },
@@ -138,11 +138,11 @@ const RU: Record<PageKey, PageCopy> = {
     description: "Сравните доступные авто возле аэропорта Кутаиси и других аэропортов Грузии.",
   },
   about: {
-    title: "О нас | RentAirportCars",
+    title: "О нас | Rent Airport Cars",
     description: "Как RentAirportCars связывает путешественников с партнёрами в Кутаиси, Тбилиси и Батуми.",
   },
   contact: {
-    title: "Контакты | RentAirportCars",
+    title: "Контакты | Rent Airport Cars",
     description: "Свяжитесь с нами по бронированию, партнёрству или поддержке.",
   },
   locations: {
@@ -150,7 +150,7 @@ const RU: Record<PageKey, PageCopy> = {
     description: "Активные локации аренды авто в аэропортах Грузии.",
   },
   partnership: {
-    title: "Бизнес-партнёрство | RentAirportCars",
+    title: "Бизнес-партнёрство | Rent Airport Cars",
     description: "Партнёрская программа для отелей и агентств в аэропортах Грузии.",
   },
   becomePartner: {
@@ -158,19 +158,19 @@ const RU: Record<PageKey, PageCopy> = {
     description: "Разместите автопарк для выдачи в аэропортах Кутаиси, Тбилиси и Батуми.",
   },
   terms: {
-    title: "Условия использования | RentAirportCars",
+    title: "Условия использования | Rent Airport Cars",
     description: "Условия бронирования аренды авто на RentAirportCars.com.",
   },
   privacy: {
-    title: "Политика конфиденциальности | RentAirportCars",
+    title: "Политика конфиденциальности | Rent Airport Cars",
     description: "Как мы обрабатываем и защищаем ваши персональные данные.",
   },
   register: {
-    title: "Регистрация | RentAirportCars",
+    title: "Регистрация | Rent Airport Cars",
     description: "Создайте аккаунт для управления бронированиями.",
   },
   help: {
-    title: "Справка | RentAirportCars",
+    title: "Справка | Rent Airport Cars",
     description: "Ответы о бронировании, оплате и подаче в аэропорту.",
   },
 };
@@ -197,18 +197,18 @@ export function carDetailSeo(input: {
   const locale = input.locale || "en";
   if (locale === "ka") {
     return {
-      title: `${input.make} ${input.model}${year} — გაქირავება ${airport} | RentAirportCars`,
+      title: `${input.make} ${input.model}${year} — გაქირავება ${airport} | Rent Airport Cars`,
       description: `იქირავეთ ${input.make} ${input.model}${year} ${airport}-თან. ონლაინ ჯავშანი, აეროპორტის მიწოდება და გამჭვირვალე ფასი.`,
     };
   }
   if (locale === "ru") {
     return {
-      title: `${input.make} ${input.model}${year} — аренда у ${airport} | RentAirportCars`,
+      title: `${input.make} ${input.model}${year} — аренда у ${airport} | Rent Airport Cars`,
       description: `Арендуйте ${input.make} ${input.model}${year} возле ${airport}. Онлайн-бронирование и подача в аэропорту.`,
     };
   }
   return {
-    title: `${input.make} ${input.model}${year} — Rent near ${airport} | RentAirportCars`,
+    title: `${input.make} ${input.model}${year} — Rent near ${airport} | Rent Airport Cars`,
     description: `Book the ${input.make} ${input.model}${year} for airport pickup near ${airport}. Transparent rates, TPL included, and verified partners on RentAirportCars.`,
   };
 }

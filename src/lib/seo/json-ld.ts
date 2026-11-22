@@ -2,8 +2,8 @@ import { SEO_SITE_NAME, SITE_DOMAIN, SUPPORT_EMAIL } from "@/lib/brand";
 import { SITE_URL, absoluteUrl } from "@/lib/seo/config";
 import { LOCALES } from "@/lib/i18n/config";
 
-/** Spellings people type for the brand; the domain is left out so Google keeps the brand name. */
-const BRAND_ALTERNATES = ["Rent Airport Cars", "RentAirportCars"];
+/** Alternate spellings; primary `name` stays "Rent Airport Cars" (SEO_SITE_NAME). */
+const BRAND_ALTERNATES = ["RentAirportCars", "rentairportcars.com"];
 
 export type LocalBusinessContact = {
   phone?: string;

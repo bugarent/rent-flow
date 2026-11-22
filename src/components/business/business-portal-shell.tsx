@@ -49,7 +49,7 @@ export function BusinessPortalShell({ children }: { children: ReactNode }) {
               "inline-flex items-center gap-2 rounded-xl px-2 py-1.5",
               login ? "bg-slate-50" : "bg-white/10",
             )}
-            aria-label="Rentairportcars.com"
+            aria-label="Rent Airport Cars"
           >
             <BrandLogo size="md" />
           </Link>

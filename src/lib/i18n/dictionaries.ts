@@ -360,7 +360,7 @@ export type Dictionary = {
 export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionary } = {
   en: {
     meta: {
-      title: "Kutaisi Airport Car Rental (KUT) | Georgia Airport Hire | RentAirportCars",
+      title: "Kutaisi Airport Car Rental (KUT) | Georgia Airport Hire | Rent Airport Cars",
       description:
         "Rent a car at Kutaisi International Airport (KUT), Tbilisi (TBS) and Batumi (BUS). Verified partners, transparent rates with TPL included, airport delivery timed to your flight.",
     },
@@ -730,7 +730,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
   },
   ka: {
     meta: {
-      title: "ქუთაისის აეროპორტის მანქანის გაქირავება (KUT) | RentAirportCars",
+      title: "ქუთაისის აეროპორტის მანქანის გაქირავება (KUT) | Rent Airport Cars",
       description:
         "იქირავეთ მანქანა ქუთაისის საერთაშორისო აეროპორტში (KUT), თბილისსა და ბათუმში. გადაამოწმებული პარტნიორები, გამჭვირვალე ფასები და მიწოდება აეროპორტში.",
     },
@@ -1100,7 +1100,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
   },
   ru: {
     meta: {
-      title: "Аренда авто в аэропорту Кутаиси (KUT) | Грузия | RentAirportCars",
+      title: "Аренда авто в аэропорту Кутаиси (KUT) | Грузия | Rent Airport Cars",
       description:
         "Арендуйте авто в аэропорту Кутаиси (KUT), Тбилиси и Батуми. Проверенные партнёры, прозрачные цены и подача в аэропорту.",
     },
@@ -1470,7 +1470,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
   },
   fr: {
     meta: {
-      title: "Location de voiture aéroport de Koutaïssi (KUT) | Géorgie | RentAirportCars",
+      title: "Location de voiture aéroport de Koutaïssi (KUT) | Géorgie | Rent Airport Cars",
       description:
         "Louez une voiture à l'aéroport international de Koutaïssi (KUT), Tbilissi et Batoumi. Partenaires vérifiés, tarifs transparents et livraison à l'aéroport.",
     },
@@ -1840,7 +1840,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
   },
   de: {
     meta: {
-      title: "Mietwagen Flughafen Kutaisi (KUT) | Georgien | RentAirportCars",
+      title: "Mietwagen Flughafen Kutaisi (KUT) | Georgien | Rent Airport Cars",
       description:
         "Mieten Sie ein Auto am Flughafen Kutaisi (KUT), Tiflis und Batumi. Geprüfte Partner, transparente Preise und Flughafenlieferung.",
     },
@@ -2210,7 +2210,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
   },
   pl: {
     meta: {
-      title: "Wynajem auta lotnisko Kutaisi (KUT) | Gruzja | RentAirportCars",
+      title: "Wynajem auta lotnisko Kutaisi (KUT) | Gruzja | Rent Airport Cars",
       description:
         "Wynajmij auto na lotnisku Kutaisi (KUT), w Tbilisi i Batumi. Zweryfikowani partnerzy, przejrzyste ceny i dostawa na lotnisko.",
     },
@@ -2580,7 +2580,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
   },
   ar: {
     meta: {
-      title: "تأجير سيارات مطار كوتايسي (KUT) | جورجيا | RentAirportCars",
+      title: "تأجير سيارات مطار كوتايسي (KUT) | جورجيا | Rent Airport Cars",
       description:
         "استأجر سيارة في مطار كوتايسي الدولي (KUT) وتبليسي وباتومي. شركاء موثوقون وأسعار شفافة وتسليم في المطار.",
     },
