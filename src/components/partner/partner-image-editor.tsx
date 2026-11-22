@@ -523,13 +523,23 @@ export function PartnerImageEditor({
       }
       ctx.drawImage(full, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
 
-      // Documents stay sharper at a slightly higher JPEG quality; upload compress
-      // still caps final bytes so storage does not grow.
-      const jpegQ = asDocument ? 0.92 : 0.9;
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(copy.failed))), "image/jpeg", jpegQ);
+      // Documents export as WebP (falls back to JPEG if the browser cannot encode it).
+      const mime = asDocument ? "image/webp" : "image/jpeg";
+      const quality = asDocument ? 0.9 : 0.9;
+      let blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((b) => resolve(b), mime, quality);
       });
-      const file = new File([blob], "edited.jpg", { type: "image/jpeg" });
+      let type = mime;
+      if (!blob && asDocument) {
+        blob = await new Promise<Blob | null>((resolve) => {
+          canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92);
+        });
+        type = "image/jpeg";
+      }
+      if (!blob) throw new Error(copy.failed);
+      const file = new File([blob], type === "image/webp" ? "edited.webp" : "edited.jpg", {
+        type,
+      });
       const url = await uploadEdited(file, asDocument);
       onSaved(url);
       onClose();
