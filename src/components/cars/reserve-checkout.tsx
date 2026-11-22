@@ -260,6 +260,12 @@ export function ReserveCheckout({
     bookingId: "",
   });
   const successPathRef = useRef("/booking/payment/success");
+  const handleBookingRef = useRef<
+    (
+      provider?: "bog" | "paypal",
+      opts?: { embed?: boolean },
+    ) => Promise<{ bookingId: string; orderId: string; redirectUrl?: string } | void>
+  >(async () => undefined);
 
   const [seed] = useState(() =>
     initialCar && initialRange === carRangeKey(initialStart, initialEnd)
@@ -912,6 +918,13 @@ export function ReserveCheckout({
     }
     setInvalidFields(new Set());
     setError("");
+
+    // 0€ site fee: confirm the booking immediately — never open Card/PayPal.
+    if (depositReady && roundMoney(Math.max(0, totals.payNow)) <= 0.009) {
+      void handleBookingRef.current("bog");
+      return;
+    }
+
     setCheckoutStep("payment");
     window.scrollTo({ top: 0, behavior: "auto" });
     if (!payAmountLabel) {
@@ -1304,7 +1317,6 @@ export function ReserveCheckout({
     }
   };
 
-  const handleBookingRef = useRef(handleBooking);
   handleBookingRef.current = handleBooking;
   const bogAutoStartRef = useRef(false);
 
@@ -1319,14 +1331,13 @@ export function ReserveCheckout({
       bogAutoStartRef.current = false;
       return;
     }
-    // 0€ online (admin test / 0% deposit): confirm without the bank widget.
+    // Free bookings normally skip this step; if still here, confirm without the gateway UI.
     if (roundMoney(Math.max(0, totals.payNow)) <= 0.009) {
       if (bogAutoStartRef.current) return;
       bogAutoStartRef.current = true;
-      void (async () => {
-        const result = await handleBookingRef.current("bog", { embed: true });
+      void handleBookingRef.current("bog").then((result) => {
         if (!result) bogAutoStartRef.current = false;
-      })();
+      });
       return;
     }
     if (!paymentReady.checked || !paymentReady.bog) return;
