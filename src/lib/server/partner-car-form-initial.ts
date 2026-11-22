@@ -74,9 +74,16 @@ export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
     );
     const catalog = withTplPartnerChoice(extras, canToggleTpl);
     const prefById = new Map(prefs.map((p) => [p.extraServiceId, p]));
+    const prefBySlug = new Map<string, (typeof prefs)[number]>();
+    for (const pref of prefs) {
+      const slug = catalog.find((s) => s.id === pref.extraServiceId)?.slug;
+      if (slug && !prefBySlug.has(slug)) prefBySlug.set(slug, pref);
+    }
+    const prefFor = (service: (typeof catalog)[number]) =>
+      prefById.get(service.id) || prefBySlug.get(service.slug);
     const offered = catalog.filter((service) => {
       if (partnerStatusLocked(service)) return true;
-      const pref = prefById.get(service.id);
+      const pref = prefFor(service);
       if (isCrossBorderExtra(service)) return Boolean(pref?.enabled || pref?.forbidden);
       if (!fleet) return true;
       if (!partnerServiceAdded(service, pref, fleet.usedOnCar(service))) return false;
@@ -91,7 +98,7 @@ export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
     );
     const initialExtraPrefs: CarFormExtraPref[] | undefined = fleet
       ? initialExtrasCatalog.map((service) => {
-          const pref = prefById.get(service.id);
+          const pref = prefFor(service);
           return {
             service: { id: service.id, slug: service.slug },
             ...partnerCabinetDefaults(service, pref, fleet.usedOnCar(service)),

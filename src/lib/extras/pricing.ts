@@ -6,6 +6,7 @@ import {
   resolveCheckoutSlot,
   type ExtraCheckoutSlot,
 } from "@/lib/extras/checkout-slot";
+import { isCoreTplSlug } from "@/lib/extras/tpl-partner-choice";
 
 export type ExtraPricingMode = "toggle" | "free" | "ranged";
 
@@ -201,6 +202,14 @@ export function normalizePartnerExtraPrice(
     };
   }
   if (service.mode === "free" || service.isTpl) {
+    // Optional core TPL: cabinet Off must not recreate a CarExtra on save.
+    if (
+      input.enabled === false &&
+      service.partnerCanToggleTpl &&
+      isCoreTplSlug(service.slug)
+    ) {
+      return null;
+    }
     return { extraServiceId: service.id, priceEur: 0 };
   }
 

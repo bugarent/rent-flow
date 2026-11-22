@@ -228,13 +228,10 @@ export async function applyPartnerExtraOfferModes(
     }
     if (!prefs.length) return extras;
 
-    const { isCoreTplSlug, tplChoiceCoversPartner } = await import("@/lib/extras/tpl-partner-choice");
-    const { readTplPartnerChoiceCountries } = await import("@/lib/server/tpl-partner-choice-store");
-    const { partnerOperatingCountries } = await import("@/lib/server/extras/partner-country-scope");
-    const optionalCountries = await readTplPartnerChoiceCountries();
-    const tplOptional =
-      optionalCountries.length > 0 &&
-      tplChoiceCoversPartner(await partnerOperatingCountries(id), optionalCountries);
+    const { isCoreTplSlug } = await import("@/lib/extras/tpl-partner-choice");
+    const { partnerMayToggleTpl } = await import("@/lib/server/tpl-partner-choice-store");
+    // Same partner id the prefs were loaded from (file-partner / local aliases).
+    const tplOptional = await partnerMayToggleTpl(resolvedPartnerId);
 
     const lookup = prefLookup(prefs, await extraSlugById());
     const next: HydratedListingExtra[] = [];
@@ -242,7 +239,26 @@ export async function applyPartnerExtraOfferModes(
       const svc = row.extraService;
       const pref = lookup.forRow(row.extraServiceId, svc?.slug);
       const mandatoryPriced = Boolean(svc && isMandatoryPricedExtra(svc));
-      const optionalTpl = Boolean(tplOptional && svc && isCoreTplSlug(svc.slug));
+      const coreTpl = Boolean(svc && isCoreTplSlug(svc.slug));
+      const optionalTpl = Boolean(tplOptional && coreTpl);
+
+      if (pref) {
+        if (pref.added === false && !mandatoryPriced) continue;
+        if (!partnerExtraPrefAppliesToCar(pref, carId)) {
+          // Pref scoped to other cars — leave the car's own extra row as-is.
+          next.push(row);
+          continue;
+        }
+        // Cabinet Off must win before force-keep (esp. optional core TPL).
+        if (!pref.enabled && !mandatoryPriced && (!coreTpl || optionalTpl)) {
+          continue;
+        }
+        if (pref.forbidden && !mandatoryPriced) {
+          next.push({ ...row, priceEur: 0, forbidden: true });
+          continue;
+        }
+      }
+
       if (svc && !optionalTpl && !mandatoryPriced && (svc.isTpl || isMandatoryExtra(svc))) {
         next.push({
           extraServiceId: row.extraServiceId,
@@ -253,22 +269,6 @@ export async function applyPartnerExtraOfferModes(
       }
       if (!pref) {
         next.push(row);
-        continue;
-      }
-      // Taken off the partner's service list: no longer offered on any listing.
-      if (pref.added === false && !mandatoryPriced) continue;
-      if (!partnerExtraPrefAppliesToCar(pref, carId)) {
-        // Pref scoped to other cars — leave the car's own extra row as-is.
-        next.push(row);
-        continue;
-      }
-      // Mandatory extras cannot be hidden or forbidden by the partner; only the price applies.
-      if (pref.forbidden && !mandatoryPriced) {
-        next.push({ ...row, priceEur: 0, forbidden: true });
-        continue;
-      }
-      if (!pref.enabled && !mandatoryPriced) {
-        // Cabinet "off" removes the service from listings (and search) for this partner.
         continue;
       }
       const bounds = effectivePeriodBounds(
@@ -308,7 +308,6 @@ export async function applyPartnerExtraOfferModes(
           : row.extraService,
       });
     }
-    void resolvedPartnerId;
     return sortHydratedExtras(next);
   } catch {
     return extras;
@@ -422,9 +421,41 @@ export async function mergePartnerOfferedExtras(
   }
 }
 
+async function partnerHasCoreTplOff(partnerId: string): Promise<boolean> {
+  const pid = String(partnerId || "").trim();
+  if (!pid) return false;
+  try {
+    const { isCoreTplSlug } = await import("@/lib/extras/tpl-partner-choice");
+    const { partnerMayToggleTpl } = await import("@/lib/server/tpl-partner-choice-store");
+    if (!(await partnerMayToggleTpl(pid))) return false;
+    const { readPartnerExtraPrefs } = await import("@/lib/server/partner-extras-prefs-store");
+    const { LOCAL_PARTNER_ID } = await import("@/lib/auth/local-partner-store");
+    const candidateIds = [pid];
+    if (pid.startsWith("file-partner-")) {
+      const stripped = pid.replace(/^file-partner-/, "");
+      if (stripped) candidateIds.push(stripped);
+    }
+    if (!candidateIds.includes(LOCAL_PARTNER_ID)) candidateIds.push(LOCAL_PARTNER_ID);
+    let prefs: Array<{ extraServiceId: string; enabled: boolean }> = [];
+    for (const candidate of candidateIds) {
+      prefs = await readPartnerExtraPrefs(candidate);
+      if (prefs.length) break;
+    }
+    if (!prefs.length) return false;
+    const slugById = await extraSlugById();
+    return prefs.some((pref) => {
+      if (pref.enabled !== false) return false;
+      return isCoreTplSlug(slugById.get(pref.extraServiceId) || "");
+    });
+  } catch {
+    return false;
+  }
+}
+
 /** Ensure free catalog services (insurance + mandatory free extras) appear on checkout. */
 export async function mergeFreeInsuranceExtras(
   extras: HydratedListingExtra[],
+  partnerId?: string | null,
 ): Promise<HydratedListingExtra[]> {
   const catalog = await listExtraServices({ activeOnly: true });
   const presentIds = new Set(extras.map((row) => row.extraServiceId));
@@ -433,9 +464,12 @@ export async function mergeFreeInsuranceExtras(
       .map((row) => row.extraService?.checkoutSlot)
       .filter((slot): slot is ExtraCheckoutSlot => Boolean(slot) && slot !== "none"),
   );
+  const { isCoreTplSlug } = await import("@/lib/extras/tpl-partner-choice");
+  const skipCoreTpl = await partnerHasCoreTplOff(String(partnerId || "").trim());
   const merged = [...extras];
   for (const service of catalog) {
     if (service.mode !== "free" && !isMandatoryFreeExtra(service)) continue;
+    if (skipCoreTpl && isCoreTplSlug(service.slug)) continue;
 
     if (isInsuranceCheckoutSlot(service.checkoutSlot)) {
       if (presentIds.has(service.id) || presentSlots.has(service.checkoutSlot)) continue;
@@ -481,7 +515,7 @@ export async function hydratePartnerListingExtras(opts: {
   description?: string | null;
 }): Promise<HydratedListingExtra[]> {
   const hydrated = await hydrateListingExtras(opts.rawExtras);
-  const withFree = await mergeFreeInsuranceExtras(hydrated);
+  const withFree = await mergeFreeInsuranceExtras(hydrated, opts.partnerId);
   const withPrefs = await applyPartnerExtraOfferModes(withFree, opts.partnerId, opts.carId);
   const withOffered = await mergePartnerOfferedExtras(withPrefs, opts.partnerId, opts.carId);
   if (opts.description == null || opts.description === undefined) return withOffered;
