@@ -1,9 +1,9 @@
-function RacMark({ size }: { size: "lg" | "md" }) {
-  const box = size === "lg" ? "h-40 w-40" : "h-28 w-28";
-  const img = size === "lg" ? 120 : 84;
+function RacMark({ size }: { size: "lg" | "md" | "sm" }) {
+  const box = size === "lg" ? "h-40 w-40" : size === "md" ? "h-28 w-28" : "h-11 w-11";
+  const img = size === "lg" ? 120 : size === "md" ? 84 : 32;
   return (
     <div className={`relative flex ${box} shrink-0 items-center justify-center`}>
-      <span className="rac-arc" aria-hidden />
+      <span className={`rac-arc${size === "sm" ? " rac-arc--sm" : ""}`} aria-hidden />
       <img
         src="/brand/rac-logo.webp"
         alt=""
@@ -13,6 +13,16 @@ function RacMark({ size }: { size: "lg" | "md" }) {
         className="object-contain"
       />
     </div>
+  );
+}
+
+/** Compact spinning RAC mark for buttons (e.g. checkout pay-now while booking). */
+export function RacButtonLoader({ label = "Loading…" }: { label?: string }) {
+  return (
+    <span role="status" aria-live="polite" className="inline-flex items-center justify-center">
+      <RacMark size="sm" />
+      <span className="sr-only">{label}</span>
+    </span>
   );
 }
 

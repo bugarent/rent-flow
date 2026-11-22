@@ -211,3 +211,7 @@ iframe[title="Powered by Netlify"] {
   border-right-color: #c47a3a;
   animation: rac-boot-spin 0.7s linear infinite;
 }
+
+.rac-arc--sm {
+  border-width: 2px;
+}

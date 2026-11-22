@@ -34,6 +34,7 @@ import {
 } from "@/components/cars/lazy-checkout";
 import { CheckoutBogFrame } from "@/components/cars/checkout-bog-frame";
 import { CheckoutPaypalButtons } from "@/components/cars/checkout-paypal-buttons";
+import { RacButtonLoader } from "@/components/layout/route-loading-spinner";
 import { usePreloadWhenIdle } from "@/lib/client/preload";
 import { ResidenceCountrySelect } from "@/components/cars/residence-country-select";
 import { CheckoutCarGallery } from "@/components/cars/checkout-car-gallery";
@@ -2798,11 +2799,18 @@ function PriceSummaryCard({
         <button
           type="button"
           disabled={loading || !depositReady}
+          aria-busy={loading || !depositReady}
           onClick={() => onPayNow?.()}
-          className="flex w-full min-h-[4.5rem] items-center justify-center rounded-xl bg-[#1d6fe8] px-4 py-3 text-white shadow-md transition hover:bg-[#1a64d4] disabled:cursor-not-allowed disabled:opacity-60"
+          className={`flex w-full min-h-[4.5rem] items-center justify-center rounded-xl bg-[#1d6fe8] px-4 py-3 text-white shadow-md transition hover:bg-[#1a64d4] disabled:cursor-not-allowed ${
+            loading || !depositReady ? "disabled:opacity-100" : "disabled:opacity-60"
+          }`}
         >
           {loading || !depositReady ? (
-            <span className="text-sm font-bold">…</span>
+            <RacButtonLoader
+              label={
+                locale === "ka" ? "ჯავშანი მუშავდება…" : locale === "ru" ? "Бронь обрабатывается…" : "Booking…"
+              }
+            />
           ) : (
             <span className="flex flex-col items-center justify-center text-center">
               {bpOn && feePercent > 0 && payNowBefore > payNow + 0.009 ? (
