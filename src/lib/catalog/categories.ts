@@ -53,6 +53,10 @@ export const VEHICLE_CATEGORIES: {
       { make: "VW", model: "Multivan" },
       { make: "Ford", model: "Tourneo" },
       { make: "Peugeot", model: "Traveller" },
+      { make: "Kia", model: "Carens" },
+      { make: "Kia", model: "Rondo" },
+      { make: "Kia", model: "Carnival" },
+      { make: "Kia", model: "Sedona" },
     ],
   },
   {
