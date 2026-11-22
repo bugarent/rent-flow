@@ -119,6 +119,8 @@ export async function createBogEcommerceOrder(
     callback_url: input.callbackUrl,
     external_order_id: input.externalOrderId.slice(0, 100),
     capture: "automatic",
+    // Explicit card method so the on-page iframe / hosted form can collect PAN+CVV.
+    payment_method: ["card"],
     purchase_units: {
       currency: input.currency,
       total_amount: amount,

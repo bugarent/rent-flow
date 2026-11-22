@@ -1130,7 +1130,19 @@ export function ReserveCheckout({
         ? ordersRef.current[provider]
         : "";
     if (cachedOrderId) {
-      return { bookingId: bookingIdRef.current, orderId: cachedOrderId };
+      const cachedRedirect =
+        provider === "bog" ? ordersRef.current.bogRedirect : ordersRef.current.paypalRedirect;
+      setEmbeddedPay({
+        method: provider,
+        bookingId: bookingIdRef.current,
+        orderId: cachedOrderId,
+        redirectUrl: cachedRedirect,
+      });
+      return {
+        bookingId: bookingIdRef.current,
+        orderId: cachedOrderId,
+        redirectUrl: cachedRedirect,
+      };
     }
     setLoading(true);
     try {
@@ -1432,6 +1444,7 @@ export function ReserveCheckout({
       return;
     }
 
+    let cancelled = false;
     void (async () => {
       // Do not await FX before starting payment — label can fill in the background.
       if (!payAmountLabel) {
@@ -1440,11 +1453,22 @@ export function ReserveCheckout({
         });
       }
       const result = await handleBookingRef.current("bog", { embed: true });
+      if (cancelled) return;
       if (!result) {
         // Allow a later retry when the user re-selects Card.
         bogAutoStartRef.current = false;
       }
     })();
+
+    // If create/embed stalls, unlock the manual "open form" CTA instead of leaving a blank slot.
+    const unlock = window.setTimeout(() => {
+      if (!cancelled) bogAutoStartRef.current = false;
+    }, 8000);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(unlock);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- start once per method/readiness/amount; label is background-only
   }, [
     checkoutStep,
@@ -1681,38 +1705,51 @@ export function ReserveCheckout({
             (!paymentReady.checked || paymentReady.bog) &&
             !embeddedPay &&
             !error ? (
-              <div className="space-y-3 rounded-2xl border border-slate-200 bg-white px-4 py-10 text-center">
-                <p className="text-sm font-semibold text-slate-500">
-                  {roundMoney(Math.max(0, totals.payNow)) <= 0.009
-                    ? locale === "ka"
-                      ? "ჯავშანი დასტურდება…"
-                      : locale === "ru"
-                        ? "Подтверждаем бронь…"
-                        : "Confirming booking…"
-                    : locale === "ka"
-                      ? "ბარათის ფორმა იხსნება…"
-                      : locale === "ru"
-                        ? "Открываем форму карты…"
-                        : "Opening card form…"}
-                </p>
-                {loading ? null : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      bogAutoStartRef.current = false;
-                      setError("");
-                      void handleBooking("bog", { embed: true });
-                    }}
-                    className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-sm font-extrabold text-white hover:bg-[#e55800]"
-                  >
-                    {roundMoney(Math.max(0, totals.payNow)) <= 0.009
-                      ? locale === "ka"
-                        ? "ჯავშნის დადასტურება"
-                        : "Confirm booking"
-                      : locale === "ka"
-                        ? "ბარათის ფორმის გახსნა"
-                        : "Open card form"}
-                  </button>
+              <div className="space-y-4 rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center shadow-sm">
+                {loading ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <RacButtonLoader
+                      label={
+                        locale === "ka"
+                          ? "ბარათის ფორმა იხსნება…"
+                          : "Opening card form…"
+                      }
+                    />
+                    <p className="text-sm font-semibold text-slate-500">
+                      {roundMoney(Math.max(0, totals.payNow)) <= 0.009
+                        ? locale === "ka"
+                          ? "ჯავშანი დასტურდება…"
+                          : "Confirming booking…"
+                        : locale === "ka"
+                          ? "ბარათის ფორმა იხსნება…"
+                          : "Opening card form…"}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-slate-600">
+                      {locale === "ka"
+                        ? "ბარათის მონაცემების შესაყვანად გახსენით გადახდის ფორმა"
+                        : "Open the payment form to enter your card details"}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        bogAutoStartRef.current = false;
+                        setError("");
+                        void handleBooking("bog", { embed: true });
+                      }}
+                      className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-sm font-extrabold text-white hover:bg-[#e55800]"
+                    >
+                      {roundMoney(Math.max(0, totals.payNow)) <= 0.009
+                        ? locale === "ka"
+                          ? "ჯავშნის დადასტურება"
+                          : "Confirm booking"
+                        : locale === "ka"
+                          ? "ბარათის ფორმის გახსნა"
+                          : "Open card form"}
+                    </button>
+                  </>
                 )}
               </div>
             ) : null}
@@ -1765,6 +1802,7 @@ export function ReserveCheckout({
 
             {embeddedPay?.method === "bog" && paymentMethod === "bog" ? (
               <CheckoutBogFrame
+                key={embeddedPay.orderId}
                 orderId={embeddedPay.orderId}
                 locale={locale}
                 redirectUrl={embeddedPay.redirectUrl || ordersRef.current.bogRedirect}
