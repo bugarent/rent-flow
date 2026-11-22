@@ -11,6 +11,7 @@ import { isCrossBorderExtra } from "@/lib/extras/cross-border";
 import { isListingInsuranceService } from "@/lib/extras/checkout-slot";
 import { partnerStatusLocked } from "@/lib/extras/partner-service-choice";
 import {
+  partnerExtraHiddenOnListing,
   partnerExtraOfferedOnListing,
   partnerExtraPrefAppliesToCar,
 } from "@/lib/extras/partner-extra-pref";
@@ -285,8 +286,24 @@ export function extrasVisibleOnCarForm(
   const onCar = (service: ExtraServicePricing) =>
     Boolean(opts.carExtraIds?.has(service.id) || opts.offerIds?.has(service.id));
   return catalog.filter((service) => {
-    if (partnerStatusLocked(service)) return true;
     const pref = prefs.forService(service);
+    // Explicit cabinet Off/removed wins even if a stale catalog row still looks mandatory.
+    if (
+      pref &&
+      partnerExtraHiddenOnListing(
+        {
+          added: pref.added,
+          enabled: pref.enabled,
+          forbidden: pref.forbidden,
+          carIds: pref.carIds,
+        },
+        opts.carId,
+      ) &&
+      !partnerStatusLocked(service)
+    ) {
+      return false;
+    }
+    if (partnerStatusLocked(service)) return true;
     if (isCrossBorderExtra(service)) {
       if (pref) return Boolean(pref.enabled || pref.forbidden);
       return onCar(service);
@@ -417,7 +434,7 @@ export function PartnerExtrasFields({
           const row = value.find((v) => v.extraServiceId === service.id);
           if (!row) return null;
 
-          if (isMandatoryFreeExtra(service)) {
+          if (isMandatoryFreeExtra(service) && partnerStatusLocked(service)) {
             return (
               <li key={service.id} className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">

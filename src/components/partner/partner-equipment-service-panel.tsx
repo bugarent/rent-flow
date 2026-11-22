@@ -13,6 +13,7 @@ import {
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
 import { compareListingServices, isListingInsuranceService } from "@/lib/extras/checkout-slot";
 import {
+  partnerServiceAdded,
   partnerServiceAlwaysAdded,
   partnerStatusLocked,
 } from "@/lib/extras/partner-service-choice";
@@ -183,7 +184,7 @@ export function PartnerEquipmentServicePanel({
       .sort(compareListingServices)
       .map((service) => {
         const locked = partnerStatusLocked(service);
-        const added = partnerServiceAlwaysAdded(service);
+        const added = partnerServiceAdded(service, null, false);
         return {
           service,
           added,

@@ -25,11 +25,13 @@ export function partnerStatusLocked(service: ChoiceService): boolean {
   return isMandatoryExtra(service);
 }
 
-/** Always on a partner's list: TPL, admin-mandatory services and border crossing (switched on the Delivery page). */
+/** Always on a partner's list: locked mandatory services and border crossing (switched on the Delivery page). */
 export function partnerServiceAlwaysAdded(service: ChoiceService): boolean {
   if (partnerStatusLocked(service)) return true;
   const slug = service.slug ?? undefined;
   if (isCrossBorderExtra({ id: service.id, slug })) return true;
+  // When the country lets partners choose TPL, it can leave their list like other insurance packs.
+  if (service.partnerCanToggleTpl && isCoreTplSlug(slug)) return false;
   return (
     resolveCheckoutSlot({
       checkoutSlot: service.checkoutSlot,
@@ -52,6 +54,8 @@ export function partnerServiceAdded(
 ): boolean {
   if (partnerServiceAlwaysAdded(service)) return true;
   if (typeof pref?.added === "boolean") return pref.added;
+  // Optional system TPL stays on the partner list by default until they remove it.
+  if (service.partnerCanToggleTpl && isCoreTplSlug(service.slug)) return true;
   return Boolean(pref?.enabled || pref?.forbidden || usedOnCar);
 }
 

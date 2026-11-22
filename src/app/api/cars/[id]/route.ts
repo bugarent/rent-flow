@@ -4,10 +4,11 @@ import { getAdminSession, getPartnerSession } from "@/lib/auth/sessions";
 import { prisma } from "@/lib/prisma";
 import { MIN_PUBLIC_PHOTOS } from "@/lib/brand";
 import {
-  isMandatoryExtra,
   normalizePartnerExtraPrice,
   type PartnerExtraInput,
 } from "@/lib/extras/pricing";
+import { partnerStatusLocked } from "@/lib/extras/partner-service-choice";
+import { withTplPartnerChoice } from "@/lib/extras/tpl-partner-choice";
 import { resolvePartnerDeliveryPrices } from "@/lib/delivery/pricing";
 import { scopePickupPlacesInDescription } from "@/lib/cars/scope-pickup-places";
 import { listPartnerScopedDeliveryLocations, persistableCarDeliveryRows } from "@/lib/server/delivery-locations";
@@ -15,6 +16,7 @@ import { withPartnerDeliveryPrices } from "@/lib/server/partner-delivery-listing
 import { cabinetExtrasForCar } from "@/lib/server/cabinet-extras-for-car";
 import { readCarInsuranceDoc, readCarInsuranceUrl } from "@/lib/server/car-insurance-store";
 import { ensureExtrasExistInDb, extrasRowsForCarFk, listExtraServices } from "@/lib/server/extras-store";
+import { partnerMayToggleTpl } from "@/lib/server/tpl-partner-choice-store";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import {
   deleteFileCar,
@@ -56,18 +58,20 @@ async function withCabinetExtras<T extends object>(payload: T, partnerId: string
   }
 }
 
-async function resolveCarExtras(rawExtras: unknown) {
+async function resolveCarExtras(rawExtras: unknown, partnerId?: string | null) {
   const catalog = await listExtraServices({ activeOnly: true });
   await ensureExtrasExistInDb(catalog);
+  const canToggleTpl = partnerId ? await partnerMayToggleTpl(partnerId) : false;
+  const flagged = withTplPartnerChoice(catalog, canToggleTpl);
   const inputs = Array.isArray(rawExtras) ? (rawExtras as PartnerExtraInput[]) : [];
   const inputById = new Map(inputs.map((i) => [i.extraServiceId, i]));
 
   const rows: Array<{ extraServiceId: string; priceEur: number; forbidden?: boolean }> = [];
-  for (const service of catalog) {
+  for (const service of flagged) {
     const input = inputById.get(service.id);
     // The car form sends every service the partner activated in the cabinet.
-    // Omitted or explicitly off services stay off the listing. Mandatory ones stay on.
-    if (!input && !isMandatoryExtra(service)) continue;
+    // Omitted or explicitly off services stay off the listing. Locked mandatory ones stay on.
+    if (!input && !partnerStatusLocked(service)) continue;
     const normalized = normalizePartnerExtraPrice(
       service,
       input ?? {
@@ -569,7 +573,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         passportBackUrl: car.passport?.backUrl || "",
         insuranceUrl: insuranceBefore || "",
       });
-      let extraRows = body.extras !== undefined ? await resolveCarExtras(body.extras) : null;
+      let extraRows =
+        body.extras !== undefined ? await resolveCarExtras(body.extras, car.partnerId) : null;
       if (adminCorrection && extraRows && Array.isArray(body.extras) && body.extras.length === 0) {
         extraRows = null;
       } else if (adminCorrection && extraRows && Array.isArray(car.extras)) {

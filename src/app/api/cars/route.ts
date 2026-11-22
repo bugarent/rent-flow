@@ -7,14 +7,16 @@ import {
   resolveCategorySlugForCar,
 } from "@/lib/server/category-mapping";
 import {
-  isMandatoryExtra,
   normalizePartnerExtraPrice,
   type PartnerExtraInput,
 } from "@/lib/extras/pricing";
+import { partnerStatusLocked } from "@/lib/extras/partner-service-choice";
+import { withTplPartnerChoice } from "@/lib/extras/tpl-partner-choice";
 import { resolvePartnerDeliveryPrices } from "@/lib/delivery/pricing";
 import { listPartnerScopedDeliveryLocations, persistableCarDeliveryRows } from "@/lib/server/delivery-locations";
 import { withPartnerDeliveryPrices } from "@/lib/server/partner-delivery-listing-sync";
 import { ensureExtrasExistInDb, extrasRowsForCarFk, listExtraServices } from "@/lib/server/extras-store";
+import { partnerMayToggleTpl } from "@/lib/server/tpl-partner-choice-store";
 import {
   isValidRegistrationNumber,
   normalizeRegistrationNumber,
@@ -166,17 +168,19 @@ export async function GET(req: Request) {
   });
 }
 
-async function resolveCarExtras(rawExtras: unknown) {
-  // Global admin catalog — identical for every partner
+async function resolveCarExtras(rawExtras: unknown, partnerId?: string | null) {
+  // Global admin catalog — identical for every partner (TPL lock depends on partner countries).
   const catalog = await listExtraServices({ activeOnly: true });
   await ensureExtrasExistInDb(catalog);
+  const canToggleTpl = partnerId ? await partnerMayToggleTpl(partnerId) : false;
+  const flagged = withTplPartnerChoice(catalog, canToggleTpl);
   const inputs = Array.isArray(rawExtras) ? (rawExtras as PartnerExtraInput[]) : [];
   const inputById = new Map(inputs.map((i) => [i.extraServiceId, i]));
 
   const rows: Array<{ extraServiceId: string; priceEur: number; forbidden?: boolean }> = [];
-  for (const service of catalog) {
+  for (const service of flagged) {
     const input = inputById.get(service.id);
-    if (!input && !isMandatoryExtra(service)) continue;
+    if (!input && !partnerStatusLocked(service)) continue;
     const normalized = normalizePartnerExtraPrice(
       service,
       input ?? {
@@ -336,7 +340,7 @@ export async function POST(req: Request) {
         categorySlug = rawSlug || null;
       }
       try {
-        extraRows = await resolveCarExtras(extras);
+        extraRows = await resolveCarExtras(extras, partner.id);
       } catch (error) {
         if (!isDbOfflineError(error)) throw error;
         extraRows = extraRowsFromBody(extras);
