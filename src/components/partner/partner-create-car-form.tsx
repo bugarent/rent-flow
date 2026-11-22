@@ -391,7 +391,11 @@ async function uploadFile(file: File, options?: { original?: boolean; document?:
   // Keep a modest original when it already fits. Anything larger is shrunk first,
   // otherwise the host drops the request and the browser only shows "Failed to fetch".
   const payload = document
-    ? await compressImageForUpload(file, { maxEdge: 2200, targetBytes: 1_100_000 })
+    ? await compressImageForUpload(file, {
+        maxEdge: 2200,
+        targetBytes: 1_100_000,
+        preferSharpness: true,
+      })
     : options?.original && file.size <= 3.5 * 1024 * 1024
       ? file
       : await compressImageForUpload(file);
@@ -400,7 +404,12 @@ async function uploadFile(file: File, options?: { original?: boolean; document?:
   } catch (err) {
     const message = err instanceof Error ? err.message : "";
     if (/unauthorized|forbidden|admin access/i.test(message)) throw err;
-    const smaller = await compressImageForUpload(file, { maxEdge: 1400, targetBytes: 480_000 });
+    // Documents: shrink gently so text stays readable; still under the host limit.
+    const smaller = await compressImageForUpload(file, {
+      maxEdge: document ? 1800 : 1400,
+      targetBytes: document ? 900_000 : 480_000,
+      preferSharpness: document,
+    });
     const network = /failed to fetch|load failed|networkerror|network request failed|timeout/i.test(message);
     if (!network && smaller.size >= payload.size && smaller.type === payload.type) throw err;
     return postUpload(smaller.size < payload.size ? smaller : payload, document);

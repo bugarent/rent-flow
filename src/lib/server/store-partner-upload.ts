@@ -64,6 +64,32 @@ async function toJpeg(bytes: Uint8Array): Promise<Uint8Array | null> {
   }
 }
 
+/** Passport / ID scans: keep text readable without growing past ~1.1 MB. */
+async function toDocumentJpeg(bytes: Uint8Array): Promise<Uint8Array | null> {
+  const targetBytes = 1_100_000;
+  try {
+    const base = sharp(bytes, { failOn: "none", animated: false, limitInputPixels: 120_000_000 })
+      .rotate()
+      .resize({ width: 2200, height: 2200, fit: "inside", withoutEnlargement: true })
+      // Light sharpen helps small Georgian/Latin glyphs after resize.
+      .sharpen({ sigma: 0.55, m1: 0.55, m2: 0.25 });
+    // 4:4:4 chroma keeps letter edges crisp; step quality down only to hold size.
+    const qualities = [88, 84, 80, 76];
+    let best: Buffer | null = null;
+    for (const quality of qualities) {
+      const out = await base
+        .clone()
+        .jpeg({ quality, mozjpeg: true, chromaSubsampling: "4:4:4" })
+        .toBuffer();
+      if (out.length > 80 && out.length <= targetBytes) return out;
+      if (out.length > 80 && (!best || out.length < best.length)) best = out;
+    }
+    return best;
+  } catch {
+    return null;
+  }
+}
+
 /** Listing / card / banner photos are stored as WebP so even the full-size view stays light. */
 async function toWebp(bytes: Uint8Array): Promise<Uint8Array | null> {
   try {
@@ -121,10 +147,11 @@ export async function storePartnerUpload(file: File, kind?: string | null): Prom
   let ext = sniffed ? extOf(sniffed) : "jpg";
 
   // Photos → WebP. Passport scans stay JPEG (admins open and print them as documents).
+  // Keep a client JPEG that already fits the budget — re-encoding at q82 was blurring text.
   const converted = document
-    ? standard && bytes.length <= 900 * 1024
+    ? sniffed === "jpeg" && bytes.length <= 1_100_000
       ? null
-      : await toJpeg(bytes)
+      : await toDocumentJpeg(bytes)
     : await toWebp(bytes);
   if (converted) {
     payload = converted;

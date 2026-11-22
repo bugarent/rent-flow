@@ -134,7 +134,11 @@ async function rotateCanvas90(src: string, degrees: 90 | -90): Promise<string> {
 
 async function uploadEdited(file: File, asDocument: boolean): Promise<string> {
   const payload = asDocument
-    ? await compressImageForUpload(file, { maxEdge: 2200, targetBytes: 1_100_000 })
+    ? await compressImageForUpload(file, {
+        maxEdge: 2200,
+        targetBytes: 1_100_000,
+        preferSharpness: true,
+      })
     : await compressImageForUpload(file);
   const fd = new FormData();
   fd.append("file", payload);
@@ -458,7 +462,7 @@ export function PartnerImageEditor({
   const exportAndSave = async () => {
     const vw = viewportSize.w || viewportRef.current?.clientWidth || 0;
     const vh = viewportSize.h || viewportRef.current?.clientHeight || 0;
-    if (!workSrc || !vw || !vh || !natural.w) {
+    if (!workSrc || !vw || !vh || !natural.w || !fitScale) {
       setError(copy.failed);
       return;
     }
@@ -471,31 +475,55 @@ export function PartnerImageEditor({
       const cropW = Math.max(8, vw * (1 - insets.left - insets.right));
       const cropH = Math.max(8, vh * (1 - insets.top - insets.bottom));
 
-      const outW = asDocument ? 1600 : 1920;
-      const outH = Math.max(1, Math.round(outW / (cropW / cropH)));
+      // Render in natural-image pixels (not the on-screen viewport). Exporting from
+      // the small preview canvas and then upscaling made passport text unreadable.
+      const unit = 1 / fitScale;
+      const fullW = Math.max(1, Math.round(vw * unit));
+      const fullH = Math.max(1, Math.round(vh * unit));
+      const full = globalThis.document.createElement("canvas");
+      full.width = fullW;
+      full.height = fullH;
+      const fctx = full.getContext("2d");
+      if (!fctx) throw new Error(copy.failed);
+      fctx.imageSmoothingEnabled = true;
+      fctx.imageSmoothingQuality = "high";
+      fctx.fillStyle = asDocument ? "#ffffff" : "#0f172a";
+      fctx.fillRect(0, 0, fullW, fullH);
+      fctx.save();
+      fctx.translate(fullW / 2 + offset.x * unit, fullH / 2 + offset.y * unit);
+      fctx.rotate((tilt * Math.PI) / 180);
+      const imgW = natural.w * zoom;
+      const imgH = natural.h * zoom;
+      fctx.drawImage(img, -imgW / 2, -imgH / 2, imgW, imgH);
+      fctx.restore();
+
+      const srcX = Math.max(0, Math.round(cropX * unit));
+      const srcY = Math.max(0, Math.round(cropY * unit));
+      const srcW = Math.max(8, Math.round(cropW * unit));
+      const srcH = Math.max(8, Math.round(cropH * unit));
+      const maxEdge = asDocument ? 2200 : 1920;
+      const edge = Math.max(srcW, srcH);
+      const outScale = edge > maxEdge ? maxEdge / edge : 1;
+      const outW = Math.max(1, Math.round(srcW * outScale));
+      const outH = Math.max(1, Math.round(srcH * outScale));
       const canvas = globalThis.document.createElement("canvas");
       canvas.width = outW;
       canvas.height = outH;
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error(copy.failed);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      if (asDocument) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, outW, outH);
+      }
+      ctx.drawImage(full, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
 
-      const full = globalThis.document.createElement("canvas");
-      full.width = Math.max(1, Math.round(vw));
-      full.height = Math.max(1, Math.round(vh));
-      const fctx = full.getContext("2d");
-      if (!fctx) throw new Error(copy.failed);
-      fctx.fillStyle = "#0f172a";
-      fctx.fillRect(0, 0, full.width, full.height);
-      fctx.save();
-      fctx.translate(full.width / 2 + offset.x, full.height / 2 + offset.y);
-      fctx.rotate((tilt * Math.PI) / 180);
-      fctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
-      fctx.restore();
-
-      ctx.drawImage(full, cropX, cropY, cropW, cropH, 0, 0, outW, outH);
-
+      // Documents stay sharper at a slightly higher JPEG quality; upload compress
+      // still caps final bytes so storage does not grow.
+      const jpegQ = asDocument ? 0.92 : 0.9;
       const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(copy.failed))), "image/jpeg", 0.92);
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(copy.failed))), "image/jpeg", jpegQ);
       });
       const file = new File([blob], "edited.jpg", { type: "image/jpeg" });
       const url = await uploadEdited(file, asDocument);

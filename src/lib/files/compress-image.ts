@@ -15,6 +15,11 @@ const SKIP_UNDER_BYTES = 280 * 1024;
 export type CompressImageOptions = {
   maxEdge?: number;
   targetBytes?: number;
+  /**
+   * Prefer readable text (passports / IDs): keep resolution longer and use higher
+   * JPEG qualities first. Still respects `targetBytes` so uploads do not grow.
+   */
+  preferSharpness?: boolean;
 };
 
 function isPdf(file: File): boolean {
@@ -50,6 +55,7 @@ function scaledSize(width: number, height: number, maxEdge: number) {
 function drawToCanvas(
   source: CanvasImageSource & { width: number; height: number },
   maxEdge: number,
+  sharp = false,
 ): HTMLCanvasElement | null {
   const { width, height } = scaledSize(source.width, source.height, maxEdge);
   if (width < 8 || height < 8) return null;
@@ -58,37 +64,58 @@ function drawToCanvas(
   canvas.height = height;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = sharp ? "high" : "medium";
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, width, height);
   ctx.drawImage(source, 0, 0, width, height);
   return canvas;
 }
 
-async function encodeJpeg(canvas: HTMLCanvasElement, targetBytes: number): Promise<Blob | null> {
-  const qualities = [0.82, 0.72, 0.6, 0.48, 0.38];
+async function encodeJpeg(
+  canvas: HTMLCanvasElement,
+  targetBytes: number,
+  preferSharpness = false,
+): Promise<Blob | null> {
+  // Documents: stay on higher qualities and a higher floor before downscaling.
+  const qualities = preferSharpness
+    ? [0.92, 0.88, 0.84, 0.78, 0.7, 0.62]
+    : [0.82, 0.72, 0.6, 0.48, 0.38];
+  const minEdge = preferSharpness ? 1400 : 960;
+  const shrinkFactor = preferSharpness ? 0.88 : 0.72;
   let best: Blob | null = null;
   let current = canvas;
-  for (let pass = 0; pass < 4; pass += 1) {
+  for (let pass = 0; pass < (preferSharpness ? 5 : 4); pass += 1) {
     for (const quality of qualities) {
       const blob = await canvasToBlob(current, quality);
       if (!blob) continue;
+      // Prefer the first blob that fits; among oversize candidates keep the
+      // smaller one, but when sharpness matters keep the highest-quality fit.
       if (!best || blob.size < best.size) best = blob;
       if (blob.size <= targetBytes) return blob;
     }
-    if (current.width <= 960 && current.height <= 960) break;
-    const nextEdge = Math.max(960, Math.round(Math.max(current.width, current.height) * 0.72));
-    const shrunk = drawToCanvas(current, nextEdge);
+    if (current.width <= minEdge && current.height <= minEdge) break;
+    const nextEdge = Math.max(
+      minEdge,
+      Math.round(Math.max(current.width, current.height) * shrinkFactor),
+    );
+    const shrunk = drawToCanvas(current, nextEdge, preferSharpness);
     if (!shrunk) break;
     current = shrunk;
   }
   return best;
 }
 
-async function bitmapFromFile(file: File, maxEdge: number): Promise<ImageBitmap | null> {
+async function bitmapFromFile(
+  file: File,
+  maxEdge: number,
+  preferSharpness = false,
+): Promise<ImageBitmap | null> {
   if (typeof createImageBitmap !== "function") return null;
   const attempts: ImageBitmapOptions[] = [];
-  if (file.size > 1_200_000) {
-    attempts.push({ imageOrientation: "from-image", resizeWidth: maxEdge, resizeQuality: "medium" });
+  // Documents: never decode with a soft early resize — that destroys small text.
+  if (!preferSharpness && file.size > 1_200_000) {
+    attempts.push({ imageOrientation: "from-image", resizeWidth: maxEdge, resizeQuality: "high" });
   }
   attempts.push({ imageOrientation: "from-image" });
   attempts.push({});
@@ -133,14 +160,16 @@ export async function compressImageForUpload(file: File, options?: CompressImage
 
   const maxEdge = options?.maxEdge ?? DEFAULT_MAX_EDGE;
   const targetBytes = options?.targetBytes ?? DEFAULT_TARGET_BYTES;
+  const preferSharpness = Boolean(options?.preferSharpness);
 
   try {
-    const bitmap = await bitmapFromFile(file, maxEdge);
+    const bitmap = await bitmapFromFile(file, maxEdge, preferSharpness);
     let canvas: HTMLCanvasElement | null = null;
     if (bitmap) {
       const alreadySmall =
         !options?.maxEdge &&
         !options?.targetBytes &&
+        !preferSharpness &&
         file.size <= SKIP_UNDER_BYTES &&
         bitmap.width <= maxEdge &&
         bitmap.height <= maxEdge &&
@@ -149,16 +178,16 @@ export async function compressImageForUpload(file: File, options?: CompressImage
         bitmap.close();
         return file;
       }
-      canvas = drawToCanvas(bitmap, maxEdge);
+      canvas = drawToCanvas(bitmap, maxEdge, preferSharpness);
       bitmap.close();
     }
     if (!canvas) {
       const img = await imageElementFromFile(file);
-      if (img) canvas = drawToCanvas(img, maxEdge);
+      if (img) canvas = drawToCanvas(img, maxEdge, preferSharpness);
     }
     if (!canvas) return file;
 
-    const blob = await encodeJpeg(canvas, targetBytes);
+    const blob = await encodeJpeg(canvas, targetBytes, preferSharpness);
     if (!blob) return file;
     if (blob.size >= file.size && file.type === "image/jpeg" && file.size <= HARD_MAX_BYTES) return file;
     if (blob.size > HARD_MAX_BYTES && file.size <= blob.size) return file;
