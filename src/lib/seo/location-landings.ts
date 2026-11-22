@@ -9,6 +9,7 @@ import {
 import { CATALOG_AIRPORTS } from "@/lib/catalog/airports";
 import { cleanLocationAnchor } from "@/lib/seo/location-link-label";
 import { cityDisplayName as translatedCityName } from "@/lib/i18n/place-label";
+import { kaGenitive, kaLocative, placeNameInLocale, ruGenitive, ruIn } from "@/lib/i18n/place-phrase";
 export {
   SEO_LANDING_LOCALES,
   SEO_LANDING_PREFIX,
@@ -214,11 +215,12 @@ export function countryDisplayName(iso2: string, locale: Locale): string {
 }
 
 function localizedCity(location: SeoLocation, locale: Locale): string {
-  if (location.iata) return cityDisplayName(location.iata, locale) || location.cityName;
-  if (locale === "ka" || locale === "ru") {
-    return translatedCityName(locale, location.cityName) || location.cityName;
-  }
-  return location.cityName;
+  const fromCatalog = location.iata ? cityDisplayName(location.iata, locale) : "";
+  const english = location.cityName || fromCatalog;
+  const named = placeNameInLocale(locale, english);
+  if (named && named !== english) return named;
+  if (fromCatalog && fromCatalog !== english) return fromCatalog;
+  return translatedCityName(locale, english) || english;
 }
 
 function localizedAirportLabel(location: SeoLocation, locale: Locale): string {
@@ -430,23 +432,12 @@ export function locationLandingCopy(location: SeoLocation, locale: Locale): Loca
   const imageAlt = location.kind === "airport" ? place || anchor : anchor;
 
   if (locale === "ka") {
-    const georgianName = /[\u10A0-\u10FF]/.test(city);
-    const cityIn = georgianName ? city : `${city}ში`;
-    const cityAt = georgianName ? city : `${city}-ში`;
+    const where = location.kind === "airport" ? `${kaGenitive(city)} აეროპორტში` : kaLocative(city);
     return {
-      title:
-        location.kind === "airport"
-          ? `მანქანის დაქირავება ${city} აეროპორტში | საუკეთესო ფასები`
-          : `მანქანის დაქირავება ${cityIn} | საუკეთესო ფასები`,
-      description:
-        location.kind === "airport"
-          ? `ავტომობილის დაქირავება ${city} აეროპორტში ადგილობრივი პარტნიორებისგან. საუკეთესო ფასები, უფასო გაუქმება.`
-          : `ავტომობილის დაქირავება ${cityIn} ადგილობრივი პარტნიორებისგან. საუკეთესო ფასები, უფასო გაუქმება.`,
-      h1:
-        location.kind === "airport"
-          ? `მანქანის დაქირავება ${city} აეროპორტში`
-          : `მანქანის დაქირავება ${cityIn}`,
-      lead: `იპოვეთ ადგილობრივი ოპერატორების მანქანები ${cityAt} და აეროპორტთან. გამჭვირვალე ფასები, მიწოდება ჩამოსვლისას.`,
+      title: `მანქანის დაქირავება ${where} | საუკეთესო ფასები`,
+      description: `ავტომობილის დაქირავება ${where} ადგილობრივი პარტნიორებისგან. საუკეთესო ფასები, უფასო გაუქმება.`,
+      h1: `მანქანის დაქირავება ${where}`,
+      lead: `იპოვეთ ადგილობრივი ოპერატორების მანქანები ${where}. გამჭვირვალე ფასები, მიწოდება ჩამოსვლისას.`,
       cta: "მანქანების ნახვა",
       popularTitle: "პოპულარული მიმართულებები",
       breadcrumbHome: "მთავარი",
@@ -463,20 +454,16 @@ export function locationLandingCopy(location: SeoLocation, locale: Locale): Loca
   }
 
   if (locale === "ru") {
+    const where =
+      location.kind === "airport" ? `в аэропорту ${ruGenitive(city)}` : `в ${ruIn(city)}`;
     return {
       title:
         location.kind === "airport"
-          ? `Аренда авто в аэропорту ${city} (${airportCode}) | Лучшие цены`
-          : `Аренда авто в городе ${city} | Лучшие цены`,
-      description:
-        location.kind === "airport"
-          ? `Прокат автомобилей в аэропорту ${city} (${airportCode}) от местных компаний. Лучшие местные цены, прозрачные условия.`
-          : `Прокат автомобилей в ${city} от местных компаний. Лучшие местные цены, прозрачные условия.`,
-      h1:
-        location.kind === "airport"
-          ? `Аренда авто в аэропорту ${city}`
-          : `Аренда авто в городе ${city}`,
-      lead: `Авто от местных партнёров в ${city} и у аэропорта. Прозрачные цены, подача к прилёту.`,
+          ? `Аренда авто ${where} (${airportCode}) | Лучшие цены`
+          : `Аренда авто ${where} | Лучшие цены`,
+      description: `Прокат автомобилей ${where} от местных компаний. Лучшие местные цены, прозрачные условия.`,
+      h1: `Аренда авто ${where}`,
+      lead: `Авто от местных партнёров ${where}. Прозрачные цены, подача к прилёту.`,
       cta: "Смотреть автомобили",
       popularTitle: "Популярные направления",
       breadcrumbHome: "Главная",

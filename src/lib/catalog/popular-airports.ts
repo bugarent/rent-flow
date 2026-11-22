@@ -20,6 +20,8 @@ export type PopularAirportCard = {
   translations?: AirportCardTranslations;
   /** Short public heading per UI language. Never the stored SEO title. */
   headings?: Partial<Record<string, string>>;
+  /** Button under the card, per UI language. */
+  actions?: Partial<Record<string, string>>;
   /** Country of the airport (from its IATA code); the homepage shows the searched country's cards. */
   countryIso2?: string;
 };

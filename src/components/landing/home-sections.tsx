@@ -25,6 +25,7 @@ import { staticHomepageAirports } from "@/lib/server/homepage";
 import { bookingCountsByPickupIata } from "@/lib/server/airport-popularity";
 import { airportCountryIso2, findSearchPlace, normalizeLocationCode } from "@/lib/catalog/search-places";
 import { airportCardLinkLabel, popularCardHeadings } from "@/lib/seo/location-link-label";
+import { carsInPlaceLabels } from "@/lib/i18n/place-phrase";
 import { readPreferences } from "@/lib/server/preferences";
 import { getCrossBorderReturnPlaces } from "@/lib/server/cross-border-returns";
 import { popularPlacesListName } from "@/lib/seo/home-seo";
@@ -171,6 +172,7 @@ export async function HomeBelowFold() {
           image: a.imageUrl,
           rank: index + 1,
           headings: popularCardHeadings(a.iata),
+          actions: carsInPlaceLabels(findSearchPlace(a.iata)?.cityName || a.iata),
           countryIso2: airportCountryIso2(a.iata),
         }))}
       />
