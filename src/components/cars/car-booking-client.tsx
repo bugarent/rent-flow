@@ -10,6 +10,9 @@ type Props = {
   initialCar?: Record<string, unknown> | null;
   /** `startDate|endDate` the initial car was priced for. */
   initialRange?: string;
+  /** Platform fee % for this pickup country — from SSR so pay-now amount paints immediately. */
+  initialDepositPercent?: number;
+  initialSiteDiscountPercent?: number;
 };
 
 export function CarBookingClient(props: Props) {
@@ -24,7 +27,13 @@ export function CarBookingClient(props: Props) {
   );
 }
 
-function CarBookingForm({ params, initialCar, initialRange }: Props) {
+function CarBookingForm({
+  params,
+  initialCar,
+  initialRange,
+  initialDepositPercent,
+  initialSiteDiscountPercent,
+}: Props) {
   const { id: carId } = use(params);
   const searchParams = useSearchParams();
 
@@ -39,6 +48,8 @@ function CarBookingForm({ params, initialCar, initialRange }: Props) {
       dropoffAddress={searchParams.get("dropoffAddress") || ""}
       initialCar={initialCar}
       initialRange={initialRange}
+      initialDepositPercent={initialDepositPercent}
+      initialSiteDiscountPercent={initialSiteDiscountPercent}
     />
   );
 }

@@ -26,3 +26,8 @@ export function fetchJsonCached<T>(url: string, ttlMs: number): Promise<T> {
 export function prefetchJson(url: string, ttlMs: number) {
   void fetchJsonCached(url, ttlMs).catch(() => undefined);
 }
+
+/** Put a known value in the cache (e.g. SSR deposit) so the next read is instant. */
+export function seedJsonCache<T>(url: string, value: T) {
+  entries.set(url, { at: Date.now(), promise: Promise.resolve(value) });
+}

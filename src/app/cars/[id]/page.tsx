@@ -37,6 +37,19 @@ async function loadInitialCar(id: string, startDate: string, endDate: string) {
   }
 }
 
+async function loadCheckoutPlatformPercents(pickup: string) {
+  try {
+    const { getPlatformSettings } = await import("@/lib/server/platform-settings-store");
+    const { countryPlatformPercents } = await import("@/lib/pricing/country-platform-percents");
+    const { locationCountryIso2 } = await import("@/lib/extras/country-scope");
+    const settings = await getPlatformSettings();
+    return countryPlatformPercents(settings, locationCountryIso2(pickup));
+  } catch (error) {
+    console.warn("[cars/[id]] deposit percents", error);
+    return null;
+  }
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const { locale } = await readPreferences();
@@ -92,9 +105,11 @@ export default async function CarBookingPage({ params, searchParams }: Props) {
   const query = await searchParams;
   const startDate = firstParam(query.startDate);
   const endDate = firstParam(query.endDate) || startDate;
-  const [{ car }, initialCar] = await Promise.all([
+  const pickup = String(Array.isArray(query.pickup) ? query.pickup[0] : query.pickup || "KUT");
+  const [{ car }, initialCar, platformPercents] = await Promise.all([
     loadCarSeo(id),
     loadInitialCar(id, startDate, endDate),
+    loadCheckoutPlatformPercents(pickup),
   ]);
   const path = carDetailPath(id);
   const url = carDetailCanonicalUrl(id);
@@ -129,6 +144,8 @@ export default async function CarBookingPage({ params, searchParams }: Props) {
         params={params}
         initialCar={initialCar ? JSON.parse(JSON.stringify(initialCar)) : null}
         initialRange={`${startDate}|${endDate}`}
+        initialDepositPercent={platformPercents?.depositPercent}
+        initialSiteDiscountPercent={platformPercents?.siteDiscountPercent}
       />
     </>
   );

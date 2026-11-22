@@ -1,6 +1,6 @@
 "use client";
 
-import { fetchJsonCached, prefetchJson } from "@/lib/client/json-cache";
+import { fetchJsonCached, prefetchJson, seedJsonCache } from "@/lib/client/json-cache";
 
 export type CheckoutLegalPages = { terms?: { body?: string; fileUrl?: string } };
 export type CheckoutDepositSettings = { depositPercent?: number; siteDiscountPercent?: number };
@@ -15,6 +15,21 @@ export const loadCheckoutLegalPages = () => fetchJsonCached<CheckoutLegalPages>(
 export function loadCheckoutDeposit(pickup?: string) {
   const url = pickup ? `${DEPOSIT_URL}?pickup=${encodeURIComponent(pickup)}` : DEPOSIT_URL;
   return fetchJsonCached<CheckoutDepositSettings>(url, DEPOSIT_TTL_MS);
+}
+
+/**
+ * Seed the client deposit cache from SSR so checkout never waits on a second
+ * round-trip when the car page already resolved platform percents.
+ */
+export function seedCheckoutDeposit(
+  pickup: string | undefined,
+  settings: { depositPercent: number; siteDiscountPercent?: number },
+) {
+  const url = pickup ? `${DEPOSIT_URL}?pickup=${encodeURIComponent(pickup)}` : DEPOSIT_URL;
+  seedJsonCache(url, {
+    depositPercent: Math.trunc(settings.depositPercent),
+    siteDiscountPercent: Math.max(0, Math.trunc(settings.siteDiscountPercent ?? 0)),
+  });
 }
 
 /** Called on car-card intent so the checkout opens with terms and deposit ready. */

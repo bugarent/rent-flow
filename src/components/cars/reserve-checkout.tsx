@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { loadCheckoutLegalPages } from "@/components/cars/checkout-data";
+import { loadCheckoutDeposit, loadCheckoutLegalPages, seedCheckoutDeposit } from "@/components/cars/checkout-data";
 import { useIntentPrefetch } from "@/lib/client/prefetch-route";
 import {
   Check,
@@ -190,6 +190,8 @@ export function ReserveCheckout({
   dropoffAddress: initialDropoffAddress,
   initialCar = null,
   initialRange = "",
+  initialDepositPercent,
+  initialSiteDiscountPercent,
 }: {
   carId: string;
   startDate: string;
@@ -200,6 +202,9 @@ export function ReserveCheckout({
   dropoffAddress: string;
   initialCar?: Record<string, unknown> | null;
   initialRange?: string;
+  /** From car page SSR — avoids spinner until /api/platform/deposit returns. */
+  initialDepositPercent?: number;
+  initialSiteDiscountPercent?: number;
 }) {
   const intentPrefetch = useIntentPrefetch();
   usePreloadWhenIdle(loadCheckoutPaypalCard, loadRentalTermsModal, loadLegalDocumentModal);
@@ -296,9 +301,17 @@ export function ReserveCheckout({
   const [noPromoCode, setNoPromoCode] = useState(false);
   /** True when promo was auto-filled from partner link / QR (7-minute TTL). */
   const [, setPromoFromReferral] = useState(false);
-  /** null until /api/platform/deposit responds — avoids flashing the 15% default then dropping to 0. */
-  const [depositPercent, setDepositPercent] = useState<number | null>(null);
-  const [siteDiscountPercent, setSiteDiscountPercent] = useState(0);
+  /** null until SSR or /api/platform/deposit — never invent 15% (would flash then drop to 0). */
+  const [depositPercent, setDepositPercent] = useState<number | null>(() =>
+    typeof initialDepositPercent === "number" && Number.isFinite(initialDepositPercent)
+      ? Math.trunc(initialDepositPercent)
+      : null,
+  );
+  const [siteDiscountPercent, setSiteDiscountPercent] = useState(() =>
+    typeof initialSiteDiscountPercent === "number" && Number.isFinite(initialSiteDiscountPercent)
+      ? Math.max(0, Math.trunc(initialSiteDiscountPercent))
+      : 0,
+  );
   const depositReady = depositPercent != null;
   const activeDepositPercent = depositPercent ?? 0;
   const bpReferral = useBusinessPartnerReferralDiscount(promoCode, {
@@ -362,34 +375,42 @@ export function ReserveCheckout({
   }, [dictionary.common.termsBody]);
 
   useEffect(() => {
+    if (
+      typeof initialDepositPercent === "number" &&
+      Number.isFinite(initialDepositPercent)
+    ) {
+      seedCheckoutDeposit(pickup, {
+        depositPercent: Math.trunc(initialDepositPercent),
+        siteDiscountPercent:
+          typeof initialSiteDiscountPercent === "number" && Number.isFinite(initialSiteDiscountPercent)
+            ? Math.max(0, Math.trunc(initialSiteDiscountPercent))
+            : 0,
+      });
+    }
     let cancelled = false;
     (async () => {
       try {
-        // Bust the short client cache so a prior warm with 15% cannot outlive an admin 0%.
-        const depositUrl = pickup
-          ? `/api/platform/deposit?pickup=${encodeURIComponent(pickup)}`
-          : "/api/platform/deposit";
-        const data = await fetch(depositUrl, { cache: "no-store" }).then(async (res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return (await res.json()) as { depositPercent?: number; siteDiscountPercent?: number };
-        });
+        // Prefer warm/SSR cache (30s) so the pay button is not blocked on Neon.
+        const data = await loadCheckoutDeposit(pickup);
         if (cancelled) return;
         if (typeof data.depositPercent === "number" && Number.isFinite(data.depositPercent)) {
           setDepositPercent(Math.trunc(data.depositPercent));
         } else {
-          setDepositPercent(DEFAULT_DEPOSIT_PERCENT);
+          setDepositPercent((prev) => (prev == null ? DEFAULT_DEPOSIT_PERCENT : prev));
         }
         if (typeof data.siteDiscountPercent === "number" && Number.isFinite(data.siteDiscountPercent)) {
           setSiteDiscountPercent(Math.max(0, Math.trunc(data.siteDiscountPercent)));
         }
       } catch {
-        if (!cancelled) setDepositPercent(DEFAULT_DEPOSIT_PERCENT);
+        if (!cancelled) {
+          setDepositPercent((prev) => (prev == null ? DEFAULT_DEPOSIT_PERCENT : prev));
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [pickup]);
+  }, [pickup, initialDepositPercent, initialSiteDiscountPercent]);
 
   useEffect(() => {
     if (seed) return;
