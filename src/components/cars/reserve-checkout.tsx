@@ -1625,21 +1625,18 @@ export function ReserveCheckout({
               {paymentMethod === "paypal" ? (
                 <div className="border-t border-slate-100 px-3 py-3">
                   {paymentReady.checked && !paymentReady.paypal ? (
-                    <div className="space-y-3 rounded-xl bg-amber-50 px-3 py-3 text-sm text-amber-950">
-                      <p className="font-bold">
+                    <div className="rounded-xl bg-[#f0f7fc] px-3 py-4 text-center text-sm text-[#0b1f4b]">
+                      <p className="font-extrabold text-[#0070ba]">PayPal</p>
+                      <p className="mt-2 font-semibold">
                         {locale === "ka"
                           ? "PayPal ჯერ არ არის ჩართული"
                           : "PayPal is not enabled yet"}
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod("bog")}
-                        className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-sm font-extrabold text-white hover:bg-[#e55800]"
-                      >
+                      <p className="mt-1 text-xs text-slate-500">
                         {locale === "ka"
-                          ? "დაბრუნება ბარათით გადახდაზე"
-                          : "Back to card payment"}
-                      </button>
+                          ? "ბარათით გადახდაზე გადასასვლელად აირჩიეთ ზედა ტაბი „ბარათი“."
+                          : "Use the Card tab above to pay by card."}
+                      </p>
                     </div>
                   ) : embeddedPay?.method === "paypal" && paymentReady.paypalClientId ? (
                     <CheckoutPaypalButtons
@@ -1656,9 +1653,9 @@ export function ReserveCheckout({
                       loading={loading || !paymentReady.checked}
                       disabled={!paymentReady.checked || !paymentReady.paypal}
                       backLabel={
-                        locale === "ka" ? "დაბრუნება ბარათზე" : "Back to card"
+                        locale === "ka" ? "დაბრუნება მძღოლის დეტალებზე" : "Back to driver details"
                       }
-                      onBack={() => setPaymentMethod("bog")}
+                      onBack={() => setCheckoutStep("details")}
                       onConfirm={async () => {
                         if (!payAmountLabel) {
                           const label = await loadPayAmountLabel(totals.payNow);
@@ -1710,14 +1707,6 @@ export function ReserveCheckout({
                         {locale === "ka"
                           ? `გადახდა ბარათით (${payAmountLabel || formatPrice(totals.payNow)})`
                           : `Pay by card (${payAmountLabel || formatPrice(totals.payNow)})`}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={loading}
-                        onClick={() => setPaymentMethod("paypal")}
-                        className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-[#0070ba]/30 bg-[#f0f7fc] px-4 text-sm font-bold text-[#0070ba] hover:bg-[#e5f1fa] disabled:opacity-60"
-                      >
-                        {locale === "ka" ? "გადახდა PayPal-ით" : "Pay with PayPal"}
                       </button>
                     </>
                   ) : (
