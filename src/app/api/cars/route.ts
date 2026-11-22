@@ -166,17 +166,22 @@ export async function GET(req: Request) {
   });
 }
 
-async function resolveCarExtras(rawExtras: unknown) {
+async function resolveCarExtras(rawExtras: unknown, partnerId?: string | null) {
   // Global admin catalog — identical for every partner
   const catalog = await listExtraServices({ activeOnly: true });
   await ensureExtrasExistInDb(catalog);
   const inputs = Array.isArray(rawExtras) ? (rawExtras as PartnerExtraInput[]) : [];
   const inputById = new Map(inputs.map((i) => [i.extraServiceId, i]));
+  const { isCoreTplSlug } = await import("@/lib/extras/tpl-partner-choice");
+  const { partnerCoreTplIsOff } = await import("@/lib/server/extras/tpl-off");
+  const tplOff = await partnerCoreTplIsOff(partnerId);
 
   const rows: Array<{ extraServiceId: string; priceEur: number; forbidden?: boolean }> = [];
   for (const service of catalog) {
+    if (tplOff && isCoreTplSlug(service.slug)) continue;
     const input = inputById.get(service.id);
     if (!input && !isMandatoryExtra(service)) continue;
+    if (!input && isCoreTplSlug(service.slug)) continue;
     const normalized = normalizePartnerExtraPrice(
       service,
       input ?? {
@@ -336,7 +341,7 @@ export async function POST(req: Request) {
         categorySlug = rawSlug || null;
       }
       try {
-        extraRows = await resolveCarExtras(extras);
+        extraRows = await resolveCarExtras(extras, partner.id);
       } catch (error) {
         if (!isDbOfflineError(error)) throw error;
         extraRows = extraRowsFromBody(extras);

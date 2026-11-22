@@ -56,18 +56,24 @@ async function withCabinetExtras<T extends object>(payload: T, partnerId: string
   }
 }
 
-async function resolveCarExtras(rawExtras: unknown) {
+async function resolveCarExtras(rawExtras: unknown, partnerId?: string | null) {
   const catalog = await listExtraServices({ activeOnly: true });
   await ensureExtrasExistInDb(catalog);
   const inputs = Array.isArray(rawExtras) ? (rawExtras as PartnerExtraInput[]) : [];
   const inputById = new Map(inputs.map((i) => [i.extraServiceId, i]));
+  const { isCoreTplSlug } = await import("@/lib/extras/tpl-partner-choice");
+  const { partnerCoreTplIsOff } = await import("@/lib/server/extras/tpl-off");
+  const tplOff = await partnerCoreTplIsOff(partnerId);
 
   const rows: Array<{ extraServiceId: string; priceEur: number; forbidden?: boolean }> = [];
   for (const service of catalog) {
+    if (tplOff && isCoreTplSlug(service.slug)) continue;
     const input = inputById.get(service.id);
     // The car form sends every service the partner activated in the cabinet.
     // Omitted or explicitly off services stay off the listing. Mandatory ones stay on.
     if (!input && !isMandatoryExtra(service)) continue;
+    // Core TPL with cabinet Off: do not force-attach when the form omitted it.
+    if (!input && isCoreTplSlug(service.slug)) continue;
     const normalized = normalizePartnerExtraPrice(
       service,
       input ?? {
@@ -569,7 +575,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         passportBackUrl: car.passport?.backUrl || "",
         insuranceUrl: insuranceBefore || "",
       });
-      let extraRows = body.extras !== undefined ? await resolveCarExtras(body.extras) : null;
+      let extraRows =
+        body.extras !== undefined ? await resolveCarExtras(body.extras, car.partnerId) : null;
       if (adminCorrection && extraRows && Array.isArray(body.extras) && body.extras.length === 0) {
         extraRows = null;
       } else if (adminCorrection && extraRows && Array.isArray(car.extras)) {

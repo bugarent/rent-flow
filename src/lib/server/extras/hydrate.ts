@@ -230,8 +230,10 @@ export async function applyPartnerExtraOfferModes(
 
     const { isCoreTplSlug } = await import("@/lib/extras/tpl-partner-choice");
     const { partnerMayToggleTpl } = await import("@/lib/server/tpl-partner-choice-store");
+    const { partnerCoreTplIsOff } = await import("@/lib/server/extras/tpl-off");
     // Same partner id the prefs were loaded from (file-partner / local aliases).
     const tplOptional = await partnerMayToggleTpl(resolvedPartnerId);
+    const coreTplOff = await partnerCoreTplIsOff(resolvedPartnerId);
 
     const lookup = prefLookup(prefs, await extraSlugById());
     const next: HydratedListingExtra[] = [];
@@ -242,6 +244,9 @@ export async function applyPartnerExtraOfferModes(
       const coreTpl = Boolean(svc && isCoreTplSlug(svc.slug));
       const optionalTpl = Boolean(tplOptional && coreTpl);
 
+      // Cabinet Off for core TPL always wins — never force-keep or re-show.
+      if (coreTpl && coreTplOff) continue;
+
       if (pref) {
         if (pref.added === false && !mandatoryPriced) continue;
         if (!partnerExtraPrefAppliesToCar(pref, carId)) {
@@ -249,8 +254,7 @@ export async function applyPartnerExtraOfferModes(
           next.push(row);
           continue;
         }
-        // Cabinet Off must win before force-keep (esp. optional core TPL).
-        if (!pref.enabled && !mandatoryPriced && (!coreTpl || optionalTpl)) {
+        if (!pref.enabled && !mandatoryPriced) {
           continue;
         }
         if (pref.forbidden && !mandatoryPriced) {
@@ -421,37 +425,6 @@ export async function mergePartnerOfferedExtras(
   }
 }
 
-async function partnerHasCoreTplOff(partnerId: string): Promise<boolean> {
-  const pid = String(partnerId || "").trim();
-  if (!pid) return false;
-  try {
-    const { isCoreTplSlug } = await import("@/lib/extras/tpl-partner-choice");
-    const { partnerMayToggleTpl } = await import("@/lib/server/tpl-partner-choice-store");
-    if (!(await partnerMayToggleTpl(pid))) return false;
-    const { readPartnerExtraPrefs } = await import("@/lib/server/partner-extras-prefs-store");
-    const { LOCAL_PARTNER_ID } = await import("@/lib/auth/local-partner-store");
-    const candidateIds = [pid];
-    if (pid.startsWith("file-partner-")) {
-      const stripped = pid.replace(/^file-partner-/, "");
-      if (stripped) candidateIds.push(stripped);
-    }
-    if (!candidateIds.includes(LOCAL_PARTNER_ID)) candidateIds.push(LOCAL_PARTNER_ID);
-    let prefs: Array<{ extraServiceId: string; enabled: boolean }> = [];
-    for (const candidate of candidateIds) {
-      prefs = await readPartnerExtraPrefs(candidate);
-      if (prefs.length) break;
-    }
-    if (!prefs.length) return false;
-    const slugById = await extraSlugById();
-    return prefs.some((pref) => {
-      if (pref.enabled !== false) return false;
-      return isCoreTplSlug(slugById.get(pref.extraServiceId) || "");
-    });
-  } catch {
-    return false;
-  }
-}
-
 /** Ensure free catalog services (insurance + mandatory free extras) appear on checkout. */
 export async function mergeFreeInsuranceExtras(
   extras: HydratedListingExtra[],
@@ -465,7 +438,8 @@ export async function mergeFreeInsuranceExtras(
       .filter((slot): slot is ExtraCheckoutSlot => Boolean(slot) && slot !== "none"),
   );
   const { isCoreTplSlug } = await import("@/lib/extras/tpl-partner-choice");
-  const skipCoreTpl = await partnerHasCoreTplOff(String(partnerId || "").trim());
+  const { partnerCoreTplIsOff } = await import("@/lib/server/extras/tpl-off");
+  const skipCoreTpl = await partnerCoreTplIsOff(partnerId);
   const merged = [...extras];
   for (const service of catalog) {
     if (service.mode !== "free" && !isMandatoryFreeExtra(service)) continue;

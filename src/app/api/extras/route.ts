@@ -3,9 +3,11 @@ import { getAdminSession, requirePartnerApi } from "@/lib/auth/sessions";
 import { prisma } from "@/lib/prisma";
 import { LOCAL_PARTNER_ID, loadLocalPartner } from "@/lib/auth/local-partner-store";
 import { isDbOfflineError } from "@/lib/server/db-errors";
+import { withTplPartnerChoice } from "@/lib/extras/tpl-partner-choice";
 import { listExtraServices } from "@/lib/server/extras-store";
 import { scopeExtrasToPartner } from "@/lib/server/extras/partner-country-scope";
 import { listPartnerCustomExtrasAsPricing } from "@/lib/server/partner-custom-extras-store";
+import { partnerMayToggleTpl } from "@/lib/server/tpl-partner-choice-store";
 
 async function resolvePartnerId(userId: string, email?: string | null): Promise<string> {
   try {
@@ -34,15 +36,19 @@ export async function GET(req: Request) {
     const partnerId = session
       ? await resolvePartnerId(session.user.id, session.user.email)
       : requestedPartner;
-    const [global, customs] = await Promise.all([
+    const [global, customs, canToggleTpl] = await Promise.all([
       listExtraServices({ activeOnly: true }),
       listPartnerCustomExtrasAsPricing(partnerId, { activeOnly: true }),
+      partnerId ? partnerMayToggleTpl(partnerId) : Promise.resolve(false),
     ]);
     const byId = new Map(global.map((s) => [s.id, s]));
     for (const custom of customs) {
       if (!byId.has(custom.id)) byId.set(custom.id, custom);
     }
-    const sorted = Array.from(byId.values()).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+    const sorted = withTplPartnerChoice(
+      Array.from(byId.values()).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
+      canToggleTpl,
+    );
     return NextResponse.json(partnerId ? await scopeExtrasToPartner(sorted, partnerId) : sorted);
   } catch (error) {
     console.error("[extras GET]", error);

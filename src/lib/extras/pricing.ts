@@ -202,12 +202,8 @@ export function normalizePartnerExtraPrice(
     };
   }
   if (service.mode === "free" || service.isTpl) {
-    // Optional core TPL: cabinet Off must not recreate a CarExtra on save.
-    if (
-      input.enabled === false &&
-      service.partnerCanToggleTpl &&
-      isCoreTplSlug(service.slug)
-    ) {
+    // Core TPL Off must not recreate a CarExtra on save (flag may be missing on catalog).
+    if (input.enabled === false && isCoreTplSlug(service.slug)) {
       return null;
     }
     return { extraServiceId: service.id, priceEur: 0 };
