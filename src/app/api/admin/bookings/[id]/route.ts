@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { runAfterResponse } from "@/lib/server/after-response";
 import { getAdminSession } from "@/lib/auth/sessions";
 import { prisma } from "@/lib/prisma";
 import { isDbOfflineError } from "@/lib/server/db-errors";
@@ -273,12 +274,15 @@ export async function PATCH(
           /* best-effort */
         }
         if (updated) {
-          try {
-            const { notifyFileBookingEvent } = await import("@/lib/notifications");
-            await notifyFileBookingEvent(updated, "BOOKING_EDITED");
-          } catch (notifyError) {
-            console.warn("[admin/bookings] notify edited failed", notifyError);
-          }
+          const edited = updated;
+          runAfterResponse(async () => {
+            try {
+              const { notifyFileBookingEvent } = await import("@/lib/notifications");
+              await notifyFileBookingEvent(edited, "BOOKING_EDITED");
+            } catch (notifyError) {
+              console.warn("[admin/bookings] notify edited failed", notifyError);
+            }
+          });
         }
       }
       if (refundableSiteFeeEur > 0) {
@@ -405,12 +409,15 @@ export async function PATCH(
       } catch {
         /* best-effort */
       }
-      try {
-        const { notifyBookingEvent } = await import("@/lib/notifications");
-        await notifyBookingEvent(dbBooking.id, "BOOKING_EDITED");
-      } catch (notifyError) {
-        console.warn("[admin/bookings] notify edited failed", notifyError);
-      }
+      const editedId = dbBooking.id;
+      runAfterResponse(async () => {
+        try {
+          const { notifyBookingEvent } = await import("@/lib/notifications");
+          await notifyBookingEvent(editedId, "BOOKING_EDITED");
+        } catch (notifyError) {
+          console.warn("[admin/bookings] notify edited failed", notifyError);
+        }
+      });
     }
 
     if (refundableSiteFeeEur > 0) {

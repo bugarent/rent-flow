@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { runAfterResponse } from "@/lib/server/after-response";
 import { z } from "zod";
 import {
   commissionableTripEur,
@@ -173,15 +174,18 @@ export async function POST(req: Request) {
         refundEur: settlement.refundEur,
         commissionableEur,
       });
-      try {
-        const { notifyFileBookingEvent } = await import("@/lib/notifications");
-        await notifyFileBookingEvent(updated || { ...file, status: "CANCELLED", cancellationReason: reason }, "BOOKING_CANCELLED", {
-          cancellationReason: reason,
-          refundEur: settlement.refundEur,
-        });
-      } catch (notifyError) {
-        console.error("[bookings/guest-cancel] notify failed", notifyError);
-      }
+      const cancelledFile = updated || { ...file, status: "CANCELLED" as const, cancellationReason: reason };
+      runAfterResponse(async () => {
+        try {
+          const { notifyFileBookingEvent } = await import("@/lib/notifications");
+          await notifyFileBookingEvent(cancelledFile, "BOOKING_CANCELLED", {
+            cancellationReason: reason,
+            refundEur: settlement.refundEur,
+          });
+        } catch (notifyError) {
+          console.error("[bookings/guest-cancel] notify failed", notifyError);
+        }
+      });
       return detailResponse(file.id);
     }
 
@@ -268,15 +272,19 @@ export async function POST(req: Request) {
         refundEur: settlement.refundEur,
         commissionableEur,
       });
-      try {
-        const { notifyBookingEvent } = await import("@/lib/notifications");
-        await notifyBookingEvent(booking.id, "BOOKING_CANCELLED", {
-          cancellationReason: reason,
-          refundEur: settlement.refundEur,
-        });
-      } catch (notifyError) {
-        console.error("[bookings/guest-cancel] notify failed", notifyError);
-      }
+      const cancelledId = booking.id;
+      const cancelRefundEur = settlement.refundEur;
+      runAfterResponse(async () => {
+        try {
+          const { notifyBookingEvent } = await import("@/lib/notifications");
+          await notifyBookingEvent(cancelledId, "BOOKING_CANCELLED", {
+            cancellationReason: reason,
+            refundEur: cancelRefundEur,
+          });
+        } catch (notifyError) {
+          console.error("[bookings/guest-cancel] notify failed", notifyError);
+        }
+      });
       return detailResponse(booking.id);
     } catch (dbError) {
       console.warn("[bookings/guest-cancel] prisma", dbError);

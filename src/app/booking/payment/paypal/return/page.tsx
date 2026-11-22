@@ -1,5 +1,5 @@
-import { after } from "next/server";
 import { redirect } from "next/navigation";
+import { runAfterResponse } from "@/lib/server/after-response";
 import {
   PaypalApiError,
   capturePaypalCheckoutOrder,
@@ -74,22 +74,20 @@ export default async function PaypalPaymentReturnPage({ searchParams }: Props) {
 
   if (result.updated) {
     const paid = booking;
-    after(() => {
-      void (async () => {
-        try {
-          if (paid.source === "file") {
-            const { getFileBooking } = await import("@/lib/server/customer-bookings-store");
-            const { notifyFileBookingEvent } = await import("@/lib/notifications");
-            const fileRow = await getFileBooking(paid.id);
-            if (fileRow) await notifyFileBookingEvent(fileRow);
-          } else {
-            const { notifyBookingEvent } = await import("@/lib/notifications");
-            await notifyBookingEvent(paid.id, "BOOKING_NEW");
-          }
-        } catch (notifyErr) {
-          console.warn("[paypal/return] notify failed", notifyErr);
+    runAfterResponse(async () => {
+      try {
+        if (paid.source === "file") {
+          const { getFileBooking } = await import("@/lib/server/customer-bookings-store");
+          const { notifyFileBookingEvent } = await import("@/lib/notifications");
+          const fileRow = await getFileBooking(paid.id);
+          if (fileRow) await notifyFileBookingEvent(fileRow);
+        } else {
+          const { notifyBookingEvent } = await import("@/lib/notifications");
+          await notifyBookingEvent(paid.id, "BOOKING_NEW");
         }
-      })();
+      } catch (notifyErr) {
+        console.warn("[paypal/return] notify failed", notifyErr);
+      }
     });
   }
 

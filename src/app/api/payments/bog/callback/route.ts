@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { runAfterResponse } from "@/lib/server/after-response";
 import { verifyBogCallbackSignature } from "@/lib/payments/bog-callback-verify";
 import {
   findBookingByBogOrderId,
@@ -73,19 +74,22 @@ export async function POST(req: Request) {
         bogOrderId: bogOrderId || booking.bogOrderId || "",
       });
       if (result.updated) {
-        try {
-          if (booking.source === "file") {
-            const { getFileBooking } = await import("@/lib/server/customer-bookings-store");
-            const { notifyFileBookingEvent } = await import("@/lib/notifications");
-            const fileRow = await getFileBooking(booking.id);
-            if (fileRow) await notifyFileBookingEvent(fileRow);
-          } else {
-            const { notifyBookingEvent } = await import("@/lib/notifications");
-            await notifyBookingEvent(booking.id, "BOOKING_NEW");
+        const paid = booking;
+        runAfterResponse(async () => {
+          try {
+            if (paid.source === "file") {
+              const { getFileBooking } = await import("@/lib/server/customer-bookings-store");
+              const { notifyFileBookingEvent } = await import("@/lib/notifications");
+              const fileRow = await getFileBooking(paid.id);
+              if (fileRow) await notifyFileBookingEvent(fileRow);
+            } else {
+              const { notifyBookingEvent } = await import("@/lib/notifications");
+              await notifyBookingEvent(paid.id, "BOOKING_NEW");
+            }
+          } catch (notifyErr) {
+            console.warn("[bog/callback] notify failed", notifyErr);
           }
-        } catch (notifyErr) {
-          console.warn("[bog/callback] notify failed", notifyErr);
-        }
+        });
       }
     } else if (statusKey === "rejected") {
       await markBookingPaymentFailed({

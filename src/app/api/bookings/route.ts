@@ -1,4 +1,5 @@
-import { after, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { runAfterResponse } from "@/lib/server/after-response";
 import { getCustomerSession } from "@/lib/auth/sessions";
 import { prisma } from "@/lib/prisma";
 import { computeBufferEndsAt, rangesOverlap } from "@/lib/calendar/buffer";
@@ -25,17 +26,6 @@ import { createFileBooking } from "@/lib/server/customer-bookings-store";
 import { isPubliclyVisibleListing } from "@/lib/cars/listing-visibility";
 import { countryPlatformPercents } from "@/lib/pricing/country-platform-percents";
 import { locationCountryIso2 } from "@/lib/extras/country-scope";
-
-/** Email, partner credit, and similar work must not hold the success page. */
-function afterResponse(task: () => Promise<unknown>) {
-  after(() =>
-    Promise.resolve()
-      .then(task)
-      .catch((error) => {
-        console.warn("[bookings] background task failed", error);
-      }),
-  );
-}
 
 /** Block a trip shorter than the partner's minimum (1 or 2 days). */
 async function rejectBelowMinRental(partnerId: string, days: number) {
@@ -803,7 +793,7 @@ export async function POST(req: Request) {
         });
         await freezeBookingTermsAtCheckout(booking.id);
 
-        afterResponse(async () => {
+        runAfterResponse(async () => {
           if (!deferNotifyUntilPaid) {
             try {
               const { notifyFileBookingEvent } = await import("@/lib/notifications");
@@ -1166,7 +1156,7 @@ export async function POST(req: Request) {
         ...(bookingPromoCode || bpCode ? { promoCode: bpCode || bookingPromoCode } : {}),
       });
       await freezeBookingTermsAtCheckout(booking.id);
-      afterResponse(async () => {
+      runAfterResponse(async () => {
         try {
           const { notifyFileBookingEvent } = await import("@/lib/notifications");
           await notifyFileBookingEvent(booking);
@@ -1336,7 +1326,7 @@ export async function POST(req: Request) {
       }
     }
 
-    afterResponse(async () => {
+    runAfterResponse(async () => {
       if (!deferNotifyUntilPaid) {
         try {
           await notifyBookingEvent(booking.id, "BOOKING_NEW");

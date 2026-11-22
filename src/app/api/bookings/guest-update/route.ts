@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { runAfterResponse } from "@/lib/server/after-response";
 import { z } from "zod";
 import { computeBufferEndsAt } from "@/lib/calendar/buffer";
 import { roundMoney } from "@/lib/cars/reserve-pricing";
@@ -203,12 +204,15 @@ export async function POST(req: Request) {
         );
       }
       if (updated) {
-        try {
-          const { notifyFileBookingEvent } = await import("@/lib/notifications");
-          await notifyFileBookingEvent(updated, "BOOKING_EDITED");
-        } catch (notifyError) {
-          console.warn("[bookings/guest-update] notify edited failed", notifyError);
-        }
+        const edited = updated;
+        runAfterResponse(async () => {
+          try {
+            const { notifyFileBookingEvent } = await import("@/lib/notifications");
+            await notifyFileBookingEvent(edited, "BOOKING_EDITED");
+          } catch (notifyError) {
+            console.warn("[bookings/guest-update] notify edited failed", notifyError);
+          }
+        });
       }
 
       const refundable = roundMoney(Number(body.refundableSiteFeeEur) || 0);
@@ -414,12 +418,15 @@ export async function POST(req: Request) {
       } catch {
         /* best-effort */
       }
-      try {
-        const { notifyBookingEvent } = await import("@/lib/notifications");
-        await notifyBookingEvent(booking.id, "BOOKING_EDITED");
-      } catch (notifyError) {
-        console.warn("[bookings/guest-update] notify edited failed", notifyError);
-      }
+      const editedId = booking.id;
+      runAfterResponse(async () => {
+        try {
+          const { notifyBookingEvent } = await import("@/lib/notifications");
+          await notifyBookingEvent(editedId, "BOOKING_EDITED");
+        } catch (notifyError) {
+          console.warn("[bookings/guest-update] notify edited failed", notifyError);
+        }
+      });
 
       const refundable = roundMoney(Number(body.refundableSiteFeeEur) || 0);
       if (refundable > 0) {
