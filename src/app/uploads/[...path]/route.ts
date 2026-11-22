@@ -28,6 +28,14 @@ const globalForThumbs = globalThis as typeof globalThis & {
 const thumbCache = globalForThumbs.__uploadThumbCache ?? new Map<string, ThumbEntry>();
 globalForThumbs.__uploadThumbCache = thumbCache;
 
+/** Same card requested 12× while HostedFile is still reading — share one promise. */
+const globalForInflight = globalThis as typeof globalThis & {
+  __uploadThumbInflight?: Map<string, Promise<ThumbEntry>>;
+};
+const thumbInflight =
+  globalForInflight.__uploadThumbInflight ?? new Map<string, Promise<ThumbEntry>>();
+globalForInflight.__uploadThumbInflight = thumbInflight;
+
 function clampWidth(raw: string | null): number | null {
   const n = Number(raw);
   if (!Number.isFinite(n) || n < 16) return null;
@@ -151,19 +159,41 @@ export async function GET(
     if (cached) return imageResponse(cached.bytes, cached.contentType, width);
   }
 
+  const loadThumb = async (): Promise<ThumbEntry> => {
+    try {
+      const info = await stat(file);
+      if (!info.isFile()) throw new Error("missing");
+      const raw = await readFile(file);
+      return maybeResize(raw, type, width, format);
+    } catch {
+      const hosted = await readHostedFile(rel.replace(/\\/g, "/"));
+      if (!hosted) throw new Error("not-found");
+      await keepLocalCopy(file, hosted.bytes);
+      return maybeResize(hosted.bytes, hosted.contentType || type, width, format);
+    }
+  };
+
   try {
-    const info = await stat(file);
-    if (!info.isFile()) throw new Error("missing");
-    const raw = await readFile(file);
-    const resized = await maybeResize(raw, type, width, format);
-    if (width) cacheSet(cacheKey, resized);
+    let resized: ThumbEntry;
+    if (width) {
+      const pending = thumbInflight.get(cacheKey);
+      if (pending) {
+        resized = await pending;
+      } else {
+        const work = loadThumb()
+          .then((value) => {
+            cacheSet(cacheKey, value);
+            return value;
+          })
+          .finally(() => thumbInflight.delete(cacheKey));
+        thumbInflight.set(cacheKey, work);
+        resized = await work;
+      }
+    } else {
+      resized = await loadThumb();
+    }
     return imageResponse(resized.bytes, resized.contentType, width);
   } catch {
-    const hosted = await readHostedFile(rel.replace(/\\/g, "/"));
-    if (!hosted) return new NextResponse("Not found", { status: 404 });
-    await keepLocalCopy(file, hosted.bytes);
-    const resized = await maybeResize(hosted.bytes, hosted.contentType || type, width, format);
-    if (width) cacheSet(cacheKey, resized);
-    return imageResponse(resized.bytes, resized.contentType, width);
+    return new NextResponse("Not found", { status: 404 });
   }
 }
