@@ -250,6 +250,12 @@ export async function GET(req: Request) {
             status: { notIn: ["UNFULFILLED", "CANCELLED"] },
             pickupAt: { lt: to },
             bufferEndsAt: { gt: from },
+            NOT: {
+              AND: [
+                { paymentProvider: { in: ["bog", "paypal"] } },
+                { paymentStatus: { not: "PAID" } },
+              ],
+            },
           },
           include: {
             pickupAirport: { select: { iata: true, name: true } },
@@ -403,6 +409,9 @@ export async function GET(req: Request) {
       const mappedIds = new Set(mapped.map((b) => String(b.id)));
       for (const b of fileBookings) {
         if (b.status === "UNFULFILLED" || b.status === "CANCELLED") continue;
+        const pay = String(b.paymentProvider || "").toLowerCase();
+        const paid = String(b.paymentStatus || "").toUpperCase() === "PAID";
+        if ((pay === "bog" || pay === "paypal") && !paid) continue;
         if (mappedIds.has(b.id)) continue;
         const known = byId.get(b.carId);
         const guestName = `${b.guestFirstName} ${b.guestLastName}`.trim();

@@ -6,6 +6,10 @@ import { carHasBlockConflict, carIdsBlockedInRange } from "@/lib/server/car-cale
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import { carIdsBlockedByChannels, channelBlocksCar } from "@/lib/server/channel-sync";
 import { readAvailabilityCache, writeAvailabilityCache } from "@/lib/server/cache/availability-cache";
+import {
+  isBookingVisibleBeforePaymentGate,
+  prismaExcludeUnpaidOnlineCheckout,
+} from "@/lib/bookings/payment-visibility";
 
 /**
  * Car IDs that cannot be rented for [rangeStart, rangeEnd] because of an
@@ -30,6 +34,7 @@ export async function carIdsBookedInRange(
         status: { in: ["PENDING", "CONFIRMED"] },
         pickupAt: { lt: searchOccupiedUntil },
         bufferEndsAt: { gt: rangeStart },
+        ...prismaExcludeUnpaidOnlineCheckout(),
       },
       select: { carId: true },
     });
@@ -54,6 +59,14 @@ async function mergeFileBookedCarIds(into: Set<string>, rangeStart: Date, rangeE
     const fileBookings = await listAllFileBookings();
     for (const b of fileBookings) {
       if (b.status !== "PENDING" && b.status !== "CONFIRMED") continue;
+      if (
+        !isBookingVisibleBeforePaymentGate({
+          paymentProvider: b.paymentProvider,
+          paymentStatus: b.paymentStatus,
+        })
+      ) {
+        continue;
+      }
       if (!b.carId) continue;
       const pickup = new Date(b.pickupAt).getTime();
       const buffer = new Date(
@@ -115,6 +128,7 @@ export async function carHasBookingConflict(
       where: {
         carId,
         status: { in: ["PENDING", "CONFIRMED"] },
+        ...prismaExcludeUnpaidOnlineCheckout(),
         ...(opts?.excludeBookingId ? { id: { not: opts.excludeBookingId } } : {}),
       },
       select: { pickupAt: true, bufferEndsAt: true },
@@ -134,6 +148,14 @@ export async function carHasBookingConflict(
     for (const b of fileBookings) {
       if (opts?.excludeBookingId && b.id === opts.excludeBookingId) continue;
       if (b.status !== "PENDING" && b.status !== "CONFIRMED") continue;
+      if (
+        !isBookingVisibleBeforePaymentGate({
+          paymentProvider: b.paymentProvider,
+          paymentStatus: b.paymentStatus,
+        })
+      ) {
+        continue;
+      }
       const bStart = new Date(b.pickupAt);
       const bEnd = new Date(b.bufferEndsAt || computeBufferEndsAt(new Date(b.dropoffAt)));
       if (rangesOverlap(pickupAt, occupiedUntil, bStart, bEnd)) return true;

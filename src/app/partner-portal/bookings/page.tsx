@@ -10,6 +10,10 @@ import { listFileBookingsForCars } from "@/lib/server/customer-bookings-store";
 import { loadCarsByIds } from "@/lib/server/booking-car-label";
 import { withBookedCarLabels } from "@/lib/server/booking-terms-store";
 import { isDbOfflineError } from "@/lib/server/db-errors";
+import {
+  isBookingVisibleBeforePaymentGate,
+  prismaExcludeUnpaidOnlineCheckout,
+} from "@/lib/bookings/payment-visibility";
 
 export default async function PartnerBookingsPage() {
   const session = await requirePartner();
@@ -36,7 +40,7 @@ export default async function PartnerBookingsPage() {
     if (partner) {
       partnerId = partner.id;
       const bookings = await prisma.booking.findMany({
-        where: { car: { partnerId: partner.id } },
+        where: { car: { partnerId: partner.id }, ...prismaExcludeUnpaidOnlineCheckout() },
         include: {
           car: {
             include: {
@@ -47,7 +51,14 @@ export default async function PartnerBookingsPage() {
         orderBy: [{ sequentialNumber: "desc" }, { createdAt: "desc" }],
         take: 200,
       });
-      rows = bookings.map((b) => {
+      rows = bookings
+        .filter((b) =>
+          isBookingVisibleBeforePaymentGate({
+            paymentProvider: b.paymentProvider,
+            paymentStatus: b.paymentStatus,
+          }),
+        )
+        .map((b) => {
         const facing = displayBookingCharges({
           totalPriceEur: toNumber(b.totalPriceEur),
           depositPaidEur: toNumber(b.depositPaidEur),
@@ -113,6 +124,14 @@ export default async function PartnerBookingsPage() {
       const seen = new Set(rows.map((r) => r.id));
       for (const b of fileBookings) {
         if (seen.has(b.id)) continue;
+        if (
+          !isBookingVisibleBeforePaymentGate({
+            paymentProvider: b.paymentProvider,
+            paymentStatus: b.paymentStatus,
+          })
+        ) {
+          continue;
+        }
         const car = named.get(b.carId);
         const facing = displayBookingCharges({
           totalPriceEur: toNumber(b.totalPriceEur),

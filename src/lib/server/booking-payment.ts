@@ -276,6 +276,8 @@ export async function markBookingPaymentFailed(params: {
       data: {
         paymentStatus: "FAILED",
         paymentProvider: "bog",
+        status: "CANCELLED",
+        cancelledAt: new Date(),
         ...(bogOrderId ? { bogOrderId } : {}),
       },
     });
@@ -287,9 +289,129 @@ export async function markBookingPaymentFailed(params: {
     await updateFileBooking(existing.id, {
       paymentStatus: "FAILED",
       paymentProvider: "bog",
+      status: "CANCELLED",
+      cancelledAt: new Date().toISOString(),
+      cancellationReason: "Payment not completed",
       ...(bogOrderId ? { bogOrderId } : {}),
     });
   } catch {
     /* optional */
   }
+
+  try {
+    const { clearAvailabilityCache } = await import("@/lib/server/cache/availability-cache");
+    await clearAvailabilityCache();
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * Cancel bog/paypal bookings that never reached PAID.
+ * @param olderThanMs Only touch rows older than this (default 0 = all). Use a
+ * short grace window when purging from admin so an in-flight bank redirect
+ * is not cancelled under the guest's feet.
+ */
+export async function purgeUnpaidOnlineCheckouts(olderThanMs = 0): Promise<number> {
+  let n = 0;
+  const cutoff = new Date(Date.now() - Math.max(0, olderThanMs));
+  try {
+    const result = await prisma.booking.updateMany({
+      where: {
+        paymentProvider: { in: ["bog", "paypal"] },
+        paymentStatus: { not: "PAID" },
+        status: { in: ["PENDING", "CONFIRMED"] },
+        ...(olderThanMs > 0 ? { createdAt: { lt: cutoff } } : {}),
+      },
+      data: {
+        status: "CANCELLED",
+        cancelledAt: new Date(),
+        paymentStatus: "FAILED",
+      },
+    });
+    n += result.count;
+  } catch (err) {
+    console.warn("[booking-payment] purge prisma unpaid failed", err);
+  }
+
+  try {
+    const { listAllFileBookings, updateFileBooking } = await import(
+      "@/lib/server/customer-bookings-store"
+    );
+    const all = await listAllFileBookings();
+    for (const row of all) {
+      const provider = String(row.paymentProvider || "").toLowerCase();
+      if (provider !== "bog" && provider !== "paypal") continue;
+      if (String(row.paymentStatus || "").toUpperCase() === "PAID") continue;
+      if (row.status !== "PENDING" && row.status !== "CONFIRMED") continue;
+      if (olderThanMs > 0) {
+        const created = new Date(row.createdAt).getTime();
+        if (!Number.isFinite(created) || created > cutoff.getTime()) continue;
+      }
+      await updateFileBooking(row.id, {
+        status: "CANCELLED",
+        cancelledAt: new Date().toISOString(),
+        cancellationReason: "Checkout abandoned before payment",
+        paymentStatus: "FAILED",
+      });
+      n += 1;
+    }
+  } catch (err) {
+    console.warn("[booking-payment] purge file unpaid failed", err);
+  }
+
+  if (n > 0) {
+    try {
+      const { clearAvailabilityCache } = await import("@/lib/server/cache/availability-cache");
+      await clearAvailabilityCache();
+    } catch {
+      /* best-effort */
+    }
+  }
+  return n;
+}
+
+/**
+ * Guest abandoned checkout before the gateway charged/held funds.
+ * Cancels the row so it never appears as an active booking.
+ */
+export async function discardUnpaidOnlineCheckout(bookingId: string): Promise<boolean> {
+  const existing = await getBookingForPayment(bookingId);
+  if (!existing) return false;
+  if (existing.paymentStatus === "PAID") return false;
+  const provider = String(existing.paymentProvider || "").trim().toLowerCase();
+  if (provider !== "bog" && provider !== "paypal") return false;
+
+  try {
+    await prisma.booking.update({
+      where: { id: existing.id },
+      data: {
+        status: "CANCELLED",
+        cancelledAt: new Date(),
+        paymentStatus: "FAILED",
+      },
+    });
+  } catch (err) {
+    console.warn("[booking-payment] prisma discardUnpaid failed", err);
+  }
+
+  try {
+    await updateFileBooking(existing.id, {
+      status: "CANCELLED",
+      cancelledAt: new Date().toISOString(),
+      cancellationReason: "Checkout abandoned before payment",
+      paymentStatus: "FAILED",
+    });
+  } catch {
+    /* optional */
+  }
+
+  try {
+    const { clearAvailabilityCache } = await import("@/lib/server/cache/availability-cache");
+    await clearAvailabilityCache();
+  } catch {
+    /* best-effort */
+  }
+
+  return true;
 }

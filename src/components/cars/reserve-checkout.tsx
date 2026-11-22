@@ -1425,6 +1425,31 @@ export function ReserveCheckout({
   handleBookingRef.current = handleBooking;
   const bogAutoStartRef = useRef(false);
 
+  const abandonUnpaidCheckout = useCallback((bookingId: string) => {
+    const id = bookingId.trim();
+    if (!id) return;
+    void fetch("/api/bookings/abandon-unpaid", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: id }),
+      keepalive: true,
+    }).catch(() => undefined);
+  }, []);
+
+  const leavePaymentWithoutPaying = useCallback(() => {
+    leaveCheckoutRef.current = false;
+    const stagedId = bookingIdRef.current || ordersRef.current.bookingId || "";
+    abandonUnpaidCheckout(stagedId);
+    setBogCheckout(null);
+    bookingIdRef.current = "";
+    ordersRef.current = { bookingId: "" };
+    bogAutoStartRef.current = false;
+    setEmbeddedPay(null);
+    setError("");
+    setCheckoutStep("details");
+  }, [abandonUnpaidCheckout]);
+
   useEffect(() => {
     if (checkoutStep !== "payment") {
       bogAutoStartRef.current = false;
@@ -1495,20 +1520,7 @@ export function ReserveCheckout({
           <Step
             label={t.step2}
             active={checkoutStep === "details"}
-            onClick={
-              checkoutStep === "payment"
-                ? () => {
-                    leaveCheckoutRef.current = false;
-                    setBogCheckout(null);
-                    bookingIdRef.current = "";
-                    ordersRef.current = { bookingId: "" };
-                    bogAutoStartRef.current = false;
-                    setEmbeddedPay(null);
-                    setError("");
-                    setCheckoutStep("details");
-                  }
-                : undefined
-            }
+            onClick={checkoutStep === "payment" ? () => leavePaymentWithoutPaying() : undefined}
           />
           <Step label={t.step3} active={checkoutStep === "payment"} />
         </div>
@@ -1620,16 +1632,7 @@ export function ReserveCheckout({
                       backLabel={
                         locale === "ka" ? "დაბრუნება მძღოლის დეტალებზე" : "Back to driver details"
                       }
-                      onBack={() => {
-                        leaveCheckoutRef.current = false;
-                        setBogCheckout(null);
-                        bookingIdRef.current = "";
-                        ordersRef.current = { bookingId: "" };
-                        bogAutoStartRef.current = false;
-                        setEmbeddedPay(null);
-                        setError("");
-                        setCheckoutStep("details");
-                      }}
+                      onBack={() => leavePaymentWithoutPaying()}
                       onConfirm={async () => {
                         if (!payAmountLabel) {
                           const label = await loadPayAmountLabel(totals.payNow);
@@ -1708,16 +1711,7 @@ export function ReserveCheckout({
             <button
               type="button"
               disabled={loading}
-              onClick={() => {
-                leaveCheckoutRef.current = false;
-                setBogCheckout(null);
-                bookingIdRef.current = "";
-                ordersRef.current = { bookingId: "" };
-                bogAutoStartRef.current = false;
-                setEmbeddedPay(null);
-                setError("");
-                setCheckoutStep("details");
-              }}
+              onClick={() => leavePaymentWithoutPaying()}
               className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
             >
               {locale === "ka"

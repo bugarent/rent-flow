@@ -10,6 +10,10 @@ import {
   businessPartnerCodeForBooking,
   loadBusinessPartnerCodeIndex,
 } from "@/lib/server/business-partner-booking-codes";
+import {
+  isBookingVisibleBeforePaymentGate,
+  prismaExcludeUnpaidOnlineCheckout,
+} from "@/lib/bookings/payment-visibility";
 
 export type AdminBookingListRow = {
   id: string;
@@ -38,9 +42,18 @@ export async function loadAdminBookingRows(): Promise<AdminBookingListRow[]> {
     byRef: new Map<string, string>(),
   }));
 
+  // Hide unpaid online checkouts immediately via filter; cancel stale ones (>2m).
+  try {
+    const { purgeUnpaidOnlineCheckouts } = await import("@/lib/server/booking-payment");
+    await purgeUnpaidOnlineCheckouts(2 * 60 * 1000);
+  } catch {
+    /* best-effort */
+  }
+
   try {
     const { prisma } = await import("@/lib/prisma");
     const bookings = await prisma.booking.findMany({
+      where: prismaExcludeUnpaidOnlineCheckout(),
       include: {
         car: {
           include: {
@@ -52,6 +65,14 @@ export async function loadAdminBookingRows(): Promise<AdminBookingListRow[]> {
       orderBy: [{ sequentialNumber: "desc" }, { createdAt: "desc" }],
     });
     for (const b of bookings) {
+      if (
+        !isBookingVisibleBeforePaymentGate({
+          paymentProvider: b.paymentProvider,
+          paymentStatus: b.paymentStatus,
+        })
+      ) {
+        continue;
+      }
       rows.push({
         id: b.id,
         sequentialNumber: b.sequentialNumber || 0,
@@ -86,6 +107,14 @@ export async function loadAdminBookingRows(): Promise<AdminBookingListRow[]> {
     const seen = new Set(rows.map((r) => r.id));
     for (const b of fileBookings) {
       if (seen.has(b.id)) continue;
+      if (
+        !isBookingVisibleBeforePaymentGate({
+          paymentProvider: b.paymentProvider,
+          paymentStatus: b.paymentStatus,
+        })
+      ) {
+        continue;
+      }
       const car = byId.get(b.carId);
       rows.push({
         id: b.id,

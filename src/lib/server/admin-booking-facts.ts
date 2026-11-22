@@ -21,6 +21,10 @@ import {
   listRetainedBookingFacts,
   saveRetainedBookingFact,
 } from "@/lib/server/retained-booking-facts";
+import {
+  isBookingVisibleBeforePaymentGate,
+  prismaExcludeUnpaidOnlineCheckout,
+} from "@/lib/bookings/payment-visibility";
 
 export type AdminBookingFact = {
   id: string;
@@ -129,6 +133,7 @@ export async function loadAdminBookingFacts(): Promise<AdminBookingFact[]> {
   try {
     const { prisma } = await import("@/lib/prisma");
     const rows = await prisma.booking.findMany({
+      where: prismaExcludeUnpaidOnlineCheckout(),
       include: {
         car: true,
         customer: true,
@@ -155,6 +160,14 @@ export async function loadAdminBookingFacts(): Promise<AdminBookingFact[]> {
     const partnerById = new Map(partners.map((partner) => [partner.id, partner]));
 
     for (const row of rows) {
+      if (
+        !isBookingVisibleBeforePaymentGate({
+          paymentProvider: row.paymentProvider,
+          paymentStatus: row.paymentStatus,
+        })
+      ) {
+        continue;
+      }
       seen.add(row.id);
       const partner = row.car?.partnerId ? partnerById.get(row.car.partnerId) : undefined;
       const iata = row.pickupAirport?.iata || "";
@@ -282,6 +295,14 @@ export async function loadAdminBookingFacts(): Promise<AdminBookingFact[]> {
 
     for (const booking of fileBookings) {
       if (seen.has(booking.id)) continue;
+      if (
+        !isBookingVisibleBeforePaymentGate({
+          paymentProvider: booking.paymentProvider,
+          paymentStatus: booking.paymentStatus,
+        })
+      ) {
+        continue;
+      }
       const car = carById.get(booking.carId);
       const prismaCar = car ? undefined : prismaCars.get(booking.carId);
       let partnerName = car?.partnerName || car?.partnerEmail || car?.partnerId || prismaCar?.partnerLabel || "—";

@@ -6,6 +6,10 @@ import { isDbOfflineError } from "@/lib/server/db-errors";
 import { computeBufferEndsAt } from "@/lib/calendar/buffer";
 import { listCalendarBlocksForCars } from "@/lib/server/car-calendar-blocks-store";
 import { formatBookingRef } from "@/lib/ids";
+import {
+  isBookingVisibleBeforePaymentGate,
+  prismaExcludeUnpaidOnlineCheckout,
+} from "@/lib/bookings/payment-visibility";
 
 export async function buildCarChannelIcal(carId: string, carLabel: string) {
   const from = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
@@ -19,6 +23,7 @@ export async function buildCarChannelIcal(carId: string, carLabel: string) {
         status: { in: ["PENDING", "CONFIRMED"] },
         bufferEndsAt: { gt: from },
         pickupAt: { lt: to },
+        ...prismaExcludeUnpaidOnlineCheckout(),
       },
       select: { id: true, sequentialNumber: true, pickupAt: true, bufferEndsAt: true },
     });
@@ -39,6 +44,14 @@ export async function buildCarChannelIcal(carId: string, carLabel: string) {
     const fileRows = await listFileBookingsForCars([carId], from, to);
     for (const row of fileRows) {
       if (row.status !== "PENDING" && row.status !== "CONFIRMED") continue;
+      if (
+        !isBookingVisibleBeforePaymentGate({
+          paymentProvider: row.paymentProvider,
+          paymentStatus: row.paymentStatus,
+        })
+      ) {
+        continue;
+      }
       const uid = `booking-${row.id}@rentairportcars.com`;
       if (events.some((event) => event.uid === uid)) continue;
       events.push({

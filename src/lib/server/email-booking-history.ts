@@ -14,6 +14,10 @@ import {
 import { listFileBookingsByEmail } from "@/lib/server/customer-bookings-store";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 import { purgeExpiredBookings } from "@/lib/server/purge-expired-bookings";
+import {
+  isBookingVisibleBeforePaymentGate,
+  prismaExcludeUnpaidOnlineCheckout,
+} from "@/lib/bookings/payment-visibility";
 
 export type EmailHistoryChat = ReturnType<typeof publicChatView>;
 
@@ -37,8 +41,13 @@ export async function loadEmailBookingHistory(input: { email: string; bookingNum
   const typedCode = parseCustomBookingCode(input.bookingNumber);
   const cutoff = bookingRetentionCutoff();
 
-  const fileRows = (await listFileBookingsByEmail(email)).filter((row) =>
-    isWithinBookingRetention(row.pickupAt),
+  const fileRows = (await listFileBookingsByEmail(email)).filter(
+    (row) =>
+      isWithinBookingRetention(row.pickupAt) &&
+      isBookingVisibleBeforePaymentGate({
+        paymentProvider: row.paymentProvider,
+        paymentStatus: row.paymentStatus,
+      }),
   );
 
   let prismaRows: Array<{ id: string; sequentialNumber: number; createdAt: Date }> = [];
@@ -54,6 +63,7 @@ export async function loadEmailBookingHistory(input: { email: string; bookingNum
       where: {
         guestEmail: { equals: email, mode: "insensitive" },
         pickupAt: { gte: cutoff },
+        ...prismaExcludeUnpaidOnlineCheckout(),
       },
       select: { id: true, sequentialNumber: true, createdAt: true },
       orderBy: { createdAt: "desc" },

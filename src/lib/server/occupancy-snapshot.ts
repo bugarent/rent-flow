@@ -1,6 +1,10 @@
 import "server-only";
 
 import { computeBufferEndsAt } from "@/lib/calendar/buffer";
+import {
+  isBookingVisibleBeforePaymentGate,
+  prismaExcludeUnpaidOnlineCheckout,
+} from "@/lib/bookings/payment-visibility";
 import { prisma } from "@/lib/prisma";
 import { isDbOfflineError } from "@/lib/server/db-errors";
 
@@ -44,7 +48,11 @@ async function load(): Promise<Snapshot> {
   const [dbRows, fileRows, blockRows, feeds, apiBlocks] = await Promise.all([
     prisma.booking
       .findMany({
-        where: { status: { in: ["PENDING", "CONFIRMED"] }, bufferEndsAt: { gt: new Date(floor) } },
+        where: {
+          status: { in: ["PENDING", "CONFIRMED"] },
+          bufferEndsAt: { gt: new Date(floor) },
+          ...prismaExcludeUnpaidOnlineCheckout(),
+        },
         select: { carId: true, pickupAt: true, bufferEndsAt: true },
       })
       .catch((error: unknown) => {
@@ -62,6 +70,14 @@ async function load(): Promise<Snapshot> {
   }
   for (const b of fileRows) {
     if (b.status !== "PENDING" && b.status !== "CONFIRMED") continue;
+    if (
+      !isBookingVisibleBeforePaymentGate({
+        paymentProvider: b.paymentProvider,
+        paymentStatus: b.paymentStatus,
+      })
+    ) {
+      continue;
+    }
     if (!b.carId) continue;
     const start = ms(b.pickupAt);
     const end = ms(b.bufferEndsAt || computeBufferEndsAt(new Date(b.dropoffAt)));

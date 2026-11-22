@@ -5,6 +5,7 @@ import { formatBookingRef, parseBookingRef } from "@/lib/ids";
 import { bookingSequentialCandidates } from "@/lib/bookings/sequential-candidates";
 import { parsePartnerMessengers } from "@/lib/partner";
 import { parseCompanySettings } from "@/lib/partners/company-settings";
+import { isBookingVisibleBeforePaymentGate } from "@/lib/bookings/payment-visibility";
 
 const schema = z.object({
   bookingNumber: z.string().trim().min(1).max(40),
@@ -92,7 +93,13 @@ export async function POST(req: Request) {
           fileBooking = await findFileBookingByRefAndEmail(sequentialNumber, email);
           if (fileBooking) break;
         }
-        if (fileBooking) {
+        if (
+          fileBooking &&
+          isBookingVisibleBeforePaymentGate({
+            paymentProvider: fileBooking.paymentProvider,
+            paymentStatus: fileBooking.paymentStatus,
+          })
+        ) {
           const { loadBookingInfoDetail } = await import("@/lib/server/booking-info-detail");
           const detail = await loadBookingInfoDetail(fileBooking.id);
           if (detail) {
@@ -103,6 +110,18 @@ export async function POST(req: Request) {
         console.warn("[bookings/lookup] file fallback", fileError);
       }
 
+      return NextResponse.json(
+        { error: "We could not find a booking with those details." },
+        { status: 404 },
+      );
+    }
+
+    if (
+      !isBookingVisibleBeforePaymentGate({
+        paymentProvider: booking.paymentProvider,
+        paymentStatus: booking.paymentStatus,
+      })
+    ) {
       return NextResponse.json(
         { error: "We could not find a booking with those details." },
         { status: 404 },

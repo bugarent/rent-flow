@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { XCircle } from "lucide-react";
+import { discardUnpaidOnlineCheckout } from "@/lib/server/booking-payment";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,15 @@ export default async function BookingPaymentFailPage({ searchParams }: Props) {
   const ref = first(sp.ref).trim();
   const bookingId = first(sp.bookingId).trim();
 
+  // Incomplete gateway checkout must not remain as an active booking anywhere.
+  if (bookingId) {
+    try {
+      await discardUnpaidOnlineCheckout(bookingId);
+    } catch (error) {
+      console.warn("[payment/fail] discard unpaid failed", error);
+    }
+  }
+
   return (
     <main className="min-h-[70vh] bg-[#eef2f6] px-3 py-10 sm:px-4">
       <div className="mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-8">
@@ -32,11 +42,11 @@ export default async function BookingPaymentFailPage({ searchParams }: Props) {
               for booking <span className="font-semibold text-[#0b1f4b]">{ref}</span>
             </>
           ) : null}
-          . Your reservation is still unpaid — you can try again from checkout or contact support.
+          . No reservation was confirmed — you can try again from checkout or contact support.
         </p>
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
           <Link
-            href={bookingId ? `/cars` : "/cars"}
+            href="/cars"
             className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#1d6fe8] px-5 text-sm font-extrabold text-white hover:bg-[#1557c0]"
           >
             Browse cars
