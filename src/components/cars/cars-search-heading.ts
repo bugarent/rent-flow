@@ -1,6 +1,7 @@
 import type { SearchAirportOption } from "@/components/search/airport-search";
 import { CATALOG_AIRPORTS } from "@/lib/catalog/airports";
 import { COUNTRY_PLACES } from "@/lib/catalog/country-places-data";
+import { driveExonym } from "@/lib/seo/location-drive-exonyms";
 
 /** Main international airport cities shown in the heading. */
 const MAX_CITIES = 4;
@@ -9,11 +10,11 @@ type Template = { one: (list: string) => string; many: (list: string) => string 
 
 const TEMPLATES: Record<string, Template> = {
   en: { one: (l) => `Car rental at ${l} Airport`, many: (l) => `Car rental at ${l} airports` },
-  ka: { one: (l) => `მანქანის გაქირავება ${l} აეროპორტში`, many: (l) => `მანქანის გაქირავება ${l} აეროპორტებში` },
-  ru: { one: (l) => `Аренда авто в аэропорту: ${l}`, many: (l) => `Аренда авто в аэропортах: ${l}` },
+  ka: { one: (l) => `მანქანის გაქირავება ${l} აეროპორტში`, many: (l) => `მანქანის გაქირავება ${l} აეროპორტში` },
+  ru: { one: (l) => `Аренда авто в аэропорту ${l}`, many: (l) => `Аренда авто в аэропортах ${l}` },
   fr: { one: (l) => `Location de voiture à l'aéroport de ${l}`, many: (l) => `Location de voiture aux aéroports : ${l}` },
   de: { one: (l) => `Mietwagen am Flughafen ${l}`, many: (l) => `Mietwagen an den Flughäfen ${l}` },
-  pl: { one: (l) => `Wynajem samochodów na lotnisku: ${l}`, many: (l) => `Wynajem samochodów na lotniskach: ${l}` },
+  pl: { one: (l) => `Wynajem samochodów na lotnisku ${l}`, many: (l) => `Wynajem samochodów na lotniskach ${l}` },
   ar: { one: (l) => `تأجير السيارات في مطار ${l}`, many: (l) => `تأجير السيارات في مطارات ${l}` },
   es: { one: (l) => `Alquiler de coches en el aeropuerto de ${l}`, many: (l) => `Alquiler de coches en los aeropuertos de ${l}` },
   it: { one: (l) => `Noleggio auto all'aeroporto di ${l}`, many: (l) => `Noleggio auto negli aeroporti di ${l}` },
@@ -47,7 +48,7 @@ const KA_CITY: Record<string, string> = {
   Riga: "რიგა", Vilnius: "ვილნიუსი", Tallinn: "ტალინი", Brussels: "ბრიუსელი",
   Zurich: "ციურიხი", Geneva: "ჟენევა", Lisbon: "ლისაბონი", Porto: "პორტო", Faro: "ფარო",
   Copenhagen: "კოპენჰაგენი", Stockholm: "სტოკჰოლმი", Oslo: "ოსლო", Helsinki: "ჰელსინკი",
-  Cairo: "კაირო", Larnaca: "ლარნაკა", Paphos: "პაფოსი", Chisinau: "კიშინიოვი",
+  Cairo: "კაირო", Larnaca: "ლარნაკა", Paphos: "პაპჰოსი", Chisinau: "კიშინიოვი",
   Belgrade: "ბელგრადი", Tashkent: "ტაშკენტი", Almaty: "ალმათი", Astana: "ასტანა",
 };
 
@@ -82,6 +83,7 @@ const CITY_NAMES: Record<string, Record<string, string>> = { ka: KA_CITY, ru: RU
 function georgianGenitive(name: string) {
   if (!/[\u10D0-\u10FF]$/.test(name)) return name;
   if (name === "ერევანი") return "ერევნის";
+  if (name === "ლარნაკა") return "ლარნაკას";
   if (/[აი]$/.test(name)) return `${name.slice(0, -1)}ის`;
   if (/[ოუე]$/.test(name)) return `${name}ს`;
   return `${name}ის`;
@@ -96,7 +98,7 @@ function localizedCity(englishCity: string, iata: string, locale: string) {
   const catalog = CATALOG_AIRPORTS.find((a) => a.iata === iata.toUpperCase());
   const names = catalog?.cityName as Record<string, string | undefined> | undefined;
   if (names?.[locale]) return names[locale] as string;
-  return CITY_NAMES[locale]?.[englishCity] || englishCity;
+  return CITY_NAMES[locale]?.[englishCity] || driveExonym(locale, englishCity) || englishCity;
 }
 
 /** Biggest international airport cities of a country (seed lists are ordered by size). */

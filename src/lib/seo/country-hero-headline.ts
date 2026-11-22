@@ -157,7 +157,7 @@ function airportLine(locale: Locale, englishCities: string[]): string {
     case "nl":
       return `Autoverhuur op ${one ? "de luchthaven" : "de luchthavens"} van ${joinList(cities, "en")}.`;
     case "pl":
-      return `Wynajem samochodów ${one ? "na lotnisku" : "na lotniskach"}: ${joinList(cities, "i")}.`;
+      return `Wynajem samochodów ${one ? "na lotnisku" : "na lotniskach"} ${joinList(cities, "i")}.`;
     case "tr":
       return `${joinList(cities, "ve")} ${one ? "havalimanında" : "havalimanlarında"} araç kiralama.`;
     case "ar":
