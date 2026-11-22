@@ -34,6 +34,7 @@ import {
 } from "@/components/cars/lazy-checkout";
 import { CheckoutBogFrame } from "@/components/cars/checkout-bog-frame";
 import { CheckoutPaypalButtons } from "@/components/cars/checkout-paypal-buttons";
+import { BookingActivatedPanel } from "@/components/cars/booking-activated-panel";
 import {
   BookingConfirmOverlay,
   RacButtonLoader,
@@ -240,6 +241,13 @@ export function ReserveCheckout({
   const [error, setError] = useState("");
   const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  /** Instant success UI after free confirm — avoids flashing checkout while success SSR loads. */
+  const [activatedBooking, setActivatedBooking] = useState<{
+    bookingId: string;
+    ref: string;
+    email: string;
+  } | null>(null);
+  const leaveCheckoutRef = useRef(false);
   const [carLoading, setCarLoading] = useState(
     () => !(initialCar && initialRange === carRangeKey(initialStart, initialEnd)),
   );
@@ -1158,102 +1166,122 @@ export function ReserveCheckout({
         .filter((row) => row.qty > 0);
       const phone = formatInternationalPhone(phoneIso2, phoneNational);
       let bookingId = bookingIdRef.current;
+      let createData: {
+        sequentialNumber?: unknown;
+        guestEmail?: unknown;
+      } | null = null;
       if (!bookingId) {
-      const res = await fetch("/api/bookings", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          carId,
-          startDate,
-          endDate,
-          flightNumber: noFlightNumber ? "" : flightNumber.trim(),
-          pickupAirportIata: pickup,
-          dropoffAirportIata: dropoff,
-          pickupAddress: pickupAddress.trim(),
-          dropoffAddress: dropoffAddress.trim(),
-          extras: selectedExtras,
-          fullProtection: hasFullInsuranceExtra ? false : fullProtection,
-          cancellationProtection,
-          pickupPaymentMethod: "card",
-          guestTitle: title,
-          guestFirstName: firstName.trim(),
-          guestLastName: lastName.trim(),
-          guestEmail: email.trim(),
-          guestPhone: phone,
-          messengers,
-          supplierNote: showNote ? supplierNote.trim() : "",
-          marketingOptIn,
-          rememberMe,
-          dateOfBirth: dateOfBirth.trim(),
-          countryOfResidence: liveInIso2.trim().toUpperCase(),
-          promoCode: noPromoCode
-            ? ""
-            : (
-                bpReferral.activeCode ||
-                promoCode.trim() ||
-                readBusinessPartnerReferralCookieClient()
-              ).toUpperCase(),
-          declinePartnerReferral: noPromoCode,
-          // 0% site fee: no gateway charge — booking confirms as paid on create.
-          ...(skipGateway ? {} : { paymentProvider: provider }),
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const apiError = String(data.error || dictionary.booking.createFailed);
-        const apiInvalid = new Set<string>();
-        const lower = apiError.toLowerCase();
-        if (/log in or register|ავტორიზაცია|регистр/i.test(lower)) {
+        const res = await fetch("/api/bookings", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            carId,
+            startDate,
+            endDate,
+            flightNumber: noFlightNumber ? "" : flightNumber.trim(),
+            pickupAirportIata: pickup,
+            dropoffAirportIata: dropoff,
+            pickupAddress: pickupAddress.trim(),
+            dropoffAddress: dropoffAddress.trim(),
+            extras: selectedExtras,
+            fullProtection: hasFullInsuranceExtra ? false : fullProtection,
+            cancellationProtection,
+            pickupPaymentMethod: "card",
+            guestTitle: title,
+            guestFirstName: firstName.trim(),
+            guestLastName: lastName.trim(),
+            guestEmail: email.trim(),
+            guestPhone: phone,
+            messengers,
+            supplierNote: showNote ? supplierNote.trim() : "",
+            marketingOptIn,
+            rememberMe,
+            dateOfBirth: dateOfBirth.trim(),
+            countryOfResidence: liveInIso2.trim().toUpperCase(),
+            promoCode: noPromoCode
+              ? ""
+              : (
+                  bpReferral.activeCode ||
+                  promoCode.trim() ||
+                  readBusinessPartnerReferralCookieClient()
+                ).toUpperCase(),
+            declinePartnerReferral: noPromoCode,
+            // 0% site fee: no gateway charge — booking confirms as paid on create.
+            ...(skipGateway ? {} : { paymentProvider: provider }),
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const apiError = String(data.error || dictionary.booking.createFailed);
+          const apiInvalid = new Set<string>();
+          const lower = apiError.toLowerCase();
+          if (/log in or register|ავტორიზაცია|регистр/i.test(lower)) {
+            throw new Error(dictionary.booking.createFailed);
+          }
+          if (/invalid `prisma|econnrefused|database is temporarily|can't reach database/.test(lower)) {
+            throw new Error(dictionary.booking.createFailed);
+          }
+          if (lower.includes("flight")) apiInvalid.add("flightNumber");
+          if (lower.includes("pick-up address") || lower.includes("pickup address")) {
+            apiInvalid.add("pickupAddress");
+          }
+          if (lower.includes("drop-off address") || lower.includes("dropoff address")) {
+            apiInvalid.add("dropoffAddress");
+          }
+          if (lower.includes("driver") || lower.includes("information")) {
+            apiInvalid.add("firstName");
+            apiInvalid.add("lastName");
+            apiInvalid.add("email");
+          }
+          if (lower.includes("phone")) apiInvalid.add("phone");
+          if (lower.includes("messenger")) apiInvalid.add("messengers");
+          if (lower.includes("date")) {
+            apiInvalid.add("startDate");
+            apiInvalid.add("endDate");
+          }
+          if (lower.includes("airport") || lower.includes("unknown")) {
+            apiInvalid.add("pickup");
+            apiInvalid.add("dropoff");
+          }
+          setInvalidFields(apiInvalid);
+          setCheckoutStep("details");
+          throw new Error(apiError);
+        }
+
+        bookingId = String(data.id || "").trim();
+        if (!bookingId) {
           throw new Error(dictionary.booking.createFailed);
         }
-        if (/invalid `prisma|econnrefused|database is temporarily|can't reach database/.test(lower)) {
-          throw new Error(dictionary.booking.createFailed);
-        }
-        if (lower.includes("flight")) apiInvalid.add("flightNumber");
-        if (lower.includes("pick-up address") || lower.includes("pickup address")) {
-          apiInvalid.add("pickupAddress");
-        }
-        if (lower.includes("drop-off address") || lower.includes("dropoff address")) {
-          apiInvalid.add("dropoffAddress");
-        }
-        if (lower.includes("driver") || lower.includes("information")) {
-          apiInvalid.add("firstName");
-          apiInvalid.add("lastName");
-          apiInvalid.add("email");
-        }
-        if (lower.includes("phone")) apiInvalid.add("phone");
-        if (lower.includes("messenger")) apiInvalid.add("messengers");
-        if (lower.includes("date")) {
-          apiInvalid.add("startDate");
-          apiInvalid.add("endDate");
-        }
-        if (lower.includes("airport") || lower.includes("unknown")) {
-          apiInvalid.add("pickup");
-          apiInvalid.add("dropoff");
-        }
-        setInvalidFields(apiInvalid);
-        setCheckoutStep("details");
-        throw new Error(apiError);
-      }
+        createData = data;
+        bookingIdRef.current = bookingId;
+        ordersRef.current = { bookingId };
+        rememberSuccessPath(bookingId, data);
 
-      bookingId = String(data.id || "").trim();
-      if (!bookingId) {
-        throw new Error(dictionary.booking.createFailed);
-      }
-      bookingIdRef.current = bookingId;
-      ordersRef.current = { bookingId };
-      rememberSuccessPath(bookingId, data);
-
-      clearBusinessPartnerReferralCookieClient();
+        clearBusinessPartnerReferralCookieClient();
       }
 
       if (skipGateway) {
         bookingIdRef.current = bookingId;
         if (!successPathRef.current.includes(encodeURIComponent(bookingId))) {
-          rememberSuccessPath(bookingId);
+          rememberSuccessPath(bookingId, createData || undefined);
         }
-        window.location.assign(successPathRef.current);
+        const seq =
+          typeof createData?.sequentialNumber === "number" ? createData.sequentialNumber : null;
+        const ref = formatBookingRef(seq) || "";
+        const mail = String(createData?.guestEmail || email || "").trim();
+        leaveCheckoutRef.current = true;
+        setActivatedBooking({
+          bookingId,
+          ref,
+          email: mail.slice(0, 120),
+        });
+        window.scrollTo({ top: 0, behavior: "auto" });
+        try {
+          window.history.replaceState(null, "", successPathRef.current);
+        } catch {
+          /* ignore */
+        }
         return { bookingId, orderId: "free" };
       }
 
@@ -1340,9 +1368,11 @@ export function ReserveCheckout({
             : "Payment redirect URL missing. Please try again — the booking was not confirmed.",
         );
       }
+      leaveCheckoutRef.current = true;
       window.location.assign(redirectUrl);
       return;
     } catch (err) {
+      leaveCheckoutRef.current = false;
       setError(err instanceof Error ? err.message : dictionary.booking.createFailed);
       setEmbeddedPay(null);
       requestAnimationFrame(() => {
@@ -1350,7 +1380,8 @@ export function ReserveCheckout({
         el?.scrollIntoView({ behavior: "smooth", block: "center" });
       });
     } finally {
-      setLoading(false);
+      // Keep overlay / leave checkout UI until success panel paints (or real error).
+      if (!leaveCheckoutRef.current) setLoading(false);
     }
   };
 
@@ -1436,13 +1467,23 @@ export function ReserveCheckout({
 
   const onBogPaid = useCallback(() => {
     const id = bookingIdRef.current;
+    const mail = email.trim().slice(0, 120);
     if (id && !successPathRef.current.includes(encodeURIComponent(id))) {
       const q = new URLSearchParams({ bookingId: id });
-      const mail = email.trim();
-      if (mail) q.set("email", mail.slice(0, 120));
+      if (mail) q.set("email", mail);
       successPathRef.current = `/booking/payment/success?${q.toString()}`;
     }
-    window.location.assign(successPathRef.current);
+    leaveCheckoutRef.current = true;
+    setActivatedBooking({
+      bookingId: id || "",
+      ref: "",
+      email: mail,
+    });
+    try {
+      window.history.replaceState(null, "", successPathRef.current);
+    } catch {
+      /* ignore */
+    }
   }, [email]);
 
   const onPaypalPaid = useCallback((orderId: string) => {
@@ -1464,12 +1505,25 @@ export function ReserveCheckout({
         ? "Подтверждаем бронь…"
         : "Confirming booking…";
 
+  if (activatedBooking) {
+    return (
+      <div className="min-h-screen bg-[#eef2f6]">
+        <BookingActivatedPanel
+          locale={locale}
+          email={activatedBooking.email}
+          bookingRef={activatedBooking.ref}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#eef2f6]">
       <BookingConfirmOverlay
         active={loading}
         label={confirmingMessage}
         message={confirmingMessage}
+        delayMs={0}
       />
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 p-2 sm:flex-row sm:gap-2.5 sm:p-2.5">
