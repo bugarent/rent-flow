@@ -106,7 +106,36 @@ const EXONYMS: Record<string, Row> = {
   Pretoria: e("პრეტორია", "Претория", { ar: "بريتوريا", zh: "比勒陀利亚", ko: "프리토리아", th: "พริทอเรีย" }),
 };
 
+function foldName(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/ł/gi, "l")
+    .replace(/ø/gi, "o")
+    .replace(/đ/gi, "d")
+    .replace(/[^a-z0-9]/gi, "")
+    .toLowerCase();
+}
+
+let foldedRows: Map<string, Row> | null = null;
+
+function rowFor(english: string): Row | undefined {
+  const exact = EXONYMS[english] || MORE_EXONYMS[english];
+  if (exact) return exact;
+  if (!foldedRows) {
+    foldedRows = new Map();
+    for (const table of [EXONYMS, MORE_EXONYMS]) {
+      for (const [key, row] of Object.entries(table)) {
+        const id = foldName(key);
+        if (!foldedRows.has(id)) foldedRows.set(id, row);
+      }
+    }
+  }
+  return foldedRows.get(foldName(english));
+}
+
 export function driveExonym(locale: string, english: string): string | undefined {
-  const code = locale as Locale;
-  return EXONYMS[english]?.[code] || MORE_EXONYMS[english]?.[code];
+  const row = rowFor(english);
+  if (!row) return undefined;
+  return row[locale as Locale];
 }

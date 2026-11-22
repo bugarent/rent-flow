@@ -2,6 +2,7 @@ import type { Locale } from "@/lib/i18n/config";
 import { cityDisplayName, regionName } from "@/lib/i18n/place-label";
 import { COUNTRY_PLACES } from "@/lib/catalog/country-places-data";
 import { COUNTRY_NAMES_KA } from "@/lib/catalog/country-names-ka";
+import { driveExonym } from "@/lib/seo/location-drive-exonyms";
 
 /** Country shown on the homepage cover before a visitor picks one (main market, what Google sees). */
 export const DEFAULT_HERO_COUNTRY = "GE";
@@ -46,6 +47,7 @@ const RU_COUNTRY_IN: Record<string, string> = {
 /** Georgian genitive that the simple rule gets wrong (vowel drop). */
 const KA_GENITIVE: Record<string, string> = {
   ერევანი: "ერევნის",
+  ლარნაკა: "ლარნაკას",
 };
 
 /** "საქართველო" → "საქართველოში", "სომხეთი" → "სომხეთში". */
@@ -71,9 +73,6 @@ function ruGenitive(name: string): string {
   if (/й$/i.test(name)) return `${name.slice(0, -1)}я`;
   return `${name}а`;
 }
-
-const GEORGIAN = /^[\u10A0-\u10FF\s-]+$/;
-const CYRILLIC = /^[\u0400-\u04FF\s-]+$/;
 
 function joinList(items: string[], and: string, comma = ", ", gap = " "): string {
   if (items.length <= 1) return items[0] ?? "";
@@ -133,18 +132,20 @@ function countryTitle(locale: Locale, code: string): string {
   }
 }
 
+function airportCityName(locale: Locale, english: string): string {
+  const shown = cityDisplayName(locale, english);
+  if (shown !== english) return shown;
+  return driveExonym(locale, english) || english;
+}
+
 function airportLine(locale: Locale, englishCities: string[]): string {
-  const cities = englishCities.map((city) => cityDisplayName(locale, city));
+  const cities = englishCities.map((city) => airportCityName(locale, city));
   const one = cities.length === 1;
   switch (locale) {
     case "ka":
-      return cities.every((c) => GEORGIAN.test(c))
-        ? `მანქანის გაქირავება ${joinList(cities.map(kaGenitive), "და")} აეროპორტში.`
-        : `მანქანის გაქირავება აეროპორტებში: ${joinList(cities, "და")}.`;
+      return `მანქანის გაქირავება ${joinList(cities.map(kaGenitive), "და")} აეროპორტში.`;
     case "ru":
-      return cities.every((c) => CYRILLIC.test(c))
-        ? `Аренда авто в ${one ? "аэропорту" : "аэропортах"} ${joinList(cities.map(ruGenitive), "и")}.`
-        : `Аренда авто в аэропортах: ${joinList(cities, "и")}.`;
+      return `Аренда авто в ${one ? "аэропорту" : "аэропортах"} ${joinList(cities.map(ruGenitive), "и")}.`;
     case "de":
       return `Mietwagen ${one ? "am Flughafen" : "an den Flughäfen"} ${joinList(cities, "und")}.`;
     case "es":
