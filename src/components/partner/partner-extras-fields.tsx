@@ -417,7 +417,7 @@ export function PartnerExtrasFields({
           const row = value.find((v) => v.extraServiceId === service.id);
           if (!row) return null;
 
-          if (isMandatoryFreeExtra(service)) {
+          if (isMandatoryFreeExtra(service) && partnerStatusLocked(service)) {
             return (
               <li key={service.id} className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">

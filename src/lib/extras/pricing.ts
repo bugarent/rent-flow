@@ -200,6 +200,14 @@ export function normalizePartnerExtraPrice(
       priceEur: clampPartnerDailyPrice(service.minPriceEur, service.maxPriceEur, toNumber(input.priceEur, 0)),
     };
   }
+  // System TPL: locked countries always attach at €0; optional countries honor off/forbid.
+  if (isMandatoryFreeExtra(service)) {
+    if (service.partnerCanToggleTpl) {
+      if (input.forbidden) return { extraServiceId: service.id, priceEur: 0, forbidden: true };
+      if (input.enabled === false) return null;
+    }
+    return { extraServiceId: service.id, priceEur: 0 };
+  }
   if (service.mode === "free" || service.isTpl) {
     return { extraServiceId: service.id, priceEur: 0 };
   }

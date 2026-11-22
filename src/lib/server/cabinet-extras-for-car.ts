@@ -2,9 +2,11 @@ import "server-only";
 
 import { partnerCabinetDefaults } from "@/lib/extras/partner-service-choice";
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
+import { withTplPartnerChoice } from "@/lib/extras/tpl-partner-choice";
 import { listExtraServices } from "@/lib/server/extras-store";
 import { listPartnerCustomExtrasAsPricing } from "@/lib/server/partner-custom-extras-store";
 import { readPartnerExtraPrefs } from "@/lib/server/partner-extras-prefs-store";
+import { partnerMayToggleTpl } from "@/lib/server/tpl-partner-choice-store";
 
 export type CarCabinetExtra = {
   extraServiceId: string;
@@ -20,12 +22,15 @@ export type CarCabinetExtra = {
 export async function cabinetExtrasForCar(partnerId: string, carId: string): Promise<CarCabinetExtra[]> {
   const id = String(partnerId || "").trim();
   if (!id || !String(carId || "").trim()) return [];
-  const [prefs, catalog, customs] = await Promise.all([
+  const [prefs, catalog, customs, canToggleTpl] = await Promise.all([
     readPartnerExtraPrefs(id),
     listExtraServices({ activeOnly: false }),
     listPartnerCustomExtrasAsPricing(id, { activeOnly: false }).catch(() => [] as ExtraServicePricing[]),
+    partnerMayToggleTpl(id),
   ]);
-  const byId = new Map(catalog.map((service) => [service.id, service]));
+  const byId = new Map(
+    withTplPartnerChoice(catalog, canToggleTpl).map((service) => [service.id, service]),
+  );
   for (const custom of customs) {
     if (!byId.has(custom.id)) byId.set(custom.id, custom);
   }

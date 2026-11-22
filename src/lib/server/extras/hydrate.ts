@@ -228,13 +228,9 @@ export async function applyPartnerExtraOfferModes(
     }
     if (!prefs.length) return extras;
 
-    const { isCoreTplSlug, tplChoiceCoversPartner } = await import("@/lib/extras/tpl-partner-choice");
-    const { readTplPartnerChoiceCountries } = await import("@/lib/server/tpl-partner-choice-store");
-    const { partnerOperatingCountries } = await import("@/lib/server/extras/partner-country-scope");
-    const optionalCountries = await readTplPartnerChoiceCountries();
-    const tplOptional =
-      optionalCountries.length > 0 &&
-      tplChoiceCoversPartner(await partnerOperatingCountries(id), optionalCountries);
+    const { isCoreTplSlug } = await import("@/lib/extras/tpl-partner-choice");
+    const { partnerMayToggleTpl } = await import("@/lib/server/tpl-partner-choice-store");
+    const tplOptional = await partnerMayToggleTpl(resolvedPartnerId);
 
     const lookup = prefLookup(prefs, await extraSlugById());
     const next: HydratedListingExtra[] = [];
@@ -242,7 +238,11 @@ export async function applyPartnerExtraOfferModes(
       const svc = row.extraService;
       const pref = lookup.forRow(row.extraServiceId, svc?.slug);
       const mandatoryPriced = Boolean(svc && isMandatoryPricedExtra(svc));
-      const optionalTpl = Boolean(tplOptional && svc && isCoreTplSlug(svc.slug));
+      const optionalTpl = Boolean(
+        tplOptional &&
+          svc &&
+          (isCoreTplSlug(svc.slug) || isMandatoryFreeExtra(svc)),
+      );
       if (svc && !optionalTpl && !mandatoryPriced && (svc.isTpl || isMandatoryExtra(svc))) {
         next.push({
           extraServiceId: row.extraServiceId,
