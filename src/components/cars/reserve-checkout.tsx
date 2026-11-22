@@ -265,6 +265,11 @@ export function ReserveCheckout({
     orderId: string;
     redirectUrl?: string;
   } | null>(null);
+  /** BOG order ready — user stays here to switch PayPal↔Card, then opens the bank form. */
+  const [bogCheckout, setBogCheckout] = useState<{
+    orderId: string;
+    redirectUrl: string;
+  } | null>(null);
   const bookingIdRef = useRef("");
   const ordersRef = useRef<{
     bookingId: string;
@@ -279,7 +284,7 @@ export function ReserveCheckout({
   const handleBookingRef = useRef<
     (
       provider?: "bog" | "paypal",
-      opts?: { embed?: boolean },
+      opts?: { embed?: boolean; prepareOnly?: boolean },
     ) => Promise<{ bookingId: string; orderId: string; redirectUrl?: string } | void>
   >(async () => undefined);
 
@@ -1046,7 +1051,7 @@ export function ReserveCheckout({
 
   const handleBooking = async (
     provider: "bog" | "paypal" = paymentMethod,
-    opts?: { embed?: boolean },
+    opts?: { embed?: boolean; prepareOnly?: boolean },
   ): Promise<{ bookingId: string; orderId: string; redirectUrl?: string } | void> => {
     const onlineDueEur = roundMoney(Math.max(0, totals.payNow));
     const skipGateway = onlineDueEur <= 0.009;
@@ -1132,8 +1137,11 @@ export function ReserveCheckout({
       const cachedRedirect =
         provider === "bog" ? ordersRef.current.bogRedirect : ordersRef.current.paypalRedirect;
       if (provider === "bog" && cachedRedirect) {
-        leaveCheckoutRef.current = true;
-        window.location.assign(cachedRedirect);
+        setBogCheckout({ orderId: cachedOrderId, redirectUrl: cachedRedirect });
+        if (!opts?.prepareOnly) {
+          leaveCheckoutRef.current = true;
+          window.location.assign(cachedRedirect);
+        }
         return {
           bookingId: bookingIdRef.current,
           orderId: cachedOrderId,
@@ -1374,8 +1382,7 @@ export function ReserveCheckout({
           ? { bogRedirect: redirectUrl || undefined }
           : { paypalRedirect: redirectUrl || undefined }),
       };
-      // PayPal can stay on-page; BOG card form only works reliably on the bank page
-      // (in-page iframe stays blank on this site).
+      // PayPal stays on-page. BOG card form opens on the bank page after the user confirms.
       if (opts?.embed && provider === "paypal") {
         setEmbeddedPay({
           method: provider,
@@ -1391,6 +1398,12 @@ export function ReserveCheckout({
             ? "გადახდის ბმული ვერ მოვიდა. სცადეთ თავიდან — ჯავშანი გადახდის გარეშე არ დადასტურდა."
             : "Payment redirect URL missing. Please try again — the booking was not confirmed.",
         );
+      }
+      if (provider === "bog") {
+        setBogCheckout({ orderId, redirectUrl });
+        if (opts?.prepareOnly) {
+          return { bookingId, orderId, redirectUrl };
+        }
       }
       leaveCheckoutRef.current = true;
       window.location.assign(redirectUrl);
@@ -1418,12 +1431,11 @@ export function ReserveCheckout({
       setEmbeddedPay(null);
       return;
     }
-    // Card (BOG): create order and open the bank card page (hosted form).
+    // Card tab: prepare BOG order in the background — stay here so PayPal↔Card can switch.
     if (paymentMethod !== "bog") {
       bogAutoStartRef.current = false;
       return;
     }
-    // Free bookings normally skip this step; if still here, confirm without the gateway UI.
     if (roundMoney(Math.max(0, totals.payNow)) <= 0.009) {
       if (bogAutoStartRef.current) return;
       bogAutoStartRef.current = true;
@@ -1433,18 +1445,20 @@ export function ReserveCheckout({
       return;
     }
     if (!paymentReady.checked || !paymentReady.bog) return;
+    if (bogCheckout?.redirectUrl) return;
     if (bogAutoStartRef.current) return;
     bogAutoStartRef.current = true;
 
     const cachedRedirect =
       bookingIdRef.current &&
       ordersRef.current.bookingId === bookingIdRef.current &&
+      ordersRef.current.bog &&
       ordersRef.current.bogRedirect
-        ? ordersRef.current.bogRedirect
-        : "";
+        ? { orderId: ordersRef.current.bog, redirectUrl: ordersRef.current.bogRedirect }
+        : null;
     if (cachedRedirect) {
-      leaveCheckoutRef.current = true;
-      window.location.assign(cachedRedirect);
+      setBogCheckout(cachedRedirect);
+      bogAutoStartRef.current = false;
       return;
     }
 
@@ -1455,27 +1469,23 @@ export function ReserveCheckout({
           if (label) setPayAmountLabel(label);
         });
       }
-      // No embed — BOG hosted page shows the working card-number form.
-      const result = await handleBookingRef.current("bog");
+      const result = await handleBookingRef.current("bog", { prepareOnly: true });
       if (cancelled) return;
-      if (!result) bogAutoStartRef.current = false;
+      bogAutoStartRef.current = false;
+      if (!result) return;
     })();
-
-    const unlock = window.setTimeout(() => {
-      if (!cancelled) bogAutoStartRef.current = false;
-    }, 8000);
 
     return () => {
       cancelled = true;
-      window.clearTimeout(unlock);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- start once per method/readiness/amount
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prepare when card tab is active
   }, [
     checkoutStep,
     paymentMethod,
     paymentReady.bog,
     paymentReady.checked,
     totals.payNow,
+    bogCheckout?.redirectUrl,
   ]);
 
   useEffect(() => {
@@ -1564,183 +1574,169 @@ export function ReserveCheckout({
               </p>
             </div>
 
-            <fieldset className="space-y-2">
-              <legend className="px-1 text-xs font-bold uppercase tracking-wide text-slate-500">
-                {locale === "ka"
-                  ? "გადახდის მეთოდი"
-                  : locale === "ru"
-                    ? "Способ оплаты"
-                    : "Payment method"}
-              </legend>
-
-              {/* 1) PayPal first */}
+            {/* Top switcher: PayPal ↔ Bank of Georgia (stay on our page until Card confirms) */}
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div
-                className={`overflow-hidden rounded-2xl border-2 transition ${
-                  paymentMethod === "paypal"
-                    ? "border-[#0070ba] bg-white shadow-sm ring-2 ring-[#0070ba]/25"
-                    : "border-slate-200 bg-white"
-                }`}
+                role="tablist"
+                aria-label={locale === "ka" ? "გადახდის მეთოდი" : "Payment method"}
+                className="grid grid-cols-2 gap-1 border-b border-slate-100 bg-slate-50 p-1.5"
               >
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={paymentMethod === "paypal"}
                   disabled={loading}
                   onClick={() => setPaymentMethod("paypal")}
-                  className={`flex w-full min-h-12 items-center gap-2.5 px-3.5 py-3 text-left transition ${
-                    paymentMethod === "paypal" ? "bg-[#f0f7fc]" : "bg-white hover:bg-slate-50"
+                  className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-2 text-sm font-extrabold transition ${
+                    paymentMethod === "paypal"
+                      ? "bg-[#0070ba] text-white shadow-sm"
+                      : "bg-transparent text-slate-600 hover:bg-white"
                   }`}
                 >
-                  <Lock
-                    className={`h-5 w-5 shrink-0 ${paymentMethod === "paypal" ? "text-[#0070ba]" : "text-slate-400"}`}
-                    aria-hidden
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-extrabold text-[#0b1f4b]">PayPal</span>
-                    <span className="block truncate text-[11px] text-slate-500">
-                      {locale === "ka" ? "PayPal ანგარიში" : "PayPal account"}
-                    </span>
-                  </span>
-                  {paymentMethod === "paypal" && (!paymentReady.checked || paymentReady.paypal) ? (
-                    <span className="shrink-0 text-right">
-                      <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                        {locale === "ka" ? "ახლა" : "Now"}
-                      </span>
-                      <span className="block text-base font-black text-[#0b1f4b]">
-                        {payAmountLabel || formatPrice(totals.payNow)}
-                      </span>
-                    </span>
-                  ) : null}
+                  <Lock className="h-4 w-4 shrink-0" aria-hidden />
+                  PayPal
                 </button>
-
-                {paymentMethod === "paypal" ? (
-                  <div className="border-t border-[#0070ba]/20 px-3 py-3">
-                    {paymentReady.checked && !paymentReady.paypal ? (
-                      <p className="text-sm font-bold text-amber-950">
-                        {locale === "ka"
-                          ? "PayPal ჯერ არ არის ჩართული — აირჩიეთ ბარათი"
-                          : "PayPal is not enabled yet — choose Card"}
-                      </p>
-                    ) : embeddedPay?.method === "paypal" && paymentReady.paypalClientId ? (
-                      <CheckoutPaypalButtons
-                        clientId={paymentReady.paypalClientId}
-                        orderId={embeddedPay.orderId}
-                        locale={locale}
-                        onPaid={onPaypalPaid}
-                        onFailed={onPayFailed}
-                      />
-                    ) : (
-                      <CheckoutPaypalCard
-                        amountLabel={payAmountLabel || formatPrice(totals.payNow)}
-                        locale={locale}
-                        loading={loading || !paymentReady.checked}
-                        disabled={!paymentReady.checked || !paymentReady.paypal}
-                        onBack={() => setCheckoutStep("details")}
-                        onConfirm={async () => {
-                          if (!payAmountLabel) {
-                            const label = await loadPayAmountLabel(totals.payNow);
-                            if (label) setPayAmountLabel(label);
-                          }
-                          await handleBooking("paypal", { embed: true });
-                        }}
-                      />
-                    )}
-                  </div>
-                ) : null}
-              </div>
-
-              {/* 2) Card — opens Bank of Georgia hosted card form */}
-              <div
-                className={`overflow-hidden rounded-2xl border-2 transition ${
-                  paymentMethod === "bog"
-                    ? "border-[#ff6200] bg-white shadow-sm ring-2 ring-[#ff6200]/25"
-                    : "border-slate-200 bg-white"
-                }`}
-              >
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={paymentMethod === "bog"}
                   disabled={loading}
                   onClick={() => setPaymentMethod("bog")}
-                  className={`flex w-full min-h-12 items-center gap-2.5 px-3.5 py-3 text-left transition ${
-                    paymentMethod === "bog" ? "bg-[#fff5ef]" : "bg-white hover:bg-slate-50"
+                  className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-2 text-sm font-extrabold transition ${
+                    paymentMethod === "bog"
+                      ? "bg-[#ff6200] text-white shadow-sm"
+                      : "bg-transparent text-slate-600 hover:bg-white"
                   }`}
                 >
-                  <CreditCard
-                    className={`h-5 w-5 shrink-0 ${paymentMethod === "bog" ? "text-[#ff6200]" : "text-slate-400"}`}
-                    aria-hidden
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-extrabold text-[#0b1f4b]">
-                      {locale === "ka" ? "ბარათი" : "Card"}
-                    </span>
-                    <span className="block truncate text-[11px] text-slate-500">Bank of Georgia</span>
-                  </span>
-                  {paymentMethod === "bog" && (!paymentReady.checked || paymentReady.bog) ? (
-                    <span className="shrink-0 text-right">
-                      <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                        {locale === "ka" ? "ახლა" : "Now"}
-                      </span>
-                      <span className="block text-base font-black text-[#0b1f4b]">
-                        {payAmountLabel || formatPrice(totals.payNow)}
-                      </span>
-                    </span>
-                  ) : null}
+                  <CreditCard className="h-4 w-4 shrink-0" aria-hidden />
+                  {locale === "ka" ? "ბარათი" : "Card"}
                 </button>
+              </div>
 
-                {paymentMethod === "bog" ? (
-                  <div className="border-t border-[#ff6200]/20 px-4 py-5 text-center">
-                    {paymentReady.checked && !paymentReady.bog ? (
-                      <p className="text-sm font-bold text-amber-950">
+              <div className="px-4 py-3 text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  {locale === "ka" ? "გადასახდელი თანხა ახლა" : "Amount due now"}
+                </p>
+                <p className="mt-1 text-2xl font-black text-[#0b1f4b]">
+                  {payAmountLabel || formatPrice(totals.payNow)}
+                </p>
+              </div>
+
+              {paymentMethod === "paypal" ? (
+                <div className="border-t border-slate-100 px-3 py-3">
+                  {paymentReady.checked && !paymentReady.paypal ? (
+                    <div className="space-y-3 rounded-xl bg-amber-50 px-3 py-3 text-sm text-amber-950">
+                      <p className="font-bold">
                         {locale === "ka"
-                          ? "ბარათით გადახდა ჯერ არ არის ჩართული"
-                          : "Card payment is not enabled yet"}
+                          ? "PayPal ჯერ არ არის ჩართული"
+                          : "PayPal is not enabled yet"}
                       </p>
-                    ) : error ? (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod("bog")}
+                        className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-sm font-extrabold text-white hover:bg-[#e55800]"
+                      >
+                        {locale === "ka"
+                          ? "დაბრუნება ბარათით გადახდაზე"
+                          : "Back to card payment"}
+                      </button>
+                    </div>
+                  ) : embeddedPay?.method === "paypal" && paymentReady.paypalClientId ? (
+                    <CheckoutPaypalButtons
+                      clientId={paymentReady.paypalClientId}
+                      orderId={embeddedPay.orderId}
+                      locale={locale}
+                      onPaid={onPaypalPaid}
+                      onFailed={onPayFailed}
+                    />
+                  ) : (
+                    <CheckoutPaypalCard
+                      amountLabel={payAmountLabel || formatPrice(totals.payNow)}
+                      locale={locale}
+                      loading={loading || !paymentReady.checked}
+                      disabled={!paymentReady.checked || !paymentReady.paypal}
+                      backLabel={
+                        locale === "ka" ? "დაბრუნება ბარათზე" : "Back to card"
+                      }
+                      onBack={() => setPaymentMethod("bog")}
+                      onConfirm={async () => {
+                        if (!payAmountLabel) {
+                          const label = await loadPayAmountLabel(totals.payNow);
+                          if (label) setPayAmountLabel(label);
+                        }
+                        await handleBooking("paypal", { embed: true });
+                      }}
+                    />
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3 border-t border-slate-100 px-4 py-4 text-center">
+                  {paymentReady.checked && !paymentReady.bog ? (
+                    <p className="text-sm font-bold text-amber-950">
+                      {locale === "ka"
+                        ? "ბარათით გადახდა ჯერ არ არის ჩართული"
+                        : "Card payment is not enabled yet"}
+                    </p>
+                  ) : error ? (
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => {
+                        bogAutoStartRef.current = false;
+                        setBogCheckout(null);
+                        setError("");
+                        void handleBooking("bog", { prepareOnly: true });
+                      }}
+                      className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-sm font-extrabold text-white hover:bg-[#e55800] disabled:opacity-60"
+                    >
+                      {locale === "ka" ? "თავიდან ცდა" : "Try again"}
+                    </button>
+                  ) : bogCheckout?.redirectUrl ? (
+                    <>
+                      <p className="text-sm font-semibold text-slate-600">
+                        {locale === "ka"
+                          ? "ბარათის ნომერი ივსება საქართველოს ბანკის უსაფრთხო გვერდზე"
+                          : "Card number is entered on Bank of Georgia’s secure page"}
+                      </p>
                       <button
                         type="button"
                         disabled={loading}
                         onClick={() => {
-                          bogAutoStartRef.current = false;
-                          setError("");
-                          void handleBooking("bog");
+                          leaveCheckoutRef.current = true;
+                          window.location.assign(bogCheckout.redirectUrl);
                         }}
-                        className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-sm font-extrabold text-white hover:bg-[#e55800] disabled:opacity-60"
+                        className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-base font-extrabold text-white hover:bg-[#e55800] disabled:opacity-60"
                       >
-                        {locale === "ka" ? "თავიდან ცდა" : "Try again"}
+                        {locale === "ka"
+                          ? `გადახდა ბარათით (${payAmountLabel || formatPrice(totals.payNow)})`
+                          : `Pay by card (${payAmountLabel || formatPrice(totals.payNow)})`}
                       </button>
-                    ) : (
-                      <div className="flex flex-col items-center gap-3">
-                        <RacButtonLoader
-                          label={
-                            locale === "ka"
-                              ? "ბარათის ფორმა იხსნება…"
-                              : "Opening card form…"
-                          }
-                        />
-                        <p className="text-sm font-semibold text-slate-600">
-                          {locale === "ka"
-                            ? "იხსნება საქართველოს ბანკის ბარათის ფორმა…"
-                            : "Opening the Bank of Georgia card form…"}
-                        </p>
-                        {!loading ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              bogAutoStartRef.current = false;
-                              setError("");
-                              void handleBooking("bog");
-                            }}
-                            className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-sm font-extrabold text-white hover:bg-[#e55800]"
-                          >
-                            {locale === "ka"
-                              ? "გადახდა საქართველოს ბანკის გვერდზე"
-                              : "Pay on Bank of Georgia page"}
-                          </button>
-                        ) : null}
-                      </div>
-                    )}
-                  </div>
-                ) : null}
-              </div>
-            </fieldset>
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={() => setPaymentMethod("paypal")}
+                        className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-[#0070ba]/30 bg-[#f0f7fc] px-4 text-sm font-bold text-[#0070ba] hover:bg-[#e5f1fa] disabled:opacity-60"
+                      >
+                        {locale === "ka" ? "გადახდა PayPal-ით" : "Pay with PayPal"}
+                      </button>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center gap-3 py-2">
+                      <RacButtonLoader
+                        label={
+                          locale === "ka" ? "მზადდება…" : "Preparing…"
+                        }
+                      />
+                      <p className="text-sm font-semibold text-slate-500">
+                        {locale === "ka"
+                          ? "ბარათით გადახდა მზადდება…"
+                          : "Preparing card payment…"}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             <button
               type="button"
