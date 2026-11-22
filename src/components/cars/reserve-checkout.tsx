@@ -922,6 +922,7 @@ export function ReserveCheckout({
 
     // 0€ site fee: confirm the booking immediately — never open Card/PayPal.
     if (depositReady && roundMoney(Math.max(0, totals.payNow)) <= 0.009) {
+      setLoading(true);
       void handleBookingRef.current("bog");
       return;
     }
@@ -976,6 +977,17 @@ export function ReserveCheckout({
       cancelled = true;
     };
   }, []);
+
+  // Warm the success page so free (0€) confirmation navigates without a cold load.
+  useEffect(() => {
+    if (!depositReady || roundMoney(Math.max(0, totals.payNow)) > 0.009) return;
+    const href = "/booking/payment/success";
+    if (document.querySelector(`link[rel="prefetch"][href="${href}"]`)) return;
+    const link = document.createElement("link");
+    link.rel = "prefetch";
+    link.href = href;
+    document.head.appendChild(link);
+  }, [depositReady, totals.payNow]);
 
   useEffect(() => {
     let cancelled = false;

@@ -791,9 +791,9 @@ export async function POST(req: Request) {
               }
             : {}),
         });
-        await freezeBookingTermsAtCheckout(booking.id);
-
+        // Confirm to the guest first; terms freeze + email/Telegram run after the response.
         runAfterResponse(async () => {
+          await freezeBookingTermsAtCheckout(booking.id);
           if (!deferNotifyUntilPaid) {
             try {
               const { notifyFileBookingEvent } = await import("@/lib/notifications");
@@ -826,11 +826,18 @@ export async function POST(req: Request) {
             });
           }
           await attachPlatformCharge(booking);
+          void import("@/lib/server/channel-publish")
+            .then((mod) => mod.noteReservationPublished(booking.carId))
+            .catch(() => undefined);
         });
-        void import("@/lib/server/channel-publish")
-          .then((mod) => mod.noteReservationPublished(booking.carId))
-          .catch(() => undefined);
-        return NextResponse.json(booking, { status: 201 });
+        return NextResponse.json(
+          {
+            id: booking.id,
+            sequentialNumber: booking.sequentialNumber ?? null,
+            guestEmail: booking.guestEmail ?? null,
+          },
+          { status: 201 },
+        );
       }
     }
 
@@ -1155,8 +1162,8 @@ export async function POST(req: Request) {
         ...(guestCountry ? { countryOfResidence: guestCountry } : {}),
         ...(bookingPromoCode || bpCode ? { promoCode: bpCode || bookingPromoCode } : {}),
       });
-      await freezeBookingTermsAtCheckout(booking.id);
       runAfterResponse(async () => {
+        await freezeBookingTermsAtCheckout(booking.id);
         try {
           const { notifyFileBookingEvent } = await import("@/lib/notifications");
           await notifyFileBookingEvent(booking);
@@ -1188,7 +1195,14 @@ export async function POST(req: Request) {
         }
         await attachPlatformCharge(booking);
       });
-      return NextResponse.json(booking, { status: 201 });
+      return NextResponse.json(
+        {
+          id: booking.id,
+          sequentialNumber: booking.sequentialNumber ?? null,
+          guestEmail: booking.guestEmail ?? null,
+        },
+        { status: 201 },
+      );
     }
 
     const resolvedFirst =
@@ -1310,8 +1324,6 @@ export async function POST(req: Request) {
     } catch (extraErr) {
       console.warn("[bookings] BookingExtra create failed", extraErr);
     }
-    await freezeBookingTermsAtCheckout(booking.id);
-
     if (paymentProvider) {
       try {
         await prisma.booking.update({
@@ -1327,6 +1339,7 @@ export async function POST(req: Request) {
     }
 
     runAfterResponse(async () => {
+      await freezeBookingTermsAtCheckout(booking.id);
       if (!deferNotifyUntilPaid) {
         try {
           await notifyBookingEvent(booking.id, "BOOKING_NEW");
@@ -1358,13 +1371,11 @@ export async function POST(req: Request) {
         });
       }
       await attachPlatformCharge(booking);
-    });
-    void import("@/lib/server/channel-publish")
-      .then((mod) => mod.noteReservationPublished(booking.carId))
-      .catch(() => undefined);
+      void import("@/lib/server/channel-publish")
+        .then((mod) => mod.noteReservationPublished(booking.carId))
+        .catch(() => undefined);
 
-    // Fire-and-forget partner channel booking lock (do not fail the guest booking).
-    void (async () => {
+      // Partner channel lock after the guest already has confirmation.
       try {
         const { listIntegrations } = await import("@/lib/integrations/repository");
         const { listMappings } = await import("@/lib/integrations/repository");
@@ -1427,9 +1438,16 @@ export async function POST(req: Request) {
       } catch (error) {
         console.warn("[bookings] integration lock failed", error);
       }
-    })();
+    });
 
-    return NextResponse.json(booking, { status: 201 });
+    return NextResponse.json(
+      {
+        id: booking.id,
+        sequentialNumber: booking.sequentialNumber ?? null,
+        guestEmail: booking.guestEmail ?? null,
+      },
+      { status: 201 },
+    );
   } catch (error) {
     console.error("[bookings] POST failed", error);
     if (isDbOfflineError(error)) {
