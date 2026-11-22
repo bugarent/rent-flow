@@ -5,6 +5,7 @@ import { loadLocalAdminAsync, revealAdminPassword, saveLocalAdminAsync } from "@
 import { AdminPageHeading, AdminPlatformTitle } from "@/components/admin/admin-page-heading";
 import { ensureDailyFxRates } from "@/lib/server/fx-rates-sync";
 import { getPlatformSettings } from "@/lib/server/platform-settings-store";
+import { listDeliveryLocations } from "@/lib/server/delivery-locations";
 
 export default async function AdminSettingsPage() {
   const session = await requireAdmin();
@@ -13,7 +14,18 @@ export default async function AdminSettingsPage() {
   let email = session.user.email ?? local?.email ?? "";
   let passwordHash = local?.passwordHash ?? "";
   await ensureDailyFxRates().catch(() => undefined);
-  const settings = await getPlatformSettings();
+  const [settings, locations] = await Promise.all([
+    getPlatformSettings(),
+    listDeliveryLocations({ activeOnly: true }).catch(() => []),
+  ]);
+  const seenCountries = new Set<string>();
+  const feeCountries: { iso2: string }[] = [];
+  for (const location of locations) {
+    const iso2 = String(location.countryIso2 || "").trim().toUpperCase();
+    if (iso2.length !== 2 || seenCountries.has(iso2)) continue;
+    seenCountries.add(iso2);
+    feeCountries.push({ iso2 });
+  }
 
   try {
     const { prisma } = await import("@/lib/prisma");
@@ -57,6 +69,9 @@ export default async function AdminSettingsPage() {
         <AdminSettingsForm
           depositPercent={settings.depositPercent}
           siteDiscountPercent={settings.siteDiscountPercent}
+          feeCountries={feeCountries}
+          depositPercentByCountry={settings.depositPercentByCountry}
+          siteDiscountPercentByCountry={settings.siteDiscountPercentByCountry}
           telegramBotSiteName={settings.telegramBotSiteName}
           eurUsdRate={settings.eurUsdRate}
           eurGbpRate={settings.eurGbpRate}

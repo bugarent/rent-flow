@@ -10,6 +10,8 @@ import { OperatingCountriesSettings } from "@/components/admin/operating-countri
 import { ADMIN_BASE } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { clampSiteDiscountPercent } from "@/lib/pricing/booking-discount";
+import type { CountryPercentMap } from "@/lib/pricing/country-platform-percents";
+import { CountryPercentDialog, type FeeCountry } from "@/components/admin/country-percent-dialog";
 
 type GelFxDraft = {
   gelUsd: number;
@@ -72,6 +74,9 @@ function clampDiscount(value: number, depositPercent: number) {
 export function AdminSettingsForm(props: {
   depositPercent: number;
   siteDiscountPercent?: number;
+  feeCountries?: FeeCountry[];
+  depositPercentByCountry?: CountryPercentMap;
+  siteDiscountPercentByCountry?: CountryPercentMap;
   telegramBotSiteName: string;
   eurUsdRate: number;
   eurGbpRate: number;
@@ -109,6 +114,13 @@ export function AdminSettingsForm(props: {
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [contractUploading, setContractUploading] = useState(false);
+  const [feeEditor, setFeeEditor] = useState<"deposit" | "discount" | null>(null);
+  const [depositByCountry, setDepositByCountry] = useState<CountryPercentMap>(
+    props.depositPercentByCountry ?? {},
+  );
+  const [discountByCountry, setDiscountByCountry] = useState<CountryPercentMap>(
+    props.siteDiscountPercentByCountry ?? {},
+  );
   const contractInputRef = useRef<HTMLInputElement>(null);
 
   const clearError = (key: FieldKey) => {
@@ -230,22 +242,20 @@ export function AdminSettingsForm(props: {
           `ონლაინ დეპოზიტი / საკომისიო პროცენტი (${DEPOSIT_MIN_PERCENT}–${DEPOSIT_MAX_PERCENT}) — სატესტოდ ჩაწერეთ 0`,
           `Онлайн-депозит / комиссия % (${DEPOSIT_MIN_PERCENT}–${DEPOSIT_MAX_PERCENT}) — для теста укажите 0`,
         )}
-        <input
-          type="number"
-          min={DEPOSIT_MIN_PERCENT}
-          max={DEPOSIT_MAX_PERCENT}
-          className={inputClass(Boolean(fieldErrors.depositPercent))}
-          value={form.depositPercent}
-          onChange={(e) => {
-            clearError("depositPercent");
-            const depositPercent = Number(e.target.value);
-            setForm({
-              ...form,
-              depositPercent,
-              siteDiscountPercent: clampDiscount(form.siteDiscountPercent, depositPercent),
-            });
-          }}
-        />
+        <button
+          type="button"
+          className={cn(inputClass(Boolean(fieldErrors.depositPercent)), "text-left text-base")}
+          onClick={() => setFeeEditor("deposit")}
+        >
+          {form.depositPercent}
+        </button>
+        <span className="mt-1 block text-xs font-normal text-slate-500">
+          {phrase(
+            "Click to set this percent for each activated country.",
+            "დააჭირეთ, რომ პროცენტი თითოეულ გააქტიურებულ ქვეყანაზე ცალ-ცალკე ჩაწეროთ.",
+            "Нажмите, чтобы задать процент отдельно для каждой активной страны.",
+          )}
+        </span>
         {fieldErrors.depositPercent ? (
           <span className="mt-1 block text-xs font-normal text-red-600">{fieldErrors.depositPercent}</span>
         ) : null}
@@ -256,21 +266,13 @@ export function AdminSettingsForm(props: {
           `საიტის ფასდაკლება % (0–${Math.max(0, form.depositPercent || 0)})`,
           `Скидка сайта % (0–${Math.max(0, form.depositPercent || 0)})`,
         )}
-        <input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          max={Math.max(0, form.depositPercent || 0)}
-          className={inputClass(Boolean(fieldErrors.siteDiscountPercent))}
-          value={form.siteDiscountPercent}
-          onChange={(e) => {
-            clearError("siteDiscountPercent");
-            setForm({
-              ...form,
-              siteDiscountPercent: clampDiscount(Number(e.target.value), form.depositPercent),
-            });
-          }}
-        />
+        <button
+          type="button"
+          className={cn(inputClass(Boolean(fieldErrors.siteDiscountPercent)), "text-left text-base")}
+          onClick={() => setFeeEditor("discount")}
+        >
+          {form.siteDiscountPercent}
+        </button>
         <span className="mt-1 block text-xs font-normal text-slate-500">
           {phrase(
             "Taken from the site commission. Example: commission 20%, discount 10% → a €100 booking costs the customer €90, the site keeps €10, the partner share stays the same. 0 = off.",
@@ -284,6 +286,20 @@ export function AdminSettingsForm(props: {
           </span>
         ) : null}
       </label>
+      <CountryPercentDialog
+        open={feeEditor != null}
+        kind={feeEditor ?? "deposit"}
+        countries={props.feeCountries ?? []}
+        depositByCountry={depositByCountry}
+        discountByCountry={discountByCountry}
+        fallbackDeposit={form.depositPercent}
+        fallbackDiscount={form.siteDiscountPercent}
+        onClose={() => setFeeEditor(null)}
+        onSaved={(next) => {
+          setDepositByCountry(next.depositPercentByCountry);
+          setDiscountByCountry(next.siteDiscountPercentByCountry);
+        }}
+      />
       <label className="block text-sm font-semibold">
         {phrase("Telegram bot site name", "Telegram-ბოტის საიტის სახელი", "Название сайта для Telegram-бота")}
         <input

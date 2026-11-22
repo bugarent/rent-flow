@@ -23,6 +23,8 @@ import { resolveListingDiscountPercent } from "@/lib/server/partner-period-disco
 import { ensureFileCarInPrisma } from "@/lib/server/ensure-file-car-in-prisma";
 import { createFileBooking } from "@/lib/server/customer-bookings-store";
 import { isPubliclyVisibleListing } from "@/lib/cars/listing-visibility";
+import { countryPlatformPercents } from "@/lib/pricing/country-platform-percents";
+import { locationCountryIso2 } from "@/lib/extras/country-scope";
 
 /** Block a trip shorter than the partner's minimum (1 or 2 days). */
 async function rejectBelowMinRental(partnerId: string, days: number) {
@@ -694,11 +696,13 @@ export async function POST(req: Request) {
 
         const { getPlatformSettings } = await import("@/lib/server/platform-settings-store");
         const platformSettings = await getPlatformSettings();
-        const depositPercent =
-          typeof platformSettings.depositPercent === "number" &&
-          Number.isFinite(platformSettings.depositPercent)
-            ? Math.trunc(platformSettings.depositPercent)
-            : DEFAULT_DEPOSIT_PERCENT;
+        const countryPercents = countryPlatformPercents(
+          platformSettings,
+          locationCountryIso2(pickupCode),
+        );
+        const depositPercent = Number.isFinite(countryPercents.depositPercent)
+          ? countryPercents.depositPercent
+          : DEFAULT_DEPOSIT_PERCENT;
         const {
           charge,
           split: bpSplit,
@@ -710,7 +714,7 @@ export async function POST(req: Request) {
           extrasEur: extrasTotal,
           deliveryEur: deliveryFeeEur,
           depositPercent,
-          siteDiscountPercent: platformSettings.siteDiscountPercent,
+          siteDiscountPercent: countryPercents.siteDiscountPercent,
           declinePartnerReferral,
         });
         const totalPriceEur = charge.totalPriceEur;
@@ -890,11 +894,13 @@ export async function POST(req: Request) {
 
     const { getPlatformSettings } = await import("@/lib/server/platform-settings-store");
     const platformSettings = await getPlatformSettings();
-    const depositPercent =
-      typeof platformSettings.depositPercent === "number" &&
-      Number.isFinite(platformSettings.depositPercent)
-        ? Math.trunc(platformSettings.depositPercent)
-        : DEFAULT_DEPOSIT_PERCENT;
+    const countryPercents = countryPlatformPercents(
+      platformSettings,
+      locationCountryIso2(pickupCode),
+    );
+    const depositPercent = Number.isFinite(countryPercents.depositPercent)
+      ? countryPercents.depositPercent
+      : DEFAULT_DEPOSIT_PERCENT;
 
     const days = Math.max(1, Math.ceil((dropoffAt.getTime() - pickupAt.getTime()) / (1000 * 60 * 60 * 24)));
     const shortRental = await rejectBelowMinRental(String(car.partner?.id || ""), days);
@@ -1079,7 +1085,7 @@ export async function POST(req: Request) {
       extrasEur: extrasTotal,
       deliveryEur: deliveryFeeEur,
       depositPercent,
-      siteDiscountPercent: platformSettings.siteDiscountPercent,
+      siteDiscountPercent: countryPercents.siteDiscountPercent,
       declinePartnerReferral,
     });
     const totalPriceEur = charge.totalPriceEur;

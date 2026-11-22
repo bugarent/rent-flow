@@ -12,10 +12,14 @@ const LEGAL_TTL_MS = 60_000;
 const DEPOSIT_TTL_MS = 30_000;
 
 export const loadCheckoutLegalPages = () => fetchJsonCached<CheckoutLegalPages>(LEGAL_URL, LEGAL_TTL_MS);
-export const loadCheckoutDeposit = () => fetchJsonCached<CheckoutDepositSettings>(DEPOSIT_URL, DEPOSIT_TTL_MS);
+export function loadCheckoutDeposit(pickup?: string) {
+  const url = pickup ? `${DEPOSIT_URL}?pickup=${encodeURIComponent(pickup)}` : DEPOSIT_URL;
+  return fetchJsonCached<CheckoutDepositSettings>(url, DEPOSIT_TTL_MS);
+}
 
 /** Called on car-card intent so the checkout opens with terms and deposit ready. */
-export function warmCheckoutData() {
+export function warmCheckoutData(pickup?: string) {
   prefetchJson(LEGAL_URL, LEGAL_TTL_MS);
-  prefetchJson(DEPOSIT_URL, DEPOSIT_TTL_MS);
+  const url = pickup ? `${DEPOSIT_URL}?pickup=${encodeURIComponent(pickup)}` : DEPOSIT_URL;
+  prefetchJson(url, DEPOSIT_TTL_MS);
 }

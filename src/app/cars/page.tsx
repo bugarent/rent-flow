@@ -17,7 +17,7 @@ import {
   type TariffInterval,
 } from "@/lib/partners/company-settings";
 import { listingDailyWithDeliveryEur, rentalDayCount } from "@/lib/cars/reserve-pricing";
-import { clampSiteDiscountPercent } from "@/lib/pricing/booking-discount";
+import { countryPlatformPercents } from "@/lib/pricing/country-platform-percents";
 import {
   mergeListingDiscountPercent,
   periodDiscountPercentByCarId,
@@ -74,11 +74,11 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-async function loadSiteDiscountPercent(): Promise<number> {
+async function loadSiteDiscountPercent(countryIso2: string): Promise<number> {
   try {
     const { getPlatformSettings } = await import("@/lib/server/platform-settings-store");
     const settings = await getPlatformSettings();
-    return clampSiteDiscountPercent(settings.siteDiscountPercent, settings.depositPercent);
+    return countryPlatformPercents(settings, countryIso2).siteDiscountPercent;
   } catch {
     return 0;
   }
@@ -209,7 +209,10 @@ export default async function CarsPage({
   }).catch(() => null);
   const searchOptionsPromise = getSearchDeliveryAirports().catch(() => []);
   const crossBorderReturnsPromise = getCrossBorderReturnPlaces().catch(() => ({}));
-  const siteDiscountPromise = cachedSearchRead("site-discount", loadSiteDiscountPercent);
+  const discountCountry = pickupCode ? locationCountryIso2(pickupCode) : countryIso2;
+  const siteDiscountPromise = cachedSearchRead(`site-discount:${discountCountry || "default"}`, () =>
+    loadSiteDiscountPercent(discountCountry),
+  );
   const companyFilesPromise = cachedSearchRead("company-files", loadCompanySettingsFiles, { keep: nonEmpty });
   const unavailablePromise = loadUnavailableCarIds(startDate, endDate);
   const categoriesPromise = cachedSearchRead(

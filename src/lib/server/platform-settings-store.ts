@@ -8,11 +8,20 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePublishedContent } from "@/lib/server/revalidate-public-content";
 import { toNumber } from "@/lib/utils";
 import { clampSiteDiscountPercent } from "@/lib/pricing/booking-discount";
+import {
+  normalizeCountryPercentMap,
+  type CountryPercentMap,
+} from "@/lib/pricing/country-platform-percents";
+import { DEPOSIT_MAX_PERCENT, DEPOSIT_MIN_PERCENT } from "@/lib/brand";
 
 export type PlatformSettingsRecord = {
   depositPercent: number;
   /** Customer discount funded from the site fee (0…depositPercent). File-store field. */
   siteDiscountPercent: number;
+  /** Per activated country. Missing key uses `depositPercent`. File-store field. */
+  depositPercentByCountry: CountryPercentMap;
+  /** Per activated country. Missing key uses `siteDiscountPercent`. File-store field. */
+  siteDiscountPercentByCountry: CountryPercentMap;
   telegramBotSiteName: string;
   eurUsdRate: number;
   eurGbpRate: number;
@@ -44,6 +53,8 @@ function defaults(): PlatformSettingsRecord {
   return {
     depositPercent: 15,
     siteDiscountPercent: 0,
+    depositPercentByCountry: {},
+    siteDiscountPercentByCountry: {},
     telegramBotSiteName: "rentairportcars.com",
     eurUsdRate: DEFAULT_FX_RATES.eurUsd,
     eurGbpRate: DEFAULT_FX_RATES.eurGbp,
@@ -67,6 +78,16 @@ function normalize(raw: Partial<PlatformSettingsRecord> | null | undefined): Pla
   return {
     depositPercent,
     siteDiscountPercent: clampSiteDiscountPercent(raw.siteDiscountPercent, depositPercent),
+    depositPercentByCountry: normalizeCountryPercentMap(
+      raw.depositPercentByCountry,
+      DEPOSIT_MIN_PERCENT,
+      DEPOSIT_MAX_PERCENT,
+    ),
+    siteDiscountPercentByCountry: normalizeCountryPercentMap(
+      raw.siteDiscountPercentByCountry,
+      0,
+      DEPOSIT_MAX_PERCENT,
+    ),
     telegramBotSiteName: String(raw.telegramBotSiteName || base.telegramBotSiteName).trim() || base.telegramBotSiteName,
     eurUsdRate: toNumber(raw.eurUsdRate, base.eurUsdRate),
     eurGbpRate: toNumber(raw.eurGbpRate, base.eurGbpRate),
@@ -174,6 +195,8 @@ export async function getPlatformSettings(): Promise<PlatformSettingsRecord> {
       const merged = normalize({
         ...next,
         siteDiscountPercent: fileSettings.siteDiscountPercent,
+        depositPercentByCountry: fileSettings.depositPercentByCountry,
+        siteDiscountPercentByCountry: fileSettings.siteDiscountPercentByCountry,
         siteContractUrl: fileSettings.siteContractUrl || next.siteContractUrl,
         adminTelegramChatId: fileSettings.adminTelegramChatId || next.adminTelegramChatId,
         telegramBotToken: fileSettings.telegramBotToken || next.telegramBotToken,

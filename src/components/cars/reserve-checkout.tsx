@@ -393,7 +393,10 @@ export function ReserveCheckout({
     (async () => {
       try {
         // Bust the short client cache so a prior warm with 15% cannot outlive an admin 0%.
-        const data = await fetch("/api/platform/deposit", { cache: "no-store" }).then(async (res) => {
+        const depositUrl = pickup
+          ? `/api/platform/deposit?pickup=${encodeURIComponent(pickup)}`
+          : "/api/platform/deposit";
+        const data = await fetch(depositUrl, { cache: "no-store" }).then(async (res) => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return (await res.json()) as { depositPercent?: number; siteDiscountPercent?: number };
         });
@@ -413,7 +416,7 @@ export function ReserveCheckout({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [pickup]);
 
   useEffect(() => {
     if (seed) return;

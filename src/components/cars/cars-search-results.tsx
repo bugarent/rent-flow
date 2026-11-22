@@ -1996,7 +1996,7 @@ function CarResultCard({
   return (
     <article
       className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
-      {...intentPrefetch(href, warmCheckoutData)}
+      {...intentPrefetch(href, () => warmCheckoutData(pickup))}
     >
       <div className="relative aspect-[4/3] w-full overflow-hidden rounded-t-xl bg-slate-100">
         <CardImage
