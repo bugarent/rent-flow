@@ -35,7 +35,11 @@ import { knownText } from "@/lib/i18n/known-record-text";
 import { localizedExtraCopy } from "@/lib/extras/localized-copy";
 import { usePartnerMoneyOptional } from "@/components/providers/partner-money-context";
 import { cn, formatMoney } from "@/lib/utils";
-import { compressImageForUpload } from "@/lib/files/compress-image";
+import {
+  compressImageForUpload,
+  DOCUMENT_MAX_EDGE,
+  DOCUMENT_TARGET_BYTES,
+} from "@/lib/files/compress-image";
 import { uiText } from "@/lib/i18n/ui-text";
 import { CAR_COLORS, carColorLabel } from "@/lib/catalog/car-colors";
 import { CAR_MAKES_MODELS } from "@/lib/catalog/car-models";
@@ -392,8 +396,8 @@ async function uploadFile(file: File, options?: { original?: boolean; document?:
   // otherwise the host drops the request and the browser only shows "Failed to fetch".
   const payload = document
     ? await compressImageForUpload(file, {
-        maxEdge: 2200,
-        targetBytes: 1_100_000,
+        maxEdge: DOCUMENT_MAX_EDGE,
+        targetBytes: DOCUMENT_TARGET_BYTES,
         preferSharpness: true,
       })
     : options?.original && file.size <= 3.5 * 1024 * 1024
@@ -404,10 +408,10 @@ async function uploadFile(file: File, options?: { original?: boolean; document?:
   } catch (err) {
     const message = err instanceof Error ? err.message : "";
     if (/unauthorized|forbidden|admin access/i.test(message)) throw err;
-    // Documents: shrink gently so text stays readable; still under the host limit.
+    // Documents: slightly tighter WebP still keeps text readable under host limits.
     const smaller = await compressImageForUpload(file, {
-      maxEdge: document ? 1800 : 1400,
-      targetBytes: document ? 900_000 : 480_000,
+      maxEdge: document ? 1600 : 1400,
+      targetBytes: document ? 320_000 : 480_000,
       preferSharpness: document,
     });
     const network = /failed to fetch|load failed|networkerror|network request failed|timeout/i.test(message);

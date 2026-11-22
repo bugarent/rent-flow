@@ -8,7 +8,11 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { RotateCcw, RotateCw, X } from "lucide-react";
-import { compressImageForUpload } from "@/lib/files/compress-image";
+import {
+  compressImageForUpload,
+  DOCUMENT_MAX_EDGE,
+  DOCUMENT_TARGET_BYTES,
+} from "@/lib/files/compress-image";
 import { cn } from "@/lib/utils";
 
 type AspectId = "free" | "4:3" | "1:1" | "3:4" | "16:9";
@@ -135,8 +139,8 @@ async function rotateCanvas90(src: string, degrees: 90 | -90): Promise<string> {
 async function uploadEdited(file: File, asDocument: boolean): Promise<string> {
   const payload = asDocument
     ? await compressImageForUpload(file, {
-        maxEdge: 2200,
-        targetBytes: 1_100_000,
+        maxEdge: DOCUMENT_MAX_EDGE,
+        targetBytes: DOCUMENT_TARGET_BYTES,
         preferSharpness: true,
       })
     : await compressImageForUpload(file);
@@ -501,7 +505,7 @@ export function PartnerImageEditor({
       const srcY = Math.max(0, Math.round(cropY * unit));
       const srcW = Math.max(8, Math.round(cropW * unit));
       const srcH = Math.max(8, Math.round(cropH * unit));
-      const maxEdge = asDocument ? 2200 : 1920;
+      const maxEdge = asDocument ? DOCUMENT_MAX_EDGE : 1920;
       const edge = Math.max(srcW, srcH);
       const outScale = edge > maxEdge ? maxEdge / edge : 1;
       const outW = Math.max(1, Math.round(srcW * outScale));

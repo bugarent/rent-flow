@@ -2,8 +2,8 @@
  * Client-side image shrink for partner uploads.
  * Phone photos of documents are often 8–15 MB (or HEIC). Those requests die on the
  * host before the server can answer, which the browser reports as "Failed to fetch".
- * This always tries to hand back a small JPEG. The original file is returned only
- * when the browser cannot decode it at all.
+ * Listing photos become JPEG; passport scans become WebP (same sharpness, less weight).
+ * The original file is returned only when the browser cannot decode it at all.
  */
 
 const DEFAULT_MAX_EDGE = 1600;
@@ -11,13 +11,16 @@ const DEFAULT_TARGET_BYTES = 420 * 1024;
 /** Stay under platform request limits even when the first encode is still heavy. */
 const HARD_MAX_BYTES = 3.5 * 1024 * 1024;
 const SKIP_UNDER_BYTES = 280 * 1024;
+/** Passport / ID scans: WebP keeps text sharp well under the old 1.1 MB JPEG budget. */
+export const DOCUMENT_MAX_EDGE = 2000;
+export const DOCUMENT_TARGET_BYTES = 420 * 1024;
 
 export type CompressImageOptions = {
   maxEdge?: number;
   targetBytes?: number;
   /**
-   * Prefer readable text (passports / IDs): keep resolution longer and use higher
-   * JPEG qualities first. Still respects `targetBytes` so uploads do not grow.
+   * Prefer readable text (passports / IDs): WebP + higher qualities first, keep
+   * resolution longer. Still respects `targetBytes`.
    */
   preferSharpness?: boolean;
 };
@@ -36,9 +39,15 @@ function shouldTryDecode(file: File): boolean {
   return /\.(jpe?g|png|gif|webp|bmp|heic|heif|avif|jfif|tiff?)$/i.test(file.name);
 }
 
-function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob | null> {
+type EncodeMime = "image/jpeg" | "image/webp";
+
+function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  quality: number,
+  mime: EncodeMime,
+): Promise<Blob | null> {
   return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(blob), "image/jpeg", quality);
+    canvas.toBlob((blob) => resolve(blob), mime, quality);
   });
 }
 
@@ -72,38 +81,46 @@ function drawToCanvas(
   return canvas;
 }
 
-async function encodeJpeg(
+async function encodeImage(
   canvas: HTMLCanvasElement,
   targetBytes: number,
   preferSharpness = false,
-): Promise<Blob | null> {
-  // Documents: stay on higher qualities and a higher floor before downscaling.
+): Promise<{ blob: Blob; mime: EncodeMime } | null> {
+  // Documents: WebP first (smaller at the same sharpness). Fall back to JPEG if
+  // the browser cannot encode WebP.
+  const mime: EncodeMime = preferSharpness ? "image/webp" : "image/jpeg";
   const qualities = preferSharpness
-    ? [0.92, 0.88, 0.84, 0.78, 0.7, 0.62]
+    ? [0.9, 0.86, 0.82, 0.78, 0.72, 0.66]
     : [0.82, 0.72, 0.6, 0.48, 0.38];
   const minEdge = preferSharpness ? 1400 : 960;
   const shrinkFactor = preferSharpness ? 0.88 : 0.72;
-  let best: Blob | null = null;
-  let current = canvas;
-  for (let pass = 0; pass < (preferSharpness ? 5 : 4); pass += 1) {
-    for (const quality of qualities) {
-      const blob = await canvasToBlob(current, quality);
-      if (!blob) continue;
-      // Prefer the first blob that fits; among oversize candidates keep the
-      // smaller one, but when sharpness matters keep the highest-quality fit.
-      if (!best || blob.size < best.size) best = blob;
-      if (blob.size <= targetBytes) return blob;
+
+  const run = async (type: EncodeMime): Promise<{ blob: Blob; mime: EncodeMime } | null> => {
+    let best: Blob | null = null;
+    let current = canvas;
+    for (let pass = 0; pass < (preferSharpness ? 5 : 4); pass += 1) {
+      for (const quality of qualities) {
+        const blob = await canvasToBlob(current, quality, type);
+        if (!blob) continue;
+        if (!best || blob.size < best.size) best = blob;
+        if (blob.size <= targetBytes) return { blob, mime: type };
+      }
+      if (current.width <= minEdge && current.height <= minEdge) break;
+      const nextEdge = Math.max(
+        minEdge,
+        Math.round(Math.max(current.width, current.height) * shrinkFactor),
+      );
+      const shrunk = drawToCanvas(current, nextEdge, preferSharpness);
+      if (!shrunk) break;
+      current = shrunk;
     }
-    if (current.width <= minEdge && current.height <= minEdge) break;
-    const nextEdge = Math.max(
-      minEdge,
-      Math.round(Math.max(current.width, current.height) * shrinkFactor),
-    );
-    const shrunk = drawToCanvas(current, nextEdge, preferSharpness);
-    if (!shrunk) break;
-    current = shrunk;
-  }
-  return best;
+    return best ? { blob: best, mime: type } : null;
+  };
+
+  const primary = await run(mime);
+  if (primary) return primary;
+  if (mime === "image/webp") return run("image/jpeg");
+  return null;
 }
 
 async function bitmapFromFile(
@@ -147,12 +164,13 @@ function imageElementFromFile(file: File): Promise<HTMLImageElement | null> {
   });
 }
 
-function jpegFile(blob: Blob): File {
-  return new File([blob], "photo.jpg", { type: "image/jpeg", lastModified: Date.now() });
+function encodedFile(blob: Blob, mime: EncodeMime): File {
+  const name = mime === "image/webp" ? "document.webp" : "photo.jpg";
+  return new File([blob], name, { type: mime, lastModified: Date.now() });
 }
 
 /**
- * Resize + JPEG-encode images before upload. PDFs pass through.
+ * Resize + encode images before upload. PDFs pass through.
  * Falls back to the original file if the browser cannot decode the image.
  */
 export async function compressImageForUpload(file: File, options?: CompressImageOptions): Promise<File> {
@@ -187,11 +205,12 @@ export async function compressImageForUpload(file: File, options?: CompressImage
     }
     if (!canvas) return file;
 
-    const blob = await encodeJpeg(canvas, targetBytes, preferSharpness);
-    if (!blob) return file;
-    if (blob.size >= file.size && file.type === "image/jpeg" && file.size <= HARD_MAX_BYTES) return file;
+    const encoded = await encodeImage(canvas, targetBytes, preferSharpness);
+    if (!encoded) return file;
+    const { blob, mime } = encoded;
+    if (blob.size >= file.size && file.type === mime && file.size <= HARD_MAX_BYTES) return file;
     if (blob.size > HARD_MAX_BYTES && file.size <= blob.size) return file;
-    return jpegFile(blob);
+    return encodedFile(blob, mime);
   } catch {
     return file;
   }

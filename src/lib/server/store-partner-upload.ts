@@ -64,22 +64,23 @@ async function toJpeg(bytes: Uint8Array): Promise<Uint8Array | null> {
   }
 }
 
-/** Passport / ID scans: keep text readable without growing past ~1.1 MB. */
-async function toDocumentJpeg(bytes: Uint8Array): Promise<Uint8Array | null> {
-  const targetBytes = 1_100_000;
+/**
+ * Passport / ID scans as WebP: sharper text than a heavy JPEG at roughly
+ * 350–450 KB instead of ~1.1 MB.
+ */
+async function toDocumentWebp(bytes: Uint8Array): Promise<Uint8Array | null> {
+  const targetBytes = 420 * 1024;
   try {
     const base = sharp(bytes, { failOn: "none", animated: false, limitInputPixels: 120_000_000 })
       .rotate()
-      .resize({ width: 2200, height: 2200, fit: "inside", withoutEnlargement: true })
-      // Light sharpen helps small Georgian/Latin glyphs after resize.
+      .resize({ width: 2000, height: 2000, fit: "inside", withoutEnlargement: true })
       .sharpen({ sigma: 0.55, m1: 0.55, m2: 0.25 });
-    // 4:4:4 chroma keeps letter edges crisp; step quality down only to hold size.
-    const qualities = [88, 84, 80, 76];
+    const qualities = [90, 86, 82, 78, 74];
     let best: Buffer | null = null;
     for (const quality of qualities) {
       const out = await base
         .clone()
-        .jpeg({ quality, mozjpeg: true, chromaSubsampling: "4:4:4" })
+        .webp({ quality, effort: 5, smartSubsample: true })
         .toBuffer();
       if (out.length > 80 && out.length <= targetBytes) return out;
       if (out.length > 80 && (!best || out.length < best.length)) best = out;
@@ -146,17 +147,18 @@ export async function storePartnerUpload(file: File, kind?: string | null): Prom
   let contentType = sniffed ? contentTypeOf(sniffed) : "image/jpeg";
   let ext = sniffed ? extOf(sniffed) : "jpg";
 
-  // Photos → WebP. Passport scans stay JPEG (admins open and print them as documents).
-  // Keep a client JPEG that already fits the budget — re-encoding at q82 was blurring text.
+  // Listing photos and passport scans both store as WebP (passports use a
+  // sharpness-first encode capped ~420 KB). Skip re-encode when the client
+  // already sent a compact WebP.
   const converted = document
-    ? sniffed === "jpeg" && bytes.length <= 1_100_000
+    ? sniffed === "webp" && bytes.length <= 420 * 1024
       ? null
-      : await toDocumentJpeg(bytes)
+      : await toDocumentWebp(bytes)
     : await toWebp(bytes);
   if (converted) {
     payload = converted;
-    contentType = document ? "image/jpeg" : "image/webp";
-    ext = document ? "jpg" : "webp";
+    contentType = "image/webp";
+    ext = "webp";
   } else if (!standard) {
     throw new Error("PNG, JPG, WEBP, GIF, HEIC or PDF only");
   }
