@@ -1579,7 +1579,7 @@ export function ReserveCheckout({
               <div
                 role="tablist"
                 aria-label={locale === "ka" ? "გადახდის მეთოდი" : "Payment method"}
-                className="grid grid-cols-2 gap-1 border-b border-slate-100 bg-slate-50 p-1.5"
+                className="grid grid-cols-2 gap-1.5 border-b border-slate-100 bg-slate-100/80 p-1.5"
               >
                 <button
                   type="button"
@@ -1589,8 +1589,8 @@ export function ReserveCheckout({
                   onClick={() => setPaymentMethod("paypal")}
                   className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-2 text-sm font-extrabold transition ${
                     paymentMethod === "paypal"
-                      ? "bg-[#0070ba] text-white shadow-sm"
-                      : "bg-transparent text-slate-600 hover:bg-white"
+                      ? "bg-[#0070ba] text-white shadow-sm ring-2 ring-[#0070ba]/35"
+                      : "border border-[#0070ba]/35 bg-[#d7ebf8] text-[#005ea6] hover:bg-[#c5e2f5]"
                   }`}
                 >
                   <Lock className="h-4 w-4 shrink-0" aria-hidden />
@@ -1604,8 +1604,8 @@ export function ReserveCheckout({
                   onClick={() => setPaymentMethod("bog")}
                   className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-2 text-sm font-extrabold transition ${
                     paymentMethod === "bog"
-                      ? "bg-[#ff6200] text-white shadow-sm"
-                      : "bg-transparent text-slate-600 hover:bg-white"
+                      ? "bg-[#ff6200] text-white shadow-sm ring-2 ring-[#ff6200]/35"
+                      : "border border-[#ff6200]/40 bg-[#ffe4d1] text-[#c44e00] hover:bg-[#ffd6b8]"
                   }`}
                 >
                   <CreditCard className="h-4 w-4 shrink-0" aria-hidden />
