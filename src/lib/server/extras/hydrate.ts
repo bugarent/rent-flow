@@ -14,10 +14,23 @@ import {
   isPeriodForcedFreeExtra,
   localizeExtraName,
 } from "@/lib/extras/pricing";
+import { partnerExtraHiddenOnListing } from "@/lib/extras/partner-extra-pref";
+import { isCoreTplSlug } from "@/lib/extras/tpl-partner-choice";
 import { readExtraI18n } from "@/lib/extras/localized-copy";
 import { createTtlCache } from "@/lib/server/ttl-cache";
 import { listExtraServices } from "./list";
 import type { HydratedListingExtra } from "./types";
+
+type PrefRow = {
+  extraServiceId: string;
+  enabled: boolean;
+  forbidden?: boolean;
+  priceEur?: number;
+  minPeriodEur?: number | null;
+  maxPeriodEur?: number | null;
+  carIds?: string[];
+  added?: boolean;
+};
 
 const slugIndexCache = createTtlCache<Map<string, string>>(15_000);
 
@@ -57,9 +70,53 @@ function prefLookup<T extends { extraServiceId: string }>(prefs: T[], slugById: 
       const direct = byId.get(extraServiceId);
       if (direct) return direct;
       const resolved = String(slug || slugById.get(extraServiceId) || "").trim();
-      return resolved ? bySlug.get(resolved) : undefined;
+      if (resolved && bySlug.has(resolved)) return bySlug.get(resolved);
+      // Core TPL: file/db id drift — any pref whose catalog slug is tpl.
+      const rowSlug = String(slug || slugById.get(extraServiceId) || "").trim();
+      if (isCoreTplSlug(rowSlug) || isCoreTplSlug(extraServiceId)) {
+        return bySlug.get("tpl");
+      }
+      return undefined;
     },
   };
+}
+
+async function readPrefsForPartner(partnerId: string): Promise<{ prefs: PrefRow[]; resolvedPartnerId: string }> {
+  const { readPartnerExtraPrefs } = await import("@/lib/server/partner-extras-prefs-store");
+  const { LOCAL_PARTNER_ID } = await import("@/lib/auth/local-partner-store");
+  const id = String(partnerId || "").trim();
+  const candidateIds = [id];
+  if (id.startsWith("file-partner-")) {
+    const stripped = id.replace(/^file-partner-/, "");
+    if (stripped) candidateIds.push(stripped);
+  }
+  if (!candidateIds.includes(LOCAL_PARTNER_ID)) candidateIds.push(LOCAL_PARTNER_ID);
+  for (const pid of candidateIds) {
+    const prefs = (await readPartnerExtraPrefs(pid)) as PrefRow[];
+    if (prefs.length) return { prefs, resolvedPartnerId: pid };
+  }
+  return { prefs: [], resolvedPartnerId: id };
+}
+
+/** True when this partner turned system TPL Off or removed it for the car. */
+async function partnerHasTplOff(
+  partnerId: string,
+  carId?: string | null,
+): Promise<boolean> {
+  const id = String(partnerId || "").trim();
+  if (!id) return false;
+  try {
+    const { partnerMayToggleTpl } = await import("@/lib/server/tpl-partner-choice-store");
+    if (!(await partnerMayToggleTpl(id))) return false;
+    const { prefs } = await readPrefsForPartner(id);
+    if (!prefs.length) return false;
+    const slugById = await extraSlugById();
+    const lookup = prefLookup(prefs, slugById);
+    const pref = lookup.forRow("", "tpl") || prefs.find((row) => isCoreTplSlug(slugById.get(row.extraServiceId)));
+    return partnerExtraHiddenOnListing(pref, carId);
+  } catch {
+    return false;
+  }
 }
 
 function copyBags(service: { name?: unknown; description?: unknown; nameI18n?: Record<string, string>; descriptionI18n?: Record<string, string> } | null | undefined) {
@@ -197,38 +254,12 @@ export async function applyPartnerExtraOfferModes(
   if (!id || !extras.length) return extras;
 
   try {
-    const { readPartnerExtraPrefs, partnerExtraPrefAppliesToCar } = await import(
+    const { partnerExtraPrefAppliesToCar } = await import(
       "@/lib/server/partner-extras-prefs-store"
     );
-    const { LOCAL_PARTNER_ID } = await import("@/lib/auth/local-partner-store");
-    const candidateIds = [id];
-    if (id.startsWith("file-partner-")) {
-      const stripped = id.replace(/^file-partner-/, "");
-      if (stripped) candidateIds.push(stripped);
-    }
-    if (!candidateIds.includes(LOCAL_PARTNER_ID)) candidateIds.push(LOCAL_PARTNER_ID);
-
-    let prefs: Array<{
-      extraServiceId: string;
-      enabled: boolean;
-      forbidden?: boolean;
-      priceEur?: number;
-      minPeriodEur?: number | null;
-      maxPeriodEur?: number | null;
-      carIds?: string[];
-      added?: boolean;
-    }> = [];
-    let resolvedPartnerId = id;
-    for (const pid of candidateIds) {
-      prefs = await readPartnerExtraPrefs(pid);
-      if (prefs.length) {
-        resolvedPartnerId = pid;
-        break;
-      }
-    }
+    const { prefs, resolvedPartnerId } = await readPrefsForPartner(id);
     if (!prefs.length) return extras;
 
-    const { isCoreTplSlug } = await import("@/lib/extras/tpl-partner-choice");
     const { partnerMayToggleTpl } = await import("@/lib/server/tpl-partner-choice-store");
     const tplOptional = await partnerMayToggleTpl(resolvedPartnerId);
 
@@ -243,6 +274,7 @@ export async function applyPartnerExtraOfferModes(
           svc &&
           (isCoreTplSlug(svc.slug) || isMandatoryFreeExtra(svc)),
       );
+      // Locked mandatory / system TPL stays on unless this partner's countries allow Off.
       if (svc && !optionalTpl && !mandatoryPriced && (svc.isTpl || isMandatoryExtra(svc))) {
         next.push({
           extraServiceId: row.extraServiceId,
@@ -308,7 +340,6 @@ export async function applyPartnerExtraOfferModes(
           : row.extraService,
       });
     }
-    void resolvedPartnerId;
     return sortHydratedExtras(next);
   } catch {
     return extras;
@@ -425,6 +456,7 @@ export async function mergePartnerOfferedExtras(
 /** Ensure free catalog services (insurance + mandatory free extras) appear on checkout. */
 export async function mergeFreeInsuranceExtras(
   extras: HydratedListingExtra[],
+  opts?: { partnerId?: string | null; carId?: string | null },
 ): Promise<HydratedListingExtra[]> {
   const catalog = await listExtraServices({ activeOnly: true });
   const presentIds = new Set(extras.map((row) => row.extraServiceId));
@@ -433,9 +465,14 @@ export async function mergeFreeInsuranceExtras(
       .map((row) => row.extraService?.checkoutSlot)
       .filter((slot): slot is ExtraCheckoutSlot => Boolean(slot) && slot !== "none"),
   );
+  const skipTpl = opts?.partnerId
+    ? await partnerHasTplOff(opts.partnerId, opts.carId)
+    : false;
   const merged = [...extras];
   for (const service of catalog) {
     if (service.mode !== "free" && !isMandatoryFreeExtra(service)) continue;
+    // Optional system TPL Off/removed in Additional Services — do not re-inject on ads.
+    if (skipTpl && isMandatoryFreeExtra(service)) continue;
 
     if (isInsuranceCheckoutSlot(service.checkoutSlot)) {
       if (presentIds.has(service.id) || presentSlots.has(service.checkoutSlot)) continue;
@@ -481,9 +518,13 @@ export async function hydratePartnerListingExtras(opts: {
   description?: string | null;
 }): Promise<HydratedListingExtra[]> {
   const hydrated = await hydrateListingExtras(opts.rawExtras);
-  const withFree = await mergeFreeInsuranceExtras(hydrated);
-  const withPrefs = await applyPartnerExtraOfferModes(withFree, opts.partnerId, opts.carId);
-  const withOffered = await mergePartnerOfferedExtras(withPrefs, opts.partnerId, opts.carId);
+  // Drop Off/removed cabinet rows before free-TPL injection so Off cannot be re-added.
+  const withPrefs = await applyPartnerExtraOfferModes(hydrated, opts.partnerId, opts.carId);
+  const withFree = await mergeFreeInsuranceExtras(withPrefs, {
+    partnerId: opts.partnerId,
+    carId: opts.carId,
+  });
+  const withOffered = await mergePartnerOfferedExtras(withFree, opts.partnerId, opts.carId);
   if (opts.description == null || opts.description === undefined) return withOffered;
   const { filterExtrasByCarOffers } = await import("@/lib/cars/car-details");
   return filterExtrasByCarOffers(withOffered, opts.description);

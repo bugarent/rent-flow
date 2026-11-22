@@ -25,9 +25,11 @@ import {
 import { readPartnerDeliveryPrefsMap } from "@/lib/server/partner-delivery-prefs-store";
 import {
   readPartnerExtraPrefsMap,
+  partnerExtraHiddenOnListing,
   partnerExtraPrefAppliesToCar,
   type PartnerExtraPref,
 } from "@/lib/server/partner-extras-prefs-store";
+import { isCoreTplSlug } from "@/lib/extras/tpl-partner-choice";
 import { computeTripDeliveryFees, matchDeliveryRowsForPlace } from "@/lib/delivery/trip-fees";
 import { meetsBookingLeadTime, resolveBookingLeadMinutes } from "@/lib/delivery/booking-lead";
 import { SearchTracePanel, type SearchTraceRow } from "@/components/cars/search-trace-panel";
@@ -635,16 +637,26 @@ export default async function CarsPage({
       string,
       { enabled: boolean; forbidden?: boolean; added?: boolean; carIds?: string[] }
     >();
+    const prefBySlug = new Map<
+      string,
+      { enabled: boolean; forbidden?: boolean; added?: boolean; carIds?: string[] }
+    >();
     const prefCandidates = [
       partnerId,
       partnerId.startsWith("file-partner-") ? partnerId.replace(/^file-partner-/, "") : "",
       "local-partner",
     ].filter(Boolean);
+    const catalogForPrefs = (await extrasCatalogPromise) ?? [];
+    const slugByExtraId = new Map(
+      catalogForPrefs.filter((s) => s.slug).map((s) => [s.id, String(s.slug)]),
+    );
     for (const pid of prefCandidates) {
       const prefs = extrasPrefsByPartner.get(pid) || [];
       if (!prefs.length) continue;
       for (const pref of prefs) {
         prefByExtraId.set(pref.extraServiceId, pref);
+        const slug = slugByExtraId.get(pref.extraServiceId);
+        if (slug && !prefBySlug.has(slug)) prefBySlug.set(slug, pref);
         if (!pref.enabled || pref.forbidden || pref.added === false) continue;
         if (!partnerExtraPrefAppliesToCar(pref, car.id)) continue;
         offeredFromPrefs.push(pref.extraServiceId);
@@ -655,11 +667,13 @@ export default async function CarsPage({
       .map((row) => String(row.extraServiceId || "").trim())
       .filter(Boolean)
       .filter((extraServiceId) => {
-        const pref = prefByExtraId.get(extraServiceId);
-        if (!pref || !partnerExtraPrefAppliesToCar(pref, car.id)) return true;
-        if (pref.added === false) return false;
-        if (pref.forbidden) return false;
-        return Boolean(pref.enabled);
+        const slug = slugByExtraId.get(extraServiceId);
+        const pref =
+          prefByExtraId.get(extraServiceId) ||
+          (slug ? prefBySlug.get(slug) : undefined) ||
+          (isCoreTplSlug(slug) ? prefBySlug.get("tpl") : undefined);
+        if (!pref) return true;
+        return !partnerExtraHiddenOnListing(pref, car.id);
       });
     const extraServiceIds = filterExtrasByCarOffers(
       [...new Set([...fromCarExtras, ...offeredFromPrefs])].map((extraServiceId) => ({

@@ -68,20 +68,29 @@ export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
       categoriesPromise,
       listPartnerCarsForExtras({ user }, partnerId).catch(() => null),
     ]);
-    const canToggleTpl = await partnerMayToggleTpl(
-      partnerId,
-      company?.deliveryCountryIso2s?.length ? company.deliveryCountryIso2s : undefined,
-    );
+    // Same country source as Additional Services / extras-prefs (not company override).
+    const canToggleTpl = await partnerMayToggleTpl(partnerId);
     const catalog = withTplPartnerChoice(extras, canToggleTpl);
     const prefById = new Map(prefs.map((p) => [p.extraServiceId, p]));
+    const prefBySlug = new Map<string, (typeof prefs)[number]>();
+    for (const pref of prefs) {
+      const match = catalog.find((service) => service.id === pref.extraServiceId);
+      if (match?.slug) prefBySlug.set(match.slug, pref);
+    }
     const offered = catalog.filter((service) => {
+      const pref = prefById.get(service.id) || (service.slug ? prefBySlug.get(service.slug) : undefined);
+      // Cabinet Off/removed — never put on car ads, including optional TPL.
+      if (
+        pref &&
+        !partnerStatusLocked(service) &&
+        (pref.added === false || (!pref.forbidden && pref.enabled === false))
+      ) {
+        return false;
+      }
       if (partnerStatusLocked(service)) return true;
-      const pref = prefById.get(service.id);
       if (isCrossBorderExtra(service)) return Boolean(pref?.enabled || pref?.forbidden);
       if (!fleet) return true;
       if (!partnerServiceAdded(service, pref, fleet.usedOnCar(service))) return false;
-      // Cabinet Off stays off listing forms (partner + admin); customer hydrate drops it too.
-      if (pref && !pref.forbidden && pref.enabled === false) return false;
       return true;
     });
     const initialExtrasCatalog = await scopeExtrasToPartner(
@@ -89,9 +98,10 @@ export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
       partnerId,
       company?.deliveryCountryIso2s,
     );
+    // Full cabinet state (incl. Off) so client refresh cannot resurrect Off insurance as mandatory.
     const initialExtraPrefs: CarFormExtraPref[] | undefined = fleet
-      ? initialExtrasCatalog.map((service) => {
-          const pref = prefById.get(service.id);
+      ? catalog.map((service) => {
+          const pref = prefById.get(service.id) || (service.slug ? prefBySlug.get(service.slug) : undefined);
           return {
             service: { id: service.id, slug: service.slug },
             ...partnerCabinetDefaults(service, pref, fleet.usedOnCar(service)),

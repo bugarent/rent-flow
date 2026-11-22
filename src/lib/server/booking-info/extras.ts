@@ -58,107 +58,81 @@ export async function catalogExtrasForCar(carId: string): Promise<
   }>
 > {
   const { isMandatoryFreeExtra } = await import("@/lib/extras/pricing");
+  const { isCoreTplSlug } = await import("@/lib/extras/tpl-partner-choice");
+  const { hydratePartnerListingExtras } = await import("@/lib/server/extras-store");
+
+  async function shape(
+    hydrated: Awaited<ReturnType<typeof hydratePartnerListingExtras>>,
+    partnerId?: string | null,
+  ) {
+    let canToggleTpl = false;
+    try {
+      if (partnerId) {
+        const { partnerMayToggleTpl } = await import("@/lib/server/tpl-partner-choice-store");
+        canToggleTpl = await partnerMayToggleTpl(partnerId);
+      }
+    } catch {
+      canToggleTpl = false;
+    }
+    return hydrated
+      .filter((e) => !e.forbidden && e.extraService?.isActive !== false)
+      .filter((e) => pickServiceLabel(localizedLabel(e.extraService?.name, "")))
+      .map((e) => {
+        const slug = e.extraService?.slug;
+        const mandatoryFree = e.extraService ? isMandatoryFreeExtra(e.extraService) : false;
+        return {
+          id: e.extraServiceId,
+          label: pickServiceLabel(localizedLabel(e.extraService?.name, "")),
+          priceEurPerDay: Number(e.priceEur) || 0,
+          // Optional-country TPL is not locked when the partner may turn it Off.
+          locked: mandatoryFree && !(canToggleTpl && isCoreTplSlug(slug)),
+          maxPeriodEur: e.extraService?.maxPeriodEur ?? null,
+          minPeriodEur: e.extraService?.minPeriodEur ?? null,
+        };
+      });
+  }
+
   try {
     const fileCar = await getFileCar(carId);
     if (fileCar?.extras?.length) {
-      const { hydratePartnerListingExtras } = await import("@/lib/server/extras-store");
       const hydrated = await hydratePartnerListingExtras({
         rawExtras: fileCar.extras,
         partnerId: fileCar.partnerId,
         carId,
         description: fileCar.description,
       });
-      return hydrated
-        .filter((e) => !e.forbidden && e.extraService?.isActive !== false)
-        .filter((e) => pickServiceLabel(localizedLabel(e.extraService?.name, "")))
-        .map((e) => ({
-          id: e.extraServiceId,
-          label: pickServiceLabel(localizedLabel(e.extraService?.name, "")),
-          priceEurPerDay: Number(e.priceEur) || 0,
-          locked: e.extraService ? isMandatoryFreeExtra(e.extraService) : false,
-          maxPeriodEur: e.extraService?.maxPeriodEur ?? null,
-          minPeriodEur: e.extraService?.minPeriodEur ?? null,
-        }));
+      return shape(hydrated, fileCar.partnerId);
     }
   } catch {
     /* fall through */
   }
 
   try {
-    const rows = await prisma.carExtra.findMany({
-      where: { carId },
-      include: {
-        extraService: {
+    const car = await prisma.car.findUnique({
+      where: { id: carId },
+      select: {
+        partnerId: true,
+        description: true,
+        extras: {
           select: {
-            name: true,
-            slug: true,
-            isTpl: true,
-            minPriceEur: true,
-            maxPriceEur: true,
-            sortOrder: true,
+            extraServiceId: true,
+            priceEur: true,
           },
         },
       },
-      orderBy: { extraService: { sortOrder: "asc" } },
     });
-    const { listExtraServices } = await import("@/lib/server/extras-store");
-    const { effectivePeriodBounds } = await import("@/lib/extras/pricing");
-    const { readPartnerExtraPrefs } = await import("@/lib/server/partner-extras-prefs-store");
-    const caps = new Map(
-      (await listExtraServices({ activeOnly: false })).map((service) => [
-        service.id,
-        service.maxPeriodEur,
-      ]),
-    );
-    const owner = await prisma.car.findUnique({
-      where: { id: carId },
-      select: { partnerId: true },
+    if (!car) return [];
+    // Ids only — hydrate attaches catalog rows (incl. checkout slot) and applies Off prefs.
+    const hydrated = await hydratePartnerListingExtras({
+      rawExtras: car.extras.map((row) => ({
+        extraServiceId: row.extraServiceId,
+        priceEur: Number(row.priceEur) || 0,
+      })),
+      partnerId: car.partnerId,
+      carId,
+      description: car.description,
     });
-    const prefs = owner?.partnerId ? await readPartnerExtraPrefs(owner.partnerId) : [];
-    const prefById = new Map(prefs.map((pref) => [pref.extraServiceId, pref]));
-    const { resolveCheckoutSlot } = await import("@/lib/extras/checkout-slot");
-    return rows.flatMap((r) => {
-      const label = pickServiceLabel(localizedLabel(r.extraService?.name, ""));
-      if (!label) return [];
-      const locked = r.extraService
-        ? isMandatoryFreeExtra({
-            slug: r.extraService.slug,
-            isTpl: r.extraService.isTpl,
-            minPriceEur: r.extraService.minPriceEur == null ? null : Number(r.extraService.minPriceEur),
-            maxPriceEur: r.extraService.maxPriceEur == null ? null : Number(r.extraService.maxPriceEur),
-          })
-        : false;
-      const pref = prefById.get(r.extraServiceId);
-      if (!locked && pref) {
-        if (pref.added === false || pref.forbidden || !pref.enabled) return [];
-      }
-      const usePref = Boolean(pref?.enabled) && !pref?.forbidden;
-      const carPrice = Number(r.priceEur) || 0;
-      const fullCover =
-        resolveCheckoutSlot({
-          slug: r.extraService?.slug,
-          isTpl: r.extraService?.isTpl,
-          name: label,
-        }) === "full";
-      const bounds = effectivePeriodBounds(
-        caps.get(r.extraServiceId) ?? null,
-        usePref ? pref?.maxPeriodEur : null,
-        usePref ? pref?.minPeriodEur : null,
-      );
-      return [{
-        id: r.extraServiceId,
-        label,
-        priceEurPerDay:
-          fullCover && carPrice > 0
-            ? carPrice
-            : usePref
-              ? Number(pref?.priceEur) || carPrice
-              : carPrice,
-        maxPeriodEur: bounds.maxPeriodEur,
-        minPeriodEur: bounds.minPeriodEur,
-        locked,
-      }];
-    });
+    return shape(hydrated, car.partnerId);
   } catch {
     return [];
   }

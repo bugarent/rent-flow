@@ -53,6 +53,7 @@ function cleanCarIds(raw: unknown): string[] | undefined {
 }
 
 export {
+  partnerExtraHiddenOnListing,
   partnerExtraOfferedOnListing,
   partnerExtraPrefAppliesToCar,
 } from "@/lib/extras/partner-extra-pref";

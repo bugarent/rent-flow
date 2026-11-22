@@ -970,11 +970,20 @@ export function PartnerCreateCarForm({
         setPricingCurrency(nextCurrency);
         setFxRates(nextRates);
 
-        if (!carId && !initialExtraPrefsRef.current && extrasRes?.ok && Array.isArray(extras) && extras.length) {
+        if (!carId && !initialExtraPrefsRef.current && (extrasRes?.ok || prefsData?.items)) {
           const prefItems = Array.isArray(prefsData?.items) ? prefsData.items : [];
+          const catalogFromPrefs = prefItems
+            .map((item: { service?: ExtraServicePricing }) => item?.service)
+            .filter((service): service is ExtraServicePricing => Boolean(service?.id));
+          const catalogSource =
+            catalogFromPrefs.length > 0
+              ? catalogFromPrefs
+              : Array.isArray(extras) && extras.length
+                ? (extras as ExtraServicePricing[])
+                : [];
           const prefs = indexExtraPrefs(prefItems);
-          const listing = selectionsForCar(extras, prefItems, "");
-          if (!cancelled && (prefs.trusted || listing.catalog.length > 0)) {
+          const listing = selectionsForCar(catalogSource, prefItems, "");
+          if (!cancelled && catalogSource.length && (prefs.trusted || listing.catalog.length > 0)) {
             setExtrasCatalog(listing.catalog);
             setExtrasReady(true);
             setExtraSelections(displayExtraPrices(listing.selections, nextCurrency, nextRates));
@@ -1101,20 +1110,26 @@ export function PartnerCreateCarForm({
             setTariffPrices(savedTiers.prices);
           }
 
-          const fromApi =
-            Array.isArray(prefsData?.items) && prefsData.items.length
-              ? (prefsData.items as CarFormExtraPref[])
-              : [];
+          const prefsItems = Array.isArray(prefsData?.items) ? prefsData.items : [];
+          // extras-prefs items carry partnerCanToggleTpl + Off/On — same source as Additional Services.
+          const fromApi = prefsItems.length
+            ? (prefsItems as CarFormExtraPref[])
+            : [];
           const fromCar = cabinetRowsToPrefs(car.cabinetExtras);
           const prefItems = fromApi.length
             ? fromApi
             : fromCar.length
               ? fromCar
               : initialExtraPrefsDataRef.current ?? [];
+          const catalogFromPrefs = prefsItems
+            .map((item: { service?: ExtraServicePricing }) => item?.service)
+            .filter((service): service is ExtraServicePricing => Boolean(service?.id));
           const catalogSource =
-            extrasRes?.ok && Array.isArray(extras) && extras.length
-              ? (extras as ExtraServicePricing[])
-              : extrasFallbackRef.current;
+            catalogFromPrefs.length > 0
+              ? catalogFromPrefs
+              : extrasRes?.ok && Array.isArray(extras) && extras.length
+                ? (extras as ExtraServicePricing[])
+                : extrasFallbackRef.current;
           // Phone and desktop both paint the cabinet. A failed prefs request keeps the
           // car payload, and a saved offer cannot add or flip a service.
           if (!cancelled && prefItems.length && catalogSource.length) {
@@ -2239,10 +2254,12 @@ export function PartnerCreateCarForm({
               const sorted = [...extrasCatalog]
                 .filter((service) => {
                   if (service.isActive === false) return false;
-                  if (partnerStatusLocked(service)) return true;
                   const row = extraSelections.find((s) => s.extraServiceId === service.id);
-                  // Cabinet or per-listing Off: keep in state for save stamps, hide in the UI.
-                  if (row && !row.forbidden && !row.enabled) return false;
+                  // Cabinet or per-listing Off: hide on the ad form (do not keep a mandatory green block).
+                  if (row && !row.forbidden && !row.enabled && !partnerStatusLocked(service)) {
+                    return false;
+                  }
+                  if (partnerStatusLocked(service)) return true;
                   return true;
                 })
                 .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));

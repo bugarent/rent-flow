@@ -51,3 +51,15 @@ export function partnerExtraOfferedOnListing(
   if (pref.forbidden) return true;
   return pref.enabled !== false;
 }
+
+/** Cabinet Off or removed — hide on ads/listings (Forbidden still shows as a notice). */
+export function partnerExtraHiddenOnListing(
+  pref: PartnerExtraPrefScope | null | undefined,
+  carId?: string | null,
+): boolean {
+  if (!pref) return false;
+  if (!partnerExtraPrefAppliesToCar(pref, carId)) return false;
+  if (pref.added === false) return true;
+  if (pref.forbidden) return false;
+  return pref.enabled === false;
+}
