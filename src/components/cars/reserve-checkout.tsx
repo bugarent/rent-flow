@@ -34,7 +34,10 @@ import {
 } from "@/components/cars/lazy-checkout";
 import { CheckoutBogFrame } from "@/components/cars/checkout-bog-frame";
 import { CheckoutPaypalButtons } from "@/components/cars/checkout-paypal-buttons";
-import { RacButtonLoader } from "@/components/layout/route-loading-spinner";
+import {
+  BookingConfirmOverlay,
+  RacButtonLoader,
+} from "@/components/layout/route-loading-spinner";
 import { usePreloadWhenIdle } from "@/lib/client/preload";
 import { ResidenceCountrySelect } from "@/components/cars/residence-country-select";
 import { CheckoutCarGallery } from "@/components/cars/checkout-car-gallery";
@@ -1454,8 +1457,20 @@ export function ReserveCheckout({
     setError(message);
   }, []);
 
+  const confirmingMessage =
+    locale === "ka"
+      ? "ჯავშანი დასტურდება…"
+      : locale === "ru"
+        ? "Подтверждаем бронь…"
+        : "Confirming booking…";
+
   return (
     <div className="min-h-screen bg-[#eef2f6]">
+      <BookingConfirmOverlay
+        active={loading}
+        label={confirmingMessage}
+        message={confirmingMessage}
+      />
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 p-2 sm:flex-row sm:gap-2.5 sm:p-2.5">
           <Step label={t.step1} href={backHref} />
