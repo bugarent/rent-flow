@@ -243,7 +243,15 @@ export default async function CarsPage({
       ]),
     ];
   }
-  const tripPartnerIds = tripList ? new Set(tripList) : null;
+  // Empty cabinet (DB blip) must not become an empty Set that filters every car out.
+  const cabinetReady = cabinet.byPartner.size > 0;
+  const tripPartnerIds =
+    tripList && tripList.length > 0
+      ? new Set(tripList)
+      : tripList && cabinetReady
+        ? new Set<string>()
+        : null;
+  let catalogLoadFailed = Boolean(pickupIata) && !cabinetReady;
 
   let categoryName: string | null = null;
   const categoryLabels = new Map<string, string>();
@@ -313,36 +321,42 @@ export default async function CarsPage({
   let cars: DbCar[] = [];
   try {
     // Every public listing once per 30s; the pickup's partner filter runs in memory.
-    const allCars = await cachedSearchRead("page-cars", async () => {
-      const { isDbCircuitOpen } = await import("@/lib/prisma");
-      if (isDbCircuitOpen()) throw new Error("database circuit open");
-      return (await prisma.car.findMany({
-        where: { ...publicListingStatusWhere, partner: publicPartnerWhere },
-        include: {
-          photos: { orderBy: { sortOrder: "asc" }, take: 5 },
-          extras: { select: { extraServiceId: true, priceEur: true } },
-          deliveryPrices: {
-            include: {
-              deliveryLocation: {
-                include: { airport: { include: { city: { include: { country: true } } } } },
+    // Never cache an empty catalog — a Neon hiccup must not look like "no cars".
+    const allCars = await cachedSearchRead(
+      "page-cars",
+      async () => {
+        const { isDbCircuitOpen } = await import("@/lib/prisma");
+        if (isDbCircuitOpen()) throw new Error("database circuit open");
+        return (await prisma.car.findMany({
+          where: { ...publicListingStatusWhere, partner: publicPartnerWhere },
+          include: {
+            photos: { orderBy: { sortOrder: "asc" }, take: 5 },
+            extras: { select: { extraServiceId: true, priceEur: true } },
+            deliveryPrices: {
+              include: {
+                deliveryLocation: {
+                  include: { airport: { include: { city: { include: { country: true } } } } },
+                },
+              },
+            },
+            partner: {
+              select: {
+                id: true,
+                companyName: true,
+                logoUrl: true,
+                companySettings: true,
               },
             },
           },
-          partner: {
-            select: {
-              id: true,
-              companyName: true,
-              logoUrl: true,
-              companySettings: true,
-            },
-          },
-        },
-      })) as unknown as DbCar[];
-    });
+        })) as unknown as DbCar[];
+      },
+      { keep: (list) => list.length > 0 },
+    );
     // Always a new array: later steps push file listings into it, and the cached list must stay intact.
     cars = allCars.filter((car) => !tripPartnerIds || tripPartnerIds.has(String(car.partnerId || "")));
   } catch {
     cars = [];
+    catalogLoadFailed = true;
   }
 
   if (traceEnabled) {
@@ -462,20 +476,25 @@ export default async function CarsPage({
       () => import("@/lib/server/delivery-places").then((m) => m.loadDeliveryPlaces()),
       { keep: (map) => map.size > 0 },
     ).catch(() => undefined);
-    const scoped = await scopeSearchCars(cars, cabinet, {
-      pickup: pickupIata,
-      dropoff,
-      countryIso2,
-      prefsByPartner,
-      places,
-    });
-    if (traceEnabled) {
-      for (const row of scoped.rejected) {
-        const car = cars.find((item) => item.id === row.id);
-        trace.push({ id: row.id, label: car ? carLabel(car) : row.id, reason: row.reason });
+    if (!cabinetReady && cars.length > 0) {
+      // Personal-info index missing — scoping would reject every car as "no places".
+      catalogLoadFailed = true;
+    } else {
+      const scoped = await scopeSearchCars(cars, cabinet, {
+        pickup: pickupIata,
+        dropoff,
+        countryIso2,
+        prefsByPartner,
+        places,
+      });
+      if (traceEnabled) {
+        for (const row of scoped.rejected) {
+          const car = cars.find((item) => item.id === row.id);
+          trace.push({ id: row.id, label: car ? carLabel(car) : row.id, reason: row.reason });
+        }
       }
+      cars = scoped.cars;
     }
-    cars = scoped.cars;
   }
 
   if (startDate && pickupIata) {
@@ -740,11 +759,13 @@ export default async function CarsPage({
     crossBorderReturnsPromise,
   ]);
 
-  const emptyMessage = pickupIata
-    ? dictionary.common.noCarsDelivery.replace("{airport}", pickupIata)
-    : categoryName
-      ? dictionary.common.noCarsCategory
-      : dictionary.common.noCars;
+  const emptyMessage = catalogLoadFailed
+    ? dictionary.common.carsLoadFailed
+    : pickupIata
+      ? dictionary.common.noCarsDelivery.replace("{airport}", pickupIata)
+      : categoryName
+        ? dictionary.common.noCarsCategory
+        : dictionary.common.noCars;
 
   if (traceEnabled) {
     console.info("[cars search trace]", { pickup: pickupIata, startDate, endDate, excluded: trace });

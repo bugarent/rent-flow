@@ -327,6 +327,8 @@ export type Dictionary = {
     noCars: string;
     noCarsDelivery: string;
     noCarsCategory: string;
+    /** Transient catalog/cabinet failure — not the same as a real empty search. */
+    carsLoadFailed: string;
   };
   contactModal: {
     getInTouchTitle: string;
@@ -700,6 +702,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       noCars: "No cars available right now.",
       noCarsDelivery: "No cars offer Delivery at {airport} yet.",
       noCarsCategory: "No cars match this category’s mapped models yet.",
+      carsLoadFailed: "Couldn’t load cars right now. Please refresh the page.",
     },
     contactModal: {
       getInTouchTitle: "Get in Touch",
@@ -1070,6 +1073,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       noCars: "ამჟამად მანქანები არ არის.",
       noCarsDelivery: "ჯერ არ არის მანქანები მიწოდებით {airport}-ში.",
       noCarsCategory: "ამ კატეგორიას ჯერ არ ემთხვევა მანქანები.",
+      carsLoadFailed: "მანქანების ჩატვირთვა ვერ მოხერხდა. გთხოვთ განაახლოთ გვერდი.",
     },
     contactModal: {
       getInTouchTitle: "დაგვიკავშირდით",
@@ -1440,6 +1444,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       noCars: "Сейчас нет доступных автомобилей.",
       noCarsDelivery: "Пока нет авто с доставкой в {airport}.",
       noCarsCategory: "В этой категории пока нет автомобилей.",
+      carsLoadFailed: "Не удалось загрузить автомобили. Обновите страницу.",
     },
     contactModal: {
       getInTouchTitle: "Связаться с нами",
@@ -1810,6 +1815,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       noCars: "Aucune voiture disponible pour le moment.",
       noCarsDelivery: "Aucune voiture avec livraison à {airport} pour l'instant.",
       noCarsCategory: "Aucune voiture ne correspond encore à cette catégorie.",
+      carsLoadFailed: "Impossible de charger les voitures. Veuillez actualiser la page.",
     },
     contactModal: {
       getInTouchTitle: "Nous contacter",
@@ -2180,6 +2186,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       noCars: "Derzeit sind keine Fahrzeuge verfügbar.",
       noCarsDelivery: "Noch keine Fahrzeuge mit Lieferung in {airport}.",
       noCarsCategory: "Noch keine Fahrzeuge in dieser Kategorie.",
+      carsLoadFailed: "Fahrzeuge konnten nicht geladen werden. Bitte Seite aktualisieren.",
     },
     contactModal: {
       getInTouchTitle: "Kontakt aufnehmen",
@@ -2550,6 +2557,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       noCars: "Brak dostępnych aut.",
       noCarsDelivery: "Brak aut z dostawą na {airport}.",
       noCarsCategory: "Brak aut w tej kategorii.",
+      carsLoadFailed: "Nie udało się wczytać aut. Odśwież stronę.",
     },
     contactModal: {
       getInTouchTitle: "Skontaktuj się",
@@ -2918,6 +2926,7 @@ export const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionar
       noCars: "لا توجد سيارات متاحة الآن.",
       noCarsDelivery: "لا توجد سيارات مع توصيل في {airport} بعد.",
       noCarsCategory: "لا توجد سيارات في هذه الفئة بعد.",
+      carsLoadFailed: "تعذر تحميل السيارات. يرجى تحديث الصفحة.",
     },
     contactModal: {
       getInTouchTitle: "تواصل معنا",

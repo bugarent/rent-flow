@@ -56,10 +56,9 @@ function cacheSet(key: string, value: { bytes: Buffer; contentType: string }) {
 
 type ResizeFormat = "avif" | "webp";
 
-function preferredFormat(accept: string | null): ResizeFormat {
-  const header = (accept || "").toLowerCase();
-  // Prefer AVIF when the client advertises it (Chrome/Edge/Firefox); else WebP.
-  if (header.includes("image/avif")) return "avif";
+function preferredFormat(_accept: string | null): ResizeFormat {
+  // WebP encodes much faster than AVIF on cold HostedFile hits; search grids
+  // time out less often when many cards resize in parallel on Netlify.
   return "webp";
 }
 
@@ -77,10 +76,10 @@ async function maybeResize(
       .rotate()
       .resize({ width, withoutEnlargement: true });
     if (format === "avif") {
-      const out = await pipeline.avif({ quality: 55, effort: 4 }).toBuffer();
+      const out = await pipeline.avif({ quality: 55, effort: 2 }).toBuffer();
       return { bytes: out, contentType: "image/avif" };
     }
-    const out = await pipeline.webp({ quality: 72 }).toBuffer();
+    const out = await pipeline.webp({ quality: 70, effort: 4 }).toBuffer();
     return { bytes: out, contentType: "image/webp" };
   } catch {
     try {

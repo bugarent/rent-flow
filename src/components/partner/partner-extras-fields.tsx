@@ -3,7 +3,6 @@
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
 import {
   clampPartnerDailyPrice,
-  isMandatoryExtra,
   isMandatoryFreeExtra,
   isMandatoryPricedExtra,
 } from "@/lib/extras/pricing";
@@ -34,10 +33,18 @@ export function buildExtraSelections(
   const byId = new Map((existing ?? []).map((e) => [e.extraServiceId, e]));
   return catalog.map((service) => {
     const current = byId.get(service.id);
-    if (isMandatoryFreeExtra(service)) {
+    if (isMandatoryFreeExtra(service) && partnerStatusLocked(service)) {
       return {
         extraServiceId: service.id,
         enabled: true,
+        forbidden: false,
+        priceEur: "0",
+      };
+    }
+    if (service.partnerCanToggleTpl) {
+      return {
+        extraServiceId: service.id,
+        enabled: current ? !current.forbidden : true,
         forbidden: false,
         priceEur: "0",
       };
@@ -129,7 +136,7 @@ export function selectionsFromCabinet(
   return buildExtraSelections(catalog, existingPrices).map((row) => {
     const service = catalog.find((item) => item.id === row.extraServiceId);
     const pref = service ? prefs.forService(service) : undefined;
-    const mandatory = service ? isMandatoryExtra(service) : false;
+    const mandatory = service ? partnerStatusLocked(service) : false;
     const insurance = service ? isListingInsuranceService(service) : false;
     let enabled = row.enabled;
     let forbidden = Boolean(row.forbidden);
@@ -224,7 +231,7 @@ export function applyListingCabinetExtras(
   );
   return rows.map((row) => {
     const service = catalog.find((item) => item.id === row.extraServiceId);
-    if (service && isMandatoryExtra(service)) return row;
+    if (service && partnerStatusLocked(service)) return row;
     const match = byId.get(row.extraServiceId) || (service?.slug ? bySlug.get(service.slug) : undefined);
     if (!match) return row;
     if (match.forbidden) return { ...row, enabled: true, forbidden: true, priceEur: "0" };
@@ -322,7 +329,7 @@ export function selectionsForCar(
   const prefs = indexExtraPrefs(prefItems);
   const selections = selectionsFromCabinet(visible, prefItems).map((row) => {
     const service = visible.find((item) => item.id === row.extraServiceId);
-    if (!service || isMandatoryExtra(service)) return row;
+    if (!service || partnerStatusLocked(service)) return row;
     const pref = prefs.forService(service);
     if (!pref) return { ...row, enabled: false, forbidden: false, priceEur: "0" };
     const applies = partnerExtraPrefAppliesToCar(
@@ -365,7 +372,7 @@ export function PartnerExtrasFields({
   const update = (id: string, patch: Partial<PartnerExtraSelection>) => {
     const service = catalog.find((s) => s.id === id);
     // Mandatory free extras cannot be disabled or repriced
-    if (service && isMandatoryFreeExtra(service)) {
+    if (service && isMandatoryFreeExtra(service) && partnerStatusLocked(service)) {
       onChange(
         value.map((row) =>
           row.extraServiceId === id

@@ -1,6 +1,9 @@
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
 import { isMandatoryExtra, type ExtraServicePricing } from "@/lib/extras/pricing";
+import { withTplPartnerChoice } from "@/lib/extras/tpl-partner-choice";
+import { partnerStatusLocked } from "@/lib/extras/partner-service-choice";
+import { partnerMayToggleTpl } from "@/lib/server/tpl-partner-choice-store";
 import { LOCAL_PARTNER_ID, loadLocalPartner } from "@/lib/auth/local-partner-store";
 import { prisma } from "@/lib/prisma";
 import { listExtraServices } from "@/lib/server/extras-store";
@@ -65,9 +68,14 @@ export async function loadPartnerCarFormInitial(user: SessionUser): Promise<{
       categoriesPromise,
       listPartnerCarsForExtras({ user }, partnerId).catch(() => null),
     ]);
+    const canToggleTpl = await partnerMayToggleTpl(
+      partnerId,
+      company?.deliveryCountryIso2s?.length ? company.deliveryCountryIso2s : undefined,
+    );
+    const catalog = withTplPartnerChoice(extras, canToggleTpl);
     const prefById = new Map(prefs.map((p) => [p.extraServiceId, p]));
-    const offered = extras.filter((service) => {
-      if (isMandatoryExtra(service)) return true;
+    const offered = catalog.filter((service) => {
+      if (partnerStatusLocked(service)) return true;
       const pref = prefById.get(service.id);
       if (isCrossBorderExtra(service)) return Boolean(pref?.enabled || pref?.forbidden);
       if (!fleet) return true;

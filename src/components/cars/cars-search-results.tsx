@@ -33,7 +33,7 @@ import { parseCarDetails } from "@/lib/cars/car-details";
 import { listingDailyWithDeliveryEur, rentalDayCount } from "@/lib/cars/reserve-pricing";
 import { findSearchPlace, isCityLocationCode } from "@/lib/catalog/search-places";
 import type { MappedCarModel } from "@/lib/catalog/car-models";
-import { SiteImage } from "@/components/ui/site-image";
+import { CardImage, SiteImage } from "@/components/ui/site-image";
 import {
   countListingsForBrand,
   countListingsForCategory,
@@ -1999,21 +1999,12 @@ function CarResultCard({
       {...intentPrefetch(href, warmCheckoutData)}
     >
       <div className="relative aspect-[4/3] w-full overflow-hidden rounded-t-xl bg-slate-100">
-        {photos[photoIndex] ? (
-          <SiteImage
-            src={photos[photoIndex]}
-            alt={`${car.make} ${car.model}${car.year ? ` ${car.year}` : ""} — airport car rental`}
-            fill
-            sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 300px"
-            className="object-cover object-center"
-            loading={aboveFold ? "eager" : "lazy"}
-            fetchPriority={aboveFold ? "high" : "low"}
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-slate-300">
-            <Car className="h-10 w-10" />
-          </div>
-        )}
+        <CardImage
+          src={photos[photoIndex] || null}
+          alt={`${car.make} ${car.model}${car.year ? ` ${car.year}` : ""} — airport car rental`}
+          loading={aboveFold ? "eager" : "lazy"}
+          fetchPriority={aboveFold ? "high" : "low"}
+        />
 
         {siteDiscountPercent > 0 ? (
           <span className="absolute left-0 top-0 z-[5] max-w-[85%] truncate rounded-br-md bg-orange-500 px-3 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-white shadow-md">

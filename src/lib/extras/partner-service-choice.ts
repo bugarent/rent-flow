@@ -6,18 +6,22 @@ import {
 } from "@/lib/extras/pricing";
 import { isListingInsuranceService, resolveCheckoutSlot } from "@/lib/extras/checkout-slot";
 import { isCrossBorderExtra } from "@/lib/extras/cross-border";
+import { isCoreTplSlug } from "@/lib/extras/tpl-partner-choice";
 
 type ChoiceService = Parameters<typeof isMandatoryExtra>[0] & {
   id?: string;
   checkoutSlot?: unknown;
   name?: string;
+  partnerCanToggleTpl?: boolean;
 };
 
 /**
  * Admin-mandatory extras (insurance included) stay on: the partner cannot turn them off
  * or forbid them, and listings always carry them as enabled.
+ * System TPL stays locked unless this partner's countries were opened for partner choice.
  */
 export function partnerStatusLocked(service: ChoiceService): boolean {
+  if (service.partnerCanToggleTpl && isCoreTplSlug(service.slug)) return false;
   return isMandatoryExtra(service);
 }
 

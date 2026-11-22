@@ -8,7 +8,8 @@ import { CREATE_AUTO_BACKDROP_URL, MIN_PUBLIC_PHOTOS } from "@/lib/brand";
 import { isStudioCoverUrl } from "@/lib/cars/studio-cover-url";
 import { PARTNER_BASE } from "@/lib/routes";
 import type { ExtraServicePricing } from "@/lib/extras/pricing";
-import { isMandatoryExtra, isMandatoryFreeExtra } from "@/lib/extras/pricing";
+import { isMandatoryFreeExtra } from "@/lib/extras/pricing";
+import { partnerStatusLocked } from "@/lib/extras/partner-service-choice";
 import { isListingInsuranceService, resolveCheckoutSlot } from "@/lib/extras/checkout-slot";
 import type { DeliveryLocationView } from "@/lib/delivery/pricing";
 import {
@@ -1476,7 +1477,7 @@ export function PartnerCreateCarForm({
         music,
         extraOffers: pricedSelections.map((row) => {
           const service = extrasCatalog.find((item) => item.id === row.extraServiceId);
-          const mandatory = Boolean(service && isMandatoryExtra(service));
+          const mandatory = Boolean(service && partnerStatusLocked(service));
           const forbidden = !mandatory && Boolean(row.forbidden);
           const enabled = mandatory || (!forbidden && Boolean(row.enabled));
           return {
@@ -1492,7 +1493,7 @@ export function PartnerCreateCarForm({
       const description = `<!--car-details:${JSON.stringify(details)}-->`;
       const extras = pricedSelections.map((row) => {
         const service = extrasCatalog.find((s) => s.id === row.extraServiceId);
-        const mandatory = Boolean(service && isMandatoryExtra(service));
+        const mandatory = Boolean(service && partnerStatusLocked(service));
         const mandatoryFree = service ? isMandatoryFreeExtra(service) : false;
         const forbidden = !mandatory && Boolean(row.forbidden);
         const enabled = mandatory || (!forbidden && Boolean(row.enabled));
@@ -2225,7 +2226,7 @@ export function PartnerCreateCarForm({
               const sorted = [...extrasCatalog]
                 .filter((service) => {
                   if (service.isActive === false) return false;
-                  if (isMandatoryExtra(service)) return true;
+                  if (partnerStatusLocked(service)) return true;
                   const row = extraSelections.find((s) => s.extraServiceId === service.id);
                   // Cabinet or per-listing Off: keep in state for save stamps, hide in the UI.
                   if (row && !row.forbidden && !row.enabled) return false;
@@ -2236,7 +2237,7 @@ export function PartnerCreateCarForm({
               const otherServices = sorted.filter((service) => !isListingInsuranceService(service));
               const offerCard = (service: ExtraServicePricing, variant: "insurance" | "light" | "desktop") => {
                 const row = extraSelections.find((s) => s.extraServiceId === service.id);
-                const mandatory = isMandatoryExtra(service);
+                const mandatory = partnerStatusLocked(service);
                 const forbidden = !mandatory && Boolean(row?.forbidden);
                 const enabled = mandatory || (!forbidden && Boolean(row?.enabled));
                 const off = !mandatory && !forbidden && !Boolean(row?.enabled);

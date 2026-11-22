@@ -185,7 +185,8 @@ export async function hydrateListingExtras(raw: unknown): Promise<HydratedListin
  * - enabled → normal service (cabinet price when set)
  * - forbidden → red notice, no price
  * - off → hidden on every listing the pref applies to
- * Mandatory/TPL catalog free extras are never hidden or forbidden by prefs.
+ * Mandatory extras stay on. System TPL stays on unless this partner's countries
+ * allow them to switch it, and they have switched it off.
  */
 export async function applyPartnerExtraOfferModes(
   extras: HydratedListingExtra[],
@@ -227,13 +228,22 @@ export async function applyPartnerExtraOfferModes(
     }
     if (!prefs.length) return extras;
 
+    const { isCoreTplSlug, tplChoiceCoversPartner } = await import("@/lib/extras/tpl-partner-choice");
+    const { readTplPartnerChoiceCountries } = await import("@/lib/server/tpl-partner-choice-store");
+    const { partnerOperatingCountries } = await import("@/lib/server/extras/partner-country-scope");
+    const optionalCountries = await readTplPartnerChoiceCountries();
+    const tplOptional =
+      optionalCountries.length > 0 &&
+      tplChoiceCoversPartner(await partnerOperatingCountries(id), optionalCountries);
+
     const lookup = prefLookup(prefs, await extraSlugById());
     const next: HydratedListingExtra[] = [];
     for (const row of extras) {
       const svc = row.extraService;
       const pref = lookup.forRow(row.extraServiceId, svc?.slug);
       const mandatoryPriced = Boolean(svc && isMandatoryPricedExtra(svc));
-      if (svc && !mandatoryPriced && (svc.isTpl || isMandatoryExtra(svc))) {
+      const optionalTpl = Boolean(tplOptional && svc && isCoreTplSlug(svc.slug));
+      if (svc && !optionalTpl && !mandatoryPriced && (svc.isTpl || isMandatoryExtra(svc))) {
         next.push({
           extraServiceId: row.extraServiceId,
           priceEur: 0,

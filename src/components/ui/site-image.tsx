@@ -42,13 +42,24 @@ export function SiteImage({
 }
 
 /**
- * One small photo for a homepage card.
+ * One small photo for a card / search result.
  * next/image with onError reloads the largest src after hydration, so a card
  * that already loaded then requests a huge file and often comes back blank.
  */
-export function CardImage({ src, alt }: { src?: string | null; alt: string }) {
-  const [failed, setFailed] = useState(false);
+export function CardImage({
+  src,
+  alt,
+  loading = "lazy",
+  fetchPriority,
+}: {
+  src?: string | null;
+  alt: string;
+  loading?: "lazy" | "eager";
+  fetchPriority?: "high" | "low" | "auto";
+}) {
   const raw = typeof src === "string" ? src.trim() : "";
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const failed = Boolean(raw) && failedSrc === raw;
   const url = raw && !failed ? displayImageUrl(raw, CARD_WIDTH, { forSrcset: true }) : "";
   if (!url) {
     return (
@@ -61,10 +72,11 @@ export function CardImage({ src, alt }: { src?: string | null; alt: string }) {
     <img
       src={url}
       alt={alt}
-      className="absolute inset-0 h-full w-full object-cover"
-      loading="lazy"
+      className="absolute inset-0 h-full w-full object-cover object-center"
+      loading={loading}
       decoding="async"
-      onError={() => setFailed(true)}
+      fetchPriority={fetchPriority}
+      onError={() => setFailedSrc(raw)}
     />
   );
 }

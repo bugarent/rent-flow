@@ -28,6 +28,11 @@ export type ExtraServicePricing = {
   maxPeriodEur: number | null;
   mode: ExtraPricingMode;
   checkoutSlot: ExtraCheckoutSlot;
+  /**
+   * Cabinet-only. Set when this partner's countries let them switch system TPL on or off.
+   * Not stored on the catalog.
+   */
+  partnerCanToggleTpl?: boolean;
 };
 
 export type PartnerExtraInput = {

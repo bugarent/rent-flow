@@ -14,6 +14,7 @@ import {
   type ExtraCheckoutSlot,
 } from "@/lib/extras/checkout-slot";
 import { ExtraPriceWindows } from "@/components/admin/extras/extra-price-windows";
+import { TplCountryChoice, type TplChoiceCountry } from "@/components/admin/extras/tpl-country-choice";
 import { cn } from "@/lib/utils";
 import {
   ResponsiveDataList,
@@ -50,7 +51,15 @@ function isCorePackTpl(item: ExtraServicePricing) {
   return item.slug === "tpl";
 }
 
-export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePricing[] }) {
+export function ExtrasManager({
+  initialExtras,
+  tplCountries = [],
+  initialTplChoiceIso2s = [],
+}: {
+  initialExtras: ExtraServicePricing[];
+  tplCountries?: TplChoiceCountry[];
+  initialTplChoiceIso2s?: string[];
+}) {
   const { locale } = useAdminLocale();
   const copy = extrasAdminCopy(locale);
   const text = (value: string) => knownText(locale, value);
@@ -73,6 +82,8 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
   const [savingRowId, setSavingRowId] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [orderSaving, setOrderSaving] = useState(false);
+  const [tplChoiceOpen, setTplChoiceOpen] = useState(false);
+  const [tplChoiceIso2s, setTplChoiceIso2s] = useState(initialTplChoiceIso2s);
   const orderBeforeDrag = useRef<ExtraServicePricing[] | null>(null);
 
   const persistOrder = useCallback(async (next: ExtraServicePricing[]) => {
@@ -418,7 +429,7 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
                             <button
                               type="button"
                               className="text-sm font-semibold text-sky-700"
-                              onClick={() => startEdit(item)}
+                              onClick={() => (corePack ? setTplChoiceOpen(true) : startEdit(item))}
                             >
                               {copy.edit}
                             </button>
@@ -525,7 +536,7 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
                     <button
                       type="button"
                       className="min-h-11 px-3 text-sm font-semibold text-sky-700"
-                      onClick={() => startEdit(item)}
+                      onClick={() => (corePack ? setTplChoiceOpen(true) : startEdit(item))}
                     >
                       {copy.edit}
                     </button>
@@ -661,6 +672,13 @@ export function ExtrasManager({ initialExtras }: { initialExtras: ExtraServicePr
           ) : null}
         </div>
       </form>
+      <TplCountryChoice
+        open={tplChoiceOpen}
+        countries={tplCountries}
+        selected={tplChoiceIso2s}
+        onClose={() => setTplChoiceOpen(false)}
+        onChange={setTplChoiceIso2s}
+      />
     </div>
   );
 }

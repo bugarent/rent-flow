@@ -29,6 +29,8 @@ import {
   partnerStatusLocked,
 } from "@/lib/extras/partner-service-choice";
 import { syncListingExtraPrices } from "@/lib/server/sync-listing-extra-prices";
+import { withTplPartnerChoice } from "@/lib/extras/tpl-partner-choice";
+import { partnerMayToggleTpl } from "@/lib/server/tpl-partner-choice-store";
 
 async function resolvePartnerId(userId: string, email?: string | null): Promise<string> {
   try {
@@ -87,11 +89,13 @@ export async function GET() {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const partnerId = await resolvePartnerId(session.user.id, session.user.email);
-    const [catalog, prefsRaw, fleet] = await Promise.all([
+    const [catalogRaw, prefsRaw, fleet, canToggleTpl] = await Promise.all([
       partnerCatalog(partnerId),
       readPartnerExtraPrefs(partnerId),
       listPartnerCarsForExtras(session, partnerId),
+      partnerMayToggleTpl(partnerId),
     ]);
+    const catalog = withTplPartnerChoice(catalogRaw, canToggleTpl);
     const cars = fleet.cars;
     const catalogById = new Map(catalog.map((service) => [service.id, service]));
     // Clamp in memory for the response only — never write prefs on GET (was slowing every open).
@@ -162,11 +166,14 @@ export async function PUT(req: Request) {
     const partnerId = await resolvePartnerId(session.user.id, session.user.email);
     const body = await req.json();
     const raw = Array.isArray(body?.prefs) ? body.prefs : Array.isArray(body) ? body : [];
-    const [catalog, visibleCatalog, fleet] = await Promise.all([
+    const [catalogRaw, visibleRaw, fleet, canToggleTpl] = await Promise.all([
       partnerCatalog(partnerId, { scoped: false }),
       partnerCatalog(partnerId),
       listPartnerCarsForExtras(session, partnerId),
+      partnerMayToggleTpl(partnerId),
     ]);
+    const catalog = withTplPartnerChoice(catalogRaw, canToggleTpl);
+    const visibleCatalog = withTplPartnerChoice(visibleRaw, canToggleTpl);
     const cars = fleet.cars;
     const visibleIds = new Set(visibleCatalog.map((s) => s.id));
     const byId = new Map(catalog.map((s) => [s.id, s]));
@@ -179,13 +186,16 @@ export async function PUT(req: Request) {
       if (!service) continue;
       const mandatory = isMandatoryExtra(service);
       const locked = partnerStatusLocked(service);
+      const fleetWideChoice = Boolean(service.partnerCanToggleTpl);
       const mandatoryFree = isMandatoryFreeExtra(service);
       const forbidden = locked ? false : Boolean(row?.forbidden);
       const cleanedIds = cleanCarIds(row?.carIds, allowedCarIds);
       const allIds = [...allowedCarIds];
       // undefined = legacy "all cars"; [] = explicitly none for "on";
       // off/forbid with [] must still hit every listing (otherwise cars stay "enabled").
-      const carIds = mandatory
+      const carIds = fleetWideChoice
+        ? undefined
+        : mandatory
         ? allIds
         : cleanedIds !== undefined
           ? cleanedIds.length === 0 && (forbidden || !Boolean(row?.enabled))
@@ -223,7 +233,7 @@ export async function PUT(req: Request) {
             : clampPartnerDailyPrice(service.minPriceEur, service.maxPriceEur, Number(row?.priceEur)),
         minPeriodEur,
         maxPeriodEur,
-        carIds,
+        ...(carIds ? { carIds } : {}),
       });
     }
 
