@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { getCustomerSession } from "@/lib/auth/sessions";
 import { prisma } from "@/lib/prisma";
 import { computeBufferEndsAt, rangesOverlap } from "@/lib/calendar/buffer";
@@ -25,6 +25,17 @@ import { createFileBooking } from "@/lib/server/customer-bookings-store";
 import { isPubliclyVisibleListing } from "@/lib/cars/listing-visibility";
 import { countryPlatformPercents } from "@/lib/pricing/country-platform-percents";
 import { locationCountryIso2 } from "@/lib/extras/country-scope";
+
+/** Email, partner credit, and similar work must not hold the success page. */
+function afterResponse(task: () => Promise<unknown>) {
+  after(() =>
+    Promise.resolve()
+      .then(task)
+      .catch((error) => {
+        console.warn("[bookings] background task failed", error);
+      }),
+  );
+}
 
 /** Block a trip shorter than the partner's minimum (1 or 2 days). */
 async function rejectBelowMinRental(partnerId: string, days: number) {
@@ -792,50 +803,44 @@ export async function POST(req: Request) {
         });
         await freezeBookingTermsAtCheckout(booking.id);
 
-        if (!deferNotifyUntilPaid) {
-          try {
-            const { notifyFileBookingEvent } = await import("@/lib/notifications");
-            await notifyFileBookingEvent(booking);
-          } catch (notifyError) {
-            console.warn("[bookings] notifyFileBookingEvent failed", notifyError);
+        afterResponse(async () => {
+          if (!deferNotifyUntilPaid) {
+            try {
+              const { notifyFileBookingEvent } = await import("@/lib/notifications");
+              await notifyFileBookingEvent(booking);
+            } catch (notifyError) {
+              console.warn("[bookings] notifyFileBookingEvent failed", notifyError);
+            }
           }
-        }
-        try {
-          const { markBookingUnread } = await import("@/lib/server/admin-booking-unread-store");
-          await markBookingUnread(booking.id);
-        } catch {
-          /* best-effort */
-        }
+          try {
+            const { markBookingUnread } = await import("@/lib/server/admin-booking-unread-store");
+            await markBookingUnread(booking.id);
+          } catch {
+            /* best-effort */
+          }
+          await rememberMessengers(booking.id);
+          await rememberResidence(booking.id);
+          await rememberSiteDiscount(booking.id, appliedSiteDiscount);
+          if (bpCode && bpSplit) {
+            await creditBusinessPartnerFromBooking({
+              promoCode: bpCode,
+              sequentialNumber: booking.sequentialNumber,
+              bookingId: booking.id,
+              airport: booking.pickupAirportIata,
+              customerName: `${guestFirst} ${guestLast}`.trim(),
+              customerEmail: guestMail,
+              customerFirstName: guestFirst,
+              customerLastName: guestLast,
+              partnerEarnedEur: bpSplit.partnerEarnedEur,
+              siteEarnedEur: bpSplit.siteEarnedEur,
+            });
+          }
+          await attachPlatformCharge(booking);
+        });
         void import("@/lib/server/channel-publish")
           .then((mod) => mod.noteReservationPublished(booking.carId))
           .catch(() => undefined);
-
-        await rememberMessengers(booking.id);
-        await rememberResidence(booking.id);
-        await rememberSiteDiscount(booking.id, appliedSiteDiscount);
-        let bpCredit: { code: string; partnerEarnedEur: number; siteEarnedEur: number } | null =
-          null;
-        if (bpCode && bpSplit) {
-          await creditBusinessPartnerFromBooking({
-            promoCode: bpCode,
-            sequentialNumber: booking.sequentialNumber,
-            bookingId: booking.id,
-            airport: booking.pickupAirportIata,
-            customerName: `${guestFirst} ${guestLast}`.trim(),
-            customerEmail: guestMail,
-            customerFirstName: guestFirst,
-            customerLastName: guestLast,
-            partnerEarnedEur: bpSplit.partnerEarnedEur,
-            siteEarnedEur: bpSplit.siteEarnedEur,
-          });
-          bpCredit = {
-            code: bpCode,
-            partnerEarnedEur: bpSplit.partnerEarnedEur,
-            siteEarnedEur: bpSplit.siteEarnedEur,
-          };
-        }
-        const platformCharge = await attachPlatformCharge(booking);
-        return NextResponse.json({ ...booking, bpCredit, platformCharge }, { status: 201 });
+        return NextResponse.json(booking, { status: 201 });
       }
     }
 
@@ -1161,44 +1166,39 @@ export async function POST(req: Request) {
         ...(bookingPromoCode || bpCode ? { promoCode: bpCode || bookingPromoCode } : {}),
       });
       await freezeBookingTermsAtCheckout(booking.id);
-      try {
-        const { notifyFileBookingEvent } = await import("@/lib/notifications");
-        await notifyFileBookingEvent(booking);
-      } catch (notifyError) {
-        console.warn("[bookings] notifyFileBookingEvent failed", notifyError);
-      }
-      try {
-        const { markBookingUnread } = await import("@/lib/server/admin-booking-unread-store");
-        await markBookingUnread(booking.id);
-      } catch {
-        /* best-effort */
-      }
-      await rememberMessengers(booking.id);
-      await rememberResidence(booking.id);
-      await rememberSiteDiscount(booking.id, appliedSiteDiscount);
-      let bpCredit: { code: string; partnerEarnedEur: number; siteEarnedEur: number } | null =
-        null;
-      if (bpCode && bpSplit) {
-        await creditBusinessPartnerFromBooking({
-          promoCode: bpCode,
-          sequentialNumber: booking.sequentialNumber,
-          bookingId: booking.id,
-          airport: booking.pickupAirportIata,
-          customerName: `${guestFirst} ${guestLast}`.trim(),
-          customerEmail: guestMail,
-          customerFirstName: guestFirst,
-          customerLastName: guestLast,
-          partnerEarnedEur: bpSplit.partnerEarnedEur,
-          siteEarnedEur: bpSplit.siteEarnedEur,
-        });
-        bpCredit = {
-          code: bpCode,
-          partnerEarnedEur: bpSplit.partnerEarnedEur,
-          siteEarnedEur: bpSplit.siteEarnedEur,
-        };
-      }
-      const platformCharge = await attachPlatformCharge(booking);
-      return NextResponse.json({ ...booking, bpCredit, platformCharge }, { status: 201 });
+      afterResponse(async () => {
+        try {
+          const { notifyFileBookingEvent } = await import("@/lib/notifications");
+          await notifyFileBookingEvent(booking);
+        } catch (notifyError) {
+          console.warn("[bookings] notifyFileBookingEvent failed", notifyError);
+        }
+        try {
+          const { markBookingUnread } = await import("@/lib/server/admin-booking-unread-store");
+          await markBookingUnread(booking.id);
+        } catch {
+          /* best-effort */
+        }
+        await rememberMessengers(booking.id);
+        await rememberResidence(booking.id);
+        await rememberSiteDiscount(booking.id, appliedSiteDiscount);
+        if (bpCode && bpSplit) {
+          await creditBusinessPartnerFromBooking({
+            promoCode: bpCode,
+            sequentialNumber: booking.sequentialNumber,
+            bookingId: booking.id,
+            airport: booking.pickupAirportIata,
+            customerName: `${guestFirst} ${guestLast}`.trim(),
+            customerEmail: guestMail,
+            customerFirstName: guestFirst,
+            customerLastName: guestLast,
+            partnerEarnedEur: bpSplit.partnerEarnedEur,
+            siteEarnedEur: bpSplit.siteEarnedEur,
+          });
+        }
+        await attachPlatformCharge(booking);
+      });
+      return NextResponse.json(booking, { status: 201 });
     }
 
     const resolvedFirst =
@@ -1336,22 +1336,42 @@ export async function POST(req: Request) {
       }
     }
 
-    if (!deferNotifyUntilPaid) {
-      try {
-        await notifyBookingEvent(booking.id, "BOOKING_NEW");
-      } catch (notifyError) {
-        console.warn("[bookings] notifyBookingEvent failed", notifyError);
+    afterResponse(async () => {
+      if (!deferNotifyUntilPaid) {
+        try {
+          await notifyBookingEvent(booking.id, "BOOKING_NEW");
+        } catch (notifyError) {
+          console.warn("[bookings] notifyBookingEvent failed", notifyError);
+        }
       }
-    }
+      try {
+        const { markBookingUnread } = await import("@/lib/server/admin-booking-unread-store");
+        await markBookingUnread(booking.id);
+      } catch {
+        /* best-effort */
+      }
+      await rememberMessengers(booking.id);
+      await rememberResidence(booking.id);
+      await rememberSiteDiscount(booking.id, appliedSiteDiscount);
+      if (bpCode && bpSplit) {
+        await creditBusinessPartnerFromBooking({
+          promoCode: bpCode,
+          sequentialNumber: booking.sequentialNumber,
+          bookingId: booking.id,
+          airport: pickupIata,
+          customerName: `${resolvedFirst} ${resolvedLast}`.trim(),
+          customerEmail: resolvedMail,
+          customerFirstName: resolvedFirst,
+          customerLastName: resolvedLast,
+          partnerEarnedEur: bpSplit.partnerEarnedEur,
+          siteEarnedEur: bpSplit.siteEarnedEur,
+        });
+      }
+      await attachPlatformCharge(booking);
+    });
     void import("@/lib/server/channel-publish")
       .then((mod) => mod.noteReservationPublished(booking.carId))
       .catch(() => undefined);
-    try {
-      const { markBookingUnread } = await import("@/lib/server/admin-booking-unread-store");
-      await markBookingUnread(booking.id);
-    } catch {
-      /* best-effort */
-    }
 
     // Fire-and-forget partner channel booking lock (do not fail the guest booking).
     void (async () => {
@@ -1419,32 +1439,7 @@ export async function POST(req: Request) {
       }
     })();
 
-    await rememberMessengers(booking.id);
-    await rememberResidence(booking.id);
-    await rememberSiteDiscount(booking.id, appliedSiteDiscount);
-    let bpCredit: { code: string; partnerEarnedEur: number; siteEarnedEur: number } | null =
-      null;
-    if (bpCode && bpSplit) {
-      await creditBusinessPartnerFromBooking({
-        promoCode: bpCode,
-        sequentialNumber: booking.sequentialNumber,
-        bookingId: booking.id,
-        airport: pickupIata,
-        customerName: `${resolvedFirst} ${resolvedLast}`.trim(),
-        customerEmail: resolvedMail,
-        customerFirstName: resolvedFirst,
-        customerLastName: resolvedLast,
-        partnerEarnedEur: bpSplit.partnerEarnedEur,
-        siteEarnedEur: bpSplit.siteEarnedEur,
-      });
-      bpCredit = {
-        code: bpCode,
-        partnerEarnedEur: bpSplit.partnerEarnedEur,
-        siteEarnedEur: bpSplit.siteEarnedEur,
-      };
-    }
-    const platformCharge = await attachPlatformCharge(booking);
-    return NextResponse.json({ ...booking, bpCredit, platformCharge }, { status: 201 });
+    return NextResponse.json(booking, { status: 201 });
   } catch (error) {
     console.error("[bookings] POST failed", error);
     if (isDbOfflineError(error)) {

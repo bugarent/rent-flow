@@ -5,7 +5,6 @@ import { ModalSkeleton, Skeleton } from "@/components/ui/skeleton";
 
 export const loadRentalTermsModal = () => import("@/components/cars/rental-terms-modal");
 export const loadLegalDocumentModal = () => import("@/components/legal/legal-document-modal");
-export const loadGuestBookingNoticeModal = () => import("@/components/cars/guest-booking-notice-modal");
 export const loadCheckoutPaypalSandbox = () => import("@/components/cars/checkout-paypal-sandbox");
 export const loadCheckoutPaypalCard = () => import("@/components/cars/checkout-paypal-card");
 export const loadCheckoutBogCard = () => import("@/components/cars/checkout-bog-card");
@@ -18,11 +17,6 @@ export const RentalTermsModal = dynamic(
 export const LegalDocumentModal = dynamic(
   () => loadLegalDocumentModal().then((m) => m.LegalDocumentModal),
   { ssr: false, loading: () => <ModalSkeleton size="lg" /> },
-);
-
-export const GuestBookingNoticeModal = dynamic(
-  () => loadGuestBookingNoticeModal().then((m) => m.GuestBookingNoticeModal),
-  { ssr: false, loading: () => <ModalSkeleton size="md" /> },
 );
 
 export const CheckoutPaypalSandbox = dynamic(

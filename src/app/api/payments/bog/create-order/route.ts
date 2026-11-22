@@ -107,6 +107,7 @@ export async function POST(req: Request) {
     ...(booking.sequentialNumber != null
       ? { ref: String(formatBookingRef(booking.sequentialNumber) || "") }
       : {}),
+    ...(booking.guestEmail ? { email: booking.guestEmail } : {}),
   });
 
   try {

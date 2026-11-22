@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import {
   PaypalApiError,
@@ -72,19 +73,24 @@ export default async function PaypalPaymentReturnPage({ searchParams }: Props) {
   });
 
   if (result.updated) {
-    try {
-      if (booking.source === "file") {
-        const { getFileBooking } = await import("@/lib/server/customer-bookings-store");
-        const { notifyFileBookingEvent } = await import("@/lib/notifications");
-        const fileRow = await getFileBooking(booking.id);
-        if (fileRow) await notifyFileBookingEvent(fileRow);
-      } else {
-        const { notifyBookingEvent } = await import("@/lib/notifications");
-        await notifyBookingEvent(booking.id, "BOOKING_NEW");
-      }
-    } catch (notifyErr) {
-      console.warn("[paypal/return] notify failed", notifyErr);
-    }
+    const paid = booking;
+    after(() => {
+      void (async () => {
+        try {
+          if (paid.source === "file") {
+            const { getFileBooking } = await import("@/lib/server/customer-bookings-store");
+            const { notifyFileBookingEvent } = await import("@/lib/notifications");
+            const fileRow = await getFileBooking(paid.id);
+            if (fileRow) await notifyFileBookingEvent(fileRow);
+          } else {
+            const { notifyBookingEvent } = await import("@/lib/notifications");
+            await notifyBookingEvent(paid.id, "BOOKING_NEW");
+          }
+        } catch (notifyErr) {
+          console.warn("[paypal/return] notify failed", notifyErr);
+        }
+      })();
+    });
   }
 
   const successQs = new URLSearchParams({ bookingId: booking.id });
@@ -94,5 +100,6 @@ export default async function PaypalPaymentReturnPage({ searchParams }: Props) {
       ? formatBookingRef(booking.sequentialNumber) || ""
       : "");
   if (ref) successQs.set("ref", ref);
+  if (booking.guestEmail) successQs.set("email", booking.guestEmail);
   redirect(`/booking/payment/success?${successQs.toString()}`);
 }

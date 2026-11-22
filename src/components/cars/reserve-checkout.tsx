@@ -26,11 +26,9 @@ import {
 import { BirthDateSelect } from "@/components/cars/birth-date-select";
 import {
   CheckoutPaypalCard,
-  GuestBookingNoticeModal,
   LegalDocumentModal,
   RentalTermsModal,
   loadCheckoutPaypalCard,
-  loadGuestBookingNoticeModal,
   loadLegalDocumentModal,
   loadRentalTermsModal,
 } from "@/components/cars/lazy-checkout";
@@ -64,6 +62,7 @@ import { useBusinessPartnerReferralDiscount } from "@/components/business/use-bu
 import { formatInternationalPhone } from "@/lib/catalog/dial-codes";
 import { extraPeriodCharge } from "@/lib/extras/pricing";
 import type { PartnerSocialPlatform } from "@/lib/partner";
+import { formatBookingRef } from "@/lib/ids";
 import { cn, toNumber } from "@/lib/utils";
 import {
   clearBusinessPartnerReferralCookieClient,
@@ -202,12 +201,7 @@ export function ReserveCheckout({
   initialRange?: string;
 }) {
   const intentPrefetch = useIntentPrefetch();
-  usePreloadWhenIdle(
-    loadCheckoutPaypalCard,
-    loadGuestBookingNoticeModal,
-    loadRentalTermsModal,
-    loadLegalDocumentModal,
-  );
+  usePreloadWhenIdle(loadCheckoutPaypalCard, loadRentalTermsModal, loadLegalDocumentModal);
   const { data: session } = useSession();
   const { dictionary, formatPrice, locale, currency, fxRates } = usePreferences();
   const record = (value: string) => knownText(locale, value);
@@ -265,35 +259,7 @@ export function ReserveCheckout({
   }>({
     bookingId: "",
   });
-  const [guestNoticeOpen, setGuestNoticeOpen] = useState(false);
-  const [previewBookingRef, setPreviewBookingRef] = useState("");
-  const previewRefRequest = useRef<Promise<string> | null>(null);
-
-  const loadPreviewBookingRef = useCallback(() => {
-    if (previewRefRequest.current) return previewRefRequest.current;
-    const task = (async () => {
-      try {
-        const res = await fetch("/api/bookings/next-ref", { cache: "no-store" });
-        const data = await res.json().catch(() => ({}));
-        const reference =
-          res.ok && typeof data.reference === "string" ? data.reference.trim() : "";
-        if (reference) {
-          setPreviewBookingRef(reference);
-          return reference;
-        }
-      } catch {
-        /* allow another attempt */
-      }
-      previewRefRequest.current = null;
-      return "";
-    })();
-    previewRefRequest.current = task;
-    return task;
-  }, []);
-
-  useEffect(() => {
-    void loadPreviewBookingRef();
-  }, [loadPreviewBookingRef]);
+  const successPathRef = useRef("/booking/payment/success");
 
   const [seed] = useState(() =>
     initialCar && initialRange === carRangeKey(initialStart, initialEnd)
@@ -946,18 +912,13 @@ export function ReserveCheckout({
     }
     setInvalidFields(new Set());
     setError("");
-    let reference = previewBookingRef.trim();
-    if (!reference) {
-      setLoading(true);
-      reference = (await loadPreviewBookingRef()).trim();
-      setLoading(false);
+    setCheckoutStep("payment");
+    window.scrollTo({ top: 0, behavior: "auto" });
+    if (!payAmountLabel) {
+      void loadPayAmountLabel(totals.payNow).then((label) => {
+        if (label) setPayAmountLabel(label);
+      });
     }
-    if (!reference) {
-      setError(dictionary.booking.createFailed);
-      return;
-    }
-    setPreviewBookingRef(reference);
-    setGuestNoticeOpen(true);
   };
 
   const loadPayAmountLabel = useCallback(async (amountEur: number) => {
@@ -1013,15 +974,17 @@ export function ReserveCheckout({
     };
   }, [loadPayAmountLabel, totals.payNow]);
 
-  const proceedToPaymentAfterNotice = () => {
-    setGuestNoticeOpen(false);
-    setCheckoutStep("payment");
-    window.scrollTo({ top: 0, behavior: "auto" });
-    if (!payAmountLabel) {
-      void loadPayAmountLabel(totals.payNow).then((label) => {
-        if (label) setPayAmountLabel(label);
-      });
-    }
+  const rememberSuccessPath = (
+    id: string,
+    data?: { sequentialNumber?: unknown; guestEmail?: unknown },
+  ) => {
+    const q = new URLSearchParams({ bookingId: id });
+    const seq = typeof data?.sequentialNumber === "number" ? data.sequentialNumber : null;
+    const ref = formatBookingRef(seq);
+    if (ref) q.set("ref", ref);
+    const mail = String(data?.guestEmail || email || "").trim();
+    if (mail) q.set("email", mail.slice(0, 120));
+    successPathRef.current = `/booking/payment/success?${q.toString()}`;
   };
 
   const handleBooking = async (
@@ -1230,15 +1193,17 @@ export function ReserveCheckout({
       }
       bookingIdRef.current = bookingId;
       ordersRef.current = { bookingId };
+      rememberSuccessPath(bookingId, data);
 
       clearBusinessPartnerReferralCookieClient();
       }
 
       if (skipGateway) {
         bookingIdRef.current = bookingId;
-        window.location.assign(
-          `/booking/payment/success?bookingId=${encodeURIComponent(bookingId)}`,
-        );
+        if (!successPathRef.current.includes(encodeURIComponent(bookingId))) {
+          rememberSuccessPath(bookingId);
+        }
+        window.location.assign(successPathRef.current);
         return { bookingId, orderId: "free" };
       }
 
@@ -1423,8 +1388,14 @@ export function ReserveCheckout({
 
   const onBogPaid = useCallback(() => {
     const id = bookingIdRef.current;
-    window.location.assign(`/booking/payment/success?bookingId=${encodeURIComponent(id)}`);
-  }, []);
+    if (id && !successPathRef.current.includes(encodeURIComponent(id))) {
+      const q = new URLSearchParams({ bookingId: id });
+      const mail = email.trim();
+      if (mail) q.set("email", mail.slice(0, 120));
+      successPathRef.current = `/booking/payment/success?${q.toString()}`;
+    }
+    window.location.assign(successPathRef.current);
+  }, [email]);
 
   const onPaypalPaid = useCallback((orderId: string) => {
     const q = new URLSearchParams({
@@ -2545,21 +2516,6 @@ export function ReserveCheckout({
           openFileLabel={t.bookingTermsOpenFile}
           closeLabel={t.rentalTermsClose}
         />
-      ) : null}
-      {guestNoticeOpen ? (
-      <GuestBookingNoticeModal
-        open
-        title={t.guestNoticeTitle}
-        body={t.guestNoticeBody}
-        remember={t.guestNoticeRemember}
-        continueLabel={t.guestNoticeContinue}
-        emailLabel={t.guestNoticeEmailLabel}
-        bookingNumberLabel={t.guestNoticeBookingLabel}
-        email={email}
-        bookingReference={previewBookingRef}
-        onContinue={proceedToPaymentAfterNotice}
-        onClose={() => setGuestNoticeOpen(false)}
-      />
       ) : null}
     </div>
   );
