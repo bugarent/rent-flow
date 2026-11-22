@@ -8,8 +8,8 @@ import { CardImage } from "@/components/ui/site-image";
 import { requestHomeCategorySearch } from "@/lib/catalog/home-country-store";
 
 const AUTO_MS = 4000;
-/** Cards visible side by side on desktop (lg grid) — same as popular airports. */
-const MAX_COLUMNS = 3;
+/** Cards visible side by side on desktop (lg grid). */
+const MAX_COLUMNS = 4;
 const SLIDE_MS = 650;
 
 type Category = { id: string; slug: string; name: string; details: string; imageUrl: string };
@@ -234,7 +234,7 @@ export function CategorySlider({ categories }: { categories: Category[] }) {
                     if (step > 0) setLead(Math.round(Math.abs(event.currentTarget.scrollLeft) / step));
                   }
             }
-            className="grid grid-flow-col grid-rows-1 auto-cols-[100%] gap-4 overflow-x-auto pb-1 sm:auto-cols-[calc((100%-1.25rem)/2)] sm:gap-5 lg:auto-cols-[calc((100%-3rem)/3)] lg:gap-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="grid grid-flow-col grid-rows-1 auto-cols-[100%] gap-4 overflow-x-auto pb-1 sm:auto-cols-[calc((100%-1.25rem)/2)] sm:gap-5 lg:auto-cols-[calc((100%-4.5rem)/4)] lg:gap-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {slides.map((category, index) => (
               <CategoryCard
