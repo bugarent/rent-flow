@@ -310,10 +310,15 @@ export async function POST(req: Request) {
       .trim()
       .toLowerCase()
       .slice(0, 32);
-    /** Online gateways (BOG / PayPal) stay unpaid until callback/capture confirms. */
-    const deferNotifyUntilPaid =
-      paymentProvider === "bog" || paymentProvider === "paypal";
-    const initialPaymentStatus = "UNPAID";
+    /** Online gateways (BOG / PayPal). Refined after the charge when the online amount is known. */
+    const wantsOnlineGateway = paymentProvider === "bog" || paymentProvider === "paypal";
+    const paymentFlagsFor = (depositPaidEur: number) => {
+      const chargeOnline = wantsOnlineGateway && depositPaidEur > 0.009;
+      return {
+        deferNotifyUntilPaid: chargeOnline,
+        initialPaymentStatus: chargeOnline ? ("UNPAID" as const) : ("PAID" as const),
+      };
+    };
     const countryOfResidence = String(
       (body as { countryOfResidence?: unknown }).countryOfResidence || "",
     )
@@ -711,6 +716,7 @@ export async function POST(req: Request) {
         const totalPriceEur = charge.totalPriceEur;
         const depositPaidEur = charge.depositPaidEur;
         const balanceDueEur = charge.balanceDueEur;
+        const { deferNotifyUntilPaid, initialPaymentStatus } = paymentFlagsFor(depositPaidEur);
         const guestFirst =
           typeof guestFirstName === "string" && guestFirstName.trim()
             ? guestFirstName.trim()
@@ -1079,6 +1085,7 @@ export async function POST(req: Request) {
     const totalPriceEur = charge.totalPriceEur;
     const depositPaidEur = charge.depositPaidEur;
     const balanceDueEur = charge.balanceDueEur;
+    const { deferNotifyUntilPaid, initialPaymentStatus } = paymentFlagsFor(depositPaidEur);
     const effectiveDepositPercent = bpSplit ? charge.settled.depositPercent : depositPercent;
 
     const guestFirst =

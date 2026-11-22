@@ -1011,6 +1011,8 @@ export function ReserveCheckout({
     provider: "bog" | "paypal" = paymentMethod,
     opts?: { embed?: boolean },
   ): Promise<{ bookingId: string; orderId: string; redirectUrl?: string } | void> => {
+    const onlineDueEur = roundMoney(Math.max(0, totals.payNow));
+    const skipGateway = onlineDueEur <= 0.009;
     const invalid = new Set<string>();
     const messages: string[] = [];
 
@@ -1083,7 +1085,10 @@ export function ReserveCheckout({
     setInvalidFields(new Set());
     setError("");
     const cachedOrderId =
-      opts?.embed && bookingIdRef.current && ordersRef.current.bookingId === bookingIdRef.current
+      !skipGateway &&
+      opts?.embed &&
+      bookingIdRef.current &&
+      ordersRef.current.bookingId === bookingIdRef.current
         ? ordersRef.current[provider]
         : "";
     if (cachedOrderId) {
@@ -1091,25 +1096,27 @@ export function ReserveCheckout({
     }
     setLoading(true);
     try {
-      const cachedReady = paymentReadyRef.current;
-      const alreadyReady =
-        cachedReady.checked && (provider === "bog" ? cachedReady.bog : cachedReady.paypal);
-      if (!alreadyReady) {
-        const readyRes = await fetch(
-          provider === "paypal" ? "/api/payments/paypal/ready" : "/api/payments/bog/ready",
-          { cache: "no-store" },
-        );
-        const readyData = await readyRes.json().catch(() => ({}));
-        if (!readyRes.ok || readyData?.ready === false) {
-          throw new Error(
-            locale === "ka"
-              ? provider === "bog"
-                ? "ბარათით გადახდა ჯერ არ არის ჩართული. Netlify-ზე დაამატეთ BOG_CLIENT_ID და BOG_SECRET_KEY, შემდეგ სცადეთ თავიდან. ბარათის მონაცემები ივსება საქართველოს ბანკის გვერდზე (გადამისამართების შემდეგ)."
-                : "PayPal ჯერ არ არის ჩართული. Netlify-ზე დაამატეთ PAYPAL_CLIENT_ID და PAYPAL_CLIENT_SECRET."
-              : provider === "bog"
-                ? "Card payment is not configured. Add BOG_CLIENT_ID and BOG_SECRET_KEY in Netlify. Card details are entered on Bank of Georgia’s page after redirect."
-                : "PayPal is not configured. Add PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET in Netlify.",
+      if (!skipGateway) {
+        const cachedReady = paymentReadyRef.current;
+        const alreadyReady =
+          cachedReady.checked && (provider === "bog" ? cachedReady.bog : cachedReady.paypal);
+        if (!alreadyReady) {
+          const readyRes = await fetch(
+            provider === "paypal" ? "/api/payments/paypal/ready" : "/api/payments/bog/ready",
+            { cache: "no-store" },
           );
+          const readyData = await readyRes.json().catch(() => ({}));
+          if (!readyRes.ok || readyData?.ready === false) {
+            throw new Error(
+              locale === "ka"
+                ? provider === "bog"
+                  ? "ბარათით გადახდა ჯერ არ არის ჩართული. Netlify-ზე დაამატეთ BOG_CLIENT_ID და BOG_SECRET_KEY, შემდეგ სცადეთ თავიდან. ბარათის მონაცემები ივსება საქართველოს ბანკის გვერდზე (გადამისამართების შემდეგ)."
+                  : "PayPal ჯერ არ არის ჩართული. Netlify-ზე დაამატეთ PAYPAL_CLIENT_ID და PAYPAL_CLIENT_SECRET."
+                : provider === "bog"
+                  ? "Card payment is not configured. Add BOG_CLIENT_ID and BOG_SECRET_KEY in Netlify. Card details are entered on Bank of Georgia’s page after redirect."
+                  : "PayPal is not configured. Add PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET in Netlify.",
+            );
+          }
         }
       }
 
@@ -1158,7 +1165,8 @@ export function ReserveCheckout({
                 readBusinessPartnerReferralCookieClient()
               ).toUpperCase(),
           declinePartnerReferral: noPromoCode,
-          paymentProvider: provider,
+          // 0% site fee: no gateway charge — booking confirms as paid on create.
+          ...(skipGateway ? {} : { paymentProvider: provider }),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1209,6 +1217,14 @@ export function ReserveCheckout({
       clearBusinessPartnerReferralCookieClient();
       }
 
+      if (skipGateway) {
+        bookingIdRef.current = bookingId;
+        window.location.assign(
+          `/booking/payment/success?bookingId=${encodeURIComponent(bookingId)}`,
+        );
+        return { bookingId, orderId: "free" };
+      }
+
       const payPath =
         provider === "paypal"
           ? "/api/payments/paypal/create-order"
@@ -1246,7 +1262,9 @@ export function ReserveCheckout({
             locale === "ka"
               ? payErr.includes("not configured")
                 ? "ბარათით გადახდა ჯერ არ არის ჩართული (BOG გასაღებები). სცადეთ PayPal ან დაგვიკავშირდით."
-                : payErr || "ბარათით გადახდის დაწყება ვერ მოხერხდა. ჯავშანი გადახდის გარეშე არ დადასტურდა."
+                : payErr.includes("Nothing to charge")
+                  ? "გადასახდელი თანხა 0€ა. ადმინში ონლაინ დეპოზიტის % შეამოწმეთ (0 = ტესტი)."
+                  : payErr || "ბარათით გადახდის დაწყება ვერ მოხერხდა. ჯავშანი გადახდის გარეშე არ დადასტურდა."
               : payErr || "Could not start card payment. The booking was not confirmed.",
           );
         }
@@ -1319,6 +1337,16 @@ export function ReserveCheckout({
       bogAutoStartRef.current = false;
       return;
     }
+    // 0€ online (admin test / 0% deposit): confirm without the bank widget.
+    if (roundMoney(Math.max(0, totals.payNow)) <= 0.009) {
+      if (bogAutoStartRef.current) return;
+      bogAutoStartRef.current = true;
+      void (async () => {
+        const result = await handleBookingRef.current("bog", { embed: true });
+        if (!result) bogAutoStartRef.current = false;
+      })();
+      return;
+    }
     if (!paymentReady.checked || !paymentReady.bog) return;
     if (embeddedPay?.method === "bog") {
       bogAutoStartRef.current = true;
@@ -1344,9 +1372,11 @@ export function ReserveCheckout({
     }
 
     void (async () => {
+      // Do not await FX before starting payment — label can fill in the background.
       if (!payAmountLabel) {
-        const label = await loadPayAmountLabel(totals.payNow);
-        if (label) setPayAmountLabel(label);
+        void loadPayAmountLabel(totals.payNow).then((label) => {
+          if (label) setPayAmountLabel(label);
+        });
       }
       const result = await handleBookingRef.current("bog", { embed: true });
       if (!result) {
@@ -1354,14 +1384,13 @@ export function ReserveCheckout({
         bogAutoStartRef.current = false;
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- start once per method/readiness/amount; label is background-only
   }, [
     checkoutStep,
     paymentMethod,
     paymentReady.bog,
     paymentReady.checked,
     embeddedPay?.method,
-    loadPayAmountLabel,
-    payAmountLabel,
     totals.payNow,
   ]);
 
@@ -1548,14 +1577,57 @@ export function ReserveCheckout({
 
             {paymentMethod === "bog" &&
             (!paymentReady.checked || paymentReady.bog) &&
-            !embeddedPay ? (
-              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-10 text-center text-sm font-semibold text-slate-500">
-                {locale === "ka"
-                  ? "ბარათის ფორმა იხსნება…"
-                  : locale === "ru"
-                    ? "Открываем форму карты…"
-                    : "Opening card form…"}
+            !embeddedPay &&
+            !error ? (
+              <div className="space-y-3 rounded-2xl border border-slate-200 bg-white px-4 py-10 text-center">
+                <p className="text-sm font-semibold text-slate-500">
+                  {roundMoney(Math.max(0, totals.payNow)) <= 0.009
+                    ? locale === "ka"
+                      ? "ჯავშანი დასტურდება…"
+                      : locale === "ru"
+                        ? "Подтверждаем бронь…"
+                        : "Confirming booking…"
+                    : locale === "ka"
+                      ? "ბარათის ფორმა იხსნება…"
+                      : locale === "ru"
+                        ? "Открываем форму карты…"
+                        : "Opening card form…"}
+                </p>
+                {loading ? null : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      bogAutoStartRef.current = false;
+                      setError("");
+                      void handleBooking("bog", { embed: true });
+                    }}
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-sm font-extrabold text-white hover:bg-[#e55800]"
+                  >
+                    {roundMoney(Math.max(0, totals.payNow)) <= 0.009
+                      ? locale === "ka"
+                        ? "ჯავშნის დადასტურება"
+                        : "Confirm booking"
+                      : locale === "ka"
+                        ? "ბარათის ფორმის გახსნა"
+                        : "Open card form"}
+                  </button>
+                )}
               </div>
+            ) : null}
+
+            {paymentMethod === "bog" && error && !embeddedPay ? (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => {
+                  bogAutoStartRef.current = false;
+                  setError("");
+                  void handleBooking("bog", { embed: true });
+                }}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#ff6200] px-4 text-sm font-extrabold text-white hover:bg-[#e55800] disabled:opacity-60"
+              >
+                {locale === "ka" ? "თავიდან ცდა" : "Try again"}
+              </button>
             ) : null}
 
             {paymentMethod === "paypal" &&
