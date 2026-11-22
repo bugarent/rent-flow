@@ -974,7 +974,9 @@ export function PartnerCreateCarForm({
           const prefItems = Array.isArray(prefsData?.items) ? prefsData.items : [];
           const catalogFromPrefs = prefItems
             .map((item: { service?: ExtraServicePricing }) => item?.service)
-            .filter((service): service is ExtraServicePricing => Boolean(service?.id));
+            .filter((service: ExtraServicePricing | undefined): service is ExtraServicePricing =>
+              Boolean(service?.id),
+            );
           const catalogSource =
             catalogFromPrefs.length > 0
               ? catalogFromPrefs
@@ -1123,7 +1125,9 @@ export function PartnerCreateCarForm({
               : initialExtraPrefsDataRef.current ?? [];
           const catalogFromPrefs = prefsItems
             .map((item: { service?: ExtraServicePricing }) => item?.service)
-            .filter((service): service is ExtraServicePricing => Boolean(service?.id));
+            .filter((service: ExtraServicePricing | undefined): service is ExtraServicePricing =>
+              Boolean(service?.id),
+            );
           const catalogSource =
             catalogFromPrefs.length > 0
               ? catalogFromPrefs

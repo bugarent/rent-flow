@@ -596,6 +596,12 @@ export default async function CarsPage({
     });
   }
 
+  // Resolve once — the cars.map callback below is sync and cannot await.
+  const catalogForPrefs = (await extrasCatalogPromise) ?? [];
+  const slugByExtraId = new Map(
+    catalogForPrefs.filter((s) => s.slug).map((s) => [s.id, String(s.slug)]),
+  );
+
   let results: SearchResultCar[] = cars.map((car) => {
     const partnerId = car.partner?.id || car.partnerId || "";
     const barePartnerId = partnerId.replace(/^file-partner-/, "");
@@ -646,10 +652,6 @@ export default async function CarsPage({
       partnerId.startsWith("file-partner-") ? partnerId.replace(/^file-partner-/, "") : "",
       "local-partner",
     ].filter(Boolean);
-    const catalogForPrefs = (await extrasCatalogPromise) ?? [];
-    const slugByExtraId = new Map(
-      catalogForPrefs.filter((s) => s.slug).map((s) => [s.id, String(s.slug)]),
-    );
     for (const pid of prefCandidates) {
       const prefs = extrasPrefsByPartner.get(pid) || [];
       if (!prefs.length) continue;
