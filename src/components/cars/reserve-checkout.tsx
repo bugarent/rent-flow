@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { loadCheckoutDeposit, loadCheckoutLegalPages } from "@/components/cars/checkout-data";
+import { loadCheckoutLegalPages } from "@/components/cars/checkout-data";
 import { useIntentPrefetch } from "@/lib/client/prefetch-route";
 import {
   Check,
@@ -323,8 +323,11 @@ export function ReserveCheckout({
   const [noPromoCode, setNoPromoCode] = useState(false);
   /** True when promo was auto-filled from partner link / QR (7-minute TTL). */
   const [, setPromoFromReferral] = useState(false);
-  const [depositPercent, setDepositPercent] = useState(DEFAULT_DEPOSIT_PERCENT);
+  /** null until /api/platform/deposit responds — avoids flashing the 15% default then dropping to 0. */
+  const [depositPercent, setDepositPercent] = useState<number | null>(null);
   const [siteDiscountPercent, setSiteDiscountPercent] = useState(0);
+  const depositReady = depositPercent != null;
+  const activeDepositPercent = depositPercent ?? 0;
   const bpReferral = useBusinessPartnerReferralDiscount(promoCode, {
     disabled: noPromoCode,
   });
@@ -389,16 +392,22 @@ export function ReserveCheckout({
     let cancelled = false;
     (async () => {
       try {
-        const data = await loadCheckoutDeposit();
+        // Bust the short client cache so a prior warm with 15% cannot outlive an admin 0%.
+        const data = await fetch("/api/platform/deposit", { cache: "no-store" }).then(async (res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return (await res.json()) as { depositPercent?: number; siteDiscountPercent?: number };
+        });
         if (cancelled) return;
         if (typeof data.depositPercent === "number" && Number.isFinite(data.depositPercent)) {
           setDepositPercent(Math.trunc(data.depositPercent));
+        } else {
+          setDepositPercent(DEFAULT_DEPOSIT_PERCENT);
         }
         if (typeof data.siteDiscountPercent === "number" && Number.isFinite(data.siteDiscountPercent)) {
           setSiteDiscountPercent(Math.max(0, Math.trunc(data.siteDiscountPercent)));
         }
       } catch {
-        /* keep default */
+        if (!cancelled) setDepositPercent(DEFAULT_DEPOSIT_PERCENT);
       }
     })();
     return () => {
@@ -569,22 +578,25 @@ export function ReserveCheckout({
   }, [car, pickup, dropoff, days]);
 
   const totals = useMemo(() => {
+    // Until the platform percent is known, charge 0 online so the summary never
+    // flashes the built-in 15% and then collapses when admin has set 0.
+    const feePercent = activeDepositPercent;
     const base = computeReserveTotals({
       dailyRateEur: dailyRate,
       days,
       extrasTotalEur: extrasLineTotal,
       fullProtection: hasFullInsuranceExtra ? false : fullProtection,
       cancellationProtection,
-      depositPercent,
+      depositPercent: feePercent,
     });
     const delivery = roundMoney(deliveryFees.totalFeeEur);
     const standard = settleBookingMoney({
       rentalEur: base.rentalTotal,
       extrasEur: base.extrasTotal,
       deliveryEur: delivery,
-      depositPercent,
+      depositPercent: feePercent,
     });
-    const site = clampSiteDiscountPercent(siteDiscountPercent, depositPercent);
+    const site = clampSiteDiscountPercent(siteDiscountPercent, feePercent);
     const siteActive = site > 0 && site > (bpReferral.active ? bpReferral.discountPercent : 0);
     const discountActive = siteActive || bpReferral.active;
     const discountPercent = siteActive ? site : bpReferral.discountPercent;
@@ -593,7 +605,7 @@ export function ReserveCheckout({
           rentalEur: base.rentalTotal,
           extrasEur: base.extrasTotal,
           deliveryEur: delivery,
-          depositPercent,
+          depositPercent: feePercent,
           discount: siteActive ? { percent: site, cardOnDiscountedFee: true } : undefined,
         })
       : standard;
@@ -613,6 +625,7 @@ export function ReserveCheckout({
       extrasTotal: extrasShown,
       extrasTotalBefore: base.extrasTotal,
       depositPercent: settled.depositPercent,
+      depositReady,
       deliveryFeeEur: delivery,
       pickupDeliveryFeeEur: deliveryFees.pickupFeeEur,
       dropoffDeliveryFeeEur: deliveryFees.dropoffFeeEur,
@@ -636,7 +649,8 @@ export function ReserveCheckout({
     fullProtection,
     hasFullInsuranceExtra,
     cancellationProtection,
-    depositPercent,
+    activeDepositPercent,
+    depositReady,
     deliveryFees,
     bpReferral.active,
     bpReferral.discountPercent,
@@ -2664,6 +2678,7 @@ function PriceSummaryCard({
     dropoffDeliveryFeeEur?: number;
     cardSurcharge?: number;
     cardSurchargePercent?: number;
+    depositReady?: boolean;
     total?: number;
     totalBefore?: number;
     payNow?: number;
@@ -2712,11 +2727,17 @@ function PriceSummaryCard({
   };
 
   const bpOn = Boolean(totals.bpDiscountActive);
+  const depositReady = totals.depositReady !== false;
+  const feePercent = Math.max(0, Math.trunc(Number(totals.depositPercent) || 0));
   const totalNow = toNumber(totals.total, 0);
   const totalBefore = toNumber(totals.totalBefore, totalNow);
-  const payNow = toNumber(totals.payNow, 0);
-  const payNowBefore = toNumber(totals.payNowBefore, payNow);
-  const payAtPickup = toNumber(totals.payAtPickup, 0);
+  // When the site fee % is 0, every online charge on this card must read as 0.
+  const payNow = feePercent <= 0 ? 0 : toNumber(totals.payNow, 0);
+  const payNowBefore = feePercent <= 0 ? 0 : toNumber(totals.payNowBefore, payNow);
+  const cardSurcharge = feePercent <= 0 ? 0 : toNumber(totals.cardSurcharge, 0);
+  const payAtPickup =
+    feePercent <= 0 ? totalNow : toNumber(totals.payAtPickup, 0);
+  const moneyOrWait = (amount: number) => (depositReady ? formatPrice(amount) : "…");
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -2777,13 +2798,17 @@ function PriceSummaryCard({
             value={formatPrice(totals.cancellationTotal)}
           />
         ) : null}
-        {(totals.cardSurcharge || 0) > 0 ? (
+        {depositReady ? (
           <LineItem
             label={copy.cardPayPlus.replace(
               "{percent}",
-              String(totals.cardSurchargePercent || CARD_PICKUP_SURCHARGE_PERCENT),
+              String(
+                feePercent <= 0
+                  ? 0
+                  : totals.cardSurchargePercent || CARD_PICKUP_SURCHARGE_PERCENT,
+              ),
             )}
-            value={formatPrice(totals.cardSurcharge || 0)}
+            value={formatPrice(cardSurcharge)}
           />
         ) : null}
       </div>
@@ -2802,15 +2827,15 @@ function PriceSummaryCard({
 
         <button
           type="button"
-          disabled={loading}
+          disabled={loading || !depositReady}
           onClick={() => onPayNow?.()}
           className="flex w-full min-h-[4.5rem] items-center justify-center rounded-xl bg-[#1d6fe8] px-4 py-3 text-white shadow-md transition hover:bg-[#1a64d4] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? (
+          {loading || !depositReady ? (
             <span className="text-sm font-bold">…</span>
           ) : (
             <span className="flex flex-col items-center justify-center text-center">
-              {bpOn && payNowBefore > payNow + 0.009 ? (
+              {bpOn && feePercent > 0 && payNowBefore > payNow + 0.009 ? (
                 <span className="text-sm font-semibold text-white/70 line-through">
                   {formatPrice(payNowBefore)}
                 </span>
@@ -2818,7 +2843,7 @@ function PriceSummaryCard({
               <span className="text-xl font-black leading-none tracking-tight sm:text-2xl">
                 {formatPrice(payNow)}
               </span>
-              {bpOn ? (
+              {bpOn && feePercent > 0 ? (
                 <span className="mt-1 text-[11px] font-bold text-emerald-200">
                   −{totals.bpDiscountPercent}%
                 </span>
@@ -2834,7 +2859,7 @@ function PriceSummaryCard({
         <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3">
           <span className="text-base font-medium text-[#1d6fe8]">{copy.payOnSiteShort}</span>
           <span className="shrink-0 text-base font-extrabold text-[#1d6fe8]">
-            {formatPrice(payAtPickup)}
+            {moneyOrWait(payAtPickup)}
           </span>
         </div>
       </div>
